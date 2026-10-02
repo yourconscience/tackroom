@@ -180,11 +180,11 @@
     </div>
     <div class="tablewrap">
       <table>
-        <thead><tr><th scope="col">Agent</th><th scope="col">Skills</th><th scope="col">Roles</th><th scope="col">MCP servers</th><th scope="col">Hooks</th></tr></thead>
+        <thead><tr><th scope="col">Agent</th><th scope="col">Skills</th><th scope="col">Roles</th><th scope="col">MCP servers</th><th scope="col">Hooks</th><th scope="col">Plugins</th></tr></thead>
         <tbody id="matrix"></tbody>
       </table>
     </div>
-    <div class="legend"><span><span class="w">Synced</span> tackroom writes it</span><span><span class="n">Native</span> the agent reads <code>~/.agents/skills</code> itself</span><span>Planned: on the roadmap</span><span>None: the agent has no such setting</span></div>
+    <div class="legend"><span><span class="w">Synced</span> tackroom writes it</span><span><span class="n">Native</span> the agent reads <code>~/.agents/skills</code> itself</span><span>Planned: on the roadmap</span><span>—: not synced for this agent</span></div>
   </section>
 
   <section>
@@ -274,20 +274,20 @@ external skill audit .... <span class="g">pass</span>
     hermes: '<svg viewBox="0 0 16 16" fill="none"> <path d="M8 1.5v13" stroke="#f5c86a" stroke-width="1.5" stroke-linecap="round"/> <path d="M8 3.25c-2.35-1.4-4.7-.95-6.25.35 1.85-.2 3.8.2 5.55 1.55" stroke="#f5c86a" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/> <path d="M8 3.25c2.35-1.4 4.7-.95 6.25.35-1.85-.2-3.8.2-5.55 1.55" stroke="#f5c86a" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/> <path d="M8 13.25c-2.3-1-3.05-2.65-1.35-4.15-2 .8-2.35 2.95-.35 4" stroke="#f5c86a" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/> <path d="M8 13.25c2.3-1 3.05-2.65 1.35-4.15 2 .8 2.35 2.95.35 4" stroke="#f5c86a" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/> <circle cx="8" cy="1.8" r="1.1" fill="#f5c86a"/> </svg>',
     omp: '<svg viewBox="0 0 24 24"><text x="12" y="17" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="800" fill="#73e6df">omp</text></svg>',
   };
-  // s = synced (tackroom writes it), n = native, p = planned, x = none
+  // s = synced (tackroom writes it), n = native, p = planned, x = not synced, k = plugin skills and MCP projected
   const AGENTS = [
-    ['Claude Code', 'claude', 's', 's', 's', 's'],
-    ['Codex', 'codex', 's', 's', 's', 's'],
-    ['Cursor', 'cursor', 'n', 'p', 'p', 'p'],
-    ['OpenCode', 'opencode', 'n', 's', 's', 'x'],
-    ['Pi', 'pi', 's', 's', 's', 'x'],
-    ['OMP', 'omp', 's', 's', 's', 'x'],
-    ['Factory Droid', 'droid', 's', 's', 's', 's'],
-    ['Qwen Code', 'qwen', 's', 's', 's', 's'],
-    ['Amp', 'amp', 's', 'x', 's', 'x'],
-    ['Hermes', 'hermes', 's', 'x', 's', 's'],
+    ['Claude Code', 'claude', 's', 's', 's', 's', 'p'],
+    ['Codex', 'codex', 's', 's', 's', 's', 'p'],
+    ['Cursor', 'cursor', 'n', 'p', 'p', 'p', 'x'],
+    ['OpenCode', 'opencode', 'n', 's', 's', 'x', 'x'],
+    ['Pi', 'pi', 's', 's', 's', 'x', 'k'],
+    ['OMP', 'omp', 's', 's', 's', 'x', 'x'],
+    ['Factory Droid', 'droid', 's', 's', 's', 's', 'x'],
+    ['Qwen Code', 'qwen', 's', 's', 's', 's', 'k'],
+    ['Amp', 'amp', 's', 'x', 's', 'x', 'x'],
+    ['Hermes', 'hermes', 's', 'x', 's', 's', 'x'],
   ];
-  const CELL = { s: '<td class="w">Synced</td>', n: '<td class="n">Native</td>', p: '<td>Planned</td>', x: '<td>None</td>' };
+  const CELL = { s: '<td class="w">Synced</td>', n: '<td class="n">Native</td>', p: '<td>Planned</td>', x: '<td>—</td>', k: '<td class="w">Skills + MCP</td>' };
   document.getElementById('matrix').innerHTML = AGENTS.map(([name, key, ...cells]) =>
     `<tr><th scope="row"><span>${I[key]}${name}</span></th>${cells.map(c => CELL[c]).join('')}</tr>`).join('');
   document.getElementById('works').innerHTML = AGENTS.map(([name, key]) => `<span>${I[key]}${name}</span>`).join('');
