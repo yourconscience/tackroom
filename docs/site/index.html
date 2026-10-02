@@ -167,7 +167,7 @@
   .steps .is-active a { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
   .steps .is-active a::before { background: var(--accent); }
   .run-outs { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(28px, 4vw, 48px); min-width: 0; }
-  .out-text { display: none; }
+  .out-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .term { margin: 0; border-radius: var(--r-lg); background: var(--code-bg); border: 1px solid var(--code-line); box-shadow: var(--shadow); overflow: hidden; }
   .term-head { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--code-line); color: var(--code-dim); font: 500 .8rem/1 var(--mono); }
   .term-head .icon { font-size: .95rem; color: var(--code-key); }
@@ -272,7 +272,7 @@
     .run { grid-template-columns: minmax(0, 1fr); }
     .run-side { position: static; }
     .steps { display: none; }
-    .out-text { display: block; margin-bottom: 14px; }
+    .out-text { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; margin-bottom: 14px; }
     .out-text h3 { font-size: 1.2rem; }
     .out-text p { margin-top: 6px; color: var(--muted); }
     .ex { grid-template-columns: minmax(0, 1fr); }
@@ -334,10 +334,10 @@
         <p class="sub rise" style="--i:1">tackroom keeps skills, MCP servers, hooks and roles in one <code>~/.agents</code> repo and syncs them into each agent's native config.</p>
         <div class="install rise" style="--i:2">
           <div class="tabs" role="tablist" aria-label="Install with">
-            <button class="tab" role="tab" type="button" id="tab-brew" data-pm="brew" aria-selected="true"><svg class="icon" aria-hidden="true"><use href="#i-beer-bottle"/></svg>Homebrew</button>
-            <button class="tab" role="tab" type="button" id="tab-npm" data-pm="npm" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg>npm</button>
-            <button class="tab" role="tab" type="button" id="tab-npx" data-pm="npx" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg>npx</button>
-            <button class="tab" role="tab" type="button" id="tab-curl" data-pm="curl" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>Script</button>
+            <button class="tab" role="tab" type="button" id="tab-brew" data-pm="brew" aria-controls="install-panel" aria-selected="true"><svg class="icon" aria-hidden="true"><use href="#i-beer-bottle"/></svg>Homebrew</button>
+            <button class="tab" role="tab" type="button" id="tab-npm" data-pm="npm" aria-controls="install-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg>npm</button>
+            <button class="tab" role="tab" type="button" id="tab-npx" data-pm="npx" aria-controls="install-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg>npx</button>
+            <button class="tab" role="tab" type="button" id="tab-curl" data-pm="curl" aria-controls="install-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>Script</button>
           </div>
           <div class="cmds" role="tabpanel" id="install-panel" aria-labelledby="tab-brew">
             <div class="cmd" id="row-install"><span class="p" aria-hidden="true">$</span><code id="cmd-install">brew install yourconscience/tap/tackroom</code><button class="copy" type="button" data-copy="cmd-install" aria-label="Copy install command"><svg class="icon cp" aria-hidden="true"><use href="#i-copy"/></svg><svg class="icon ok" aria-hidden="true"><use href="#i-check"/></svg><span class="label">Copy</span></button></div>
