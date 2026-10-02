@@ -97,8 +97,8 @@ jobs:
           NPM_CONFIG_PROVENANCE: true
         run: |
           version="${GITHUB_REF_NAME#v}"
-          if npm view "@your_conscience/tackroom@$version" version >/dev/null 2>&1; then
-            echo "@your_conscience/tackroom@$version already published"
+          if npm view "tackroom@$version" version >/dev/null 2>&1; then
+            echo "tackroom@$version already published"
             exit 0
           fi
           npm version "$version" --no-git-tag-version

@@ -1,5 +1,5 @@
 {
-  "name": "@your_conscience/tackroom",
+  "name": "tackroom",
   "version": "0.0.0-dev",
   "description": "Dotfiles for your AI agents: one ~/.agents repo synced to every coding agent.",
   "license": "MIT",
