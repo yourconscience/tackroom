@@ -1,7 +1,10 @@
 # tackroom
 
-Dotfiles for your AI agents.
+Dotfiles for your AI agents. One `~/.agents` repo, rendered into every coding agent.
 
+[![tackroom in 22 seconds: one ~/.agents repo wired into Claude Code, Codex, Droid, Hermes, Qwen Code, Pi, OpenCode and Amp](docs/site/brag.jpg)](https://yourconscience.github.io/tackroom/brag.mp4)
+
+[Watch the 22-second tour](https://yourconscience.github.io/tackroom/brag.mp4) · [Website](https://yourconscience.github.io/tackroom/)
 
 [![Release](https://img.shields.io/github/v/release/yourconscience/tackroom)](https://github.com/yourconscience/tackroom/releases) [![brew](https://img.shields.io/badge/brew-yourconscience%2Ftap-orange)](https://github.com/yourconscience/homebrew-tap) [![npm](https://img.shields.io/npm/v/tackroom)](https://www.npmjs.com/package/tackroom) [![CI](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml/badge.svg)](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
