@@ -117,33 +117,28 @@ tackroom setup    [--memory off|basic|memsearch] [--yes] [--dry-run] [--json]
 tackroom status   [--verbose] [--agents ...]
 tackroom sync     [--pull] [--agents ...]
 tackroom doctor   [--e2e] [--agents ...]
-tackroom config                  # Bubble Tea canonical YAML editor (terminal)
-tackroom config validate|print
+tackroom config   validate|print
 tackroom view     [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host]  # loopback web config UI
-tackroom inspect  [--no-open] [--ssh-host user@host] [--port N] [--host ADDR]  # launch HarnessKit (cross-harness inspector)
-tackroom sessions [--no-open] [--ssh-host user@host] [--port N] [--host ADDR]  # launch AgentsView (sessions and usage)
 tackroom skill    new|list|info|update|promote
 tackroom publish  [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]  # push skills to a remote registry
 tackroom mcp      list|add|import|remove
 tackroom hook     list [query] | remove [--dry-run] <query>
 ```
 
-## Supported integrations
+## Companion tools
 
-tackroom can launch two optional external tools. Neither is installed, vendored, or required by tackroom:
+tackroom does one job. These tools pair well with it; install and run them on their own:
 
-| Integration | Purpose | Connector |
+| Tool | Purpose | Run |
 |---|---|---|
-| [HarnessKit](https://github.com/RealZST/HarnessKit) | Inspect and audit skills, MCP servers, hooks, and native harness configuration | `tackroom inspect` |
-| [AgentsView](https://github.com/kenn-io/agentsview) | Search and replay sessions; inspect tool telemetry, token usage, and estimated cost | `tackroom sessions` |
+| [HarnessKit](https://github.com/RealZST/HarnessKit) | Inspect and audit skills, MCP servers, hooks, and native harness configuration | `hk serve` |
+| [AgentsView](https://github.com/kenn-io/agentsview) | Search and replay sessions; inspect tool telemetry, token usage, and estimated cost | `agentsview serve` |
+
+Treat HarnessKit as read-mostly: its enable, disable and deploy actions bypass tackroom, so reconcile any changes with `tackroom sync`.
 
 `tackroom skill list` remains the built-in provenance view for each harness skill root. It reports managed links, foreign symlinks, unmanaged directories, drift, broken links, and estimated context cost.
 
 `tackroom hook list [query]` inventories native hook registrations and marks canonical entries as managed and missing script targets as stale. To clean up a hook installed outside tackroom, preview with `tackroom hook remove --dry-run <query>`, then rerun without `--dry-run`; unrelated hook entries are preserved. `tackroom doctor` reports stale native hooks, and `tackroom sync` reconciles the remaining canonical hooks afterward.
-
-`tackroom inspect` shells out to HarnessKit (`hk serve`). Treat it as read-mostly: HarnessKit's enable/disable/deploy actions bypass tackroom, so reconcile any changes with `tackroom sync`. Install HarnessKit separately.
-
-`tackroom sessions` shells out to AgentsView (`agentsview serve`). AgentsView owns its local transcript index and configuration; tackroom does not sync or mutate either. `--no-open` maps to AgentsView's `--no-browser`; `--ssh-host user@host` prints a loopback tunnel command on a remote machine. Other flags are forwarded to `agentsview serve`. Install AgentsView separately.
 
 ## Installing skills without tackroom
 
@@ -161,14 +156,13 @@ That path copies editable files (the "fork" model); tackroom users get the symli
 
 ### Canonical config authoring
 
-`tackroom config` (terminal TUI) and `tackroom view` (browser web UI) edit the
-resolved canonical YAML through the same review-first flow. Shared and
-`tackroom.local.yaml` are separate editable layers; the effective view is
-read-only. Structured edits preserve comments and unknown fields, and a save
-never runs `sync` implicitly.
+`tackroom view` (browser web UI) edits the resolved canonical YAML through a
+review-first flow. Shared and `tackroom.local.yaml` are separate editable
+layers; the effective view is read-only. Structured edits preserve comments and
+unknown fields, and a save never runs `sync` implicitly. `tackroom config`
+validates or prints the result.
 
 ```bash
-tackroom config                       # interactive terminal editor
 tackroom view --no-open --addr 127.0.0.1:8765   # loopback web UI, print the URL
 tackroom config validate
 tackroom config print

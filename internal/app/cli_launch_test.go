@@ -68,45 +68,52 @@ func TestCanonicalCLIRoutesToCommandFamilies(t *testing.T) {
 	}
 }
 
-func TestHiddenAliasesRouteWithOneRenameNotice(t *testing.T) {
-	tests := []struct {
-		name        string
-		args        []string
-		wantErr     string
-		containsErr string
-		notice      string
-	}{
-		{name: "pull", args: []string{"pull", "unexpected"}, wantErr: "pull does not accept positional arguments", notice: `tackroom: "pull" was renamed to "sync --pull"`},
-		{name: "deps", args: []string{"deps", "unexpected"}, wantErr: `unknown deps subcommand "unexpected"`, notice: `tackroom: "deps" was renamed to "doctor deps or sync deps"`},
-		{name: "memsearch", args: []string{"memsearch", "unexpected"}, wantErr: `unknown memsearch subcommand "unexpected"`, notice: `tackroom: "memsearch" was renamed to "setup memsearch or status memsearch"`},
-		{name: "skillify", args: []string{"skillify"}, wantErr: "skillify requires a skill name: tackroom skillify <name>", notice: `tackroom: "skillify" was renamed to "skill new"`},
-		{name: "render", args: []string{"render", "unexpected"}, wantErr: "render does not accept positional arguments", notice: `tackroom: "render" was renamed to "sync"`},
-		{name: "audit", args: []string{"audit", "unexpected"}, wantErr: "audit does not accept positional arguments", notice: `tackroom: "audit" was renamed to "doctor"`},
-		{name: "external", args: []string{"external"}, wantErr: "usage: tackroom external <list|update> [name ...]", notice: `tackroom: "external" was renamed to "status or skill update"`},
-		{name: "promote", args: []string{"promote"}, wantErr: "promote requires a skill name or path: tackroom promote <name-or-path>", notice: `tackroom: "promote" was renamed to "skill promote"`},
-		{name: "dogfood", args: []string{"dogfood", "unexpected"}, wantErr: "dogfood does not accept positional arguments", notice: `tackroom: "dogfood" was renamed to "doctor --e2e"`},
+func TestRemovedAliasesAreUnknownCommands(t *testing.T) {
+	removed := [][]string{
+		{"inspect"}, {"sessions"}, {"deps", "check"}, {"skillify", "x"}, {"render"},
+		{"audit"}, {"external", "list"}, {"promote", "x"}, {"dogfood"},
+	}
+	for _, args := range removed {
+		t.Run(args[0], func(t *testing.T) {
+			_, _, err := captureCLIOutput(t, func() error { return Run(args) })
+			want := `unknown subcommand "` + args[0] + `"`
+			if err == nil || err.Error() != want {
+				t.Fatalf("Run(%q) error = %v, want %q", args, err, want)
+			}
+		})
 	}
 
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			_, stderr, err := captureCLIOutput(t, func() error { return Run(tc.args) })
-			if err == nil {
-				t.Fatalf("Run(%q) unexpectedly succeeded", tc.args)
-			}
-			if tc.wantErr != "" && err.Error() != tc.wantErr {
-				t.Fatalf("Run(%q) error = %q, want %q", tc.args, err, tc.wantErr)
-			}
-			if tc.containsErr != "" && !strings.Contains(err.Error(), tc.containsErr) {
-				t.Fatalf("Run(%q) error = %q, want substring %q", tc.args, err, tc.containsErr)
-			}
-			if strings.Count(stderr, "tackroom: ") != 1 || !strings.Contains(stderr, tc.notice+"\n") {
-				t.Fatalf("Run(%q) rename output = %q, want exactly one %q notice", tc.args, stderr, tc.notice)
+	nested := []struct {
+		args    []string
+		wantErr string
+	}{
+		{args: []string{"sync", "render"}, wantErr: "sync does not accept positional arguments"},
+		{args: []string{"sync", "pull"}, wantErr: "sync does not accept positional arguments"},
+		{args: []string{"doctor", "dogfood"}, wantErr: "doctor does not accept positional arguments"},
+		{args: []string{"skill", "external", "list"}, wantErr: `unknown skill subcommand "external"`},
+		{args: []string{"config"}, wantErr: "config requires a subcommand: validate or print (edit the config with `tackroom view`)"},
+	}
+	for _, tc := range nested {
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			_, _, err := captureCLIOutput(t, func() error { return Run(tc.args) })
+			if err == nil || err.Error() != tc.wantErr {
+				t.Fatalf("Run(%q) error = %v, want %q", tc.args, err, tc.wantErr)
 			}
 		})
 	}
 }
 
-func TestSkillUpdateIsCanonicalAndExternalUpdateRemainsCompatible(t *testing.T) {
+func TestPullStaysForCronWithoutRenameNotice(t *testing.T) {
+	_, stderr, err := captureCLIOutput(t, func() error { return Run([]string{"pull", "unexpected"}) })
+	if err == nil || err.Error() != "pull does not accept positional arguments" {
+		t.Fatalf("pull error = %v", err)
+	}
+	if stderr != "" {
+		t.Fatalf("pull printed a notice that cron would log every run: %q", stderr)
+	}
+}
+
+func TestSkillUpdateIsCanonical(t *testing.T) {
 	home := t.TempDir()
 	repoRoot := t.TempDir()
 	t.Setenv("HOME", home)
@@ -132,17 +139,6 @@ external_skills:
 	if canonicalStderr != "" {
 		t.Fatalf("canonical skill update printed rename notice: %q", canonicalStderr)
 	}
-
-	_, legacyStderr, legacyErr := captureCLIOutput(t, func() error {
-		return Run([]string{"external", "update", "missing"})
-	})
-	if legacyErr == nil || legacyErr.Error() != wantErr {
-		t.Fatalf("external update error = %v, want routed error %q", legacyErr, wantErr)
-	}
-	const wantNotice = "tackroom: \"external update\" was renamed to \"skill update\"\n"
-	if legacyStderr != wantNotice {
-		t.Fatalf("external update rename notice = %q, want %q", legacyStderr, wantNotice)
-	}
 }
 
 func TestRootHelpAdvertisesCanonicalDescriptiveFamilies(t *testing.T) {
@@ -167,10 +163,10 @@ func TestRootHelpAdvertisesCanonicalDescriptiveFamilies(t *testing.T) {
 		}
 		families = append(families, fields[0])
 	}
-	if got, want := strings.Join(families, ","), "setup,status,sync,doctor,config,view,inspect,sessions,skill,publish,mcp,hook"; got != want {
+	if got, want := strings.Join(families, ","), "setup,status,sync,doctor,config,view,skill,publish,mcp,hook"; got != want {
 		t.Fatalf("short-help families = %q, want %q:\n%s", got, want, stdout)
 	}
-	if !strings.Contains(stdout, `Run "tackroom help --all" for flags, maintenance commands, and compatibility aliases.`) {
+	if !strings.Contains(stdout, `Run "tackroom help --all" for flags and maintenance commands.`) {
 		t.Fatalf("short help does not direct users to the complete surface:\n%s", stdout)
 	}
 }

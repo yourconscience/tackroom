@@ -37,7 +37,6 @@ After setup, use the authoring surface rather than editing native harness
 files:
 
 ```bash
-tackroom config
 tackroom view --no-open --addr 127.0.0.1:8765
 tackroom config validate
 tackroom config print

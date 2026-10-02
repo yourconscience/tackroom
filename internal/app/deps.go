@@ -11,28 +11,6 @@ import (
 	"time"
 )
 
-func runDeps(args []string) error {
-	if len(args) == 0 {
-		return errors.New("deps requires subcommand: check, update")
-	}
-	switch args[0] {
-	case "check":
-		opts, err := parseDepsFlags("deps check", args[1:])
-		if err != nil {
-			return err
-		}
-		return runDepsCheck(opts)
-	case "update":
-		opts, err := parseDepsFlags("deps update", args[1:])
-		if err != nil {
-			return err
-		}
-		return runDepsUpdate(opts)
-	default:
-		return fmt.Errorf("unknown deps subcommand %q", args[0])
-	}
-}
-
 func parseDepsFlags(name string, args []string) (runOptions, error) {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)

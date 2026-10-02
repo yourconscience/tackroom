@@ -46,13 +46,13 @@ func TestParseViewFlagsRejectsPositional(t *testing.T) {
 func TestRunViewLegacyHarnessKitFlagsGiveRenameGuidance(t *testing.T) {
 	for _, flag := range []string{"--port", "--host", "--no-token", "--name"} {
 		t.Run(flag, func(t *testing.T) {
-			// Legacy HarnessKit args must not launch anything; they point at inspect.
+			// Legacy HarnessKit args must not launch anything; they point at HarnessKit itself.
 			for _, args := range [][]string{{flag, "7070"}, {flag + "=x"}} {
 				err := runView(args)
 				if err == nil {
 					t.Fatalf("runView(%v) = nil, want rename guidance error", args)
 				}
-				if !strings.Contains(err.Error(), "tackroom inspect") || !strings.Contains(err.Error(), flag) {
+				if !strings.Contains(err.Error(), "hk serve") || !strings.Contains(err.Error(), flag) {
 					t.Fatalf("runView(%v) error = %q, want guidance naming %s and inspect", args, err, flag)
 				}
 			}

@@ -22,12 +22,9 @@ tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--dry-run]
 tackroom status [--verbose] [--agents ...]
 tackroom sync [--pull] [--agents ...]
 tackroom doctor [--e2e] [--agents ...]
-tackroom config
 tackroom config validate
 tackroom config print
 tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host]
-tackroom inspect [--no-open] [--ssh-host user@host] [--port N] [--host ADDR]
-tackroom sessions [--no-open] [--ssh-host user@host] [--port N] [--host ADDR]
 tackroom skill new <name> [--description ...]
 tackroom skill list [--agents ...]
 tackroom skill info <name>
@@ -37,16 +34,14 @@ tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]
 tackroom mcp <list|add|import|remove> [options]
 ```
 
-`config` (terminal TUI) and `view` (browser web UI) are the canonical authoring
-surfaces. Both edit shared YAML or the machine-local overlay; effective
-configuration is read-only. In `view`, each toggle applies immediately; neither
-surface runs `sync` implicitly. `view` binds only to loopback and uses a session
-cookie plus CSRF and origin protection. `inspect` is a separate read-mostly
-HarnessKit launcher. `sessions` is a separate AgentsView launcher for transcript
-search, replay, telemetry, and usage. Both integrations are optional external
-tools, not tackroom dependencies.
+`view` (browser web UI) is the canonical authoring surface. It edits shared YAML
+or the machine-local overlay; effective configuration is read-only. Each toggle
+applies immediately, and `view` never runs `sync` implicitly. It binds only to
+loopback and uses a session cookie plus CSRF and origin protection. `config`
+validates or prints the result. HarnessKit (`hk serve`) and AgentsView
+(`agentsview serve`) are optional companion tools that you run on their own.
 
-Run `tackroom help --all` for maintenance commands and compatibility aliases. Do not use hidden aliases in new scripts or documentation.
+Run `tackroom help --all` for maintenance commands.
 
 ## setup
 
@@ -168,7 +163,7 @@ tackroom doctor --e2e
 
 ## view
 
-Opens the canonical config UI in your browser: the same review-first authoring surface as `tackroom config`, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no HarnessKit, Node, or separate daemon). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
+Opens the canonical config UI in your browser: the review-first authoring surface, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no HarnessKit, Node, or separate daemon). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
 
 It prints the tokenized URL on its own line and, when running locally, opens it in your default browser. `--no-open` suppresses the browser launch. `--addr` sets the loopback bind (default `127.0.0.1:8765`). `--secure-cookie` marks the session cookie `Secure` for HTTPS loopback access (e.g. behind a Tailscale HTTPS proxy). On a remote host, pass `--ssh-host user@host` (or run inside an SSH session, where it derives the host from `SSH_CONNECTION`) to print a ready `ssh -L` tunnel command instead of auto-opening.
 
@@ -178,31 +173,7 @@ tackroom view --no-open --addr 127.0.0.1:8765        # print the URL, do not ope
 tackroom view --ssh-host me@box                      # remote: print an ssh -L tunnel command
 ```
 
-Legacy HarnessKit flags on `view` (`--port`, `--host`, `--no-token`) are rejected with a one-line pointer to `tackroom inspect`; they do not launch HarnessKit.
-
-## inspect
-
-Launches [HarnessKit](https://github.com/RealZST/HarnessKit) (`hk serve`) as a read-mostly inspection web UI over every detected harness — skills, MCP, hooks, and configs in one place, with a security audit. `inspect` writes nothing, but HarnessKit's own enable/disable/deploy actions bypass tackroom; treat `inspect` as look/audit and reconcile any HarnessKit changes with `tackroom sync`. Requires `hk` on `PATH` (install HarnessKit separately). This launcher was `tackroom view` before v0.9.0, when `view` became the config UI.
-
-It prints the tokenized URL on its own line and, when running locally, opens it in your default browser. `--no-open` suppresses the browser launch. On a remote host, pass `--ssh-host user@host` (or run inside an SSH session, where it derives the host from `SSH_CONNECTION`) to print a ready `ssh -L` tunnel command instead of auto-opening. Any other flags (`--port`, `--host`, `--no-token`, `--name`) are forwarded to `hk serve`.
-
-```bash
-tackroom inspect                                 # open the inspector locally
-tackroom inspect --no-open --port 7070           # print the URL, do not open a browser
-tackroom inspect --ssh-host me@box --host 0.0.0.0 # remote: print an ssh -L tunnel command
-```
-
-## sessions
-
-Launches [AgentsView](https://github.com/kenn-io/agentsview) (`agentsview serve`) as an optional local session search, replay, telemetry, and usage dashboard. AgentsView owns its index and configuration; tackroom does not sync or mutate either. Requires `agentsview` on `PATH`, installed separately.
-
-`--no-open` maps to AgentsView's `--no-browser`. On a remote host, pass `--ssh-host user@host` (or run inside an SSH session) to suppress remote browser launch and print a loopback `ssh -L` tunnel command. Other flags are forwarded to `agentsview serve`.
-
-```bash
-tackroom sessions                              # open AgentsView locally
-tackroom sessions --no-open --port 8080        # serve without opening a browser
-tackroom sessions --ssh-host me@box --port 8080 # remote: print a tunnel command
-```
+Legacy HarnessKit flags on `view` (`--port`, `--host`, `--no-token`) are rejected with a one-line pointer to running HarnessKit itself (`hk serve`); they do not launch it.
 
 ## Capability matrix
 

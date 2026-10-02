@@ -96,14 +96,6 @@ func renderREADMESkills(repoRoot string) error {
 	return nil
 }
 
-func runRender(opts runOptions) error {
-	repoRoot, _, _, _, err := loadContext(opts)
-	if err != nil {
-		return err
-	}
-	return renderCommittedArtifacts(repoRoot)
-}
-
 func renderCommittedArtifacts(repoRoot string) error {
 	return renderREADMESkills(repoRoot)
 }
