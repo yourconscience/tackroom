@@ -102,7 +102,7 @@ func TestScopeAgnixToCanonicalIgnoresExternalClones(t *testing.T) {
 			{Level: "error", File: "external/skills/.agents/writing-docs.md", Line: 17, Message: "Unclosed XML tag"},
 			{Level: "warning", File: "external/skills/README.md", Line: 3, Message: "style"},
 			{Level: "error", File: "agents/tester.md", Line: 6, Message: "bad frontmatter"},
-			{Level: "info", File: "skills/dotagents/SKILL.md", Line: 1, Message: "note"},
+			{Level: "info", File: "skills/tackroom/SKILL.md", Line: 1, Message: "note"},
 		},
 	}
 	scoped, ignored := scopeAgnixToCanonical(report)

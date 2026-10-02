@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 )
 
 func writeAgentsFixture(t *testing.T, repoRoot, name, data string) {
@@ -66,6 +66,14 @@ func TestIsManagedAgentFile(t *testing.T) {
 	}
 	if !isManagedAgentFile(managed, []byte("# "+agentrole.GeneratedMarker+"\n"), repoRoot) {
 		t.Fatal("generated marker should be managed")
+	}
+
+	legacy := filepath.Join(repoRoot, "legacy.toml")
+	if err := os.WriteFile(legacy, []byte("# "+agentrole.LegacyGeneratedMarker+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if !isManagedAgentFile(legacy, []byte("# "+agentrole.LegacyGeneratedMarker+"\n"), repoRoot) {
+		t.Fatal("roles rendered before the rename should stay managed")
 	}
 
 	unmanaged := filepath.Join(repoRoot, "unmanaged.toml")

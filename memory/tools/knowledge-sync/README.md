@@ -14,7 +14,7 @@ The LaunchAgent should point at the stable installed executable, not at this sou
 GOWORK=off go build -o ~/.local/bin/knowledge-sync .
 ```
 
-`GOWORK=off` keeps this small standalone module independent from the parent dotagents Go workspace.
+`GOWORK=off` keeps this small standalone module independent from the parent tackroom Go workspace.
 
 Configuration is read from environment variables, with defaults in `main.go`:
 

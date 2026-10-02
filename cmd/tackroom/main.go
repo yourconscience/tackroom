@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/yourconscience/dotagents/internal/app"
+	"github.com/yourconscience/tackroom/internal/app"
 )
 
 func main() {

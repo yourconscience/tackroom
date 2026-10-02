@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-// Severity levels for `dotagents audit`. CRITICAL is the only level that fails
+// Severity levels for `tackroom audit`. CRITICAL is the only level that fails
 // the command (non-zero exit).
 const (
 	auditCritical = "CRITICAL"
@@ -76,7 +76,7 @@ func runAudit(opts runOptions) error {
 		return err
 	}
 
-	fmt.Println("dotagents audit")
+	fmt.Println("tackroom audit")
 	fmt.Printf("repo: %s\n\n", repoRoot)
 
 	findings := auditRepo(repoRoot, home, cfg)
@@ -132,7 +132,7 @@ func auditExternalSkill(name string, src externalSkillSource, cacheRoot string) 
 	if !hasDir(cachePath) {
 		return []auditFinding{{
 			auditInfo, name, filepath.Join("external", name),
-			"external skill not in cache; run dotagents sync to fetch and audit",
+			"external skill not in cache; run tackroom sync to fetch and audit",
 		}}
 	}
 	if len(src.SkillDirs) > 0 {
@@ -147,7 +147,7 @@ func auditExternalSkill(name string, src externalSkillSource, cacheRoot string) 
 			}
 			skillDir := filepath.Join(cachePath, filepath.FromSlash(clean))
 			if !hasDir(skillDir) {
-				findings = append(findings, auditFinding{auditInfo, name, filepath.Join("external", name, clean), "selected external skill directory not in cache; run dotagents sync"})
+				findings = append(findings, auditFinding{auditInfo, name, filepath.Join("external", name, clean), "selected external skill directory not in cache; run tackroom sync"})
 				continue
 			}
 			candidates, err := discoverSkillsAtExternalRoot(src, name, skillDir, "")
@@ -170,7 +170,7 @@ func auditExternalSkill(name string, src externalSkillSource, cacheRoot string) 
 		}
 		for skill := range allowed {
 			if !found[skill] {
-				findings = append(findings, auditFinding{auditInfo, name, filepath.Join("external", name, skill), "allowlisted external skill not in configured skill directories; run dotagents sync"})
+				findings = append(findings, auditFinding{auditInfo, name, filepath.Join("external", name, skill), "allowlisted external skill not in configured skill directories; run tackroom sync"})
 			}
 		}
 		return findings
@@ -196,7 +196,7 @@ func auditExternalSkill(name string, src externalSkillSource, cacheRoot string) 
 		if !hasDir(subDir) {
 			findings = append(findings, auditFinding{
 				auditInfo, name, filepath.Join("external", name, sub),
-				"allowlisted external skill not in cache; run dotagents sync",
+				"allowlisted external skill not in cache; run tackroom sync",
 			})
 			continue
 		}

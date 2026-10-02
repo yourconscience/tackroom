@@ -7,7 +7,7 @@ import (
 
 func runExternal(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("usage: dotagents external <list|update> [name ...]")
+		return fmt.Errorf("usage: tackroom external <list|update> [name ...]")
 	}
 	switch args[0] {
 	case "list":

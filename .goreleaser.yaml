@@ -1,12 +1,12 @@
 version: 2
 
-project_name: dotagents
+project_name: tackroom
 
 builds:
-  - id: dotagents
-    dir: cmd/dotagents
+  - id: tackroom
+    dir: cmd/tackroom
     main: .
-    binary: dotagents
+    binary: tackroom
     env:
       - CGO_ENABLED=0
     goos:
@@ -33,7 +33,7 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
     description: "Sync skills, MCP servers, hooks, and roles across coding agents"
-    homepage: "https://github.com/yourconscience/dotagents"
+    homepage: "https://github.com/yourconscience/tackroom"
     license: MIT
 
 changelog:

@@ -24,7 +24,7 @@ func parseMemsearchFlags(args []string) (memsearchOptions, error) {
 		vaultDefault = "~/Workspace/knowledge"
 	}
 	fs.StringVar(&opts.VaultDir, "vault", vaultDefault, "Root directory for the knowledge vault (default: $KNOWLEDGE_DIR or ~/Workspace/knowledge)")
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents.yaml (default: DOTAGENTS_HOME/dotagents.yaml or ~/.agents/dotagents.yaml)")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom.yaml (default: TACKROOM_HOME/tackroom.yaml or ~/.agents/tackroom.yaml)")
 
 	if err := fs.Parse(args); err != nil {
 		return memsearchOptions{}, err
@@ -65,7 +65,7 @@ func memsearchConfigContent(vaultDir, home string) string {
 	notesDir := filepath.Join(vaultDir, "notes")
 	profileDir := filepath.Join(vaultDir, "profile")
 	stateDir := filepath.Join(home, ".memsearch", "state")
-	return fmt.Sprintf(`# memsearch configuration (written by dotagents memsearch setup)
+	return fmt.Sprintf(`# memsearch configuration (written by tackroom memsearch setup)
 # Source this file from memory hooks to get portable paths.
 KNOWLEDGE_DIR=%s
 SESSIONS_DIR=%s
@@ -123,7 +123,7 @@ func runMemsearchSetup(opts memsearchOptions) error {
 	stateDir := filepath.Join(home, ".memsearch", "state")
 	confPath := filepath.Join(repoRoot, "memsearch.conf")
 
-	fmt.Println("dotagents memsearch setup")
+	fmt.Println("tackroom memsearch setup")
 	fmt.Printf("vault: %s\n\n", vaultDir)
 
 	// 1. Check memsearch is installed
@@ -257,7 +257,7 @@ func runMemsearchStatus() error {
 	}
 
 	confPath := filepath.Join(home, ".agents", "memsearch.conf")
-	fmt.Println("dotagents memsearch status")
+	fmt.Println("tackroom memsearch status")
 	fmt.Println()
 
 	// Check memsearch binary
@@ -272,7 +272,7 @@ func runMemsearchStatus() error {
 	data, err := os.ReadFile(confPath)
 	if err != nil {
 		fmt.Printf("config: not found (%s)\n", confPath)
-		fmt.Println("\nrun 'dotagents memsearch setup' to configure")
+		fmt.Println("\nrun 'tackroom memsearch setup' to configure")
 		return nil
 	}
 
@@ -289,9 +289,9 @@ func runMemsearchStatus() error {
 }
 
 func printMemsearchUsage() {
-	fmt.Println("dotagents memsearch - manage knowledge vault and memsearch integration")
+	fmt.Println("tackroom memsearch - manage knowledge vault and memsearch integration")
 	fmt.Println()
 	fmt.Println("Usage:")
-	fmt.Println("  dotagents memsearch setup  [--vault ~/Workspace/knowledge]  Bootstrap vault + config")
-	fmt.Println("  dotagents memsearch status                                  Show current configuration")
+	fmt.Println("  tackroom memsearch setup  [--vault ~/Workspace/knowledge]  Bootstrap vault + config")
+	fmt.Println("  tackroom memsearch status                                  Show current configuration")
 }

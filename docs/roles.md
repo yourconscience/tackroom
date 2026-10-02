@@ -1,6 +1,6 @@
 # Agent roles
 
-A role is a Markdown file in `~/.agents/agents/` with frontmatter (`name`, `description`, `model`, `effort`, `tools`, optional per-harness overrides) and the system prompt as body. dotagents renders it into each harness's native format — e.g. TOML for Codex. Six generic starter roles ship with the tool: `architect` `builder` `general` `researcher` `reviewer` `tester`. A same-name file in your `~/.agents/agents/` always wins over the starter.
+A role is a Markdown file in `~/.agents/agents/` with frontmatter (`name`, `description`, `model`, `effort`, `tools`, optional per-harness overrides) and the system prompt as body. tackroom renders it into each harness's native format — e.g. TOML for Codex. Six generic starter roles ship with the tool: `architect` `builder` `general` `researcher` `reviewer` `tester`. A same-name file in your `~/.agents/agents/` always wins over the starter.
 
 ## Model tiers and overrides
 
@@ -23,7 +23,7 @@ qwen:
 
 ### Centralized model pin
 
-To pin one model for all rendered roles that have no explicit model, set `role_model` on the agent entry in `dotagents.yaml`. Roles (or per-harness overrides) that declare a model always win over `role_model`. Exact model names belong in role frontmatter or `role_model` — never in tool code.
+To pin one model for all rendered roles that have no explicit model, set `role_model` on the agent entry in `tackroom.yaml`. Roles (or per-harness overrides) that declare a model always win over `role_model`. Exact model names belong in role frontmatter or `role_model` — never in tool code.
 
 ## Rendering targets
 
@@ -39,4 +39,4 @@ To pin one model for all rendered roles that have no explicit model, set `role_m
 
 Pi role files are inert unless the `pi-subagents` package is installed. Legacy model tiers are omitted so Pi inherits its configured model; use a `pi.model` exact override when needed.
 
-Roles are regenerated on every `dotagents sync`; edit the canonical `.md`, never the rendered output.
+Roles are regenerated on every `tackroom sync`; edit the canonical `.md`, never the rendered output.

@@ -8,14 +8,14 @@ import (
 	"sort"
 	"sync"
 
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 )
 
-// skillsKind describes how an agent discovers skills from dotagents.
+// skillsKind describes how an agent discovers skills from tackroom.
 type skillsKind int
 
 const (
-	// skillsSymlink means dotagents creates symlinks in the agent's skill root.
+	// skillsSymlink means tackroom creates symlinks in the agent's skill root.
 	skillsSymlink skillsKind = iota
 	// skillsConfigDriven means the agent reads skills from a config-driven
 	// shared path (e.g. Amp's amp.skills.path or Hermes' skills.external_dirs).
@@ -55,11 +55,11 @@ type harness struct {
 	// when Skills == skillsConfigDriven.
 	InspectSkills inspectSkillsFunc
 	// SkillsNativeRoot, when non-nil and returning true, marks that this
-	// harness reads dotagents skills directly from the config root, so no
+	// harness reads tackroom skills directly from the config root, so no
 	// per-harness skill mirror is created. Only consulted for skillsSymlink
 	// harnesses.
 	SkillsNativeRoot func(repoRoot string, home string) bool
-	// Setup patches the agent's config during `dotagents setup`.
+	// Setup patches the agent's config during `tackroom setup`.
 	// nil means no patching needed.
 	Setup setupFunc
 
@@ -77,7 +77,7 @@ type harness struct {
 	// Empty string = no note.
 	IntegrationNote string
 
-	// doctorChecks are agent-specific health checks appended to `dotagents doctor`.
+	// doctorChecks are agent-specific health checks appended to `tackroom doctor`.
 	doctorChecks []doctorCheck
 
 	// TrailerExample is the Co-authored-by trailer this agent's bot produces.

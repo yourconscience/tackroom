@@ -11,7 +11,7 @@ import (
 //
 // CORRECTNESS: we deliberately never show a percentage of a context window and
 // never hardcode a model context size. Model context windows range from 256K to
-// 1M+ tokens and dotagents cannot know which model a harness session uses, so a
+// 1M+ tokens and tackroom cannot know which model a harness session uses, so a
 // wrong percentage would be worse than no percentage. Absolute estimates only.
 const (
 	// contextNoteTokensDefault is the doctor advisory threshold when the config
@@ -118,7 +118,7 @@ func contextNoteLines(threshold int, costs []harnessContextCost) []string {
 	for _, c := range costs {
 		if c.Tokens > threshold {
 			lines = append(lines, fmt.Sprintf(
-				"note: %s skill listing %s exceeds context_note_tokens=%d; consider per-harness skill scoping in dotagents.yaml",
+				"note: %s skill listing %s exceeds context_note_tokens=%d; consider per-harness skill scoping in tackroom.yaml",
 				c.Name, formatTokenEstimate(c.Tokens), threshold))
 		}
 	}

@@ -46,11 +46,11 @@ func TestResolveServerTokenStableFromFile(t *testing.T) {
 }
 
 func TestParseViewFlagsTokenFile(t *testing.T) {
-	opts, err := parseViewFlags([]string{"--token-file", "/tmp/dotagents.token"})
+	opts, err := parseViewFlags([]string{"--token-file", "/tmp/tackroom.token"})
 	if err != nil {
 		t.Fatalf("parseViewFlags error: %v", err)
 	}
-	if opts.TokenFile != "/tmp/dotagents.token" {
-		t.Fatalf("TokenFile = %q, want /tmp/dotagents.token", opts.TokenFile)
+	if opts.TokenFile != "/tmp/tackroom.token" {
+		t.Fatalf("TokenFile = %q, want /tmp/tackroom.token", opts.TokenFile)
 	}
 }

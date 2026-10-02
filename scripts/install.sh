@@ -1,12 +1,12 @@
 #!/bin/sh
-# Install dotagents binary from GitHub Releases.
-# Usage: curl -fsSL https://raw.githubusercontent.com/yourconscience/dotagents/main/scripts/install.sh | sh
+# Install tackroom binary from GitHub Releases.
+# Usage: curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
 
 set -e
 
-REPO="yourconscience/dotagents"
-BINARY="dotagents"
-INSTALL_DIR="${DOTAGENTS_INSTALL_DIR:-$HOME/.local/bin}"
+REPO="yourconscience/tackroom"
+BINARY="tackroom"
+INSTALL_DIR="${TACKROOM_INSTALL_DIR:-$HOME/.local/bin}"
 
 # Detect OS
 OS="$(uname -s)"

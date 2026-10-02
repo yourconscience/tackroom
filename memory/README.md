@@ -1,19 +1,19 @@
 # memory
 
 Agent-agnostic session memory and private Hermes-vault synchronization for
-dotagents. Session capture writes bounded, redacted digests; it never promotes
+tackroom. Session capture writes bounded, redacted digests; it never promotes
 facts into durable profile or agent instructions automatically.
 
 ## Setup and shipped tools
 
 ```bash
-dotagents setup --memory basic      # default; Python 3 only
-dotagents setup --memory off        # no managed memory hooks
-dotagents setup --memory memsearch  # derived search index; requires memsearch
+tackroom setup --memory basic      # default; Python 3 only
+tackroom setup --memory off        # no managed memory hooks
+tackroom setup --memory memsearch  # derived search index; requires memsearch
 ```
 
 A fresh setup scaffolds `memory/hooks`, `memory/lib`, and the Go sources for
-`memory/tools/rem` and `memory/tools/knowledge-sync`. `dotagents sync` builds
+`memory/tools/rem` and `memory/tools/knowledge-sync`. `tackroom sync` builds
 those source packages and installs `rem` and `knowledge-sync` into `$GOBIN` or
 `~/.local/bin`; no prebuilt binaries are shipped. The repository tests both
 packages in its root module, while setup materializes each embedded
@@ -72,6 +72,6 @@ The CLI only manages hooks exposed by the harness registry:
 - `tests/` — dependency-free Python behavior tests
 
 `memory/hooks/` and `memory/lib/` are managed in a deployed config root:
-`dotagents sync` refreshes them while they are unmodified, removes files a
+`tackroom sync` refreshes them while they are unmodified, removes files a
 release stopped shipping, and reports (without touching) anything you edited.
-Ownership is recorded in `.dotagents-starter.json` at the config root.
+Ownership is recorded in `.tackroom-starter.json` at the config root.

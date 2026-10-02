@@ -1,5 +1,5 @@
 # Canonical copy managed from a pinned external repository. Review upstream;
-# dotagents doctor verifies that this directory still matches its lock pin.
+# tackroom doctor verifies that this directory still matches its lock pin.
 ignore:
   - .git
   - venv

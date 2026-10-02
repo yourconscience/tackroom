@@ -1,8 +1,8 @@
 # rem
 
 The sole supported capture/consolidation CLI for the knowledge vault. A fresh
-`dotagents setup` copies this Go package source, materializes the embedded
-`go.mod.template` as `go.mod`, and `dotagents sync` builds and installs it to
+`tackroom setup` copies this Go package source, materializes the embedded
+`go.mod.template` as `go.mod`, and `tackroom sync` builds and installs it to
 `$GOBIN` or `~/.local/bin`. In this repository the package remains part of the
 root module, so `go test ./...` covers it without a nested module boundary.
 

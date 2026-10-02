@@ -1,4 +1,4 @@
-# How dotagents differs
+# How tackroom differs
 
 Different tools solve different parts of agent-config fragmentation.
 
@@ -9,13 +9,13 @@ Different tools solve different parts of agent-config fragmentation.
 | [dot-agents](https://github.com/dot-agents/dot-agents) | user-level | Symlink rules and MCP config once |
 | [dotagent](https://github.com/johnlindquist/dotagent) | one-shot | Convert between agent config formats |
 | `AGENTS.md` | per-project | Project-level agent instructions |
-| **dotagents** | user-level | Sync skills, MCP, hooks, roles, root instructions, and memory across harnesses continuously |
+| **tackroom** | user-level | Sync skills, MCP, hooks, roles, root instructions, and memory across harnesses continuously |
 
 ## Detailed comparison
 
-dotagents' own harness coverage is listed below; competitor breadth is described qualitatively, since their exact tool counts drift over time.
+tackroom' own harness coverage is listed below; competitor breadth is described qualitatively, since their exact tool counts drift over time.
 
-| | dotagents | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) |
+| | tackroom | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) |
 |---|---|---|---|---|
 | Scope | user-level | project-level | project-level | user + project |
 | Skills sync | yes | yes | experimental | yes |
@@ -29,4 +29,4 @@ dotagents' own harness coverage is listed below; competitor breadth is described
 
 ## Positioning
 
-Project-level generators win on tool breadth: if you need every team member's repo to emit config for 30 tools, use rulesync or ruler. dotagents is the complement, not the competitor: one personal setup, carried deeply into the harnesses you actually live in, following you across machines like dotfiles, with dependency discipline (pins, audits) applied to the prompt code you install from strangers.
+Project-level generators win on tool breadth: if you need every team member's repo to emit config for 30 tools, use rulesync or ruler. tackroom is the complement, not the competitor: one personal setup, carried deeply into the harnesses you actually live in, following you across machines like dotfiles, with dependency discipline (pins, audits) applied to the prompt code you install from strangers.

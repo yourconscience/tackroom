@@ -11,7 +11,7 @@ import (
 )
 
 // Shared risky-pattern regexes, reused by the doctor external-skill audit and
-// the standalone `dotagents audit` command.
+// the standalone `tackroom audit` command.
 var (
 	rePipeToShell     = regexp.MustCompile(`(?i)\b(curl|wget)\b[^|\n]*\|\s*(sudo\s+)?(ba|z)?sh\b`)
 	reBase64ToShell   = regexp.MustCompile(`(?i)\bbase64\b\s+(-d|-D|--decode)\b[^\n]*\|\s*(ba|z)?sh\b`)
@@ -123,7 +123,7 @@ func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResul
 		name := repoName(src.URL)
 		pin := lockEntryFor(lock, src)
 		if pin == nil {
-			issues = append(issues, fmt.Sprintf("%s unpinned (run dotagents sync)", name))
+			issues = append(issues, fmt.Sprintf("%s unpinned (run tackroom sync)", name))
 			continue
 		}
 		head := externalSkillCommitFull(filepath.Join(cacheRoot, name))

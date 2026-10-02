@@ -12,7 +12,7 @@ from pathlib import Path
 
 MEMORY_DIR = Path(__file__).parents[1]
 SYNC_PATH = MEMORY_DIR / "lib" / "sync.py"
-SPEC = importlib.util.spec_from_file_location("dotagents_memory_sync", SYNC_PATH)
+SPEC = importlib.util.spec_from_file_location("tackroom_memory_sync", SYNC_PATH)
 assert SPEC is not None
 SYNC = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None

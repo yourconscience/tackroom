@@ -1,4 +1,4 @@
-module github.com/yourconscience/dotagents
+module github.com/yourconscience/tackroom
 
 go 1.24.2
 

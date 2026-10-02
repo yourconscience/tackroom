@@ -15,7 +15,7 @@ import (
 
 func writeCanonicalTestConfig(t *testing.T, root string) string {
 	t.Helper()
-	path := filepath.Join(root, "dotagents.yaml")
+	path := filepath.Join(root, "tackroom.yaml")
 	data := []byte("# canonical comment\nversion: 1\nfuture_key: preserve\nagents:\n  - name: Codex\n    enabled: false\n    skill_root: ~/.codex/skills\n")
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
@@ -79,7 +79,7 @@ func TestConfigDocumentLocalOverlayIsolatedAndUIWholeEntry(t *testing.T) {
 	root := t.TempDir()
 	home := t.TempDir()
 	path := writeCanonicalTestConfig(t, root)
-	localPath := filepath.Join(root, "dotagents.local.yaml")
+	localPath := filepath.Join(root, "tackroom.local.yaml")
 	local := []byte("ui:\n  links:\n    - name: Usage\n      url: /usage\n")
 	if err := os.WriteFile(localPath, local, 0o644); err != nil {
 		t.Fatal(err)
@@ -113,7 +113,7 @@ func TestConfigWebRequiresSessionOriginAndCSRF(t *testing.T) {
 	server := &configWebServer{doc: doc, origin: "http://127.0.0.1:8765", token: "session", csrf: "csrf"}
 	handler := server.handler()
 	request := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8765/api/state", nil)
-	request.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
+	request.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
 	request.Header.Set("Origin", server.origin)
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -121,8 +121,8 @@ func TestConfigWebRequiresSessionOriginAndCSRF(t *testing.T) {
 		t.Fatalf("authenticated state response = %d %s", response.Code, response.Body.String())
 	}
 	mutation := httptest.NewRequest(http.MethodPatch, "http://127.0.0.1:8765/api/config", strings.NewReader(`{"layer":"shared","expected_revision":"x","operations":[]}`))
-	mutation.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
-	mutation.AddCookie(&http.Cookie{Name: "dotagents_csrf", Value: "csrf"})
+	mutation.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
+	mutation.AddCookie(&http.Cookie{Name: "tackroom_csrf", Value: "csrf"})
 	mutation.Header.Set("Origin", server.origin)
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, mutation)
@@ -132,10 +132,10 @@ func TestConfigWebRequiresSessionOriginAndCSRF(t *testing.T) {
 	value, _ := json.Marshal(true)
 	body := `{"layer":"shared","expected_revision":"` + doc.revision(configLayerShared) + `","operations":[{"op":"set","path":"/agents/codex/enabled","value":` + string(value) + `}]}`
 	mutation = httptest.NewRequest(http.MethodPatch, "http://127.0.0.1:8765/api/config", strings.NewReader(body))
-	mutation.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
-	mutation.AddCookie(&http.Cookie{Name: "dotagents_csrf", Value: "csrf"})
+	mutation.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
+	mutation.AddCookie(&http.Cookie{Name: "tackroom_csrf", Value: "csrf"})
 	mutation.Header.Set("Origin", server.origin)
-	mutation.Header.Set("X-Dotagents-CSRF", "csrf")
+	mutation.Header.Set("X-Tackroom-CSRF", "csrf")
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, mutation)
 	if response.Code != http.StatusOK {
@@ -160,7 +160,7 @@ func TestConfigWebAcceptsMatchingHTTPSProxyOrigin(t *testing.T) {
 
 	request := httptest.NewRequest(http.MethodGet, "https://macbook.example.ts.net/api/state", nil)
 	request.Host = "macbook.example.ts.net"
-	request.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
+	request.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
 	request.Header.Set("Origin", "https://macbook.example.ts.net")
 	response := httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -170,8 +170,8 @@ func TestConfigWebAcceptsMatchingHTTPSProxyOrigin(t *testing.T) {
 
 	request = httptest.NewRequest(http.MethodGet, "https://macbook.example.ts.net/api/state", nil)
 	request.Host = "macbook.example.ts.net"
-	request.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
-	request.Header.Set("Referer", "https://macbook.example.ts.net/dotagents/")
+	request.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
+	request.Header.Set("Referer", "https://macbook.example.ts.net/tackroom/")
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
@@ -180,7 +180,7 @@ func TestConfigWebAcceptsMatchingHTTPSProxyOrigin(t *testing.T) {
 
 	request = httptest.NewRequest(http.MethodGet, "https://macbook.example.ts.net/api/state", nil)
 	request.Host = "macbook.example.ts.net"
-	request.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
+	request.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
@@ -189,7 +189,7 @@ func TestConfigWebAcceptsMatchingHTTPSProxyOrigin(t *testing.T) {
 
 	request = httptest.NewRequest(http.MethodGet, "https://macbook.example.ts.net/api/state", nil)
 	request.Host = "macbook.example.ts.net"
-	request.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
+	request.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
 	request.Header.Set("Origin", "https://other.example.ts.net")
 	response = httptest.NewRecorder()
 	handler.ServeHTTP(response, request)
@@ -219,7 +219,7 @@ func TestConfigWebRawYAMLPreservesSecrets(t *testing.T) {
 	}
 	server := &configWebServer{doc: doc, origin: "http://127.0.0.1:8765", token: "session", csrf: "csrf"}
 	request := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8765/api/state", nil)
-	request.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
+	request.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
 	request.Header.Set("Origin", server.origin)
 	response := httptest.NewRecorder()
 	server.handler().ServeHTTP(response, request)
@@ -270,7 +270,7 @@ func TestConfigServeRejectsWildcardAddresses(t *testing.T) {
 func TestReplaceTypedClearsOmittedSchemaFields(t *testing.T) {
 	root := t.TempDir()
 	home := t.TempDir()
-	path := filepath.Join(root, "dotagents.yaml")
+	path := filepath.Join(root, "tackroom.yaml")
 	data := []byte("# keep this comment\nversion: 1\nfuture_key: preserve\nagents:\n  - name: codex\n    enabled: true\n    skill_root: ~/.codex/skills\nmcp_servers:\n  - name: linkedin\n    enabled: true\n    command: old-command\n    args:\n      - --port\n      - \"9999\"\n    env:\n      SECRET_TOKEN: sk-super-secret-old\n    agents:\n      - codex\n")
 	if err := os.WriteFile(path, data, 0o600); err != nil {
 		t.Fatal(err)
@@ -366,7 +366,7 @@ func TestConfigWebStateReloadsExternalChanges(t *testing.T) {
 
 	stateReq := func() *httptest.ResponseRecorder {
 		request := httptest.NewRequest(http.MethodGet, "http://127.0.0.1:8765/api/state", nil)
-		request.AddCookie(&http.Cookie{Name: "dotagents_session", Value: "session"})
+		request.AddCookie(&http.Cookie{Name: "tackroom_session", Value: "session"})
 		request.Header.Set("Origin", server.origin)
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, request)

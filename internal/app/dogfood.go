@@ -5,7 +5,7 @@ import (
 )
 
 func runDogfood(opts runOptions) error {
-	fmt.Println("dotagents dogfood")
+	fmt.Println("tackroom dogfood")
 	fmt.Println()
 
 	fmt.Println("--- sync ---")

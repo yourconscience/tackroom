@@ -13,27 +13,27 @@ import (
 	"path/filepath"
 	"strings"
 
-	starter "github.com/yourconscience/dotagents"
+	starter "github.com/yourconscience/tackroom"
 )
 
 // starterManifestName records which starter files this config root received
-// from dotagents and what they looked like when it wrote them. It is committed
+// from tackroom and what they looked like when it wrote them. It is committed
 // with the config root so every machine tracks the same baseline.
-const starterManifestName = ".dotagents-starter.json"
+const starterManifestName = ".tackroom-starter.json"
 
 const starterManifestVersion = 1
 
-// starterManagedPrefixes are the starter paths dotagents owns as code. It
+// starterManagedPrefixes are the starter paths tackroom owns as code. It
 // refreshes them while they are unmodified and removes them once a release
 // stops shipping them. Everything else in the starter set (AGENTS.md,
-// dotagents.yaml, agents/*.md, skills/) is user content: dotagents only ever
+// tackroom.yaml, agents/*.md, skills/) is user content: tackroom only ever
 // creates those when missing.
 var starterManagedPrefixes = []string{"memory/hooks/", "memory/lib/"}
 
 // legacyStarterHashes lists hashes of managed starter files that earlier
-// dotagents releases wrote. It bridges config roots created before the manifest
+// tackroom releases wrote. It bridges config roots created before the manifest
 // existed: a managed file is refreshed or removed only while its content
-// matches one of these hashes or the manifest baseline, so dotagents never
+// matches one of these hashes or the manifest baseline, so tackroom never
 // overwrites or deletes content it did not write itself.
 //
 // The manifest takes over for every release after v0.9.0, so this table is a
@@ -108,7 +108,7 @@ func isManagedStarterPath(path string) bool {
 // isSafeStarterManifestPath reports whether a manifest entry is a plain relative
 // path inside the managed layer. Entries that are absolute, contain a `.` or
 // `..` segment, or name user content are rejected, so a hand-edited manifest
-// cannot make dotagents read or remove a file outside the config root.
+// cannot make tackroom read or remove a file outside the config root.
 func isSafeStarterManifestPath(path string) bool {
 	if path == "" || filepath.IsAbs(path) || strings.ContainsRune(path, '\\') {
 		return false
@@ -220,7 +220,7 @@ func writeStarterFile(root, path string, data []byte) error {
 }
 
 // reconcileStarterFiles keeps the managed starter code layer in step with the
-// running release: missing files are scaffolded, files dotagents wrote and the
+// running release: missing files are scaffolded, files tackroom wrote and the
 // user did not touch are refreshed to the shipped version, files a release
 // stopped shipping are removed, and anything the user modified is reported and
 // left alone.
@@ -261,7 +261,7 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 			case diskHash == shippedHash:
 				next[path] = shippedHash
 			case (tracked && diskHash == recorded) || hashIn(legacy[path], diskHash):
-				// Untouched content dotagents wrote in this or an earlier
+				// Untouched content tackroom wrote in this or an earlier
 				// release: safe to refresh.
 				if err := writeStarterFile(root, path, data); err != nil {
 					return changes, err
@@ -269,7 +269,7 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 				changes.Updated = append(changes.Updated, path)
 				next[path] = shippedHash
 			default:
-				// Content dotagents did not write: keep the file and keep
+				// Content tackroom did not write: keep the file and keep
 				// reporting it, so a customized layer is never clobbered.
 				changes.KeptModified = append(changes.KeptModified, path)
 				if tracked {
@@ -323,7 +323,7 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 }
 
 // retireStarterFile removes a managed file that is no longer shipped while its
-// content is still one dotagents wrote, and keeps it otherwise.
+// content is still one tackroom wrote, and keeps it otherwise.
 func retireStarterFile(root, path, recorded string, legacy []string, streams setupIO, confirm bool) (bool, bool, error) {
 	target := filepath.Join(root, filepath.FromSlash(path))
 	disk, err := os.ReadFile(target)

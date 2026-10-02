@@ -52,7 +52,7 @@ func TestRunViewLegacyHarnessKitFlagsGiveRenameGuidance(t *testing.T) {
 				if err == nil {
 					t.Fatalf("runView(%v) = nil, want rename guidance error", args)
 				}
-				if !strings.Contains(err.Error(), "dotagents inspect") || !strings.Contains(err.Error(), flag) {
+				if !strings.Contains(err.Error(), "tackroom inspect") || !strings.Contains(err.Error(), flag) {
 					t.Fatalf("runView(%v) error = %q, want guidance naming %s and inspect", args, err, flag)
 				}
 			}

@@ -64,8 +64,8 @@ func TestConfigResolutionPrecedenceAndIgnoresCWD(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = os.Chdir(oldwd) })
-	writeMinimalConfig(t, filepath.Join(cwd, "dotagents.yaml"), "cwd")
-	writeMinimalConfig(t, filepath.Join(home, ".agents", "dotagents.yaml"), "home")
+	writeMinimalConfig(t, filepath.Join(cwd, "tackroom.yaml"), "cwd")
+	writeMinimalConfig(t, filepath.Join(home, ".agents", "tackroom.yaml"), "home")
 
 	repoRoot, _, cfg, _, err := loadContext(runOptions{})
 	if err != nil {
@@ -75,18 +75,18 @@ func TestConfigResolutionPrecedenceAndIgnoresCWD(t *testing.T) {
 		t.Fatalf("default resolution = root %q agent %q, want ~/.agents/home", repoRoot, cfg.Agents[0].Name)
 	}
 
-	dotagentsHome := filepath.Join(home, "custom")
-	writeMinimalConfig(t, filepath.Join(dotagentsHome, "dotagents.yaml"), "dotagents-home")
-	t.Setenv("DOTAGENTS_HOME", dotagentsHome)
+	tackroomHome := filepath.Join(home, "custom")
+	writeMinimalConfig(t, filepath.Join(tackroomHome, "tackroom.yaml"), "tackroom-home")
+	t.Setenv("TACKROOM_HOME", tackroomHome)
 	repoRoot, _, cfg, _, err = loadContext(runOptions{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if repoRoot != dotagentsHome || cfg.Agents[0].Name != "dotagents-home" {
-		t.Fatalf("DOTAGENTS_HOME resolution = root %q agent %q", repoRoot, cfg.Agents[0].Name)
+	if repoRoot != tackroomHome || cfg.Agents[0].Name != "tackroom-home" {
+		t.Fatalf("TACKROOM_HOME resolution = root %q agent %q", repoRoot, cfg.Agents[0].Name)
 	}
 
-	explicit := filepath.Join(home, "explicit", "dotagents.yaml")
+	explicit := filepath.Join(home, "explicit", "tackroom.yaml")
 	writeMinimalConfig(t, explicit, "explicit")
 	repoRoot, _, cfg, _, err = loadContext(runOptions{ConfigPath: explicit})
 	if err != nil {
@@ -100,20 +100,20 @@ func TestConfigResolutionPrecedenceAndIgnoresCWD(t *testing.T) {
 func TestEnsureStarterAssetsCreatesMissingOnlyAndExecutableHooks(t *testing.T) {
 	root := t.TempDir()
 	customConfig := []byte("version: 1\nagents: []\n")
-	writeSyncTestFile(t, filepath.Join(root, "dotagents.yaml"), customConfig)
-	if err := ensureStarterAssets(root, filepath.Join(root, "dotagents.yaml")); err != nil {
+	writeSyncTestFile(t, filepath.Join(root, "tackroom.yaml"), customConfig)
+	if err := ensureStarterAssets(root, filepath.Join(root, "tackroom.yaml")); err != nil {
 		t.Fatal(err)
 	}
-	got, err := os.ReadFile(filepath.Join(root, "dotagents.yaml"))
+	got, err := os.ReadFile(filepath.Join(root, "tackroom.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if !bytes.Equal(got, customConfig) {
-		t.Fatalf("dotagents.yaml overwritten:\n%s", got)
+		t.Fatalf("tackroom.yaml overwritten:\n%s", got)
 	}
 	for _, path := range []string{
 		filepath.Join(root, "AGENTS.md"),
-		filepath.Join(root, "skills", "dotagents", "SKILL.md"),
+		filepath.Join(root, "skills", "tackroom", "SKILL.md"),
 		filepath.Join(root, "agents", "architect.md"),
 		filepath.Join(root, "agents", "tester.md"),
 		filepath.Join(root, "memory", "lib", "basic_memory.py"),
@@ -304,7 +304,7 @@ func TestSetupMemoryOffRemovesNativeBasicHooksPreservingUnrelated(t *testing.T) 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	fakePath(t, "claude")
-	configPath := filepath.Join(home, ".agents", "dotagents.yaml")
+	configPath := filepath.Join(home, ".agents", "tackroom.yaml")
 	writeSyncTestFile(t, configPath, []byte(`version: 1
 agents:
   - name: claude-code
@@ -357,7 +357,7 @@ func TestSetupMemoryBasicReplacesNativeMemsearchHooksPreservingUnrelated(t *test
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	fakePath(t, "claude")
-	configPath := filepath.Join(home, ".agents", "dotagents.yaml")
+	configPath := filepath.Join(home, ".agents", "tackroom.yaml")
 	writeSyncTestFile(t, configPath, []byte(`version: 1
 agents:
   - name: claude-code
@@ -422,7 +422,7 @@ func TestSetupMemoryBasicUsesCustomRootCommands(t *testing.T) {
 	root := filepath.Join(home, "custom-agents")
 	t.Setenv("HOME", home)
 	fakePath(t, "claude")
-	configPath := filepath.Join(root, "dotagents.yaml")
+	configPath := filepath.Join(root, "tackroom.yaml")
 	writeSyncTestFile(t, configPath, []byte(`version: 1
 agents:
   - name: claude-code
@@ -447,10 +447,10 @@ agents:
 	if !strings.Contains(text, wantStart) || !strings.Contains(text, wantEnd) || strings.Contains(text, "~/.agents/memory/hooks") {
 		t.Fatalf("native custom-root hooks not rendered from canonical root:\n%s", text)
 	}
-	linkPath := filepath.Join(home, ".claude", "skills", "dotagents")
-	if !sameResolvedPath(linkPath, filepath.Join(root, "skills", "dotagents")) {
+	linkPath := filepath.Join(home, ".claude", "skills", "tackroom")
+	if !sameResolvedPath(linkPath, filepath.Join(root, "skills", "tackroom")) {
 		rawTarget, _ := os.Readlink(linkPath)
-		t.Fatalf("custom-root skill link %s -> %q, want %s", linkPath, rawTarget, filepath.Join(root, "skills", "dotagents"))
+		t.Fatalf("custom-root skill link %s -> %q, want %s", linkPath, rawTarget, filepath.Join(root, "skills", "tackroom"))
 	}
 }
 
@@ -497,8 +497,8 @@ func TestScanNativeImportsExpandsPortableAgentPaths(t *testing.T) {
 
 func TestImportedStarterNameWinsOnFreshSetupOrdering(t *testing.T) {
 	root := t.TempDir()
-	skillSrc := filepath.Join(t.TempDir(), "dotagents")
-	writeSyncTestFile(t, filepath.Join(skillSrc, "SKILL.md"), []byte("imported dotagents skill\n"))
+	skillSrc := filepath.Join(t.TempDir(), "tackroom")
+	writeSyncTestFile(t, filepath.Join(skillSrc, "SKILL.md"), []byte("imported tackroom skill\n"))
 	roleData := []byte("---\nname: builder\ndescription: Imported builder\n---\n\nImported builder role.\n")
 	role := nativeRoleCandidate{
 		nativeImportCandidate: nativeImportCandidate{Name: "builder", Origin: agentClaudeCode, Path: filepath.Join(t.TempDir(), "builder.md")},
@@ -507,18 +507,18 @@ func TestImportedStarterNameWinsOnFreshSetupOrdering(t *testing.T) {
 			return roleData, nil
 		},
 	}
-	skills := []nativeSkillCandidate{{nativeImportCandidate: nativeImportCandidate{Name: "dotagents", Origin: agentClaudeCode, Path: skillSrc}}}
+	skills := []nativeSkillCandidate{{nativeImportCandidate: nativeImportCandidate{Name: "tackroom", Origin: agentClaudeCode, Path: skillSrc}}}
 	if err := importNativeContent(root, &config{Version: 1}, skills, []nativeRoleCandidate{role}, nil, setupIO{in: strings.NewReader("y\ny\n"), out: &bytes.Buffer{}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureStarterAssets(root, filepath.Join(root, "dotagents.yaml")); err != nil {
+	if err := ensureStarterAssets(root, filepath.Join(root, "tackroom.yaml")); err != nil {
 		t.Fatal(err)
 	}
-	skillData, err := os.ReadFile(filepath.Join(root, "skills", "dotagents", "SKILL.md"))
+	skillData, err := os.ReadFile(filepath.Join(root, "skills", "tackroom", "SKILL.md"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(skillData) != "imported dotagents skill\n" {
+	if string(skillData) != "imported tackroom skill\n" {
 		t.Fatalf("starter overwrote imported same-name skill:\n%s", skillData)
 	}
 	gotRole, err := os.ReadFile(filepath.Join(root, "agents", "builder.md"))
@@ -537,7 +537,7 @@ func TestSetupFirstRunSyncStatusEndToEnd(t *testing.T) {
 	if err := runSetup(runOptions{MemoryTier: memoryTierBasic, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}}); err != nil {
 		t.Fatal(err)
 	}
-	configPath := filepath.Join(home, ".agents", "dotagents.yaml")
+	configPath := filepath.Join(home, ".agents", "tackroom.yaml")
 	cfg := readConfigFile(t, configPath)
 	if len(cfg.Agents) != 1 || cfg.Agents[0].Name != agentClaudeCode {
 		t.Fatalf("setup agents = %#v", cfg.Agents)
@@ -548,7 +548,7 @@ func TestSetupFirstRunSyncStatusEndToEnd(t *testing.T) {
 	for _, path := range []string{
 		filepath.Join(home, ".agents", "agents", "tester.md"),
 		filepath.Join(home, ".agents", "memory", "hooks", "basic-session-end.py"),
-		filepath.Join(home, ".claude", "skills", "dotagents"),
+		filepath.Join(home, ".claude", "skills", "tackroom"),
 		filepath.Join(home, ".claude", "agents", "builder.md"),
 	} {
 		if _, err := os.Lstat(path); err != nil {

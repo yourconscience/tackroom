@@ -76,15 +76,15 @@ func TestHiddenAliasesRouteWithOneRenameNotice(t *testing.T) {
 		containsErr string
 		notice      string
 	}{
-		{name: "pull", args: []string{"pull", "unexpected"}, wantErr: "pull does not accept positional arguments", notice: `dotagents: "pull" was renamed to "sync --pull"`},
-		{name: "deps", args: []string{"deps", "unexpected"}, wantErr: `unknown deps subcommand "unexpected"`, notice: `dotagents: "deps" was renamed to "doctor deps or sync deps"`},
-		{name: "memsearch", args: []string{"memsearch", "unexpected"}, wantErr: `unknown memsearch subcommand "unexpected"`, notice: `dotagents: "memsearch" was renamed to "setup memsearch or status memsearch"`},
-		{name: "skillify", args: []string{"skillify"}, wantErr: "skillify requires a skill name: dotagents skillify <name>", notice: `dotagents: "skillify" was renamed to "skill new"`},
-		{name: "render", args: []string{"render", "unexpected"}, wantErr: "render does not accept positional arguments", notice: `dotagents: "render" was renamed to "sync"`},
-		{name: "audit", args: []string{"audit", "unexpected"}, wantErr: "audit does not accept positional arguments", notice: `dotagents: "audit" was renamed to "doctor"`},
-		{name: "external", args: []string{"external"}, wantErr: "usage: dotagents external <list|update> [name ...]", notice: `dotagents: "external" was renamed to "status or skill update"`},
-		{name: "promote", args: []string{"promote"}, wantErr: "promote requires a skill name or path: dotagents promote <name-or-path>", notice: `dotagents: "promote" was renamed to "skill promote"`},
-		{name: "dogfood", args: []string{"dogfood", "unexpected"}, wantErr: "dogfood does not accept positional arguments", notice: `dotagents: "dogfood" was renamed to "doctor --e2e"`},
+		{name: "pull", args: []string{"pull", "unexpected"}, wantErr: "pull does not accept positional arguments", notice: `tackroom: "pull" was renamed to "sync --pull"`},
+		{name: "deps", args: []string{"deps", "unexpected"}, wantErr: `unknown deps subcommand "unexpected"`, notice: `tackroom: "deps" was renamed to "doctor deps or sync deps"`},
+		{name: "memsearch", args: []string{"memsearch", "unexpected"}, wantErr: `unknown memsearch subcommand "unexpected"`, notice: `tackroom: "memsearch" was renamed to "setup memsearch or status memsearch"`},
+		{name: "skillify", args: []string{"skillify"}, wantErr: "skillify requires a skill name: tackroom skillify <name>", notice: `tackroom: "skillify" was renamed to "skill new"`},
+		{name: "render", args: []string{"render", "unexpected"}, wantErr: "render does not accept positional arguments", notice: `tackroom: "render" was renamed to "sync"`},
+		{name: "audit", args: []string{"audit", "unexpected"}, wantErr: "audit does not accept positional arguments", notice: `tackroom: "audit" was renamed to "doctor"`},
+		{name: "external", args: []string{"external"}, wantErr: "usage: tackroom external <list|update> [name ...]", notice: `tackroom: "external" was renamed to "status or skill update"`},
+		{name: "promote", args: []string{"promote"}, wantErr: "promote requires a skill name or path: tackroom promote <name-or-path>", notice: `tackroom: "promote" was renamed to "skill promote"`},
+		{name: "dogfood", args: []string{"dogfood", "unexpected"}, wantErr: "dogfood does not accept positional arguments", notice: `tackroom: "dogfood" was renamed to "doctor --e2e"`},
 	}
 
 	for _, tc := range tests {
@@ -99,7 +99,7 @@ func TestHiddenAliasesRouteWithOneRenameNotice(t *testing.T) {
 			if tc.containsErr != "" && !strings.Contains(err.Error(), tc.containsErr) {
 				t.Fatalf("Run(%q) error = %q, want substring %q", tc.args, err, tc.containsErr)
 			}
-			if strings.Count(stderr, "dotagents: ") != 1 || !strings.Contains(stderr, tc.notice+"\n") {
+			if strings.Count(stderr, "tackroom: ") != 1 || !strings.Contains(stderr, tc.notice+"\n") {
 				t.Fatalf("Run(%q) rename output = %q, want exactly one %q notice", tc.args, stderr, tc.notice)
 			}
 		})
@@ -110,8 +110,8 @@ func TestSkillUpdateIsCanonicalAndExternalUpdateRemainsCompatible(t *testing.T) 
 	home := t.TempDir()
 	repoRoot := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("DOTAGENTS_HOME", repoRoot)
-	writeSyncTestFile(t, filepath.Join(repoRoot, "dotagents.yaml"), []byte(`version: 1
+	t.Setenv("TACKROOM_HOME", repoRoot)
+	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
 agents:
   - name: codex
     enabled: true
@@ -139,7 +139,7 @@ external_skills:
 	if legacyErr == nil || legacyErr.Error() != wantErr {
 		t.Fatalf("external update error = %v, want routed error %q", legacyErr, wantErr)
 	}
-	const wantNotice = "dotagents: \"external update\" was renamed to \"skill update\"\n"
+	const wantNotice = "tackroom: \"external update\" was renamed to \"skill update\"\n"
 	if legacyStderr != wantNotice {
 		t.Fatalf("external update rename notice = %q, want %q", legacyStderr, wantNotice)
 	}
@@ -170,7 +170,7 @@ func TestRootHelpAdvertisesCanonicalDescriptiveFamilies(t *testing.T) {
 	if got, want := strings.Join(families, ","), "setup,status,sync,doctor,config,view,inspect,sessions,skill,publish,mcp,hook"; got != want {
 		t.Fatalf("short-help families = %q, want %q:\n%s", got, want, stdout)
 	}
-	if !strings.Contains(stdout, `Run "dotagents help --all" for flags, maintenance commands, and compatibility aliases.`) {
+	if !strings.Contains(stdout, `Run "tackroom help --all" for flags, maintenance commands, and compatibility aliases.`) {
 		t.Fatalf("short help does not direct users to the complete surface:\n%s", stdout)
 	}
 }

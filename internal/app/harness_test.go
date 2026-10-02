@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 	"gopkg.in/yaml.v3"
 )
 
@@ -49,7 +49,7 @@ func TestPublicTemplateStartsWithoutConfiguredAgents(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(repoRoot, "dotagents.yaml"))
+	data, err := os.ReadFile(filepath.Join(repoRoot, "tackroom.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}

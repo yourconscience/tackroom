@@ -58,7 +58,7 @@ func TestInstallMemoryToolsBuildsAndSkipsFresh(t *testing.T) {
 
 func TestFreshScaffoldBuildsBothMemoryTools(t *testing.T) {
 	root := t.TempDir()
-	configPath := filepath.Join(root, "dotagents.yaml")
+	configPath := filepath.Join(root, "tackroom.yaml")
 	if err := ensureStarterAssets(root, configPath); err != nil {
 		t.Fatalf("scaffold starter assets: %v", err)
 	}

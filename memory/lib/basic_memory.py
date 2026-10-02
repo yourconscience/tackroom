@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Basic markdown-backed memory hooks for dotagents.
+"""Basic markdown-backed memory hooks for tackroom.
 
 This module intentionally has no memsearch or third-party dependency. It reads
 hook payloads, stores compact digests under $KNOWLEDGE_DIR/sessions, and emits
@@ -64,7 +64,7 @@ def ensure_sessions_dir(knowledge_dir: Path) -> Path:
             mode="w",
             encoding="utf-8",
             dir=sessions_dir,
-            prefix=".dotagents-basic-memory-write-test-",
+            prefix=".tackroom-basic-memory-write-test-",
             delete=False,
         ) as handle:
             test_path = Path(handle.name)
@@ -226,7 +226,7 @@ def read_transcript(path: Path, tolerant: bool = False) -> tuple[list[dict[str, 
 
 
 def provider_source(payload: dict[str, Any]) -> str:
-    hint = os.environ.get("DOTAGENTS_MEMORY_SOURCE", "").strip().lower()
+    hint = os.environ.get("TACKROOM_MEMORY_SOURCE", "").strip().lower()
     if hint:
         return hint
     marker = str(payload.get("platform") or payload.get("agent") or "").strip().lower()
@@ -287,7 +287,7 @@ def collect_messages(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], dat
     transcript = payload.get("transcript_path")
     if isinstance(transcript, str) and transcript.strip():
         transcript_path = Path(os.path.expanduser(transcript)).resolve()
-        tolerant = payload.get("dotagents_memory_source") == "droid"
+        tolerant = payload.get("tackroom_memory_source") == "droid"
         transcript_messages, transcript_started, transcript_session_id = read_transcript(transcript_path, tolerant=tolerant)
         if transcript_messages:
             messages = transcript_messages
@@ -368,8 +368,8 @@ def build_digest(payload: dict[str, Any], messages: list[dict[str, Any]], starte
     # An explicit source hint wins over payload markers so a conflicting
     # platform/agent field in the payload cannot mislabel the digest.
     platform = (
-        payload.get("dotagents_memory_source")
-        or os.environ.get("DOTAGENTS_MEMORY_SOURCE")
+        payload.get("tackroom_memory_source")
+        or os.environ.get("TACKROOM_MEMORY_SOURCE")
         or payload.get("platform")
         or payload.get("agent")
         or payload.get("hook_event_name")
@@ -489,7 +489,7 @@ def session_end(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout) -> int:
             )
             return 0
         if source != "basic":
-            payload["dotagents_memory_source"] = source
+            payload["tackroom_memory_source"] = source
         knowledge_dir = knowledge_dir_from_env()
         sessions_dir = ensure_sessions_dir(knowledge_dir)
         messages, transcript_started, transcript_session_id = collect_messages(payload)

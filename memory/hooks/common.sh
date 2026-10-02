@@ -101,7 +101,7 @@ refresh_index_async() {
 # through the local basic_memory digest (never the Claude plugin), detected from
 # an explicit source hint or the payload's own agent/platform marker.
 classify_payload() {
-  MEMORY_SOURCE_HINT="${DOTAGENTS_MEMORY_SOURCE:-}" python3 - "$1" <<'PY'
+  MEMORY_SOURCE_HINT="${TACKROOM_MEMORY_SOURCE:-}" python3 - "$1" <<'PY'
 import os
 import json
 import sys
@@ -136,7 +136,7 @@ PY
 # bounded, non-overlapping reindex only when a new digest was actually appended.
 dispatch_basic_digest() {
   digest_source="${2:-}"
-  if digest_output="$(DOTAGENTS_MEMORY_SOURCE="$digest_source" python3 "$MEMORY_DIR/hooks/basic-session-end.py" <"$1")"; then
+  if digest_output="$(TACKROOM_MEMORY_SOURCE="$digest_source" python3 "$MEMORY_DIR/hooks/basic-session-end.py" <"$1")"; then
     printf '%s\n' "$digest_output"
     case "$digest_output" in
       *'"systemMessage":"basic memory appended'*|*'"message": "memsearch updated from'*|*'"systemMessage":"memsearch updated from'*) refresh_index_async ;;

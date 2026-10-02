@@ -14,9 +14,9 @@ func TestRunSyncRepairsHermesExternalDirsDrift(t *testing.T) {
 	home := t.TempDir()
 	repoRoot := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("DOTAGENTS_HOME", repoRoot)
+	t.Setenv("TACKROOM_HOME", repoRoot)
 
-	writeSyncTestFile(t, filepath.Join(repoRoot, "dotagents.yaml"), []byte(`version: 1
+	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
 agents:
   - name: hermes
     enabled: true
@@ -58,9 +58,9 @@ func TestRunSyncProjectsPiSkillsRolesMCPAndInstructions(t *testing.T) {
 	home := t.TempDir()
 	repoRoot := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("DOTAGENTS_HOME", repoRoot)
+	t.Setenv("TACKROOM_HOME", repoRoot)
 
-	writeSyncTestFile(t, filepath.Join(repoRoot, "dotagents.yaml"), []byte(`version: 1
+	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
 agents:
   - name: pi
     enabled: true

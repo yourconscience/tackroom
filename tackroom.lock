@@ -1,4 +1,4 @@
-# Managed by dotagents sync / dotagents skill update. Pins commits and materialized skill ownership.
+# Managed by tackroom sync / tackroom skill update. Pins commits and materialized skill ownership.
 version: 1
 external_skills:
   - name: skills

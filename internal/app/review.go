@@ -148,7 +148,7 @@ func (m *reviewModel) cycleSource(delta int) {
 
 func (m reviewModel) View() string {
 	var b strings.Builder
-	title := fmt.Sprintf("dotagents setup — review %d item(s)", len(m.rows))
+	title := fmt.Sprintf("tackroom setup — review %d item(s)", len(m.rows))
 	if m.resolved > 0 {
 		title += reviewDimStyle.Render(fmt.Sprintf("  (%d identical, shared automatically)", m.resolved))
 	}

@@ -13,7 +13,7 @@ import (
 
 func runPromote(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("promote requires a skill name or path: dotagents promote <name-or-path>")
+		return fmt.Errorf("promote requires a skill name or path: tackroom promote <name-or-path>")
 	}
 
 	source := args[0]
@@ -41,10 +41,10 @@ func runPromote(args []string) error {
 		return err
 	}
 
-	// Check it doesn't already exist in dotagents
+	// Check it doesn't already exist in tackroom
 	dstDir := filepath.Join(repoRoot, "skills", name)
 	if _, err := os.Stat(dstDir); err == nil {
-		return fmt.Errorf("skill %q already exists in dotagents at %s", name, dstDir)
+		return fmt.Errorf("skill %q already exists in tackroom at %s", name, dstDir)
 	}
 
 	// Validate the skill has a SKILL.md
@@ -89,7 +89,7 @@ func runPromote(args []string) error {
 
 	// Create PR
 	prTitle := fmt.Sprintf("Add %s skill", name)
-	prBody := fmt.Sprintf("Promotes `%s` skill to dotagents shared skills.\n\nSource: local Hermes skill\nPromoted: %s", name, time.Now().Format("2006-01-02"))
+	prBody := fmt.Sprintf("Promotes `%s` skill to tackroom shared skills.\n\nSource: local Hermes skill\nPromoted: %s", name, time.Now().Format("2006-01-02"))
 
 	repoSlug, err := gitRepoSlug(repoRoot)
 	if err != nil {

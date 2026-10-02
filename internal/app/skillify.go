@@ -12,7 +12,7 @@ var validSkillName = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,48}[a-z0-9]$`)
 
 func runSkillify(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("skillify requires a skill name: dotagents skillify <name>")
+		return fmt.Errorf("skillify requires a skill name: tackroom skillify <name>")
 	}
 	name := args[0]
 
@@ -73,7 +73,7 @@ Use when TODO.
 	fmt.Printf("created: skills/%s/SKILL.md\n", name)
 	fmt.Println()
 	fmt.Println("edit the skill, then run:")
-	fmt.Println("  dotagents sync")
+	fmt.Println("  tackroom sync")
 
 	return nil
 }

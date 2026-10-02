@@ -38,7 +38,7 @@ func runMCP(args []string) error {
 func runMCPList(args []string) error {
 	fs := flag.NewFlagSet("mcp list", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	configPath := fs.String("config", "", "Path to dotagents YAML config")
+	configPath := fs.String("config", "", "Path to tackroom YAML config")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -80,7 +80,7 @@ func runMCPList(args []string) error {
 func runMCPAdd(args []string) error {
 	fs := flag.NewFlagSet("mcp add", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	configPath := fs.String("config", "", "Path to dotagents YAML config")
+	configPath := fs.String("config", "", "Path to tackroom YAML config")
 	command := fs.String("command", "", "MCP stdio command")
 	agentsCSV := fs.String("agents", "", "Comma-separated target agents")
 	var mcpArgs stringListFlag
@@ -99,7 +99,7 @@ func runMCPAdd(args []string) error {
 	if name == "" && fs.NArg() == 1 {
 		name = fs.Arg(0)
 	} else if fs.NArg() != 0 {
-		return errors.New("usage: dotagents mcp add <name> --command <cmd> [--arg value ...] [--env KEY=VALUE ...]")
+		return errors.New("usage: tackroom mcp add <name> --command <cmd> [--arg value ...] [--env KEY=VALUE ...]")
 	}
 	name = strings.TrimSpace(name)
 	if name == "" {
@@ -130,7 +130,7 @@ func runMCPAdd(args []string) error {
 func runMCPImport(args []string) error {
 	fs := flag.NewFlagSet("mcp import", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	configPath := fs.String("config", "", "Path to dotagents YAML config")
+	configPath := fs.String("config", "", "Path to tackroom YAML config")
 	agentsCSV := fs.String("agents", "", "Comma-separated target agents")
 	var importAgent, name string
 	parseArgs := args
@@ -146,7 +146,7 @@ func runMCPImport(args []string) error {
 		importAgent = fs.Arg(0)
 		name = fs.Arg(1)
 	} else if fs.NArg() != 0 {
-		return errors.New("usage: dotagents mcp import <agent> <name> [--agents a,b,c]")
+		return errors.New("usage: tackroom mcp import <agent> <name> [--agents a,b,c]")
 	}
 	importAgent = normalizeAgentName(importAgent)
 	name = strings.TrimSpace(name)
@@ -184,7 +184,7 @@ func runMCPImport(args []string) error {
 func runMCPRemove(args []string) error {
 	fs := flag.NewFlagSet("mcp remove", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
-	configPath := fs.String("config", "", "Path to dotagents YAML config")
+	configPath := fs.String("config", "", "Path to tackroom YAML config")
 	name := ""
 	parseArgs := args
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
@@ -197,7 +197,7 @@ func runMCPRemove(args []string) error {
 	if name == "" && fs.NArg() == 1 {
 		name = fs.Arg(0)
 	} else if fs.NArg() != 0 {
-		return errors.New("usage: dotagents mcp remove <name>")
+		return errors.New("usage: tackroom mcp remove <name>")
 	}
 	name = strings.TrimSpace(name)
 	cfg, path, err := loadEditableMCPConfig(*configPath)

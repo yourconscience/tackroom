@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
-  "name": "dotagents",
-  "description": "Skills and agent roles synced by dotagents across coding-agent harnesses.",
-  "homepage": "https://github.com/yourconscience/dotagents",
-  "repository": "https://github.com/yourconscience/dotagents",
+  "name": "tackroom",
+  "description": "Skills and agent roles synced by tackroom across coding-agent harnesses.",
+  "homepage": "https://github.com/yourconscience/tackroom",
+  "repository": "https://github.com/yourconscience/tackroom",
   "license": "MIT"
 }
