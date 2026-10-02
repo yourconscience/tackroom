@@ -149,7 +149,7 @@ func TestDoctorDetectsREADMECountAndListDrift(t *testing.T) {
 			if result.status != checkStatusFail {
 				t.Fatalf("doctor status = %q (%s), want fail", result.status, result.detail)
 			}
-			if result.detail != "generated block is stale; run: dotagents sync" {
+			if result.detail != "generated block is stale; run: tackroom sync" {
 				t.Fatalf("doctor detail = %q", result.detail)
 			}
 		})
@@ -218,7 +218,7 @@ func TestCommittedPublicSkillInventoryMatchesLaunchSet(t *testing.T) {
 	if count != 2 {
 		t.Fatalf("committed public skill count = %d, want 2", count)
 	}
-	if !strings.Contains(block, "`dotagents`") || !strings.Contains(block, "`grilling`") {
+	if !strings.Contains(block, "`tackroom`") || !strings.Contains(block, "`grilling`") {
 		t.Fatalf("committed public inventory omits retained public skills:\n%s", block)
 	}
 	if strings.Contains(block, "`grill-me`") {

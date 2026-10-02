@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	starter "github.com/yourconscience/dotagents"
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	starter "github.com/yourconscience/tackroom"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 	"gopkg.in/yaml.v3"
 )
 
@@ -85,7 +85,7 @@ func ensureStarterAssets(root string, configPath string) error {
 			targetPath = strings.TrimSuffix(targetPath, ".template")
 		}
 		target := filepath.Join(root, filepath.FromSlash(targetPath))
-		if path == "dotagents.yaml" {
+		if path == "tackroom.yaml" {
 			target = configPath
 		}
 		if d.IsDir() {
@@ -117,7 +117,7 @@ func ensureStarterAssets(root string, configPath string) error {
 func loadSetupConfig(configPath string, home string) (config, error) {
 	data, err := os.ReadFile(configPath)
 	if errors.Is(err, fs.ErrNotExist) {
-		data, err = starter.StarterAssets.ReadFile("dotagents.yaml")
+		data, err = starter.StarterAssets.ReadFile("tackroom.yaml")
 		if err != nil {
 			return config{}, fmt.Errorf("read embedded starter config: %w", err)
 		}
@@ -153,7 +153,7 @@ func defaultAgentConfigs() []agentConfig {
 
 func setupSelectableAgentConfigs() []agentConfig {
 	agents := append([]agentConfig{}, defaultAgentConfigs()...)
-	agents = append(agents, agentConfig{Name: agentAmp, Enabled: true, SkillRoot: dotagentsSkillsPathValue, Detect: "amp"})
+	agents = append(agents, agentConfig{Name: agentAmp, Enabled: true, SkillRoot: tackroomSkillsPathValue, Detect: "amp"})
 	return agents
 }
 
@@ -801,7 +801,7 @@ func importNativeContent(root string, cfg *config, skills []nativeSkillCandidate
 			}
 		}
 	}
-	if len(mcps) > 0 && promptYesNo(streams, fmt.Sprintf("Import %d MCP servers into dotagents.yaml?", len(mcps))) {
+	if len(mcps) > 0 && promptYesNo(streams, fmt.Sprintf("Import %d MCP servers into tackroom.yaml?", len(mcps))) {
 		chosen := resolveMCPConflicts(mcps, streams)
 		for _, candidate := range chosen {
 			server := candidate.Server

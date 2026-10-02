@@ -5,14 +5,14 @@ __pycache__/
 
 # Canonical user-config runtime state
 external/
-dotagents.local.yaml
+tackroom.local.yaml
 memsearch.conf
 .skill-lock.json
 
 # Local development
-/dotagents
+/tackroom
 npm/bin/*
-!npm/bin/dotagents.js
+!npm/bin/tackroom.js
 memory/local/
 memory/apply-local.sh
 npm/node_modules/

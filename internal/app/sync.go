@@ -32,7 +32,7 @@ func runStatus(opts runOptions) error {
 
 	printStatusReport(repoRoot, repoReport, reports, home, cfg, opts.Verbose)
 	if repoReport.State != stateSynced {
-		return errors.New("dotagents is not fully synced")
+		return errors.New("tackroom is not fully synced")
 	}
 	for _, report := range reports {
 		if report.Detected && !report.Synced {

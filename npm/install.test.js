@@ -24,10 +24,10 @@ test("platformTarget rejects unsupported platforms", () => {
 
 test("assetName and releaseAssetUrl follow goreleaser layout", () => {
   const target = platformTarget("darwin", "arm64");
-  assert.equal(assetName("1.2.3", target), "dotagents_1.2.3_darwin_arm64.tar.gz");
+  assert.equal(assetName("1.2.3", target), "tackroom_1.2.3_darwin_arm64.tar.gz");
   assert.equal(
     releaseAssetUrl("1.2.3", assetName("1.2.3", target)),
-    "https://github.com/yourconscience/dotagents/releases/download/v1.2.3/dotagents_1.2.3_darwin_arm64.tar.gz",
+    "https://github.com/yourconscience/tackroom/releases/download/v1.2.3/tackroom_1.2.3_darwin_arm64.tar.gz",
   );
 });
 
@@ -37,13 +37,13 @@ test("sha256 computes the expected digest", () => {
 
 test("expectedChecksum finds the matching asset line", () => {
   const checksums = [
-    "1111111111111111111111111111111111111111111111111111111111111111  dotagents_1.2.3_darwin_amd64.tar.gz",
-    "2222222222222222222222222222222222222222222222222222222222222222  dotagents_1.2.3_darwin_arm64.tar.gz",
+    "1111111111111111111111111111111111111111111111111111111111111111  tackroom_1.2.3_darwin_amd64.tar.gz",
+    "2222222222222222222222222222222222222222222222222222222222222222  tackroom_1.2.3_darwin_arm64.tar.gz",
     "",
   ].join("\n");
   assert.equal(
-    expectedChecksum(checksums, "dotagents_1.2.3_darwin_arm64.tar.gz"),
+    expectedChecksum(checksums, "tackroom_1.2.3_darwin_arm64.tar.gz"),
     "2222222222222222222222222222222222222222222222222222222222222222",
   );
-  assert.equal(expectedChecksum(checksums, "dotagents_1.2.3_linux_arm64.tar.gz"), null);
+  assert.equal(expectedChecksum(checksums, "tackroom_1.2.3_linux_arm64.tar.gz"), null);
 });

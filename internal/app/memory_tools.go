@@ -14,7 +14,7 @@ import (
 // and installs the binary into the user's bin directory. Source checkouts use
 // the root module; setup scaffolds a module file beside each copied tool. This
 // is how the default memory system (rem, knowledge-sync)
-// follows a machine: dotagents sync provisions it after reconciling files.
+// follows a machine: tackroom sync provisions it after reconciling files.
 //
 // installed binary, so frequent syncs stay cheap. GOBIN overrides the
 // destination directory; the default is $HOME/.local/bin. Requires the Go

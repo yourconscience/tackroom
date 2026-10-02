@@ -311,7 +311,7 @@ func discoverExternalSourceSkills(src externalSkillSource, home string) ([]disco
 	name := repoName(src.URL)
 	cachePath := filepath.Join(externalCacheDir(home), name)
 	if !hasDir(filepath.Join(cachePath, ".git")) {
-		return nil, fmt.Errorf("external source %s not cloned; run dotagents sync", src.URL)
+		return nil, fmt.Errorf("external source %s not cloned; run tackroom sync", src.URL)
 	}
 	resolvedCache, err := filepath.EvalSymlinks(cachePath)
 	if err != nil {
@@ -547,7 +547,7 @@ func applyMaterializedSkills(plan []materializedSkill) error {
 			cleanupMaterializationStages(changes)
 			return fmt.Errorf("create %s: %w", parent, err)
 		}
-		stage, err := os.MkdirTemp(parent, ".dotagents-materialize-"+skill.Name+"-")
+		stage, err := os.MkdirTemp(parent, ".tackroom-materialize-"+skill.Name+"-")
 		if err != nil {
 			cleanupMaterializationStages(changes)
 			return fmt.Errorf("stage materialized skill %s: %w", skill.Name, err)
@@ -562,7 +562,7 @@ func applyMaterializedSkills(plan []materializedSkill) error {
 	for i := range changes {
 		change := &changes[i]
 		if _, err := os.Lstat(change.Skill.TargetPath); err == nil {
-			placeholder, err := os.MkdirTemp(filepath.Dir(change.Skill.TargetPath), ".dotagents-backup-"+change.Skill.Name+"-")
+			placeholder, err := os.MkdirTemp(filepath.Dir(change.Skill.TargetPath), ".tackroom-backup-"+change.Skill.Name+"-")
 			if err != nil {
 				rollbackMaterializedChanges(changes, i-1)
 				return fmt.Errorf("prepare backup for materialized skill %s: %w", change.Skill.Name, err)

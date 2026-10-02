@@ -261,7 +261,7 @@ func TestMaterializedMultiDirSourceWritesCanonicalCopiesAndLockOwnership(t *test
 	git(t, cachePath, "add", ".")
 	git(t, cachePath, "commit", "-m", "initial")
 
-	writeSyncTestFile(t, filepath.Join(repoRoot, "dotagents.yaml"), []byte(`version: 1
+	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
 agents:
   - name: codex
     enabled: true

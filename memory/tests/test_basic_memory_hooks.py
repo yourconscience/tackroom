@@ -585,7 +585,7 @@ class ClaudeFallbackAndDispatchTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             knowledge = tmp_path / "knowledge"
-            env = self.base_env(knowledge, {"DOTAGENTS_MEMORY_SOURCE": "codex"})
+            env = self.base_env(knowledge, {"TACKROOM_MEMORY_SOURCE": "codex"})
             payload = self.claude_payload(tmp_path, "codex-1", first="codex remember this")
             payload["model"] = "gpt-5-codex"
 

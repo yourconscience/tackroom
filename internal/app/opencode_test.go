@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 	"gopkg.in/yaml.v3"
 )
 

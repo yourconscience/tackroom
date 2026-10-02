@@ -54,7 +54,7 @@ func parseHookCommandFlags(name string, args []string, requireQuery bool) (hookC
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts hookCommandOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to inspect")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Preview removals without changing native config")
 	if err := fs.Parse(args); err != nil {
@@ -67,7 +67,7 @@ func parseHookCommandFlags(name string, args []string, requireQuery bool) (hookC
 		opts.Query = strings.TrimSpace(fs.Arg(0))
 	}
 	if requireQuery && opts.Query == "" {
-		return hookCommandOptions{}, fmt.Errorf("usage: dotagents hook remove [--dry-run] [--agents ...] <query>")
+		return hookCommandOptions{}, fmt.Errorf("usage: tackroom hook remove [--dry-run] [--agents ...] <query>")
 	}
 	return opts, nil
 }

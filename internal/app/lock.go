@@ -11,7 +11,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const lockFileName = "dotagents.lock"
+const lockFileName = "tackroom.lock"
 
 type lockFile struct {
 	Version         int                  `yaml:"version"`
@@ -102,7 +102,7 @@ func writeLockFile(repoRoot string, lock lockFile) error {
 	if err != nil {
 		return fmt.Errorf("yaml encode lock: %w", err)
 	}
-	header := []byte("# Managed by dotagents sync / dotagents skill update. Pins commits and materialized skill ownership.\n")
+	header := []byte("# Managed by tackroom sync / tackroom skill update. Pins commits and materialized skill ownership.\n")
 	return os.WriteFile(lockFilePath(repoRoot), append(header, data...), 0o644)
 }
 

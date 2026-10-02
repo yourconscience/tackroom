@@ -206,14 +206,14 @@ func (s *configWebServer) handleAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *configWebServer) authenticated(r *http.Request) bool {
-	cookie, err := r.Cookie("dotagents_session")
+	cookie, err := r.Cookie("tackroom_session")
 	return err == nil && cookie.Value == s.token
 }
 
 func (s *configWebServer) setSessionCookies(w http.ResponseWriter) {
 	secure := s.secureCookie
-	http.SetCookie(w, &http.Cookie{Name: "dotagents_session", Value: s.token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure})
-	http.SetCookie(w, &http.Cookie{Name: "dotagents_csrf", Value: s.csrf, Path: "/", HttpOnly: false, SameSite: http.SameSiteStrictMode, Secure: secure})
+	http.SetCookie(w, &http.Cookie{Name: "tackroom_session", Value: s.token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure})
+	http.SetCookie(w, &http.Cookie{Name: "tackroom_csrf", Value: s.csrf, Path: "/", HttpOnly: false, SameSite: http.SameSiteStrictMode, Secure: secure})
 }
 
 func (s *configWebServer) authorizeAPI(w http.ResponseWriter, r *http.Request, mutation bool) bool {
@@ -227,8 +227,8 @@ func (s *configWebServer) authorizeAPI(w http.ResponseWriter, r *http.Request, m
 		return false
 	}
 	if mutation {
-		csrf, err := r.Cookie("dotagents_csrf")
-		if err != nil || csrf.Value == "" || r.Header.Get("X-Dotagents-CSRF") != csrf.Value || csrf.Value != s.csrf {
+		csrf, err := r.Cookie("tackroom_csrf")
+		if err != nil || csrf.Value == "" || r.Header.Get("X-Tackroom-CSRF") != csrf.Value || csrf.Value != s.csrf {
 			writeAPIError(w, http.StatusForbidden, "invalid_config", "CSRF header is required")
 			return false
 		}

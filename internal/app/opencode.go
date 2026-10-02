@@ -25,9 +25,9 @@ func openCodeConfigPath(home string) string {
 	return filepath.Join(openCodeConfigDir(home), "opencode.json")
 }
 
-// openCodeReadsAgentsSkills reports whether OpenCode already reads dotagents
+// openCodeReadsAgentsSkills reports whether OpenCode already reads tackroom
 // skills directly from the config root. OpenCode natively loads
-// ~/.agents/skills, so when the dotagents config root IS ~/.agents there is no
+// ~/.agents/skills, so when the tackroom config root IS ~/.agents there is no
 // need to mirror skills into ~/.config/opencode/skills (doing so would
 // double-list every skill).
 func openCodeReadsAgentsSkills(repoRoot string, home string) bool {

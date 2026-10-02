@@ -45,7 +45,7 @@ func augmentPiPackageReport(report *agentReport, agent agentConfig, home string)
 }
 
 // readPiPackages returns exact=false when settings contain filtered object-form
-// package entries. Dotagents' string-list declaration intentionally replaces
+// package entries. Tackroom' string-list declaration intentionally replaces
 // those entries so the canonical machine setup remains reproducible.
 func readPiPackages(home string) ([]string, bool, error) {
 	path := piSettingsPath(home)

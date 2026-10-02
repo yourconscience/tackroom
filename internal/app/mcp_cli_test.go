@@ -16,7 +16,7 @@ const (
 	mcpTestUVXCommand       = "uvx"
 )
 
-func writeTestDotagentsConfig(t *testing.T, path string) {
+func writeTestTackroomConfig(t *testing.T, path string) {
 	t.Helper()
 	data := []byte(`version: 1
 agents:
@@ -60,8 +60,8 @@ func captureStdout(t *testing.T, fn func() error) (string, error) {
 }
 
 func TestMCPCLIAddListRemove(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "dotagents.yaml")
-	writeTestDotagentsConfig(t, configPath)
+	configPath := filepath.Join(t.TempDir(), "tackroom.yaml")
+	writeTestTackroomConfig(t, configPath)
 
 	if err := runMCP([]string{"add", "local", "--command", mcpTestUVXCommand, "--arg", "pkg@latest", "--env", "SECRET=value", "--agents", "claude-code,droid", "--config", configPath}); err != nil {
 		t.Fatal(err)
@@ -111,8 +111,8 @@ func TestMCPCLIAddListRemove(t *testing.T) {
 func TestMCPCLIImport(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	configPath := filepath.Join(t.TempDir(), "dotagents.yaml")
-	writeTestDotagentsConfig(t, configPath)
+	configPath := filepath.Join(t.TempDir(), "tackroom.yaml")
+	writeTestTackroomConfig(t, configPath)
 
 	claudePath := filepath.Join(home, ".claude.json")
 	if err := os.MkdirAll(filepath.Dir(claudePath), 0o755); err != nil {
@@ -150,8 +150,8 @@ func TestMCPCLIImport(t *testing.T) {
 func TestMCPCLIImportCodexMultiline(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	configPath := filepath.Join(t.TempDir(), "dotagents.yaml")
-	writeTestDotagentsConfig(t, configPath)
+	configPath := filepath.Join(t.TempDir(), "tackroom.yaml")
+	writeTestTackroomConfig(t, configPath)
 
 	codexPath := filepath.Join(home, ".codex", "config.toml")
 	if err := os.MkdirAll(filepath.Dir(codexPath), 0o755); err != nil {
@@ -204,8 +204,8 @@ env = {
 func TestMCPCLIImportCodexLiteralStrings(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	configPath := filepath.Join(t.TempDir(), "dotagents.yaml")
-	writeTestDotagentsConfig(t, configPath)
+	configPath := filepath.Join(t.TempDir(), "tackroom.yaml")
+	writeTestTackroomConfig(t, configPath)
 
 	codexPath := filepath.Join(home, ".codex", "config.toml")
 	if err := os.MkdirAll(filepath.Dir(codexPath), 0o755); err != nil {
@@ -242,8 +242,8 @@ env = { TOKEN = 'secret', HASH = 'keep#value' }
 }
 
 func TestMCPCLIRejectsUnsupportedAgent(t *testing.T) {
-	configPath := filepath.Join(t.TempDir(), "dotagents.yaml")
-	writeTestDotagentsConfig(t, configPath)
+	configPath := filepath.Join(t.TempDir(), "tackroom.yaml")
+	writeTestTackroomConfig(t, configPath)
 	if err := runMCP([]string{"add", "bad", "--command", mcpTestUVXCommand, "--agents", "unsupported-agent", "--config", configPath}); err == nil {
 		t.Fatal("mcp add with unknown agent succeeded, want error")
 	}

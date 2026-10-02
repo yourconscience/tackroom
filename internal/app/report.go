@@ -9,7 +9,7 @@ import (
 )
 
 func printReport(mode string, repoRoot string, repoReport repoLinkReport, reports []agentReport, home string, cfg config) {
-	fmt.Printf("dotagents %s\n", mode)
+	fmt.Printf("tackroom %s\n", mode)
 	fmt.Printf("repo: %s\n", repoRoot)
 	fmt.Printf("~/.agents: %s", repoReport.State)
 	if repoReport.State == stateSynced {
@@ -261,13 +261,13 @@ func (p palette) mark(kind string) string {
 	}
 }
 
-// printStatusReport renders a human-scannable `dotagents status`: overall health
+// printStatusReport renders a human-scannable `tackroom status`: overall health
 // first, then a compact per-harness block that leads with sync state and shows
 // only actionable drift. The identical multi-harness managed lists collapse to
 // counts; --verbose (verbose=true) restores the full lists and native roots.
 func printStatusReport(repoRoot string, repoReport repoLinkReport, reports []agentReport, home string, cfg config, verbose bool) {
 	p := statusPalette()
-	fmt.Println(p.bold("dotagents status"))
+	fmt.Println(p.bold("tackroom status"))
 	fmt.Println()
 
 	if repoReport.State == stateSynced {
@@ -326,7 +326,7 @@ func printStatusReport(repoRoot string, repoReport repoLinkReport, reports []age
 	if len(drifted) > 0 {
 		fmt.Printf("%s %s\n", p.yellow("drifted:"), strings.Join(drifted, ", "))
 	}
-	fmt.Printf("run %s to reconcile.\n", p.bold("dotagents sync"))
+	fmt.Printf("run %s to reconcile.\n", p.bold("tackroom sync"))
 }
 
 // checkMarkKind maps a checkResult status to a palette mark kind.

@@ -1,40 +1,40 @@
-# dotagents
+# tackroom
 
 Dotfiles for your AI agents.
 
 
-[![Release](https://img.shields.io/github/v/release/yourconscience/dotagents)](https://github.com/yourconscience/dotagents/releases) [![brew](https://img.shields.io/badge/brew-yourconscience%2Ftap-orange)](https://github.com/yourconscience/homebrew-tap) [![npm](https://img.shields.io/npm/v/@your_conscience%2fdotagents)](https://www.npmjs.com/package/@your_conscience/dotagents) [![CI](https://github.com/yourconscience/dotagents/actions/workflows/ci.yml/badge.svg)](https://github.com/yourconscience/dotagents/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Release](https://img.shields.io/github/v/release/yourconscience/tackroom)](https://github.com/yourconscience/tackroom/releases) [![brew](https://img.shields.io/badge/brew-yourconscience%2Ftap-orange)](https://github.com/yourconscience/homebrew-tap) [![npm](https://img.shields.io/npm/v/@your_conscience%2ftackroom)](https://www.npmjs.com/package/@your_conscience/tackroom) [![CI](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml/badge.svg)](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 ```bash
-brew install yourconscience/tap/dotagents
+brew install yourconscience/tap/tackroom
 ```
 
-> Not affiliated with the unscoped npm `dotagents` package — this repo publishes as [`@your_conscience/dotagents`](https://www.npmjs.com/package/@your_conscience/dotagents).
+> Formerly `dotagents`. Renamed in v1.0 because several unrelated tools, including Sentry's `@sentry/dotagents`, ship a `dotagents` binary that manages the same `~/.agents` directory.
 
-**[Overview & comparison →](https://yourconscience.github.io/dotagents/)** · [Releases](https://github.com/yourconscience/dotagents/releases) · [Docs](docs/)
+**[Overview & comparison →](https://yourconscience.github.io/tackroom/)** · [Releases](https://github.com/yourconscience/tackroom/releases) · [Docs](docs/)
 
 ## Why
 
-If you use more than one coding agent, you maintain the same skills, MCP servers, hooks, and roles in a different place and format for each one. Copying them by hand drifts within a week. Skills have converged on one open convention ([agentskills.io](https://agentskills.io)), plugins on [agent-plugins-spec](https://agent-plugins.org), and root instructions on `AGENTS.md` — but every harness still stores and renders config in its own native format. dotagents applies the dotfiles pattern to that last mile: one versioned repo, rendered natively per harness, with memory tooling built in.
+If you use more than one coding agent, you maintain the same skills, MCP servers, hooks, and roles in a different place and format for each one. Copying them by hand drifts within a week. Skills have converged on one open convention ([agentskills.io](https://agentskills.io)), plugins on [agent-plugins-spec](https://agent-plugins.org), and root instructions on `AGENTS.md` — but every harness still stores and renders config in its own native format. tackroom applies the dotfiles pattern to that last mile: one versioned repo, rendered natively per harness, with memory tooling built in.
 
 ## Quick start
 
 ```bash
-brew install yourconscience/tap/dotagents   # or: npm i -g @your_conscience/dotagents
-# no brew/npm? curl -fsSL https://raw.githubusercontent.com/yourconscience/dotagents/main/scripts/install.sh | sh
-dotagents setup                             # detect harnesses, import, first sync
+brew install yourconscience/tap/tackroom   # or: npm i -g @your_conscience/tackroom
+# no brew/npm? curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
+tackroom setup                             # detect harnesses, import, first sync
 ```
 
 `setup` creates `~/.agents`, detects installed harnesses, imports existing content by copy after a per-item review, and runs the first sync. To carry the setup to other machines, add a private git remote and repeat — details in [docs/setup.md](docs/setup.md).
 
 ```bash
-dotagents status   # per-harness sync state
-dotagents doctor   # health checks: frontmatter, lock pins, audits, hooks
+tackroom status   # per-harness sync state
+tackroom doctor   # health checks: frontmatter, lock pins, audits, hooks
 ```
 
 ## What it syncs
 
-Five surfaces, each rendered into the harness's own format — dotagents does not invent compatibility files a harness cannot consume:
+Five surfaces, each rendered into the harness's own format — tackroom does not invent compatibility files a harness cannot consume:
 
 | Harness | Skills | Roles | MCP | Hooks | Plugins |
 |---|---|---|---|---|---|
@@ -48,7 +48,7 @@ Five surfaces, each rendered into the harness's own format — dotagents does no
 | OMP (pi fork) | yes | yes | yes | --‡ | -- |
 | Pi* | yes | yes* | yes* | -- | skills + MCP* |
 
-\* Vanilla [pi](https://github.com/earendil-works/pi) gains managed roles through `pi-subagents` and managed MCP/Agent Plugin projection through `pi-mcp-adapter`. A Pi target can also declare a pinned `packages` list; `sync` writes that list to `~/.pi/agent/settings.json`, and Pi installs missing packages on its next startup. Dotagents does not install the Pi executable itself. The OMP fork remains a separate target.
+\* Vanilla [pi](https://github.com/earendil-works/pi) gains managed roles through `pi-subagents` and managed MCP/Agent Plugin projection through `pi-mcp-adapter`. A Pi target can also declare a pinned `packages` list; `sync` writes that list to `~/.pi/agent/settings.json`, and Pi installs missing packages on its next startup. Tackroom does not install the Pi executable itself. The OMP fork remains a separate target.
 
 ```yaml
 agents:
@@ -63,14 +63,14 @@ agents:
 ```
 † OpenCode reads `~/.agents/skills/` natively; its only hook surface is a JS plugin API.
 ‡ OMP has no managed hook surface yet; register memory hooks manually if needed.
-§ Qwen Code natively loads Agent Plugins v1 skills and MCP servers; dotagents manages those same surfaces without rewriting the plugin.
-⁑ Amp's hook and role surfaces use plugin-based models incompatible with dotagents' script-based hooks and per-agent role files.
+§ Qwen Code natively loads Agent Plugins v1 skills and MCP servers; tackroom manages those same surfaces without rewriting the plugin.
+⁑ Amp's hook and role surfaces use plugin-based models incompatible with tackroom' script-based hooks and per-agent role files.
 
 OpenClaw is not currently supported. Native skill discovery from `~/.agents/skills` may work due to OpenClaw's multi-tier skill precedence, but this is unverified and unmanaged. A managed harness entry is planned for a future release. A "yes" above only appears after end-to-end verification.
 
 ## Skills
 
-A skill is a directory under `~/.agents/skills/` with a `SKILL.md` ([agentskills.io](https://agentskills.io) convention) — create once, appears everywhere. External skills are treated like dependencies: pinned in `dotagents.lock`, materialized for diffing, audited by `dotagents doctor`. Details in [docs/skills.md](docs/skills.md).
+A skill is a directory under `~/.agents/skills/` with a `SKILL.md` ([agentskills.io](https://agentskills.io) convention) — create once, appears everywhere. External skills are treated like dependencies: pinned in `tackroom.lock`, materialized for diffing, audited by `tackroom doctor`. Details in [docs/skills.md](docs/skills.md).
 
 ## Memory
 
@@ -92,69 +92,65 @@ Markdown role definitions in `~/.agents/agents/`, rendered to each harness's nat
 ## Commands
 
 ```bash
-dotagents setup    [--memory off|basic|memsearch] [--yes] [--dry-run] [--json]
-dotagents status   [--verbose] [--agents ...]
-dotagents sync     [--pull] [--agents ...]
-dotagents doctor   [--e2e] [--agents ...]
-dotagents config                  # Bubble Tea canonical YAML editor (terminal)
-dotagents config validate|print
-dotagents view     [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host]  # loopback web config UI
-dotagents inspect  [--no-open] [--ssh-host user@host] [--port N] [--host ADDR]  # launch HarnessKit (cross-harness inspector)
-dotagents sessions [--no-open] [--ssh-host user@host] [--port N] [--host ADDR]  # launch AgentsView (sessions and usage)
-dotagents skill    new|list|info|update|promote
-dotagents publish  [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]  # push skills to a remote registry
-dotagents mcp      list|add|import|remove
-dotagents hook     list [query] | remove [--dry-run] <query>
+tackroom setup    [--memory off|basic|memsearch] [--yes] [--dry-run] [--json]
+tackroom status   [--verbose] [--agents ...]
+tackroom sync     [--pull] [--agents ...]
+tackroom doctor   [--e2e] [--agents ...]
+tackroom config                  # Bubble Tea canonical YAML editor (terminal)
+tackroom config validate|print
+tackroom view     [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host]  # loopback web config UI
+tackroom inspect  [--no-open] [--ssh-host user@host] [--port N] [--host ADDR]  # launch HarnessKit (cross-harness inspector)
+tackroom sessions [--no-open] [--ssh-host user@host] [--port N] [--host ADDR]  # launch AgentsView (sessions and usage)
+tackroom skill    new|list|info|update|promote
+tackroom publish  [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]  # push skills to a remote registry
+tackroom mcp      list|add|import|remove
+tackroom hook     list [query] | remove [--dry-run] <query>
 ```
 
 ## Supported integrations
 
-dotagents can launch two optional external tools. Neither is installed, vendored, or required by dotagents:
+tackroom can launch two optional external tools. Neither is installed, vendored, or required by tackroom:
 
 | Integration | Purpose | Connector |
 |---|---|---|
-| [HarnessKit](https://github.com/RealZST/HarnessKit) | Inspect and audit skills, MCP servers, hooks, and native harness configuration | `dotagents inspect` |
-| [AgentsView](https://github.com/kenn-io/agentsview) | Search and replay sessions; inspect tool telemetry, token usage, and estimated cost | `dotagents sessions` |
+| [HarnessKit](https://github.com/RealZST/HarnessKit) | Inspect and audit skills, MCP servers, hooks, and native harness configuration | `tackroom inspect` |
+| [AgentsView](https://github.com/kenn-io/agentsview) | Search and replay sessions; inspect tool telemetry, token usage, and estimated cost | `tackroom sessions` |
 
-`dotagents skill list` remains the built-in provenance view for each harness skill root. It reports managed links, foreign symlinks, unmanaged directories, drift, broken links, and estimated context cost.
+`tackroom skill list` remains the built-in provenance view for each harness skill root. It reports managed links, foreign symlinks, unmanaged directories, drift, broken links, and estimated context cost.
 
-`dotagents hook list [query]` inventories native hook registrations and marks canonical entries as managed and missing script targets as stale. To clean up a hook installed outside dotagents, preview with `dotagents hook remove --dry-run <query>`, then rerun without `--dry-run`; unrelated hook entries are preserved. `dotagents doctor` reports stale native hooks, and `dotagents sync` reconciles the remaining canonical hooks afterward.
+`tackroom hook list [query]` inventories native hook registrations and marks canonical entries as managed and missing script targets as stale. To clean up a hook installed outside tackroom, preview with `tackroom hook remove --dry-run <query>`, then rerun without `--dry-run`; unrelated hook entries are preserved. `tackroom doctor` reports stale native hooks, and `tackroom sync` reconciles the remaining canonical hooks afterward.
 
-`dotagents inspect` shells out to HarnessKit (`hk serve`). Treat it as read-mostly: HarnessKit's enable/disable/deploy actions bypass dotagents, so reconcile any changes with `dotagents sync`. Install HarnessKit separately.
+`tackroom inspect` shells out to HarnessKit (`hk serve`). Treat it as read-mostly: HarnessKit's enable/disable/deploy actions bypass tackroom, so reconcile any changes with `tackroom sync`. Install HarnessKit separately.
 
-`dotagents sessions` shells out to AgentsView (`agentsview serve`). AgentsView owns its local transcript index and configuration; dotagents does not sync or mutate either. `--no-open` maps to AgentsView's `--no-browser`; `--ssh-host user@host` prints a loopback tunnel command on a remote machine. Other flags are forwarded to `agentsview serve`. Install AgentsView separately.
+`tackroom sessions` shells out to AgentsView (`agentsview serve`). AgentsView owns its local transcript index and configuration; tackroom does not sync or mutate either. `--no-open` maps to AgentsView's `--no-browser`; `--ssh-host user@host` prints a loopback tunnel command on a remote machine. Other flags are forwarded to `agentsview serve`. Install AgentsView separately.
 
-## Installing skills without dotagents
+## Installing skills without tackroom
 
-A dotagents-format repo also works as a plain skills source. Anyone can copy individual skills into their harness of choice with the skills.sh installer, no dotagents install needed:
+A tackroom-format repo also works as a plain skills source. Anyone can copy individual skills into their harness of choice with the skills.sh installer, no tackroom install needed:
 
 ```bash
-npx skills add yourconscience/myagents -s dotagents --copy   # verified: copies cleanly, no symlinks
+npx skills add yourconscience/myagents -s tackroom --copy   # verified: copies cleanly, no symlinks
 ```
 
-That path copies editable files (the "fork" model); dotagents users get the symlink-to-canonical model with lock-pinned updates. Pick one per machine — installing both leaves you with every skill twice.
-
-## Not to be confused with
-
-Other tools share the name: npm's [`dotagents`](https://www.npmjs.com/package/dotagents) (@iannuttall) and Sentry's [`@sentry/dotagents`](https://www.npmjs.com/package/@sentry/dotagents) skill vendoring CLI. This repo is `yourconscience/dotagents` — install as `brew install yourconscience/tap/dotagents` or `npm i -g @your_conscience/dotagents`.
+That path copies editable files (the "fork" model); tackroom users get the symlink-to-canonical model with lock-pinned updates. Pick one per machine — installing both leaves you with every skill twice.
 
 ## Configuration
 
-`~/.agents/dotagents.yaml` is the single source of truth; `setup` fills in detected harnesses. Resolution order: `--config <path>` → `$DOTAGENTS_HOME/dotagents.yaml` → `~/.agents/dotagents.yaml`; never walks the current project. Machine-local entries overlay via `dotagents.local.yaml`. Managed entries are marked in native configs; anything else is left untouched.
+`~/.agents/tackroom.yaml` is the single source of truth; `setup` fills in detected harnesses. Resolution order: `--config <path>` → `$TACKROOM_HOME/tackroom.yaml` → `~/.agents/tackroom.yaml`; never walks the current project. Machine-local entries overlay via `tackroom.local.yaml`. Managed entries are marked in native configs; anything else is left untouched.
 
 ### Canonical config authoring
 
-`dotagents config` (terminal TUI) and `dotagents view` (browser web UI) edit the
+`tackroom config` (terminal TUI) and `tackroom view` (browser web UI) edit the
 resolved canonical YAML through the same review-first flow. Shared and
-`dotagents.local.yaml` are separate editable layers; the effective view is
+`tackroom.local.yaml` are separate editable layers; the effective view is
 read-only. Structured edits preserve comments and unknown fields, and a save
 never runs `sync` implicitly.
 
 ```bash
-dotagents config                       # interactive terminal editor
-dotagents view --no-open --addr 127.0.0.1:8765   # loopback web UI, print the URL
-dotagents config validate
-dotagents config print
+tackroom config                       # interactive terminal editor
+tackroom view --no-open --addr 127.0.0.1:8765   # loopback web UI, print the URL
+tackroom config validate
+tackroom config print
 ```
 
 The `view` web server is loopback-only, session-cookie authenticated (a
@@ -167,8 +163,8 @@ and opens your default browser locally; `--no-open` skips that, and
 deliberate HTTPS tailnet access, expose the loopback listener yourself:
 
 ```bash
-dotagents view --no-open --secure-cookie --addr 127.0.0.1:8765
-tailscale serve --bg --set-path /dotagents http://127.0.0.1:8765
+tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765
+tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
 ```
 
 ## Releases
@@ -183,16 +179,16 @@ The script refuses to run unless the tree is clean, `HEAD` matches `origin/main`
 
 ## Documentation
 
-- [Overview & comparison](https://yourconscience.github.io/dotagents/) — landing page, sync matrix, positioning
+- [Overview & comparison](https://yourconscience.github.io/tackroom/) — landing page, sync matrix, positioning
 - [docs/setup.md](docs/setup.md) — first-run walkthrough, review screen, multi-machine setup
 - [docs/skills.md](docs/skills.md) — authoring skills, external pins and audits
 - [docs/roles.md](docs/roles.md) — role format, model tiers, per-harness overrides
 - [docs/memory.md](docs/memory.md) — memory tiers, rem workflow, vault layout
-- [docs/comparison.md](docs/comparison.md) — how dotagents differs from rulesync, ruler, openskills
+- [docs/comparison.md](docs/comparison.md) — how tackroom differs from rulesync, ruler, openskills
 - [Troubleshooting](docs/troubleshooting.md)
 - [memory/README.md](memory/README.md) — memory layer layout, hooks, and tools
 
-Project-level generators (rulesync, ruler) win on tool breadth; dotagents is user-level — one private repo, nine targets deep, pinned externals, review-first memory. Full table in [docs/comparison.md](docs/comparison.md).
+Project-level generators (rulesync, ruler) win on tool breadth; tackroom is user-level — one private repo, nine targets deep, pinned externals, review-first memory. Full table in [docs/comparison.md](docs/comparison.md).
 
 ## License
 

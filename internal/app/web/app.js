@@ -4,13 +4,13 @@ let state = null;
 const baseURL = new URL(window.location.pathname.endsWith('/') ? window.location.pathname : `${window.location.pathname}/`, window.location.origin);
 
 function csrf() {
-  return document.cookie.split('; ').find((item) => item.startsWith('dotagents_csrf='))?.split('=')[1] || '';
+  return document.cookie.split('; ').find((item) => item.startsWith('tackroom_csrf='))?.split('=')[1] || '';
 }
 function setStatus(message, kind = '') {
   const node = $('#status'); node.textContent = message; node.className = `status ${kind}`;
 }
 async function api(path, options = {}) {
-  const headers = {'Accept':'application/json', ...(options.body ? {'Content-Type':'application/json'} : {}), ...(options.method && options.method !== 'GET' ? {'X-Dotagents-CSRF':csrf()} : {})};
+  const headers = {'Accept':'application/json', ...(options.body ? {'Content-Type':'application/json'} : {}), ...(options.method && options.method !== 'GET' ? {'X-Tackroom-CSRF':csrf()} : {})};
   const response = await fetch(new URL(path.replace(/^\//, ''), baseURL), {...options, headers});
   const body = await response.json().catch(() => ({}));
   if (!response.ok) {

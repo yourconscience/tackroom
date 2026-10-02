@@ -144,7 +144,7 @@ func TestReconcileStarterSetNeverTouchesUnrecognizedManagedContent(t *testing.T)
 	root := t.TempDir()
 	shipped, legacy := testStarterSet()
 
-	// Neither a recorded baseline nor a known earlier release: dotagents must
+	// Neither a recorded baseline nor a known earlier release: tackroom must
 	// not overwrite it, and must keep reporting it.
 	writeStarter(t, root, "memory/lib/keep.py", "def my_own_helper():\n    pass\n")
 
@@ -168,7 +168,7 @@ func TestReconcileStarterSetNeverTouchesUnrecognizedManagedContent(t *testing.T)
 		t.Fatal(err)
 	}
 	if _, ok := manifest.Files["memory/lib/keep.py"]; ok {
-		t.Fatal("manifest recorded a file dotagents never wrote")
+		t.Fatal("manifest recorded a file tackroom never wrote")
 	}
 }
 
@@ -257,7 +257,7 @@ func TestShippedStarterFilesAreManagedPathsOnly(t *testing.T) {
 		}
 	}
 	// User content must never be treated as managed code.
-	for _, path := range []string{"AGENTS.md", "dotagents.yaml", "agents/architect.md", "skills/dotagents/SKILL.md"} {
+	for _, path := range []string{"AGENTS.md", "tackroom.yaml", "agents/architect.md", "skills/tackroom/SKILL.md"} {
 		if isManagedStarterPath(path) {
 			t.Fatalf("%s must not be managed", path)
 		}
@@ -281,9 +281,9 @@ func TestRunSyncReconcilesManagedStarterFiles(t *testing.T) {
 	home := t.TempDir()
 	repoRoot := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("DOTAGENTS_HOME", repoRoot)
+	t.Setenv("TACKROOM_HOME", repoRoot)
 
-	writeSyncTestFile(t, filepath.Join(repoRoot, "dotagents.yaml"), []byte(`version: 1
+	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
 agents:
   - name: hermes
     enabled: true
@@ -312,7 +312,7 @@ agents:
 		t.Fatalf("manifest did not record the shipped hash for a scaffolded file: %#v", manifest.Files)
 	}
 	if _, ok := manifest.Files["memory/hooks/common.sh"]; ok {
-		t.Fatal("manifest claimed a file dotagents never wrote")
+		t.Fatal("manifest claimed a file tackroom never wrote")
 	}
 }
 

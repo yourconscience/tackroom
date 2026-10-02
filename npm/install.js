@@ -1,6 +1,6 @@
 "use strict";
 
-// Downloads the dotagents binary for this platform from GitHub Releases and
+// Downloads the tackroom binary for this platform from GitHub Releases and
 // verifies its sha256 against the published checksums.txt before extraction.
 // No code from the archive is executed; only the checksum-verified binary is
 // unpacked next to the bin shim.
@@ -12,7 +12,7 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const REPO = "yourconscience/dotagents";
+const REPO = "yourconscience/tackroom";
 const MAX_REDIRECTS = 5;
 
 function platformTarget(platform = process.platform, arch = process.arch) {
@@ -25,7 +25,7 @@ function platformTarget(platform = process.platform, arch = process.arch) {
 }
 
 function assetName(version, target) {
-  return `dotagents_${version}_${target.goos}_${target.goarch}.tar.gz`;
+  return `tackroom_${version}_${target.goos}_${target.goarch}.tar.gz`;
 }
 
 function releaseAssetUrl(version, name) {
@@ -75,11 +75,11 @@ function fetchBuffer(url, redirects = 0) {
 
 async function install(options = {}) {
   const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "package.json"), "utf8"));
-  const version = options.version || process.env.DOTAGENTS_VERSION || pkg.version;
+  const version = options.version || process.env.TACKROOM_VERSION || pkg.version;
   const target = platformTarget(options.platform, options.arch);
   if (!target) {
     throw new Error(
-      `dotagents has no prebuilt binary for ${options.platform || process.platform}/${options.arch || process.arch}; use brew or scripts/install.sh instead`,
+      `tackroom has no prebuilt binary for ${options.platform || process.platform}/${options.arch || process.arch}; use brew or scripts/install.sh instead`,
     );
   }
 
@@ -111,7 +111,7 @@ async function install(options = {}) {
     fs.rmSync(tmpArchive, { force: true });
   }
 
-  const binary = path.join(binDir, "dotagents");
+  const binary = path.join(binDir, "tackroom");
   fs.chmodSync(binary, 0o755);
   return binary;
 }
@@ -121,10 +121,10 @@ module.exports = { platformTarget, assetName, releaseAssetUrl, sha256, expectedC
 if (require.main === module) {
   install()
     .then((binary) => {
-      console.log(`dotagents installed to ${binary}`);
+      console.log(`tackroom installed to ${binary}`);
     })
     .catch((error) => {
-      console.error(`dotagents postinstall failed: ${error.message}`);
+      console.error(`tackroom postinstall failed: ${error.message}`);
       console.error("The CLI still works via brew or scripts/install.sh; see the README.");
       process.exit(1);
     });

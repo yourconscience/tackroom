@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 )
 
 type renderedAgentRole struct {
@@ -87,13 +87,13 @@ func inspectAgentRoles(report *agentReport, repoRoot string, agent agentConfig) 
 			report.UpdatesAgent = append(report.UpdatesAgent, name)
 			continue
 		}
-		report.Conflicts = append(report.Conflicts, fmt.Sprintf("agent %s exists but is not dotagents-managed", rendered.Target))
+		report.Conflicts = append(report.Conflicts, fmt.Sprintf("agent %s exists but is not tackroom-managed", rendered.Target))
 	}
 	return nil
 }
 
 func isManagedAgentFile(path string, data []byte, repoRoot string) bool {
-	if strings.Contains(string(data), agentrole.GeneratedMarker) {
+	if strings.Contains(string(data), agentrole.GeneratedMarker) || strings.Contains(string(data), agentrole.LegacyGeneratedMarker) {
 		return true
 	}
 

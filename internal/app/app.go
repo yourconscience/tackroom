@@ -18,7 +18,7 @@ type config struct {
 	Hooks          []hookConfig          `yaml:"hooks,omitempty"`
 	UI             *uiConfig             `yaml:"ui,omitempty"`
 	// ContextNoteTokens is the estimated skill-listing token threshold above
-	// which `dotagents doctor` prints a soft context advisory note. Absent
+	// which `tackroom doctor` prints a soft context advisory note. Absent
 	// (nil) uses contextNoteTokensDefault; 0 (or negative) disables the note.
 	ContextNoteTokens *int `yaml:"context_note_tokens,omitempty"`
 }
@@ -252,10 +252,10 @@ func Run(args []string) error {
 			printAllUsage()
 			return nil
 		}
-		return errors.New("usage: dotagents help [--all]")
+		return errors.New("usage: tackroom help [--all]")
 	case "-h", "--help":
 		if len(args) != 1 {
-			return errors.New("usage: dotagents help [--all]")
+			return errors.New("usage: tackroom help [--all]")
 		}
 		printUsage()
 		return nil
@@ -299,7 +299,7 @@ func parseStatusFlags(args []string) (runOptions, error) {
 	fs.SetOutput(os.Stderr)
 
 	var opts runOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
 	fs.BoolVar(&opts.Verbose, "verbose", false, "Show full managed/external skill lists and native root paths")
@@ -445,7 +445,7 @@ func runDeprecatedMemsearch(args []string) error {
 }
 
 func printRenameNotice(oldCommand string, newCommand string) {
-	fmt.Fprintf(os.Stderr, "dotagents: %q was renamed to %q\n", oldCommand, newCommand)
+	fmt.Fprintf(os.Stderr, "tackroom: %q was renamed to %q\n", oldCommand, newCommand)
 }
 
 func parseSubcommandFlags(name string, args []string) (runOptions, error) {
@@ -453,7 +453,7 @@ func parseSubcommandFlags(name string, args []string) (runOptions, error) {
 	fs.SetOutput(os.Stderr)
 
 	var opts runOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
 
@@ -472,7 +472,7 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	fs.SetOutput(os.Stderr)
 	var opts runOptions
 	opts.MemoryTier = memoryTierBasic
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.StringVar(&opts.MemoryTier, "memory", memoryTierBasic, "Memory tier: off, basic, or memsearch")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Emit detection result as JSON and exit")
@@ -491,7 +491,7 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs := flag.NewFlagSet("sync", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts runOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.Pull, "pull", false, "Pull the repo before syncing")
 	if err := fs.Parse(args); err != nil {
@@ -507,7 +507,7 @@ func parseDoctorFlags(args []string) (runOptions, error) {
 	fs := flag.NewFlagSet("doctor", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts runOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.E2E, "e2e", false, "Run sync, status, and doctor end to end")
 	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
@@ -525,7 +525,7 @@ func parseCronFlags(args []string) (cronOptions, error) {
 	fs.SetOutput(os.Stderr)
 
 	var opts cronOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names")
 	fs.BoolVar(&opts.Remove, "remove", false, "Remove the cron entry instead of installing")
 	fs.BoolVar(&opts.Deps, "deps", false, "Install dependency maintenance cron instead of auto-pull")
@@ -538,7 +538,7 @@ func parseCronFlags(args []string) (cronOptions, error) {
 }
 
 func printUsage() {
-	fmt.Println("dotagents - manage shared skills, MCP, and canonical config")
+	fmt.Println("tackroom - manage shared skills, MCP, and canonical config")
 	fmt.Println()
 	fmt.Println("Commands:")
 	fmt.Println("  setup    Set up this machine and sync configured harnesses")
@@ -558,40 +558,40 @@ func printUsage() {
 	fmt.Println("  mcp      Manage MCP servers")
 	fmt.Println("  hook     Review and remove native hook registrations")
 	fmt.Println()
-	fmt.Println("Run \"dotagents help --all\" for flags, maintenance commands, and compatibility aliases.")
+	fmt.Println("Run \"tackroom help --all\" for flags, maintenance commands, and compatibility aliases.")
 }
 
 func printAllUsage() {
 	printUsage()
 	fmt.Println()
 	fmt.Println("Canonical forms:")
-	fmt.Println("  dotagents setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--dry-run] [--json]")
-	fmt.Println("  dotagents status [--verbose] [--agents ...]")
-	fmt.Println("  dotagents sync [--pull] [--agents ...]")
-	fmt.Println("  dotagents doctor [--e2e] [--agents ...]")
-	fmt.Println("  dotagents config [validate|print] [--config PATH]")
-	fmt.Println("  dotagents view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]")
-	fmt.Println("  dotagents inspect [--no-open] [--ssh-host user@host] [hk serve flags: --port N, --host ADDR, --no-token]")
-	fmt.Println("  dotagents sessions [--no-open] [--ssh-host user@host] [agentsview serve flags: --port N, --host ADDR, --no-sync]")
-	fmt.Println("  dotagents skill new <name> [--description ...]")
-	fmt.Println("  dotagents skill list [--agents ...]")
-	fmt.Println("  dotagents skill info <name>")
-	fmt.Println("  dotagents skill update [name ...]")
-	fmt.Println("  dotagents skill promote <name-or-path> [--dry-run]")
-	fmt.Println("  dotagents publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]")
-	fmt.Println("  dotagents mcp <list|add|import|remove> [options]")
-	fmt.Println("  dotagents hook list [--agents ...] [query]")
-	fmt.Println("  dotagents hook remove [--dry-run] [--agents ...] <query>")
+	fmt.Println("  tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--dry-run] [--json]")
+	fmt.Println("  tackroom status [--verbose] [--agents ...]")
+	fmt.Println("  tackroom sync [--pull] [--agents ...]")
+	fmt.Println("  tackroom doctor [--e2e] [--agents ...]")
+	fmt.Println("  tackroom config [validate|print] [--config PATH]")
+	fmt.Println("  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]")
+	fmt.Println("  tackroom inspect [--no-open] [--ssh-host user@host] [hk serve flags: --port N, --host ADDR, --no-token]")
+	fmt.Println("  tackroom sessions [--no-open] [--ssh-host user@host] [agentsview serve flags: --port N, --host ADDR, --no-sync]")
+	fmt.Println("  tackroom skill new <name> [--description ...]")
+	fmt.Println("  tackroom skill list [--agents ...]")
+	fmt.Println("  tackroom skill info <name>")
+	fmt.Println("  tackroom skill update [name ...]")
+	fmt.Println("  tackroom skill promote <name-or-path> [--dry-run]")
+	fmt.Println("  tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]")
+	fmt.Println("  tackroom mcp <list|add|import|remove> [options]")
+	fmt.Println("  tackroom hook list [--agents ...] [query]")
+	fmt.Println("  tackroom hook remove [--dry-run] [--agents ...] <query>")
 	fmt.Println()
 	fmt.Println("Maintenance and compatibility aliases:")
-	fmt.Println("  dotagents cron [--interval 30m|--deps|--remove]")
-	fmt.Println("  dotagents deps <check|update> [options]")
-	fmt.Println("  dotagents memsearch <setup|status> [options]")
-	fmt.Println("  dotagents pull [options]")
-	fmt.Println("  dotagents render [options]")
-	fmt.Println("  dotagents audit [options]")
-	fmt.Println("  dotagents external <list|update> [name ...]")
-	fmt.Println("  dotagents skillify <name> [options]")
-	fmt.Println("  dotagents promote <name-or-path> [--dry-run]")
-	fmt.Println("  dotagents dogfood [options]")
+	fmt.Println("  tackroom cron [--interval 30m|--deps|--remove]")
+	fmt.Println("  tackroom deps <check|update> [options]")
+	fmt.Println("  tackroom memsearch <setup|status> [options]")
+	fmt.Println("  tackroom pull [options]")
+	fmt.Println("  tackroom render [options]")
+	fmt.Println("  tackroom audit [options]")
+	fmt.Println("  tackroom external <list|update> [name ...]")
+	fmt.Println("  tackroom skillify <name> [options]")
+	fmt.Println("  tackroom promote <name-or-path> [--dry-run]")
+	fmt.Println("  tackroom dogfood [options]")
 }

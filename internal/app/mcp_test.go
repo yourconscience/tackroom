@@ -541,7 +541,7 @@ func TestAmpConfigPreservesExistingSkillPaths(t *testing.T) {
 		t.Fatal(err)
 	}
 	if !patched {
-		t.Fatal("patchAmpConfig did not patch missing dotagents path")
+		t.Fatal("patchAmpConfig did not patch missing tackroom path")
 	}
 	out, err := os.ReadFile(configPath)
 	if err != nil {

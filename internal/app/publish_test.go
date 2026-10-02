@@ -61,7 +61,7 @@ func writePublishSkill(t *testing.T, repoRoot, name string, files map[string]str
 
 func writePublishConfig(t *testing.T, repoRoot, body string) string {
 	t.Helper()
-	p := filepath.Join(repoRoot, "dotagents.yaml")
+	p := filepath.Join(repoRoot, "tackroom.yaml")
 	if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestRunPublishLifecycle(t *testing.T) {
 	if len(reg.creates) != 0 {
 		t.Fatalf("dry-run uploaded: %v", reg.creates)
 	}
-	if _, err := os.Stat(filepath.Join(repo, "dotagents.lock")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(repo, "tackroom.lock")); !os.IsNotExist(err) {
 		t.Fatalf("dry-run wrote a lock file")
 	}
 	if !strings.Contains(out, "dry-run") {

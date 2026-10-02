@@ -21,9 +21,9 @@ type detectedSource struct {
 
 // detectedItem is a unified representation of a skill, role, or MCP server
 // found in one or more harness configs that is NOT already managed by
-// dotagents. Managed items (symlinks, owned roles, configured MCP) are
+// tackroom. Managed items (symlinks, owned roles, configured MCP) are
 // pre-filtered during detection. Hooks are excluded: they flow FROM
-// dotagents.yaml INTO harnesses, not the other direction.
+// tackroom.yaml INTO harnesses, not the other direction.
 type detectedItem struct {
 	Surface   string           `json:"surface"`
 	Name      string           `json:"name"`
@@ -161,7 +161,7 @@ func detectNativeSkills(agent agentConfig, skillRoot string, canonicalSkills str
 			continue
 		}
 		path := filepath.Join(skillRoot, entry.Name())
-		// Skip symlinks (managed by dotagents) and entries resolving to canonical.
+		// Skip symlinks (managed by tackroom) and entries resolving to canonical.
 		if isSymlinkOrResolvesTo(path, filepath.Join(canonicalSkills, entry.Name())) {
 			continue
 		}

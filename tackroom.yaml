@@ -1,5 +1,5 @@
 version: 1
-agents: [] # populated by dotagents setup
+agents: [] # populated by tackroom setup
 
 external_skills:
   - url: https://github.com/mattpocock/skills

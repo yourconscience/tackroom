@@ -11,10 +11,10 @@ import (
 func TestSyncRenderUpdatesCommittedArtifacts(t *testing.T) {
 	repoRoot := t.TempDir()
 	home := t.TempDir()
-	t.Setenv("DOTAGENTS_HOME", repoRoot)
+	t.Setenv("TACKROOM_HOME", repoRoot)
 	t.Setenv("HOME", home)
 
-	writeSyncTestFile(t, filepath.Join(repoRoot, "dotagents.yaml"), []byte(`version: 1
+	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
 agents:
   - name: omp
     enabled: true
@@ -43,7 +43,7 @@ Review the change.
 	}
 }
 
-func TestDotagentsBinaryDoesNotCarryCodexMirrorCopyDependency(t *testing.T) {
+func TestTackroomBinaryDoesNotCarryCodexMirrorCopyDependency(t *testing.T) {
 	info, ok := debug.ReadBuildInfo()
 	if !ok {
 		t.Fatal("Go build information unavailable")

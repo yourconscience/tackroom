@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>dotagents - public CLI for your private agent config</title>
+<title>tackroom - public CLI for your private agent config</title>
 <meta name="description" content="Public Go CLI that syncs skills, MCP servers, hooks, roles, root instructions, and memory from your private ~/.agents repository into Amp, Claude Code, Codex, Droid, Hermes, OpenCode, Qwen Code, and Pi.">
 <style>
   :root {
@@ -192,7 +192,7 @@
   <div class="eyebrow">open source</div>
   <h1>One private repo for all your coding agents.</h1>
   <p class="subtitle">
-    <b>dotagents</b> is a public CLI that keeps your skills, MCP servers, hooks,
+    <b>tackroom</b> is a public CLI that keeps your skills, MCP servers, hooks,
     agent roles, root instructions, and memory tooling in a private
     <code>~/.agents</code> repository, then syncs each supported surface into its
     harness-native format.
@@ -206,7 +206,7 @@
       <div class="dot" style="background:#28c840"></div>
       <span class="term-title">~/.agents</span>
     </div>
-    <pre><span class="p">$</span> <span class="c">dotagents status</span>
+    <pre><span class="p">$</span> <span class="c">tackroom status</span>
 
 <span class="d">canonical config: ~/.agents (user owned)</span>
 
@@ -324,27 +324,27 @@
     <div class="paths">
       <div class="path-card">
         <div class="path-label" style="background:rgba(201,167,255,.15); color:var(--violet);">Public CLI</div>
-        <h3>Install dotagents</h3>
+        <h3>Install tackroom</h3>
         <p class="desc">Homebrew, npm, release binary, or Go. No personal configuration ships with the tool.</p>
-        <pre><span class="p">$</span> <span class="c">brew install yourconscience/tap/dotagents</span>
-<span class="p"># or</span> <span class="c">npm install -g @your_conscience/dotagents</span>
-<span class="p"># or</span> <span class="c">go install github.com/yourconscience/dotagents/cmd/dotagents@latest</span></pre>
+        <pre><span class="p">$</span> <span class="c">brew install yourconscience/tap/tackroom</span>
+<span class="p"># or</span> <span class="c">npm install -g @your_conscience/tackroom</span>
+<span class="p"># or</span> <span class="c">go install github.com/yourconscience/tackroom/cmd/tackroom@latest</span></pre>
       </div>
 
       <div class="path-card">
         <div class="path-label" style="background:rgba(245,200,106,.12); color:var(--gold);">Private config</div>
         <h3>Set up your home</h3>
         <p class="desc">Detect harnesses, import existing content by copy, offer git init, and run the first native sync. Removals are previewed per harness before anything is touched.</p>
-        <pre><span class="p">$</span> <span class="c">dotagents setup</span>
+        <pre><span class="p">$</span> <span class="c">tackroom setup</span>
 <span class="p">$</span> <span class="c">git -C ~/.agents remote add origin &lt;your-private-repo&gt;</span></pre>
         <div class="then">
           <p>Then add a skill and sync it everywhere:</p>
-          <pre><span class="p">$</span> <span class="c">dotagents skill new my-skill</span>
-<span class="p">$</span> <span class="c">dotagents sync</span>
+          <pre><span class="p">$</span> <span class="c">tackroom skill new my-skill</span>
+<span class="p">$</span> <span class="c">tackroom sync</span>
 <span class="g">synced configured surfaces to detected harnesses</span></pre>
         </div>
       </div>
-    <p class="section-sub" style="margin-top:24px">Author the canonical file with <code>dotagents config</code> in the terminal or <code>dotagents view</code> in a loopback browser. The effective local overlay stays separate, and sync is always an explicit reviewed action.</p>
+    <p class="section-sub" style="margin-top:24px">Author the canonical file with <code>tackroom config</code> in the terminal or <code>tackroom view</code> in a loopback browser. The effective local overlay stays separate, and sync is always an explicit reviewed action.</p>
     </div>
   </section>
 
@@ -373,21 +373,21 @@
       </div>
       <p class="section-sub" style="margin-top:10px">* Vanilla Pi uses pi-subagents for managed roles and pi-mcp-adapter for MCP and Agent Plugin projection. OMP remains a separate target.</p>
       <p class="section-sub" style="margin:4px 24px 4px; font-size: 13px">&dagger; OpenCode reads <code>~/.agents/skills/</code> natively — skills need no mirror when the config root is <code>~/.agents</code>. Its only hook surface is a JS plugin API.</p>
-      <p class="section-sub" style="margin:4px 24px 4px; font-size: 13px">&#8225; OMP has no managed hook surface in <code>dotagents.yaml</code> yet; register memory hooks manually if needed.</p>
-      <p class="section-sub" style="margin:4px 24px 12px; font-size: 13px">⁑ Amp's hook and role surfaces use plugin-based models incompatible with dotagents' script-based hooks and per-agent role files.</p>
+      <p class="section-sub" style="margin:4px 24px 4px; font-size: 13px">&#8225; OMP has no managed hook surface in <code>tackroom.yaml</code> yet; register memory hooks manually if needed.</p>
+      <p class="section-sub" style="margin:4px 24px 12px; font-size: 13px">⁑ Amp's hook and role surfaces use plugin-based models incompatible with tackroom' script-based hooks and per-agent role files.</p>
     </div>
   </section>
 
   <!-- Landscape -->
   <section>
     <h2>Landscape</h2>
-    <p class="section-sub">Project-level generators win on tool breadth. dotagents is user-level: one private repo across machines, nine targets deep, pinned and audited externals, review-first memory (<code>rem</code>) built in.</p>
+    <p class="section-sub">Project-level generators win on tool breadth. tackroom is user-level: one private repo across machines, nine targets deep, pinned and audited externals, review-first memory (<code>rem</code>) built in.</p>
 
     <div class="panel">
       <h3>How it compares</h3>
       <div class="table-wrap">
       <table>
-        <thead><tr><th></th><th>dotagents</th><th><a href="https://github.com/dyoshikawa/rulesync">rulesync</a></th><th><a href="https://github.com/intellectronica/ruler">ruler</a></th><th><a href="https://github.com/numman-ali/openskills">openskills</a></th></tr></thead>
+        <thead><tr><th></th><th>tackroom</th><th><a href="https://github.com/dyoshikawa/rulesync">rulesync</a></th><th><a href="https://github.com/intellectronica/ruler">ruler</a></th><th><a href="https://github.com/numman-ali/openskills">openskills</a></th></tr></thead>
         <tbody>
           <tr><th scope="row">Scope</th><td class="y">user-level</td><td style="color:var(--gold)">project-level</td><td style="color:var(--gold)">project-level</td><td style="color:var(--gold)">user + project</td></tr>
           <tr><th scope="row">Skills sync</th><td class="y">yes</td><td class="y">yes</td><td style="color:var(--gold)">experimental</td><td class="y">yes</td></tr>
@@ -400,7 +400,7 @@
         </tbody>
       </table>
       </div>
-      <p class="section-sub" style="margin-top:10px; margin-bottom:8px; padding: 0 24px 12px; font-size: 13px">dotagents' own harness coverage is shown above; competitor breadth is described qualitatively, since their exact tool counts drift over time. Different tools for different jobs: rulesync and ruler generate per-project config for many tools; dotagents carries one personal setup deeply into the harnesses you live in.</p>
+      <p class="section-sub" style="margin-top:10px; margin-bottom:8px; padding: 0 24px 12px; font-size: 13px">tackroom' own harness coverage is shown above; competitor breadth is described qualitatively, since their exact tool counts drift over time. Different tools for different jobs: rulesync and ruler generate per-project config for many tools; tackroom carries one personal setup deeply into the harnesses you live in.</p>
     </div>
   </section>
 
@@ -414,13 +414,13 @@
       <div class="table-wrap">
       <table>
         <tbody>
-          <tr><th scope="row"><a href="https://github.com/yourconscience/dotagents#readme">README</a></th><td>Install channels, the five synced surfaces, and the command index</td></tr>
-          <tr><th scope="row"><a href="https://github.com/yourconscience/dotagents/blob/main/docs/setup.md">Setup</a></th><td>First-run walkthrough, review screen, multi-machine setup</td></tr>
-          <tr><th scope="row"><a href="https://github.com/yourconscience/dotagents/blob/main/docs/skills.md">Skills</a></th><td>Authoring skills, external pins, plugin discovery</td></tr>
-          <tr><th scope="row"><a href="https://github.com/yourconscience/dotagents/blob/main/docs/roles.md">Roles</a></th><td>Role format, model tiers, per-harness overrides</td></tr>
-          <tr><th scope="row"><a href="https://github.com/yourconscience/dotagents/blob/main/docs/memory.md">Memory</a></th><td>Tiers, the <code>rem</code> workflow, vault layout</td></tr>
-          <tr><th scope="row"><a href="https://github.com/yourconscience/dotagents/blob/main/docs/comparison.md">Comparison</a></th><td>How dotagents differs from rulesync, ruler, and openskills</td></tr>
-          <tr><th scope="row"><a href="https://github.com/yourconscience/dotagents/blob/main/docs/troubleshooting.md">Troubleshooting</a></th><td>Doctor first, plus the common failure modes</td></tr>
+          <tr><th scope="row"><a href="https://github.com/yourconscience/tackroom#readme">README</a></th><td>Install channels, the five synced surfaces, and the command index</td></tr>
+          <tr><th scope="row"><a href="https://github.com/yourconscience/tackroom/blob/main/docs/setup.md">Setup</a></th><td>First-run walkthrough, review screen, multi-machine setup</td></tr>
+          <tr><th scope="row"><a href="https://github.com/yourconscience/tackroom/blob/main/docs/skills.md">Skills</a></th><td>Authoring skills, external pins, plugin discovery</td></tr>
+          <tr><th scope="row"><a href="https://github.com/yourconscience/tackroom/blob/main/docs/roles.md">Roles</a></th><td>Role format, model tiers, per-harness overrides</td></tr>
+          <tr><th scope="row"><a href="https://github.com/yourconscience/tackroom/blob/main/docs/memory.md">Memory</a></th><td>Tiers, the <code>rem</code> workflow, vault layout</td></tr>
+          <tr><th scope="row"><a href="https://github.com/yourconscience/tackroom/blob/main/docs/comparison.md">Comparison</a></th><td>How tackroom differs from rulesync, ruler, and openskills</td></tr>
+          <tr><th scope="row"><a href="https://github.com/yourconscience/tackroom/blob/main/docs/troubleshooting.md">Troubleshooting</a></th><td>Doctor first, plus the common failure modes</td></tr>
         </tbody>
       </table>
       </div>
@@ -428,7 +428,7 @@
   </section>
 
   <footer>
-    <a href="https://github.com/yourconscience/dotagents">github.com/yourconscience/dotagents</a>
+    <a href="https://github.com/yourconscience/tackroom">github.com/yourconscience/tackroom</a>
     <a href="https://yourconscience.github.io/mushroom/" title="agent-built in one evening">built by agents, verified by humans</a>
   </footer>
 

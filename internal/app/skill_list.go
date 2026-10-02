@@ -11,7 +11,7 @@ import (
 
 // skillOrigins maps a canonical skill name to a human-readable provenance
 // label ("local" or "owner/repo@commit" for external sources). Computed from
-// dotagents.lock plus the configured external sources, never invented.
+// tackroom.lock plus the configured external sources, never invented.
 func skillOrigins(cfg config, repoRoot string, home string, expected map[string]string) (map[string]string, error) {
 	origins := make(map[string]string)
 	lock, err := readLockFile(repoRoot)
@@ -170,7 +170,7 @@ func containsString(list []string, needle string) bool {
 }
 
 // runSkillList prints, per detected harness, every entry in its skill root
-// with provenance: where dotagents put it, where anything else came from,
+// with provenance: where tackroom put it, where anything else came from,
 // and which links are drifted, stale, or broken. Read-only.
 func runSkillList(args []string) error {
 	opts, err := parseSubcommandFlags("skill list", args)
@@ -200,7 +200,7 @@ func runSkillList(args []string) error {
 			localCount++
 		}
 	}
-	fmt.Printf("dotagents skill list\n")
+	fmt.Printf("tackroom skill list\n")
 	fmt.Printf("repo: %s (%d canonical skills: %d local, %d external)\n", repoRoot, len(expected), localCount, len(expected)-localCount)
 
 	for _, report := range reports {
@@ -272,7 +272,7 @@ func runSkillInfo(args []string) error {
 		return err
 	}
 
-	fmt.Printf("dotagents skill info %s\n", name)
+	fmt.Printf("tackroom skill info %s\n", name)
 	origin := origins[name]
 	if origin != "" {
 		fmt.Printf("canonical: %s (external: %s)\n", canonical, origin)

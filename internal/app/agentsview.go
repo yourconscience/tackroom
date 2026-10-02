@@ -14,11 +14,11 @@ var agentsViewLookPath = exec.LookPath
 
 const agentsViewInstallHint = `AgentsView not found on PATH.
 
-dotagents sessions launches AgentsView as an optional session search, replay,
+tackroom sessions launches AgentsView as an optional session search, replay,
 telemetry, and usage dashboard. AgentsView remains independently installed and
 owns its own local index.
 
-Install it from https://github.com/kenn-io/agentsview, then re-run: dotagents sessions`
+Install it from https://github.com/kenn-io/agentsview, then re-run: tackroom sessions`
 
 type sessionsOptions struct {
 	NoOpen  bool

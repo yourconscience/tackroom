@@ -1,6 +1,6 @@
 # Memory
 
-dotagents ships a review-first memory system: capture is automatic and cheap, consolidation produces reports, and only you promote facts into durable instructions.
+tackroom ships a review-first memory system: capture is automatic and cheap, consolidation produces reports, and only you promote facts into durable instructions.
 
 ## Tiers
 
@@ -17,7 +17,7 @@ Hermes memory: the vault is imported into `~/.hermes/memories/` at session
 start, the finalized session is captured into the vault, and Hermes durable
 memory is exported back to the vault at finalize. Hermes continues to use its
 built-in memory injector and memory tool; memsearch provides the larger indexed
-history. Run `dotagents doctor --e2e` and `hermes hooks doctor` after setup.
+history. Run `tackroom doctor --e2e` and `hermes hooks doctor` after setup.
 
 Memory data lives in your knowledge directory (default `~/Workspace/knowledge`, configurable via `KNOWLEDGE_DIR`), never in the tool repository.
 
@@ -46,4 +46,4 @@ Run `rem dream` on a schedule (cron/LaunchAgent, ~2x per week) and review the re
 
 ## Why review-first
 
-Automatically rewriting memory is how agents corrupt their own instructions: low-authority observations get promoted into preferences or standing rules, contradictions silently resolve to whichever fact was written last, and near-duplicate merges drop the constraints that made a fact true. So dotagents draws a hard line: capture and dedup are machine jobs; promotion of meaning requires an explicit human decision on a concrete patch.
+Automatically rewriting memory is how agents corrupt their own instructions: low-authority observations get promoted into preferences or standing rules, contradictions silently resolve to whichever fact was written last, and near-duplicate merges drop the constraints that made a fact true. So tackroom draws a hard line: capture and dedup are machine jobs; promotion of meaning requires an explicit human decision on a concrete patch.

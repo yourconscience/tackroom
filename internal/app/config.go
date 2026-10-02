@@ -88,7 +88,7 @@ func mergeByKey[T any](base []T, overlay []T, key func(T) string) []T {
 }
 
 func defaultConfigPath(repoRoot string) string {
-	return filepath.Join(repoRoot, "dotagents.yaml")
+	return filepath.Join(repoRoot, "tackroom.yaml")
 }
 
 func validateConfig(cfg *config, home string, expand bool) error {
@@ -230,7 +230,7 @@ func validateConfig(cfg *config, home string, expand bool) error {
 			if !hasMCPSupport(agentName) {
 				hint := ""
 				if agentName == agentPi {
-					hint = ` (if this config predates the Pi/OMP split, rename "pi" to "omp" in dotagents.yaml)`
+					hint = ` (if this config predates the Pi/OMP split, rename "pi" to "omp" in tackroom.yaml)`
 				}
 				fmt.Fprintf(os.Stderr, "warning: config MCP server %s targets agent %q without MCP support; target ignored%s\n", cfg.MCPServers[i].Name, agentName, hint)
 				continue
@@ -392,7 +392,7 @@ func findRoots() (string, string, error) {
 		return "", "", err
 	}
 	root := filepath.Dir(configPath)
-	return root, filepath.Join(root, "skills", "dotagents"), nil
+	return root, filepath.Join(root, "skills", "tackroom"), nil
 }
 
 func resolveConfigPath(overridePath string, home string) (string, error) {
@@ -400,15 +400,15 @@ func resolveConfigPath(overridePath string, home string) (string, error) {
 	if path != "" {
 		return absoluteExpandedPath(path, home)
 	}
-	if env := strings.TrimSpace(os.Getenv("DOTAGENTS_HOME")); env != "" {
+	if env := strings.TrimSpace(os.Getenv("TACKROOM_HOME")); env != "" {
 		root, err := absoluteExpandedPath(env, home)
 		if err != nil {
 			return "", err
 		}
-		return filepath.Join(root, "dotagents.yaml"), nil
+		return filepath.Join(root, "tackroom.yaml"), nil
 	}
 	root := filepath.Join(home, ".agents")
-	return filepath.Join(root, "dotagents.yaml"), nil
+	return filepath.Join(root, "tackroom.yaml"), nil
 }
 
 func absoluteExpandedPath(path string, home string) (string, error) {

@@ -1,14 +1,14 @@
 {
-  "name": "@your_conscience/dotagents",
+  "name": "@your_conscience/tackroom",
   "version": "0.0.0-dev",
   "description": "Dotfiles for your AI agents: one ~/.agents repo synced to every coding agent.",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourconscience/dotagents.git"
+    "url": "git+https://github.com/yourconscience/tackroom.git"
   },
   "bin": {
-    "dotagents": "bin/dotagents.js"
+    "tackroom": "bin/tackroom.js"
   },
   "scripts": {
     "postinstall": "node install.js",

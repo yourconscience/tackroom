@@ -88,7 +88,7 @@ func runPublishCommand(args []string) error {
 	fs := flag.NewFlagSet("publish", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts publishOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Target, "target", "", "Limit to a single publish target by name")
 	fs.StringVar(&opts.Skills, "skills", "", "Comma-separated skill names to limit this run")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Show what would be published without uploading or writing the lock")

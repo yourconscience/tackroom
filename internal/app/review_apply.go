@@ -10,7 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/mattn/go-isatty"
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 )
 
 // reviewTTYAvailable reports whether the review TUI can run: setup must be

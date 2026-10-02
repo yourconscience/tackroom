@@ -29,7 +29,7 @@ func TestInspectRepoLinkInPlaceClone(t *testing.T) {
 }
 
 // TestInspectRepoLinkSymlink covers the symlink layout: ~/.agents -> repoRoot
-// living elsewhere (e.g. ~/Workspace/dotagents).
+// living elsewhere (e.g. ~/Workspace/tackroom).
 func TestInspectRepoLinkSymlink(t *testing.T) {
 	home := t.TempDir()
 	repoRoot := t.TempDir()
@@ -47,7 +47,7 @@ func TestInspectRepoLinkSymlink(t *testing.T) {
 	}
 }
 
-// TestInspectRepoLinkCustomRootDoesNotConflict covers DOTAGENTS_HOME/--config:
+// TestInspectRepoLinkCustomRootDoesNotConflict covers TACKROOM_HOME/--config:
 // a canonical root outside ~/.agents is already the source, so status/sync must
 // not force ~/.agents to be a symlink.
 func TestInspectRepoLinkCustomRootDoesNotConflict(t *testing.T) {

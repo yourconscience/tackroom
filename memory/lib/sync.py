@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sync Hermes built-in memory with the dotagents knowledge vault.
+"""Sync Hermes built-in memory with the tackroom knowledge vault.
 
 Direction 1 (memory->vault): export Hermes MEMORY.md/USER.md facts to vault
   - Hermes MEMORY.md -> vault sessions/knowledge.md

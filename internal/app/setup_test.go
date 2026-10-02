@@ -10,20 +10,20 @@ import (
 )
 
 func TestCronCommandForWeeklyDeps(t *testing.T) {
-	cmd, interval := cronCommandForOptions("/usr/local/bin/dotagents", cronOptions{Deps: true, Interval: cronIntervalDefault, runOptions: runOptions{ConfigPath: "/custom/dotagents.yaml"}})
+	cmd, interval := cronCommandForOptions("/usr/local/bin/tackroom", cronOptions{Deps: true, Interval: cronIntervalDefault, runOptions: runOptions{ConfigPath: "/custom/tackroom.yaml"}})
 	if interval != cronIntervalWeekly {
 		t.Fatalf("interval = %q, want %s", interval, cronIntervalWeekly)
 	}
 	if !strings.Contains(cmd, "deps update") {
 		t.Fatalf("cmd = %q, want deps update", cmd)
 	}
-	if !strings.Contains(cmd, "/usr/local/bin/dotagents") || strings.Contains(cmd, "go run") {
+	if !strings.Contains(cmd, "/usr/local/bin/tackroom") || strings.Contains(cmd, "go run") {
 		t.Fatalf("cmd = %q, want installed CLI path without go run", cmd)
 	}
 	if strings.Contains(cmd, " pull") {
 		t.Fatalf("cmd = %q, should not use pull mode", cmd)
 	}
-	if !strings.Contains(cmd, `--config "/custom/dotagents.yaml"`) {
+	if !strings.Contains(cmd, `--config "/custom/tackroom.yaml"`) {
 		t.Fatalf("cmd = %q, want custom config preserved", cmd)
 	}
 }
@@ -34,7 +34,7 @@ func TestIntervalToScheduleWeekly(t *testing.T) {
 	}
 }
 
-func TestPatchHermesConfigAddsDotagentsSkillDir(t *testing.T) {
+func TestPatchHermesConfigAddsTackroomSkillDir(t *testing.T) {
 	home := t.TempDir()
 	configPath := filepath.Join(home, ".hermes", "config.yaml")
 	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
@@ -62,7 +62,7 @@ func TestPatchHermesConfigAddsDotagentsSkillDir(t *testing.T) {
 	}
 	skills := raw["skills"].(map[string]interface{})
 	dirs := skills["external_dirs"].([]interface{})
-	if !containsInterfaceString(dirs, "~/keep") || !containsInterfaceString(dirs, dotagentsSkillsPathValue) {
+	if !containsInterfaceString(dirs, "~/keep") || !containsInterfaceString(dirs, tackroomSkillsPathValue) {
 		t.Fatalf("external_dirs = %#v", dirs)
 	}
 }

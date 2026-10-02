@@ -66,7 +66,7 @@ func runSetup(opts runOptions) error {
 		return err
 	}
 
-	fmt.Fprintln(streams.out, "dotagents setup")
+	fmt.Fprintln(streams.out, "tackroom setup")
 	fmt.Fprintf(streams.out, "config root: %s\n\n", repoRoot)
 
 	skills, roles, mcps, err := scanNativeImports(cfg, detected, repoRoot, home)
@@ -345,7 +345,7 @@ func patchHermesConfig(home string, repoRoot string, _ config) (bool, error) {
 
 func hermesExternalDirValue(home string, target string) string {
 	if target == filepath.Join(home, ".agents", "skills") {
-		return dotagentsSkillsPathValue
+		return tackroomSkillsPathValue
 	}
 	return target
 }
@@ -384,11 +384,11 @@ func runCron(opts cronOptions) error {
 		return err
 	}
 
-	binaryPath, err := exec.LookPath("dotagents")
+	binaryPath, err := exec.LookPath("tackroom")
 	if err != nil {
 		binaryPath, err = os.Executable()
 		if err != nil {
-			return fmt.Errorf("locate dotagents executable: %w", err)
+			return fmt.Errorf("locate tackroom executable: %w", err)
 		}
 	}
 
@@ -468,7 +468,7 @@ func removeCronEntry(cronCmd string) error {
 	}
 
 	if removed == 0 {
-		fmt.Println("no dotagents cron entry found")
+		fmt.Println("no tackroom cron entry found")
 		return nil
 	}
 

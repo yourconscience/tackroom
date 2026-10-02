@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 	"gopkg.in/yaml.v3"
 )
 
@@ -207,7 +207,7 @@ func TestQwenSyncEndToEnd(t *testing.T) {
 	t.Setenv("HOME", home)
 	fakePath(t, "qwen")
 	repoRoot := filepath.Join(home, ".agents")
-	writeSyncTestFile(t, filepath.Join(repoRoot, "dotagents.yaml"), []byte(`version: 1
+	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
 agents:
   - name: qwen-code
     enabled: true
@@ -232,10 +232,10 @@ hooks:
 	writeSyncTestFile(t, filepath.Join(repoRoot, "agents", "reviewer.md"), []byte("---\nname: reviewer\ndescription: Review code\n---\n\nReview carefully.\n"))
 	writeSyncTestFile(t, qwenSettingsPath(home), []byte(`{"ui":{"theme":"keep"}}`))
 
-	if err := runSync(runOptions{ConfigPath: filepath.Join(repoRoot, "dotagents.yaml"), Agents: agentQwenCode}); err != nil {
+	if err := runSync(runOptions{ConfigPath: filepath.Join(repoRoot, "tackroom.yaml"), Agents: agentQwenCode}); err != nil {
 		t.Fatal(err)
 	}
-	if err := runStatus(runOptions{ConfigPath: filepath.Join(repoRoot, "dotagents.yaml"), Agents: agentQwenCode}); err != nil {
+	if err := runStatus(runOptions{ConfigPath: filepath.Join(repoRoot, "tackroom.yaml"), Agents: agentQwenCode}); err != nil {
 		t.Fatal(err)
 	}
 	if target, err := os.Readlink(filepath.Join(home, ".qwen", "QWEN.md")); err != nil || target != filepath.Join(repoRoot, "AGENTS.md") {

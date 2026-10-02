@@ -37,7 +37,7 @@ func parseDepsFlags(name string, args []string) (runOptions, error) {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts runOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err

@@ -87,7 +87,7 @@ func newConfigDocument(path string, home string) (*configDocument, error) {
 	if err := refuseWorktreeRoot(filepath.Dir(path)); err != nil {
 		return nil, err
 	}
-	doc := &configDocument{home: home, sharedPath: path, localPath: filepath.Join(filepath.Dir(path), "dotagents.local.yaml")}
+	doc := &configDocument{home: home, sharedPath: path, localPath: filepath.Join(filepath.Dir(path), "tackroom.local.yaml")}
 	if err := doc.reload(); err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func (d *configDocument) reloadLocked() error {
 	sharedBytes, err := os.ReadFile(d.sharedPath)
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
-			return fmt.Errorf("canonical config %s not found; run dotagents setup", d.sharedPath)
+			return fmt.Errorf("canonical config %s not found; run tackroom setup", d.sharedPath)
 		}
 		return fmt.Errorf("read config %s: %w", d.sharedPath, err)
 	}
@@ -507,7 +507,7 @@ func atomicConfigWrite(path string, data []byte, mode fs.FileMode) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create config directory: %w", err)
 	}
-	tmp, err := os.CreateTemp(filepath.Dir(path), ".dotagents-config-*")
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".tackroom-config-*")
 	if err != nil {
 		return fmt.Errorf("create temporary config: %w", err)
 	}

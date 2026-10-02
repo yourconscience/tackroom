@@ -11,13 +11,13 @@ import (
 	"strings"
 )
 
-// hkBinary is the HarnessKit CLI that `dotagents inspect` launches as a
+// hkBinary is the HarnessKit CLI that `tackroom inspect` launches as a
 // cross-harness inspection surface over the materialized native harness dirs.
-// The `inspect` command itself never writes. dotagents does NOT enforce
+// The `inspect` command itself never writes. tackroom does NOT enforce
 // read-only: the launched HarnessKit UI can enable/disable/deploy, and those
-// writes go straight to native dirs, bypassing dotagents. The launch banner
+// writes go straight to native dirs, bypassing tackroom. The launch banner
 // warns against using them on managed surfaces; reconcile any drift with
-// `dotagents sync`.
+// `tackroom sync`.
 const hkBinary = "hk"
 
 // hkLookPath is indirected so tests can exercise the missing-binary path
@@ -26,12 +26,12 @@ var hkLookPath = exec.LookPath
 
 const hkInstallHint = `HarnessKit (hk) not found on PATH.
 
-dotagents inspect launches HarnessKit as a cross-harness inspection surface for
+tackroom inspect launches HarnessKit as a cross-harness inspection surface for
 skills, MCP servers, hooks, and configs across every detected agent.
 
-Install it from https://github.com/RealZST/HarnessKit, then re-run: dotagents inspect`
+Install it from https://github.com/RealZST/HarnessKit, then re-run: tackroom inspect`
 
-// inspectOptions are the dotagents-owned flags for `dotagents inspect`,
+// inspectOptions are the tackroom-owned flags for `tackroom inspect`,
 // separated from the flags forwarded verbatim to `hk serve`.
 type inspectOptions struct {
 	// NoOpen suppresses launching the default browser.
@@ -41,7 +41,7 @@ type inspectOptions struct {
 	SSHHost string
 }
 
-// parseInspectArgs splits dotagents-owned flags (--no-open, --open, --ssh-host)
+// parseInspectArgs splits tackroom-owned flags (--no-open, --open, --ssh-host)
 // from the remaining args, which are forwarded verbatim to `hk serve`.
 func parseInspectArgs(args []string) (inspectOptions, []string, error) {
 	var opts inspectOptions
@@ -89,14 +89,14 @@ func extractServeURL(line string) (string, bool) {
 }
 
 // hkBannerNoise reports whether line is one of HarnessKit's startup banner
-// lines that dotagents replaces with its own cleaner summary. Suppressing them
+// lines that tackroom replaces with its own cleaner summary. Suppressing them
 // keeps the terminal readable; any unmatched line still falls through to stderr.
 func hkBannerNoise(line string) bool {
 	t := strings.TrimSpace(line)
 	return strings.HasPrefix(t, "Access via SSH tunnel:") || strings.HasPrefix(t, "Auth token:")
 }
 
-// announceInspect prints dotagents' clean access block once the HarnessKit URL
+// announceInspect prints tackroom' clean access block once the HarnessKit URL
 // is known: the bare URL on its own line, an optional tunnel command for remote
 // hosts, and (locally, unless suppressed) a default-browser launch.
 func announceInspect(w io.Writer, url string, opts inspectOptions, remote bool, sshHost string) {
@@ -126,7 +126,7 @@ func announceInspect(w io.Writer, url string, opts inspectOptions, remote bool, 
 // runInspect starts `hk serve`, watches its stderr for the ready URL, and prints
 // a clean access block (bare URL, optional SSH tunnel, default-browser launch).
 // The launcher itself writes nothing; the banner cautions that HarnessKit's own
-// write actions bypass dotagents.
+// write actions bypass tackroom.
 func runInspect(args []string) error {
 	opts, passthrough, err := parseInspectArgs(args)
 	if err != nil {
@@ -136,7 +136,7 @@ func runInspect(args []string) error {
 	if err != nil {
 		return errors.New(hkInstallHint)
 	}
-	fmt.Fprintln(os.Stdout, "Launching HarnessKit for inspection. Note: HarnessKit can also enable/disable/deploy, and those writes bypass dotagents — avoid them on dotagents-managed skills, MCP, and hooks (reconcile drift with: dotagents sync).")
+	fmt.Fprintln(os.Stdout, "Launching HarnessKit for inspection. Note: HarnessKit can also enable/disable/deploy, and those writes bypass tackroom — avoid them on tackroom-managed skills, MCP, and hooks (reconcile drift with: tackroom sync).")
 
 	cmd := exec.Command(path, hkServeArgs(passthrough)...) // nosemgrep: go.lang.security.audit.dangerous-exec-command
 	cmd.Stdin = os.Stdin
@@ -158,7 +158,7 @@ func runInspect(args []string) error {
 		if url, ok := extractServeURL(line); ok && !announced {
 			announced = true
 			announceInspect(os.Stdout, url, opts, remote, sshHost)
-			continue // dotagents' block replaces HarnessKit's verbose URL line.
+			continue // tackroom' block replaces HarnessKit's verbose URL line.
 		}
 		if !announced || !hkBannerNoise(line) {
 			fmt.Fprintln(os.Stderr, line)

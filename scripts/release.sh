@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# Cut a dotagents release: verify, tag, push. CI does the rest.
+# Cut a tackroom release: verify, tag, push. CI does the rest.
 #
 # Usage: scripts/release.sh vX.Y.Z [--yes|-y]
 #
@@ -10,14 +10,14 @@
 # explicit approval -- this script is the approval step, so it must be run on
 # purpose, from a clean up-to-date main.
 #
-# Set DOTAGENTS_RELEASE_LIB=1 to source the helpers (used by release_test.sh)
+# Set TACKROOM_RELEASE_LIB=1 to source the helpers (used by release_test.sh)
 # without running a release.
 
 set -eu
 
 SEMVER_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-NPM_PACKAGE='@your_conscience/dotagents'
-HOMEBREW_FORMULA='dotagents'
+NPM_PACKAGE='@your_conscience/tackroom'
+HOMEBREW_FORMULA='tackroom'
 
 usage() {
 	cat <<'EOF'
@@ -123,7 +123,7 @@ main() {
 
 	[ -n "$TAG" ] || { usage >&2; exit 1; }
 	valid_tag "$TAG" || { usage >&2; die "tag must look like v0.9.0"; }
-	[ -f .goreleaser.yaml ] || die "run from the dotagents repo root"
+	[ -f .goreleaser.yaml ] || die "run from the tackroom repo root"
 
 	branch=$(git rev-parse --abbrev-ref HEAD)
 	[ "$branch" = "main" ] || die "must be on main (on $branch)"
@@ -155,4 +155,4 @@ main() {
 	echo ">> after CI: brew info $HOMEBREW_FORMULA && npm view $NPM_PACKAGE version"
 }
 
-[ "${DOTAGENTS_RELEASE_LIB:-}" = "1" ] || main "$@"
+[ "${TACKROOM_RELEASE_LIB:-}" = "1" ] || main "$@"

@@ -31,13 +31,13 @@ mcp_servers:
 	}
 }
 
-func installFakeDotagentsOnPath(t *testing.T, home string) {
+func installFakeTackroomOnPath(t *testing.T, home string) {
 	t.Helper()
 	fakeBin := filepath.Join(home, "bin")
 	if err := os.MkdirAll(fakeBin, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(fakeBin, "dotagents"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+	if err := os.WriteFile(filepath.Join(fakeBin, "tackroom"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(fakeBin, "amp"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
@@ -50,9 +50,9 @@ func TestAmpSetupE2EConfiguresSkillsAndMCP(t *testing.T) {
 	home := t.TempDir()
 	repoRoot := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("DOTAGENTS_HOME", repoRoot)
-	installFakeDotagentsOnPath(t, home)
-	configPath := filepath.Join(repoRoot, "dotagents.yaml")
+	t.Setenv("TACKROOM_HOME", repoRoot)
+	installFakeTackroomOnPath(t, home)
+	configPath := filepath.Join(repoRoot, "tackroom.yaml")
 	writeAmpE2EConfig(t, configPath)
 
 	if err := Run([]string{"setup", "--agents=amp", "--config", configPath}); err != nil {
@@ -92,9 +92,9 @@ func TestAmpSetupE2EPreservesExistingSettings(t *testing.T) {
 	home := t.TempDir()
 	repoRoot := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("DOTAGENTS_HOME", repoRoot)
-	installFakeDotagentsOnPath(t, home)
-	configPath := filepath.Join(repoRoot, "dotagents.yaml")
+	t.Setenv("TACKROOM_HOME", repoRoot)
+	installFakeTackroomOnPath(t, home)
+	configPath := filepath.Join(repoRoot, "tackroom.yaml")
 	writeAmpE2EConfig(t, configPath)
 	settingsPath := filepath.Join(home, ".config", "amp", "settings.json")
 	if err := os.MkdirAll(filepath.Dir(settingsPath), 0o755); err != nil {

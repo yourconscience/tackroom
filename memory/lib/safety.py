@@ -55,7 +55,7 @@ def knowledge_dir_from_environment() -> Path:
 
 
 @contextlib.contextmanager
-def locked_directory(directory: Path, lock_name: str = ".dotagents-memory.lock") -> Iterator[None]:
+def locked_directory(directory: Path, lock_name: str = ".tackroom-memory.lock") -> Iterator[None]:
     directory.mkdir(parents=True, exist_ok=True)
     lock_path = directory / lock_name
     with lock_path.open("a", encoding="utf-8") as handle:

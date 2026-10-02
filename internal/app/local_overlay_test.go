@@ -35,14 +35,14 @@ external_skills:
     branch: dev
     skills: [alpha]
 `
-	if err := os.WriteFile(filepath.Join(repoRoot, "dotagents.yaml"), []byte(base), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repoRoot, "tackroom.yaml"), []byte(base), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repoRoot, "dotagents.local.yaml"), []byte(local), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repoRoot, "tackroom.local.yaml"), []byte(local), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
-	cfg, err := loadConfig(repoRoot, home, filepath.Join(repoRoot, "dotagents.yaml"))
+	cfg, err := loadConfig(repoRoot, home, filepath.Join(repoRoot, "tackroom.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,10 +83,10 @@ agents:
     enabled: true
     skill_root: ~/.claude/skills
 `
-	if err := os.WriteFile(filepath.Join(repoRoot, "dotagents.yaml"), []byte(base), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repoRoot, "tackroom.yaml"), []byte(base), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	cfg, err := loadConfig(repoRoot, home, filepath.Join(repoRoot, "dotagents.yaml"))
+	cfg, err := loadConfig(repoRoot, home, filepath.Join(repoRoot, "tackroom.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,13 +104,13 @@ agents:
     enabled: true
     skill_root: ~/.claude/skills
 `
-	if err := os.WriteFile(filepath.Join(repoRoot, "dotagents.yaml"), []byte(base), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repoRoot, "tackroom.yaml"), []byte(base), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(repoRoot, "dotagents.local.yaml"), []byte("agents: {broken"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(repoRoot, "tackroom.local.yaml"), []byte("agents: {broken"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := loadConfig(repoRoot, home, filepath.Join(repoRoot, "dotagents.yaml")); err == nil {
+	if _, err := loadConfig(repoRoot, home, filepath.Join(repoRoot, "tackroom.yaml")); err == nil {
 		t.Fatal("expected error for invalid local overlay")
 	}
 }

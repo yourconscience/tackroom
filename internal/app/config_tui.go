@@ -62,7 +62,7 @@ func parseConfigFlags(args []string) (configCommandOptions, error) {
 	fs := flag.NewFlagSet("config", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts configCommandOptions
-	fs.StringVar(&opts.ConfigPath, "config", "", "Path to dotagents YAML config")
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	if err := fs.Parse(args); err != nil {
 		return configCommandOptions{}, err
 	}
@@ -389,7 +389,7 @@ func (m configTUIModel) View() string {
 	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#155EEF"))
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("#46515F"))
 	var b strings.Builder
-	b.WriteString(title.Render("dotagents config"))
+	b.WriteString(title.Render("tackroom config"))
 	b.WriteString("  ")
 	b.WriteString("shared [h]  local [l]  effective [f]")
 	b.WriteString("\n")

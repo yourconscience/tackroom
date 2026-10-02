@@ -12,21 +12,21 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yourconscience/dotagents/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 	"gopkg.in/yaml.v3"
 )
 
 const (
-	agentAmp                 = "amp"
-	agentClaudeCode          = "claude-code"
-	agentCodex               = "codex"
-	agentDroid               = "droid"
-	agentHermes              = "hermes"
-	agentOpenCode            = "opencode"
-	agentPi                  = "pi"
-	agentOMP                 = "omp"
-	agentQwenCode            = "qwen-code"
-	dotagentsSkillsPathValue = "~/.agents/skills"
+	agentAmp                = "amp"
+	agentClaudeCode         = "claude-code"
+	agentCodex              = "codex"
+	agentDroid              = "droid"
+	agentHermes             = "hermes"
+	agentOpenCode           = "opencode"
+	agentPi                 = "pi"
+	agentOMP                = "omp"
+	agentQwenCode           = "qwen-code"
+	tackroomSkillsPathValue = "~/.agents/skills"
 )
 
 type checkResult struct {
@@ -47,7 +47,7 @@ func runDoctor(opts runOptions) error {
 		return err
 	}
 
-	fmt.Println("dotagents doctor")
+	fmt.Println("tackroom doctor")
 	fmt.Printf("repo: %s\n\n", repoRoot)
 
 	var results []checkResult
@@ -120,7 +120,7 @@ func checkNativeHookHealth(home string, cfg config, selected []agentConfig) chec
 	}
 	if len(stale) > 0 {
 		sort.Strings(stale)
-		return checkResult{"native hooks", checkStatusWarn, fmt.Sprintf("%d stale registration(s); first: %s; review with: dotagents hook list", len(stale), stale[0])}
+		return checkResult{"native hooks", checkStatusWarn, fmt.Sprintf("%d stale registration(s); first: %s; review with: tackroom hook list", len(stale), stale[0])}
 	}
 	detail := fmt.Sprintf("%d registrations, %d managed, %d unmanaged", len(entries), managed, len(entries)-managed)
 	if len(unsupported) > 0 {
@@ -434,7 +434,7 @@ func checkAgentsMDSize(repoRoot string) checkResult {
 }
 
 func checkREADMESkillInventory(repoRoot string) checkResult {
-	const remediation = "run: dotagents sync"
+	const remediation = "run: tackroom sync"
 	data, err := os.ReadFile(filepath.Join(repoRoot, "README.md"))
 	if err != nil {
 		return checkResult{"README skills", checkStatusPass, "no README.md in config root (optional)"}

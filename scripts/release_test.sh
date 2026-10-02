@@ -1,13 +1,13 @@
 #!/usr/bin/env sh
 # Tests for the validation helpers in scripts/release.sh.
 #
-# Sourcing the script with DOTAGENTS_RELEASE_LIB=1 exposes valid_tag,
+# Sourcing the script with TACKROOM_RELEASE_LIB=1 exposes valid_tag,
 # version_gt, and check_clean_tree without running a release.
 
 set -eu
 
 here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-DOTAGENTS_RELEASE_LIB=1 . "$here/release.sh"
+TACKROOM_RELEASE_LIB=1 . "$here/release.sh"
 
 failures=0
 

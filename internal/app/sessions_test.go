@@ -77,7 +77,7 @@ func TestRunSessionsMissingBinary(t *testing.T) {
 	if !strings.Contains(err.Error(), "AgentsView") || !strings.Contains(err.Error(), "github.com/kenn-io/agentsview") {
 		t.Fatalf("error should guide install, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "dotagents sessions") {
+	if !strings.Contains(err.Error(), "tackroom sessions") {
 		t.Fatalf("install hint should point at the sessions command, got: %v", err)
 	}
 }

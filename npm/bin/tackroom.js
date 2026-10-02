@@ -5,12 +5,12 @@ const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const binary = path.join(__dirname, "dotagents");
+const binary = path.join(__dirname, "tackroom");
 
 if (!fs.existsSync(binary)) {
-  console.error("The dotagents binary was not downloaded during install.");
+  console.error("The tackroom binary was not downloaded during install.");
   console.error(`Run: node ${path.join(path.dirname(__dirname), "install.js")}`);
-  console.error("Or reinstall with install scripts enabled: npm rebuild -g dotagents");
+  console.error("Or reinstall with install scripts enabled: npm rebuild -g tackroom");
   process.exit(1);
 }
 

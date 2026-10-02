@@ -30,7 +30,7 @@ func TestRunInspectMissingBinary(t *testing.T) {
 	if !strings.Contains(err.Error(), "HarnessKit") || !strings.Contains(err.Error(), "github.com/RealZST/HarnessKit") {
 		t.Fatalf("error should guide install, got: %v", err)
 	}
-	if !strings.Contains(err.Error(), "dotagents inspect") {
+	if !strings.Contains(err.Error(), "tackroom inspect") {
 		t.Fatalf("install hint should point at the inspect command, got: %v", err)
 	}
 }
