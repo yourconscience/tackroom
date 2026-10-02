@@ -32,7 +32,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 
 - **Tier 1** (on the landing page, end-to-end verified each release): Claude Code, Codex, Cursor (new), OpenCode, Pi.
 - **Tier 2** (kept, unit-tested, verified on demand): Droid, Qwen Code, Amp, OMP, Hermes.
-- **Cursor adapter:** no skill mirror (Cursor reads `~/.agents/skills`). It covers roles in `~/.cursor/agents/*.md`, MCP in `~/.cursor/mcp.json`, and hooks in `~/.cursor/hooks.json` (version 1 format). Each surface is enabled only after verification against the real `cursor-agent` in a temp `HOME`.
+- **Cursor adapter:** no skill mirror when the config root is `~/.agents`, because Cursor reads `~/.agents/skills` itself. With `--config` or `TACKROOM_HOME` pointing elsewhere, mirror skills into `~/.cursor/skills`, the same way the OpenCode adapter handles a non-default root. It covers roles in `~/.cursor/agents/*.md`, MCP in `~/.cursor/mcp.json`, and hooks in `~/.cursor/hooks.json` (version 1 format). Each surface is enabled only after verification against the real `cursor-agent` in a temp `HOME`.
 
 ### Features
 
@@ -41,6 +41,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 | `setup`, `status`, `sync`, `doctor`, `config validate/print` | keep |
 | External skills (pin, audit, `skill update`) | keep |
 | `mcp`, `hook`, `skill new/list/info`, `cron`/`pull` | keep |
+| Plugin sync (agent-plugins-spec, native projection for Codex, Qwen Code and Pi) | keep unchanged; Cursor plugins are out of 1.0 |
 | `view` web UI | keep |
 | `publish` to the OpenAI Skills API | keep |
 | `config` TUI | cut |
@@ -62,7 +63,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 2. `setup` detects tier 1 and 2 harnesses, offers per-item copy import of existing skills, MCP servers and roles, initializes `~/.agents` as git, and runs the first sync.
 3. Coexistence: if `~/.agents` already holds `agents.toml` (Sentry dotagents) or another manager's lock, `setup` stops and explains, and `doctor` warns.
 4. Duplicate visibility, measured 2026-10-02 on m1 (Cursor CLI 2026.10.01, `ask` mode, empty workspace). Cursor listed 55 skills with no repeated names. Each tackroom skill appeared once, resolved from `~/.claude/skills`, so Cursor de-duplicates by name. `grill-me` was hidden because it sets `disable-model-invocation: true`. Cursor also showed skills that exist only for other harnesses: Codex's `~/.codex/skills` and Claude Code's account and plugin skills. The adapter therefore needs no skill mirror, and `doctor` should list that cross-harness spillover rather than duplicates.
-5. Every `doctor` failure ends with the exact command that fixes it.
+5. Every `doctor` failure names a next step. Checks with one unambiguous fix (missing sync, stale lock pin, legacy file names, missing binary) print the exact command.
 
 ### Release deliverables
 
@@ -79,7 +80,9 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 
 ## Acceptance tests
 
-- For each tier 1 harness, in a temp `HOME`: `setup` detects it, and `sync` writes roles, MCP and hooks (plus skills where needed) to the documented paths. A second `sync` is a no-op, and unrelated native config is byte-identical.
+- For each tier 1 harness, in a temp `HOME`: `setup` detects it, and `sync` writes the surfaces that harness supports natively (per the evidence table) to the documented paths. Skills are mirrored only where the harness doesn't read the config root's skills. A second `sync` is a no-op, and unrelated native config is byte-identical. Hooks are required only where native support is verified (not Pi, and OpenCode only through its JS plugin).
+- Plugin projection for Codex, Qwen Code and Pi behaves as before 1.0 (existing tests keep passing).
+- Cursor with a non-default config root: skills appear under `~/.cursor/skills`.
 - On a machine with only Claude Code and Cursor installed, `setup --yes` finishes and `status` shows both synced, with no YAML edits.
 - The tackroom binary has no memory code, and the memory repo's tests pass on their own.
 - The maintainer's m1 and m4 keep capturing session digests after switching to the standalone memory tool.
