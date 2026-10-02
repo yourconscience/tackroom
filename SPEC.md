@@ -61,7 +61,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 1. Install with one command: `brew install yourconscience/tap/tackroom`, the curl script, or `npx tackroom setup` from the unscoped npm package `tackroom`, which replaces `@your_conscience/dotagents`.
 2. `setup` detects tier 1 and 2 harnesses, offers per-item copy import of existing skills, MCP servers and roles, initializes `~/.agents` as git, and runs the first sync.
 3. Coexistence: if `~/.agents` already holds `agents.toml` (Sentry dotagents) or another manager's lock, `setup` stops and explains, and `doctor` warns.
-4. Duplicate visibility: Cursor loads both `~/.agents/skills` and `~/.claude/skills`, so a skill mirrored for Claude Code may appear twice in Cursor. Measure, then skip or document. `doctor` reports duplicates.
+4. Duplicate visibility, measured 2026-10-02 on m1 (Cursor CLI 2026.10.01, `ask` mode, empty workspace). Cursor listed 55 skills with no repeated names. Each tackroom skill appeared once, resolved from `~/.claude/skills`, so Cursor de-duplicates by name. `grill-me` was hidden because it sets `disable-model-invocation: true`. Cursor also showed skills that exist only for other harnesses: Codex's `~/.codex/skills` and Claude Code's account and plugin skills. The adapter therefore needs no skill mirror, and `doctor` should list that cross-harness spillover rather than duplicates.
 5. Every `doctor` failure ends with the exact command that fixes it.
 
 ### Release deliverables
@@ -88,8 +88,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 
 ## Risks / open questions
 
-- Verifying Cursor needs `cursor-agent` installed on a test machine, which is a maintainer action.
-- Cursor's handling of duplicate skill names across `~/.agents/skills` and `~/.claude/skills` is unmeasured.
+- `cursor-agent` is installed and logged in on m1. `cursor-agent mcp list` reads `~/.cursor/mcp.json` and gives an offline check for the MCP surface.
 - npm trusted publishing for a package that doesn't exist yet may need one manual first publish. This needs measurement.
 - The memory split touches the live capture hooks on both machines. Switch one machine, check a digest lands, then switch the other.
 
