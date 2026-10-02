@@ -41,7 +41,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 | `setup`, `status`, `sync`, `doctor`, `config validate/print` | keep |
 | External skills (pin, audit, `skill update`) | keep |
 | `mcp`, `hook`, `skill new/list/info`, `cron`/`pull` | keep |
-| Plugin sync (agent-plugins-spec, native projection for Codex, Qwen Code and Pi) | keep unchanged; Cursor plugins are out of 1.0 |
+| Plugin sync (agent-plugins-spec skills and MCP, consumed by Qwen Code and Pi) | keep unchanged. Codex native projection is still only planned (README, docs/skills.md) and is not in 1.0; AGENTS.md's invariant gets reworded to say so. Cursor plugins are out of 1.0 |
 | `view` web UI | keep |
 | `publish` to the OpenAI Skills API | keep |
 | `config` TUI | cut |
@@ -52,8 +52,9 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 ### Memory split
 
 - New public repo for the memory tools: hook scripts, `lib/`, `rem`, `knowledge-sync`, and the memsearch tier. It has its own release and install (brew tap and `go install`), and it works without tackroom.
-- tackroom ships no memory code. Gone: `setup --memory`, the `memsearch` command, the build of `rem` and `knowledge-sync`, and `memory/` in the starter inventory.
-- Integration is just hooks. The memory tool documents its hook commands, and users list them under `hooks:` in `tackroom.yaml` like any other hook. `tackroom setup` may offer to add them when the memory tool is on `PATH`.
+- tackroom ships no memory code. Gone: the memory tiers inside tackroom, the `memsearch` command, the build of `rem` and `knowledge-sync`, and `memory/` in the starter inventory.
+- Integration is just hooks. The memory tool documents its hook commands, and users list them under `hooks:` in `tackroom.yaml` like any other hook.
+- `setup` keeps owning the first-run memory choice (AGENTS.md): `--memory off|on`. With `on`, setup adds the memory tool's hook entries when the tool is on `PATH`, and otherwise prints its install command. The memsearch tier is configured inside the memory tool.
 - Existing roots: tackroom stops managing `memory/` (its starter manifest entries are dropped, files stay in place). The maintainer's root then switches its hooks to the installed memory tool.
 - **[decide]** Repo and package name. `rem` is taken in Homebrew core (kykim/rem, a Reminders CLI), so the package needs another name even if the `rem` command stays.
 
@@ -74,6 +75,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 
 ## Non-goals
 
+- Codex native plugin projection (still planned).
 - GitHub Copilot CLI and Gemini CLI adapters (post-1.0 backlog).
 - Project-level config generation (rulesync, ruler territory).
 - Windows support.
@@ -85,7 +87,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 - Cursor with a non-default config root: skills appear under `~/.cursor/skills`.
 - On a machine with only Claude Code and Cursor installed, `setup --yes` finishes and `status` shows both synced, with no YAML edits.
 - The tackroom binary has no memory code, and the memory repo's tests pass on their own.
-- The maintainer's m1 and m4 keep capturing session digests after switching to the standalone memory tool.
+- In a temp `HOME`, `setup --memory on` with a stub memory tool on `PATH` registers its hooks, and running the registered session-end hook writes a digest under a temp `KNOWLEDGE_DIR`.
 - `go test ./...`, the npm wrapper test and the release script test pass.
 - The landing page renders at phone width in both themes. The video runs 15 to 25 s at -16 LUFS integrated.
 
@@ -93,7 +95,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 
 - `cursor-agent` is installed and logged in on m1. `cursor-agent mcp list` reads `~/.cursor/mcp.json` and gives an offline check for the MCP surface.
 - npm trusted publishing for a package that doesn't exist yet may need one manual first publish. This needs measurement.
-- The memory split touches the live capture hooks on both machines. Switch one machine, check a digest lands, then switch the other.
+- The memory split touches live capture hooks. Maintainer rollout, kept out of the acceptance tests: switch one machine, check a digest lands, then switch the other.
 
 ## Codebase notes
 
