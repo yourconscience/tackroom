@@ -404,7 +404,7 @@ func cronCommandForOptions(binaryPath string, opts cronOptions) (string, string)
 	mode := "pull"
 	interval := opts.Interval
 	if opts.Deps {
-		mode = "deps update"
+		mode = "sync deps"
 		if interval == "" || interval == cronIntervalDefault {
 			interval = cronIntervalWeekly
 		}
@@ -417,6 +417,24 @@ func cronCommandForOptions(binaryPath string, opts cronOptions) (string, string)
 		command += fmt.Sprintf(" --config %q", opts.ConfigPath)
 	}
 	return command, interval
+}
+
+// legacyCronCommands returns earlier spellings of cronCmd that installed
+// crontab lines may still carry: `deps update` became `sync deps` in v1.0.
+func legacyCronCommands(cronCmd string) []string {
+	if strings.Contains(cronCmd, " sync deps") {
+		return []string{strings.Replace(cronCmd, " sync deps", " deps update", 1)}
+	}
+	return nil
+}
+
+func lineMatchesAny(line string, commands []string) bool {
+	for _, command := range commands {
+		if strings.Contains(line, command) {
+			return true
+		}
+	}
+	return false
 }
 
 func installCronEntry(cronCmd string, interval string) error {
@@ -433,7 +451,16 @@ func installCronEntry(cronCmd string, interval string) error {
 		}
 	}
 
-	newCrontab := string(existing)
+	legacy := legacyCronCommands(cronCmd)
+	var kept []string
+	for _, line := range lines {
+		if lineMatchesAny(line, legacy) {
+			fmt.Printf("replaced legacy cron entry: %s\n", line)
+			continue
+		}
+		kept = append(kept, line)
+	}
+	newCrontab := strings.Join(kept, "\n")
 	if !strings.HasSuffix(newCrontab, "\n") && newCrontab != "" {
 		newCrontab += "\n"
 	}
@@ -456,10 +483,11 @@ func removeCronEntry(cronCmd string) error {
 		return fmt.Errorf("crontab read: %w", err)
 	}
 
+	commands := append([]string{cronCmd}, legacyCronCommands(cronCmd)...)
 	var kept []string
 	removed := 0
 	for _, line := range strings.Split(string(existing), "\n") {
-		if strings.Contains(line, cronCmd) {
+		if lineMatchesAny(line, commands) {
 			fmt.Printf("removed: %s\n", line)
 			removed++
 			continue
