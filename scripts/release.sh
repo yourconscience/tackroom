@@ -16,7 +16,7 @@
 set -eu
 
 SEMVER_RE='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
-NPM_PACKAGE='@your_conscience/tackroom'
+NPM_PACKAGE='tackroom'
 HOMEBREW_FORMULA='tackroom'
 
 usage() {

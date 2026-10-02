@@ -3,7 +3,7 @@
 Dotfiles for your AI agents.
 
 
-[![Release](https://img.shields.io/github/v/release/yourconscience/tackroom)](https://github.com/yourconscience/tackroom/releases) [![brew](https://img.shields.io/badge/brew-yourconscience%2Ftap-orange)](https://github.com/yourconscience/homebrew-tap) [![npm](https://img.shields.io/npm/v/@your_conscience%2ftackroom)](https://www.npmjs.com/package/@your_conscience/tackroom) [![CI](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml/badge.svg)](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
+[![Release](https://img.shields.io/github/v/release/yourconscience/tackroom)](https://github.com/yourconscience/tackroom/releases) [![brew](https://img.shields.io/badge/brew-yourconscience%2Ftap-orange)](https://github.com/yourconscience/homebrew-tap) [![npm](https://img.shields.io/npm/v/tackroom)](https://www.npmjs.com/package/tackroom) [![CI](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml/badge.svg)](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 ```bash
 brew install yourconscience/tap/tackroom
@@ -20,7 +20,7 @@ If you use more than one coding agent, you maintain the same skills, MCP servers
 ## Quick start
 
 ```bash
-brew install yourconscience/tap/tackroom   # or: npm i -g @your_conscience/tackroom
+brew install yourconscience/tap/tackroom   # or: npm i -g tackroom
 # no brew/npm? curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
 tackroom setup                             # detect harnesses, import, first sync
 ```
