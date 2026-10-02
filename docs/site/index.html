@@ -2,308 +2,841 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tackroom</title>
-<meta name="description" content="tackroom renders one private ~/.agents repo into every coding agent: skill links, MCP servers, hooks and roles in each agent's own format, with external skills pinned to a commit and audited.">
-<meta property="og:title" content="tackroom: one ~/.agents repo, rendered into every coding agent">
-<meta property="og:description" content="Skills, MCP servers, hooks and roles in each agent's own format. External skills pinned and audited. Formerly dotagents.">
-<meta property="og:image" content="https://yourconscience.github.io/tackroom/brag.jpg">
-<meta property="og:url" content="https://yourconscience.github.io/tackroom/">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>tackroom: one ~/.agents repo for every coding agent</title>
+<meta name="description" content="tackroom keeps skills, MCP servers, hooks and roles in one ~/.agents repo and syncs them into each coding agent's native config. Install with Homebrew or npm.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f4f4f8" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13131b" media="(prefers-color-scheme: dark)">
+<meta property="og:title" content="tackroom">
+<meta property="og:description" content="One ~/.agents repo, synced into Claude Code, Codex, Pi, Qwen Code, Hermes and more, in each agent's own format.">
 <meta property="og:type" content="website">
+<meta property="og:url" content="https://yourconscience.github.io/tackroom/">
+<meta property="og:image" content="https://yourconscience.github.io/tackroom/brag.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 180'%3E%3Crect x='34' y='4' width='52' height='34' rx='8' fill='%23c99b3d'/%3E%3Cpath d='M60 34V118a30 30 0 1 1-30-30' fill='none' stroke='%23f5c86a' stroke-width='14' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%234f56c9'/%3E%3Cpath d='M26 14v26a8 8 0 0 0 8 8h8M18 24h22' fill='none' stroke='%23fbfbfd' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,500;0,6..72,600;1,6..72,500&display=swap">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap" rel="stylesheet">
+<link rel="preload" as="image" href="brag.jpg">
 <style>
-  /* Layout: one centered column for reading, a wide hero frame for the film. Same palette and type as the launch video. */
   :root {
-    color-scheme: dark;
-    --night: #0f0e0c;
-    --ink: #f5f1e8;
-    --muted: #aaa39a;
-    --gold: #f5c86a;
-    --green: #7edc98;
-    --line: rgba(245,241,232,.14);
-    --serif: ui-serif, "Newsreader", Georgia, "Times New Roman", serif;
-    --sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --mono: ui-monospace, SFMono-Regular, "JetBrains Mono", Menlo, Consolas, monospace;
+    --bg: #f4f4f8;
+    --bg-2: #ebebf2;
+    --surface: #fbfbfd;
+    --line: #dcdce6;
+    --text: #191924;
+    --muted: #5b5d72;
+    --faint: #8a8ca1;
+    --accent: #4f56c9;
+    --accent-ink: #fbfbfd;
+    --accent-soft: rgba(79, 86, 201, .09);
+    --code-bg: #1b1b26;
+    --code-line: #2c2c3c;
+    --code-text: #dcdeec;
+    --code-dim: #8a8ca6;
+    --code-ok: #a6e3a1;
+    --code-warn: #f9e2af;
+    --code-key: #b4befe;
+    --shadow: 0 1px 0 rgba(30, 30, 60, .04), 0 24px 60px -30px rgba(40, 44, 110, .35);
+    --r-lg: 18px;
+    --r-md: 12px;
+    --r-sm: 8px;
+    --gutter: clamp(16px, 4vw, 40px);
+    --display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --ease: cubic-bezier(.16, 1, .3, 1);
   }
-  * { box-sizing: border-box; }
-  html { background: var(--night); }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #13131b;
+      --bg-2: #181822;
+      --surface: #1c1c28;
+      --line: #2a2a39;
+      --text: #e6e7f2;
+      --muted: #a0a2b9;
+      --faint: #6f7189;
+      --accent: #b4befe;
+      --accent-ink: #171725;
+      --accent-soft: rgba(180, 190, 254, .08);
+      --code-bg: #171721;
+      --code-line: #272735;
+      --shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 30px 70px -34px rgba(0, 0, 0, .7);
+    }
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; color: var(--ink); font: 17px/1.6 var(--sans); -webkit-font-smoothing: antialiased;
-    background:
-      radial-gradient(900px 600px at 12% -5%, rgba(245,200,106,.16), transparent 70%),
-      radial-gradient(800px 520px at 92% 8%, rgba(115,230,223,.08), transparent 70%),
-      radial-gradient(900px 700px at 70% 120%, rgba(201,167,255,.07), transparent 70%),
-      var(--night);
-    padding-inline: 20px; padding-block: 0 56px;
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 400 16px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
-  .wrap { max-width: 1120px; margin: 0 auto; }
-  a { color: var(--gold); text-underline-offset: 3px; }
-  a:focus-visible, button:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 6px; }
-  p { margin: 0; }
-  h1, h2 { font-family: var(--serif); font-weight: 500; letter-spacing: -.025em; margin: 0; text-wrap: balance; }
-  h2 { font-size: clamp(32px, 4.4vw, 46px); line-height: 1.05; }
-  code { font-family: var(--mono); font-size: .88em; color: var(--ink); }
-  section { padding-top: clamp(72px, 10vw, 120px); }
-  .lede { color: var(--muted); max-width: 62ch; font-size: 18px; }
-  .lede b { color: var(--ink); font-weight: 600; }
+  img, video { display: block; max-width: 100%; height: auto; }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  code { font-family: var(--mono); font-size: .9em; }
+  p code, li code, dd code, td code { padding: .08em .35em; border-radius: 5px; background: var(--bg-2); border: 1px solid var(--line); font-size: .84em; white-space: nowrap; }
+  h1, h2, h3 { font-family: var(--display); font-weight: 650; margin: 0; text-wrap: balance; }
+  h2 { font-size: clamp(1.85rem, 3.4vw, 2.75rem); line-height: 1.06; letter-spacing: -.028em; }
+  h3 { font-size: 1.12rem; letter-spacing: -.012em; line-height: 1.25; }
+  p { margin: 0; text-wrap: pretty; }
+  .icon { width: 1em; height: 1em; fill: currentColor; flex: none; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .skip { position: absolute; left: 12px; top: -48px; padding: 8px 14px; border-radius: var(--r-sm); background: var(--accent); color: var(--accent-ink); z-index: 20; }
+  .skip:focus { top: 12px; }
+
+  .wrap { width: 100%; max-width: 1200px; margin-inline: auto; padding-inline: var(--gutter); }
+  section { padding-block: clamp(72px, 10vw, 128px) 0; }
+  .lead { color: var(--muted); font-size: 1.06rem; max-width: 60ch; margin-top: 16px; }
+  .note { color: var(--faint); font-size: .86rem; margin-top: 14px; }
 
   /* nav */
-  nav { display: flex; align-items: center; justify-content: space-between; padding-block: 22px; }
-  .brand { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); text-decoration: none; font: 600 24px/1 var(--serif); letter-spacing: -.02em; }
-  .brand svg { width: 18px; height: 27px; }
-  .links { display: flex; align-items: center; gap: 22px; font-size: 15px; }
-  .links a { color: var(--muted); text-decoration: none; }
-  .links a:hover { color: var(--ink); }
-  .ver { color: var(--gold) !important; border: 1px solid rgba(245,200,106,.35); border-radius: 999px; padding: 3px 10px; }
+  .nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid transparent; transition: border-color .3s var(--ease); }
+  .nav.is-stuck { border-bottom-color: var(--line); }
+  .nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
+  .brand { font-family: var(--display); font-weight: 680; font-size: 1.32rem; letter-spacing: -.03em; text-decoration: none; }
+  .brand:hover { color: inherit; }
+  .nav-links { display: flex; gap: 24px; margin-left: auto; align-items: center; font-size: .94rem; color: var(--muted); }
+  .nav-links a { text-decoration: none; }
+  .nav-links .gh { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); background: var(--surface); transition: border-color .2s var(--ease), transform .2s var(--ease); }
+  .nav-links .gh:hover { border-color: var(--accent); }
+  .nav-links .gh:active { transform: translateY(1px); }
+  .nav-links .gh .icon { font-size: 1.05rem; }
 
   /* hero */
-  .hero { padding-top: clamp(40px, 7vw, 84px); text-align: center; display: grid; grid-template-columns: minmax(0, 1fr); justify-items: center; gap: 24px; }
-  .hero h1 { font-size: clamp(42px, 7.2vw, 88px); line-height: .98; max-width: 15ch; }
-  .hero h1 em { font-style: italic; color: var(--gold); }
-  .hero .lede { text-align: center; }
-  .cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; align-items: center; margin-top: 6px; max-width: 100%; min-width: 0; }
-  .cmd { display: inline-flex; align-items: center; gap: 12px; max-width: 100%; min-width: 0; padding: 12px 12px 12px 18px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0,0,0,.4); font: 15px/1.4 var(--mono); }
-  .cmd span { overflow-x: auto; white-space: nowrap; min-width: 0; }
-  .cmd .p { color: var(--muted); }
-  .copy { font: 600 13px/1 var(--sans); color: var(--night); background: var(--gold); border: 0; border-radius: 8px; padding: 9px 12px; cursor: pointer; flex: none; }
-  .ghost { font: 600 15px/1 var(--sans); color: var(--ink); text-decoration: none; border: 1px solid var(--line); border-radius: 12px; padding: 15px 18px; }
-  .ghost:hover { border-color: rgba(245,241,232,.35); }
-  .alt { color: var(--muted); font-size: 14.5px; max-width: 100%; }
-  .alt code { overflow-wrap: anywhere; }
+  .hero { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: clamp(32px, 4.5vw, 64px); align-items: center; padding-block: clamp(40px, 7vw, 88px) 0; }
+  .hero h1 { font-size: clamp(2.6rem, 4.6vw, 3.9rem); line-height: 1; letter-spacing: -.038em; font-weight: 640; }
+  .hero .sub { margin-top: 22px; font-size: clamp(1.06rem, 1.5vw, 1.2rem); line-height: 1.55; color: var(--muted); max-width: 34rem; }
+  .hero .sub code { font-size: .9em; }
 
-  /* film: the picture */
-  .film { margin-top: clamp(40px, 6vw, 64px); position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--line);
-    box-shadow: 0 40px 120px rgba(0,0,0,.55), 0 0 120px rgba(245,200,106,.10); aspect-ratio: 16 / 9; background: #000; }
-  .film video, .film img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-  .play { position: absolute; inset: 0; display: grid; place-items: end start; background: linear-gradient(180deg, transparent 60%, rgba(0,0,0,.5)); border: 0; cursor: pointer; padding: clamp(14px, 3vw, 32px); }
-  .play span { display: inline-flex; align-items: center; gap: 12px; padding: 14px 22px 14px 16px; border-radius: 999px; background: rgba(15,14,12,.78); border: 1px solid rgba(245,200,106,.45); color: var(--ink); font: 600 16px/1 var(--sans); backdrop-filter: blur(6px); }
-  .play svg { width: 26px; height: 26px; }
-  .play:hover span { border-color: var(--gold); }
-  .film-note { margin-top: 12px; text-align: center; color: var(--muted); font-size: 14.5px; }
+  .install { margin-top: 32px; max-width: 34rem; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+  .tabs { display: flex; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 500 .9rem/1 var(--sans); padding: 9px 12px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; transition: color .2s var(--ease), background .2s var(--ease); }
+  .tab .icon { font-size: 1.05rem; }
+  .tab:hover { color: var(--text); }
+  .tab[aria-selected="true"] { color: var(--text); background: var(--accent-soft); }
+  .tab[aria-selected="true"] .icon { color: var(--accent); }
+  .cmds { padding: 10px 8px 10px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .cmd { display: flex; align-items: center; gap: 10px; min-height: 42px; font-family: var(--mono); font-size: .92rem; }
+  .cmd .p { color: var(--accent); user-select: none; }
+  .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; font-size: 1em; transition: opacity .18s var(--ease), transform .25s var(--ease); }
+  .cmd code::-webkit-scrollbar { display: none; }
+  .cmd code.is-swapping { opacity: 0; transform: translateY(4px); }
+  .cmd[hidden] { display: none; }
+  .copy { appearance: none; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 11px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--faint); font: 500 .8rem/1 var(--sans); cursor: pointer; transition: color .2s var(--ease), background .2s var(--ease), border-color .2s var(--ease), transform .12s var(--ease); }
+  .copy:hover { color: var(--text); background: var(--bg-2); }
+  .copy:active { transform: scale(.96); }
+  .copy .icon { font-size: 1rem; }
+  .copy .ok { display: none; }
+  .copy.is-done { color: var(--accent); }
+  .copy.is-done .ok { display: block; }
+  .copy.is-done .cp { display: none; }
+  .copy .label { min-width: 3.6em; text-align: left; }
 
-  /* works with */
-  .works { margin-top: 44px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px 26px; color: var(--muted); font-size: 15px; }
-  .works span { display: inline-flex; align-items: center; gap: 8px; }
-  .works svg { width: 20px; height: 20px; }
+  .film { position: relative; margin: 0; border-radius: var(--r-lg); overflow: hidden; background: #11111a; box-shadow: var(--shadow); border: 1px solid var(--line); aspect-ratio: 16 / 9; }
+  .film > button { all: unset; position: absolute; inset: 0; cursor: pointer; display: block; }
+  .film img, .film video { width: 100%; height: 100%; object-fit: cover; }
+  .film img { transition: transform .9s var(--ease), filter .5s var(--ease); }
+  .film > button:hover img { transform: scale(1.015); filter: brightness(1.04); }
+  .play { position: absolute; left: 18px; bottom: 18px; display: inline-flex; align-items: center; gap: 10px; padding: 9px 16px 9px 10px; border-radius: 999px; background: rgba(19, 19, 27, .72); color: #f1f2fa; font: 500 .92rem/1 var(--sans); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); transition: background .2s var(--ease), transform .2s var(--ease); }
+  .play .disc { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #b4befe; color: #171725; }
+  .play .disc .icon { font-size: .9rem; margin-left: 2px; }
+  .film > button:hover .play { background: rgba(19, 19, 27, .86); }
+  .film > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: var(--r-lg); }
+  .film > button:active .play { transform: scale(.98); }
 
-  /* matrix */
-  .head { display: grid; gap: 14px; margin-bottom: 30px; }
-  .tablewrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 16px; background: rgba(245,241,232,.03); }
-  table { border-collapse: collapse; width: 100%; min-width: 620px; font-size: 15.5px; }
-  th, td { padding: 13px 16px; border-bottom: 1px solid rgba(245,241,232,.07); text-align: left; vertical-align: middle; }
-  thead th { color: var(--muted); font-weight: 500; font-size: 14px; }
-  tbody th { font-weight: 600; white-space: nowrap; }
-  tbody th span { display: inline-flex; align-items: center; gap: 10px; }
-  tbody th svg { width: 20px; height: 20px; flex: none; }
-  tr:last-child th, tr:last-child td { border-bottom: 0; }
-  td { color: var(--muted); }
-  .w { color: var(--green); font-weight: 600; }
-  .n { color: var(--gold); }
-  .legend { margin-top: 14px; color: var(--muted); font-size: 14.5px; display: flex; flex-wrap: wrap; gap: 6px 22px; }
+  .agents-line { margin-top: clamp(40px, 6vw, 64px); padding-top: 22px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px 26px; color: var(--muted); font-size: .95rem; }
+  .agents-line strong { color: var(--text); font-weight: 500; }
+  .agents-line span { font-family: var(--display); font-weight: 560; font-size: 1.04rem; color: var(--text); letter-spacing: -.01em; }
 
-  /* steps */
-  .steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; counter-reset: s; }
-  .steps li { counter-increment: s; border-top: 1px solid var(--line); padding-top: 18px; display: grid; gap: 8px; align-content: start; }
-  .steps li::before { content: counter(s); font: 500 34px/1 var(--serif); color: var(--gold); }
-  .steps h3 { margin: 0; font: 600 21px/1.2 var(--serif); }
-  .steps p { color: var(--muted); font-size: 16px; }
+  /* first run */
+  .run { display: grid; grid-template-columns: minmax(0, 4.4fr) minmax(0, 7.6fr); gap: clamp(32px, 5vw, 80px); align-items: start; }
+  .run-side { position: sticky; top: 104px; }
+  .steps { list-style: none; margin: 36px 0 0; padding: 0; display: grid; gap: 4px; }
+  .steps a { display: grid; grid-template-columns: 22px 1fr; gap: 4px 14px; padding: 14px 16px 14px 14px; border-radius: var(--r-md); text-decoration: none; color: var(--muted); transition: background .35s var(--ease), color .35s var(--ease); }
+  .steps a::before { content: ""; grid-row: 1 / span 2; width: 3px; justify-self: center; border-radius: 3px; background: var(--line); transition: background .35s var(--ease); }
+  .steps b { font-family: var(--display); font-weight: 620; font-size: 1.1rem; color: var(--text); letter-spacing: -.01em; }
+  .steps span { font-size: .95rem; line-height: 1.5; }
+  .steps .is-active a { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+  .steps .is-active a::before { background: var(--accent); }
+  .run-outs { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(28px, 4vw, 48px); min-width: 0; }
+  .out-text { display: none; }
+  .term { margin: 0; border-radius: var(--r-lg); background: var(--code-bg); border: 1px solid var(--code-line); box-shadow: var(--shadow); overflow: hidden; }
+  .term-head { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--code-line); color: var(--code-dim); font: 500 .8rem/1 var(--mono); }
+  .term-head .icon { font-size: .95rem; color: var(--code-key); }
+  .term pre { margin: 0; padding: 18px 20px 20px; overflow-x: auto; color: var(--code-text); font: 400 .84rem/1.62 var(--mono); tab-size: 2; }
+  .term .c { color: var(--code-dim); }
+  .term .k { color: var(--code-key); }
+  .term .g { color: var(--code-ok); }
+  .term .y { color: var(--code-warn); }
+  .term .s { color: #f5c2e7; }
+  .out { min-width: 0; }
 
-  .term { margin-top: 26px; min-width: 0; border: 1px solid var(--line); border-radius: 14px; background: rgba(0,0,0,.45); overflow: hidden; }
-  .term .bar { display: flex; gap: 8px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); background: rgba(245,241,232,.03); }
-  .term .bar i { width: 11px; height: 11px; border-radius: 50%; display: block; }
-  .term .bar b { margin-left: 8px; font: 13px var(--mono); color: var(--muted); font-weight: 400; }
-  .term pre { margin: 0; padding: 18px 22px; overflow-x: auto; font: 14.5px/1.75 var(--mono); color: #d8dde8; }
-  .term .p { color: #7d8699; } .term .g { color: var(--green); } .term .k { color: var(--gold); } .term .d { color: #7d8699; }
-  .caption { margin-top: 12px; color: var(--muted); font-size: 14.5px; }
-  .pair { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
-  .pair .term { margin-top: 0; }
+  /* view */
+  .view-head { max-width: 46rem; }
+  .shot { margin: clamp(32px, 5vw, 56px) auto 0; width: min(1320px, calc(100% - 2 * var(--gutter))); }
+  .shot img { width: 100%; border-radius: var(--r-lg); border: 1px solid var(--line); box-shadow: var(--shadow); background: #181825; }
+  .shot figcaption { margin-top: 14px; color: var(--faint); font-size: .86rem; text-align: center; padding-inline: var(--gutter); }
 
-  .tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-  .tool { border: 1px solid var(--line); border-radius: 14px; padding: 20px 22px; display: grid; gap: 6px; }
-  .tool h3 { margin: 0; font: 600 21px/1.2 var(--serif); }
-  .tool p { color: var(--muted); font-size: 16px; }
+  /* explorer */
+  .ex-head { max-width: 44rem; }
+  .ex { margin-top: clamp(32px, 5vw, 52px); display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+  .ex-src { position: sticky; top: 96px; }
+  .ex-src .term-head .tag { margin-left: auto; color: var(--code-key); }
+  .ex-out { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+  .ex-out .tabs { padding: 8px; }
+  .ex-panel { padding: 14px; display: grid; gap: 12px; }
+  .ex-panel[hidden] { display: none; }
+  .ex-panel.is-entering { animation: fade .35s var(--ease) both; }
+  .file { border-radius: var(--r-md); background: var(--code-bg); border: 1px solid var(--code-line); overflow: hidden; }
+  .file .term-head { padding: 9px 14px; }
+  .file .term-head .what { margin-left: auto; font-family: var(--sans); color: var(--code-dim); }
+  .file pre { margin: 0; padding: 12px 14px 14px; overflow-x: auto; color: var(--code-text); font: 400 .8rem/1.6 var(--mono); }
+  .file .k { color: var(--code-key); }
+  .file .c { color: var(--code-dim); }
+  .file .s { color: #f5c2e7; }
+  .ex-note { padding: 0 4px 4px; color: var(--muted); font-size: .9rem; }
 
-  footer { margin-top: 96px; padding-top: 22px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 24px; color: var(--muted); font-size: 14.5px; }
+  .matrix { margin-top: clamp(40px, 6vw, 64px); }
+  .matrix h3 { font-size: 1.3rem; }
+  .tablewrap { margin-top: 18px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .93rem; }
+  th, td { text-align: left; padding: 12px 18px; vertical-align: middle; }
+  thead th { font: 500 .8rem/1.2 var(--sans); color: var(--muted); padding-block: 14px; border-bottom: 1px solid var(--line); }
+  tbody tr:nth-child(even) { background: var(--accent-soft); }
+  tbody th { font-weight: 560; font-family: var(--display); font-size: 1rem; letter-spacing: -.005em; white-space: nowrap; }
+  td .yes { color: var(--accent); font-size: 1.05rem; vertical-align: -3px; }
+  td .t { color: var(--muted); }
+  td .no { color: var(--faint); }
+  .legend { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--muted); font-size: .86rem; }
+  .legend b { font-weight: 560; color: var(--text); }
 
-  @media (max-width: 860px) {
-    .steps, .pair, .tools { grid-template-columns: 1fr; }
-    .links .hide-sm { display: none; }
+  /* bento */
+  .bento { margin-top: clamp(32px, 5vw, 52px); display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
+  .cell { border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); padding: clamp(20px, 2.4vw, 28px); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .cell p { color: var(--muted); font-size: .96rem; }
+  .cell .mark { font-size: 1.5rem; color: var(--accent); margin-bottom: 6px; }
+  .cell .term { margin-top: auto; box-shadow: none; border-radius: var(--r-md); }
+  .cell .term pre { font-size: .76rem; padding: 14px 16px; }
+  .c-audit { grid-column: span 4; grid-row: span 2; background: linear-gradient(160deg, var(--accent-soft), transparent 55%), var(--surface); }
+  .c-audit .term { margin-top: 18px; }
+  .c-pin { grid-column: span 2; background: var(--bg-2); }
+  .c-own { grid-column: span 2; }
+  .c-sync { grid-column: span 3; }
+  .c-local { grid-column: span 3; background: var(--bg-2); }
+  .c-sync .term, .c-local .term { margin-top: 12px; }
+
+  /* compare */
+  .compare { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(28px, 5vw, 72px); align-items: start; }
+  .compare .tablewrap { margin-top: 0; }
+  .compare table { min-width: 560px; }
+  .compare td.us { color: var(--text); font-weight: 520; }
+  .compare thead th a { color: var(--muted); }
+  .compare thead th.us { color: var(--accent); }
+
+  /* faq */
+  .faq { margin-top: clamp(28px, 4vw, 44px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px 56px; }
+  .faq div { min-width: 0; }
+  .faq dt { font-family: var(--display); font-weight: 620; font-size: 1.12rem; letter-spacing: -.012em; }
+  .faq dd { margin: 8px 0 0; color: var(--muted); }
+
+  footer { margin-top: clamp(80px, 11vw, 140px); border-top: 1px solid var(--line); }
+  footer .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 28px; padding-block: 32px 44px; color: var(--muted); font-size: .92rem; }
+  footer .brand { font-size: 1.1rem; color: var(--text); }
+  footer nav { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-left: auto; }
+  footer nav a { text-decoration: none; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: no-preference) {
+    .rise { animation: rise .8s var(--ease) both; animation-delay: calc(var(--i, 0) * 90ms); }
+    @supports (animation-timeline: view()) {
+      .shot img { animation: lift linear both; animation-timeline: view(); animation-range: entry 0% cover 40%; }
+      @keyframes lift { from { transform: translateY(48px) scale(.97); opacity: .4; } to { transform: none; opacity: 1; } }
+    }
   }
-  @media (max-width: 560px) {
-    .play span { font-size: 13px; padding: 9px 14px 9px 10px; gap: 8px; }
-    .play svg { width: 20px; height: 20px; }
-    .cmd { font-size: 13.5px; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *, *::before, *::after { transition-duration: 0s !important; animation: none !important; }
   }
-  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+  @media (max-width: 920px) {
+    .hero { grid-template-columns: minmax(0, 1fr); }
+    .run { grid-template-columns: minmax(0, 1fr); }
+    .run-side { position: static; }
+    .steps { display: none; }
+    .out-text { display: block; margin-bottom: 14px; }
+    .out-text h3 { font-size: 1.2rem; }
+    .out-text p { margin-top: 6px; color: var(--muted); }
+    .ex { grid-template-columns: minmax(0, 1fr); }
+    .ex-src { position: static; }
+    .bento { grid-template-columns: minmax(0, 1fr); }
+    .c-audit, .c-pin, .c-own, .c-sync, .c-local { grid-column: auto; grid-row: auto; }
+    .faq { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    .compare { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (max-width: 640px) {
+    .nav-links .hide-sm { display: none; }
+    .nav .wrap { gap: 16px; }
+    .install { border-radius: var(--r-md); }
+    .cmd { font-size: .84rem; }
+    .copy .label { display: none; }
+    .install .tab { padding: 9px 10px; }
+    .install .tab .icon { display: none; }
+    .cmds { padding-left: 12px; }
+    .play { left: 12px; bottom: 12px; font-size: .84rem; }
+    .term pre { font-size: .76rem; padding: 14px 14px 16px; }
+    footer nav { margin-left: 0; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <nav aria-label="Main">
-    <a class="brand" href="./"><svg viewBox="0 0 120 180" aria-hidden="true"><rect x="34" y="4" width="52" height="34" rx="8" fill="#c99b3d"/><path d="M60 34V118a30 30 0 1 1-30-30" fill="none" stroke="#f5c86a" stroke-width="14" stroke-linecap="round"/></svg>tackroom</a>
-    <div class="links">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-copy" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></symbol>
+<symbol id="i-check" viewBox="0 0 256 256"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></symbol>
+<symbol id="i-github-logo" viewBox="0 0 256 256"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></symbol>
+<symbol id="i-arrow-up-right" viewBox="0 0 256 256"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></symbol>
+<symbol id="i-beer-bottle" viewBox="0 0 256 256"><path d="M245.66,42.34l-32-32a8,8,0,0,0-11.32,11.32l1.48,1.47L148.65,64.51l-38.22,7.65a8.05,8.05,0,0,0-4.09,2.18L23,157.66a24,24,0,0,0,0,33.94L64.4,233a24,24,0,0,0,33.94,0l83.32-83.31a8,8,0,0,0,2.18-4.09l7.65-38.22,41.38-55.17,1.47,1.48a8,8,0,0,0,11.32-11.32ZM96,107.31,148.69,160,104,204.69,51.31,152ZM81.37,224a7.94,7.94,0,0,1-5.65-2.34L34.34,180.28a8,8,0,0,1,0-11.31L40,163.31,92.69,216,87,221.66A8,8,0,0,1,81.37,224ZM177.6,99.2a7.92,7.92,0,0,0-1.44,3.23l-7.53,37.63L160,148.69,107.31,96l8.63-8.63,37.63-7.53a7.92,7.92,0,0,0,3.23-1.44l58.45-43.84,6.19,6.19Z"/></symbol>
+<symbol id="i-package" viewBox="0 0 256 256"><path d="M223.68,66.15,135.68,18a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88-48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32l80.34,44-29.77,16.3-80.35-44ZM128,120,47.66,76l33.9-18.56,80.34,44ZM40,90l80,43.78v85.79L40,175.82Zm176,85.78h0l-80,43.79V133.82l32-17.51V152a8,8,0,0,0,16,0V107.55L216,90v85.77Z"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 256 256"><path d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,1,1,45.32,58l72,64a8,8,0,0,1,0,12ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z"/></symbol>
+<symbol id="i-push-pin" viewBox="0 0 256 256"><path d="M235.32,81.37,174.63,20.69a16,16,0,0,0-22.63,0L98.37,74.49c-10.66-3.34-35-7.37-60.4,13.14a16,16,0,0,0-1.29,23.78L85,159.71,42.34,202.34a8,8,0,0,0,11.32,11.32L96.29,171l48.29,48.29A16,16,0,0,0,155.9,224c.38,0,.75,0,1.13,0a15.93,15.93,0,0,0,11.64-6.33c19.64-26.1,17.75-47.32,13.19-60L235.33,104A16,16,0,0,0,235.32,81.37ZM224,92.69h0l-57.27,57.46a8,8,0,0,0-1.49,9.22c9.46,18.93-1.8,38.59-9.34,48.62L48,100.08c12.08-9.74,23.64-12.31,32.48-12.31A40.13,40.13,0,0,1,96.81,91a8,8,0,0,0,9.25-1.51L163.32,32,224,92.68Z"/></symbol>
+<symbol id="i-stethoscope" viewBox="0 0 256 256"><path d="M220,160a12,12,0,1,1-12-12A12,12,0,0,1,220,160Zm-4.55,39.29A48.08,48.08,0,0,1,168,240H144a48.05,48.05,0,0,1-48-48V151.49A64,64,0,0,1,40,88V40a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56V88a48,48,0,0,0,48.64,48c26.11-.34,47.36-22.25,47.36-48.83V48H136a8,8,0,0,1,0-16h24a8,8,0,0,1,8,8V87.17c0,32.84-24.53,60.29-56,64.31V192a32,32,0,0,0,32,32h24a32.06,32.06,0,0,0,31.22-25,40,40,0,1,1,16.23.27ZM232,160a24,24,0,1,0-24,24A24,24,0,0,0,232,160Z"/></symbol>
+<symbol id="i-devices" viewBox="0 0 256 256"><path d="M224,72H208V64a24,24,0,0,0-24-24H40A24,24,0,0,0,16,64v96a24,24,0,0,0,24,24H152v8a24,24,0,0,0,24,24h48a24,24,0,0,0,24-24V96A24,24,0,0,0,224,72ZM40,168a8,8,0,0,1-8-8V64a8,8,0,0,1,8-8H184a8,8,0,0,1,8,8v8H176a24,24,0,0,0-24,24v72Zm192,24a8,8,0,0,1-8,8H176a8,8,0,0,1-8-8V96a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8Zm-96,16a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h40A8,8,0,0,1,136,208Zm80-96a8,8,0,0,1-8,8H192a8,8,0,0,1,0-16h16A8,8,0,0,1,216,112Z"/></symbol>
+<symbol id="i-git-branch" viewBox="0 0 256 256"><path d="M232,64a32,32,0,1,0-40,31v17a8,8,0,0,1-8,8H96a23.84,23.84,0,0,0-8,1.38V95a32,32,0,1,0-16,0v66a32,32,0,1,0,16,0V144a8,8,0,0,1,8-8h88a24,24,0,0,0,24-24V95A32.06,32.06,0,0,0,232,64ZM64,64A16,16,0,1,1,80,80,16,16,0,0,1,64,64ZM96,192a16,16,0,1,1-16-16A16,16,0,0,1,96,192ZM200,80a16,16,0,1,1,16-16A16,16,0,0,1,200,80Z"/></symbol>
+<symbol id="i-play-fill" viewBox="0 0 256 256"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87a15.86,15.86,0,0,1,8.12-13.82,16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a class="brand" href="./">tackroom</a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="hide-sm" href="#first-run">How it works</a>
       <a class="hide-sm" href="#agents">Agents</a>
       <a class="hide-sm" href="https://github.com/yourconscience/tackroom#readme">Docs</a>
-      <a href="https://github.com/yourconscience/tackroom">GitHub</a>
-      <a class="ver" href="https://github.com/yourconscience/tackroom/releases/tag/v1.0.0">v1.0</a>
-    </div>
-  </nav>
-
-  <header class="hero">
-    <h1>One ~/.agents repo, rendered into <em>every coding agent.</em></h1>
-    <p class="lede">Copying skills, MCP servers, hooks and roles between agents by hand drifts within a week. tackroom keeps them in one private git repo and writes each one into <b>every agent's own format</b>, with other people's skills pinned to a commit and audited.</p>
-    <div class="cta">
-      <div class="cmd"><span><span class="p">$ </span>brew install yourconscience/tap/tackroom</span><button class="copy" type="button" data-copy="brew install yourconscience/tap/tackroom">Copy</button></div>
-      <a class="ghost" href="https://github.com/yourconscience/tackroom">View on GitHub</a>
-    </div>
-    <p class="alt">Then run <code>tackroom setup</code>. No Homebrew? <code>go install github.com/yourconscience/tackroom/cmd/tackroom@latest</code></p>
-  </header>
-
-  <div class="film" id="film">
-    <img src="brag.jpg" alt="tackroom wiring ~/.agents into Claude Code, Codex, Factory Droid, Hermes, Qwen Code, Pi, OpenCode and Amp" width="1920" height="1080">
-    <button class="play" type="button" id="play" aria-label="Play the 22-second launch video">
-      <span><svg viewBox="0 0 26 26" aria-hidden="true"><circle cx="13" cy="13" r="13" fill="#f5c86a"/><path d="M10.5 8.2v9.6l7.6-4.8z" fill="#0f0e0c"/></svg>Watch the 22-second tour</span>
-    </button>
+      <a class="gh" href="https://github.com/yourconscience/tackroom"><svg class="icon" aria-hidden="true"><use href="#i-github-logo"/></svg>GitHub</a>
+    </nav>
   </div>
-  <p class="film-note">Made with the <a href="https://github.com/latent-spaces/brag">brag</a> skill, which tackroom pins and audits like any other external skill.</p>
+</header>
 
-  <div class="works" aria-label="Supported agents" id="works"></div>
-
-  <section id="agents">
-    <div class="head">
-      <h2>What lands in each agent</h2>
-      <p class="lede">Each agent keeps its own config format. tackroom writes only the entries it manages and leaves everything else in those files alone.</p>
+<main id="main">
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1 class="rise" style="--i:0">Set up your coding agents once.</h1>
+        <p class="sub rise" style="--i:1">tackroom keeps skills, MCP servers, hooks and roles in one <code>~/.agents</code> repo and syncs them into each agent's native config.</p>
+        <div class="install rise" style="--i:2">
+          <div class="tabs" role="tablist" aria-label="Install with">
+            <button class="tab" role="tab" type="button" id="tab-brew" data-pm="brew" aria-selected="true"><svg class="icon" aria-hidden="true"><use href="#i-beer-bottle"/></svg>Homebrew</button>
+            <button class="tab" role="tab" type="button" id="tab-npm" data-pm="npm" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg>npm</button>
+            <button class="tab" role="tab" type="button" id="tab-npx" data-pm="npx" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg>npx</button>
+            <button class="tab" role="tab" type="button" id="tab-curl" data-pm="curl" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>Script</button>
+          </div>
+          <div class="cmds" role="tabpanel" id="install-panel" aria-labelledby="tab-brew">
+            <div class="cmd" id="row-install"><span class="p" aria-hidden="true">$</span><code id="cmd-install">brew install yourconscience/tap/tackroom</code><button class="copy" type="button" data-copy="cmd-install" aria-label="Copy install command"><svg class="icon cp" aria-hidden="true"><use href="#i-copy"/></svg><svg class="icon ok" aria-hidden="true"><use href="#i-check"/></svg><span class="label">Copy</span></button></div>
+            <div class="cmd" id="row-setup"><span class="p" aria-hidden="true">$</span><code id="cmd-setup">tackroom setup</code><button class="copy" type="button" data-copy="cmd-setup" aria-label="Copy setup command"><svg class="icon cp" aria-hidden="true"><use href="#i-copy"/></svg><svg class="icon ok" aria-hidden="true"><use href="#i-check"/></svg><span class="label">Copy</span></button></div>
+          </div>
+        </div>
+      </div>
+      <figure class="film rise" style="--i:3" id="film">
+        <button type="button" id="play" aria-label="Play the tackroom tour video, with sound">
+          <img src="brag.jpg" width="1920" height="1080" alt="A frame from the tackroom tour: one ~/.agents folder synced into claude-code, codex, hermes, pi, qwen-code and omp, each with its own config file">
+          <span class="play"><span class="disc"><svg class="icon" aria-hidden="true"><use href="#i-play-fill"/></svg></span>Watch the 23-second tour</span>
+        </button>
+      </figure>
     </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th scope="col">Agent</th><th scope="col">Skills</th><th scope="col">Roles</th><th scope="col">MCP servers</th><th scope="col">Hooks</th><th scope="col">Plugins</th></tr></thead>
-        <tbody id="matrix"></tbody>
-      </table>
-    </div>
-    <div class="legend"><span><span class="w">Synced</span> tackroom writes it</span><span><span class="n">Native</span> the agent reads <code>~/.agents/skills</code> itself</span><span>Planned: on the roadmap</span><span>—: not synced for this agent</span></div>
-  </section>
 
-  <section>
-    <div class="head"><h2>How it works</h2></div>
-    <ol class="steps">
-      <li><h3>Set up once</h3><p><code>tackroom setup</code> finds your agents, offers to copy their existing skills, MCP servers and roles into <code>~/.agents</code>, and makes it a git repo.</p></li>
-      <li><h3>Edit one repo</h3><p>Add a skill, change an MCP server, pin someone else's skill. Another machine is one <code>git clone</code> away.</p></li>
-      <li><h3>Sync</h3><p><code>tackroom sync</code> writes each change into every agent. <code>tackroom cron</code> pulls and syncs every 30 minutes.</p></li>
-    </ol>
-    <div class="term"><div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><b>~/.agents</b></div>
-<pre><span class="p">$</span> tackroom status
+    <p class="agents-line" aria-label="Supported agents"><strong>Syncs into</strong> <span>Claude Code</span> <span>Codex</span> <span>Factory Droid</span> <span>OpenCode</span> <span>Qwen Code</span> <span>Pi</span> <span>OMP</span> <span>Hermes</span> <span>Amp</span></p>
+
+    <section id="first-run" class="run" aria-labelledby="run-title">
+      <div class="run-side">
+        <h2 id="run-title">The first five minutes</h2>
+        <p class="lead">Real output from a fresh home directory with six agents installed. Paths are shortened to <code>~</code>.</p>
+        <ol class="steps" aria-hidden="true">
+          <li data-step="install" class="is-active"><a href="#out-install" tabindex="-1"><b>Install</b><span>Homebrew, npm or npx. One Go binary for macOS or Linux.</span></a></li>
+          <li data-step="setup"><a href="#out-setup" tabindex="-1"><b>Set up</b><span>Finds your agents, shows what they already have, and imports it after you review each item.</span></a></li>
+          <li data-step="sync"><a href="#out-sync" tabindex="-1"><b>Sync</b><span>Writes skills, roles, MCP servers and hooks into every agent. Run it again any time; it only changes what drifted.</span></a></li>
+          <li data-step="check"><a href="#out-check" tabindex="-1"><b>Check</b><span>Validates every skill, confirms lock pins and scans third-party skills before they reach an agent.</span></a></li>
+        </ol>
+      </div>
+      <div class="run-outs">
+        <div class="out" id="out-install" data-step="install">
+          <div class="out-text"><h3>Install</h3><p>Homebrew, npm or npx. One Go binary for macOS or Linux.</p></div>
+          <figure class="term">
+            <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>install</figcaption>
+<pre><span class="k">$</span> brew install yourconscience/tap/tackroom
+<span class="c"># or: npm i -g tackroom</span>
+<span class="k">$</span> tackroom
+tackroom - manage shared skills, MCP, and canonical config
+
+Commands:
+  setup    Set up this machine and sync configured harnesses
+  status   Show harness, external lock, and memsearch state
+  sync     Regenerate committed artifacts and reconcile harnesses
+  doctor   Check pins, dependencies, and local health
+  config   Validate or print the canonical YAML
+  view     Author the canonical YAML in a loopback web UI (browser)</pre>
+          </figure>
+        </div>
+        <div class="out" id="out-setup" data-step="setup">
+          <div class="out-text"><h3>Set up</h3><p>Finds your agents, shows what they already have, and imports it after you review each item.</p></div>
+          <figure class="term">
+            <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>setup</figcaption>
+<pre><span class="k">$</span> tackroom setup --dry-run
+needs review:
+  mcp     context7  [claude-code]
+  skill   pr-review  [claude-code]
+identical everywhere (would be shared automatically):
+  skill   release-notes  [claude-code codex]
+
+<span class="k">$</span> tackroom setup --yes --memory off
+config root: ~/.agents
+
+imported 3 item(s) without prompting (--yes)
+
+claude-code: config already set
+codex: config already set
+hermes: config patched (added ~/.agents/skills)
+omp: config already set
+pi: config already set
+qwen-code: config patched (added ~/.agents/skills)
+<span class="c">...first sync follows</span></pre>
+          </figure>
+        </div>
+        <div class="out" id="out-sync" data-step="sync">
+          <div class="out-text"><h3>Sync</h3><p>Writes skills, roles, MCP servers and hooks into every agent. Run it again any time; it only changes what drifted.</p></div>
+          <figure class="term">
+            <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>sync</figcaption>
+<pre><span class="k">$</span> tackroom sync
+<span class="k">$</span> tackroom status
 claude-code   <span class="g">✓ synced</span>
-codex         <span class="g">✓ synced</span>
-hermes        <span class="g">✓ synced</span>
-pi            <span class="g">✓ synced</span>
-omp           <span class="g">✓ synced</span>
-<span class="k">Everything is synced.</span></pre></div>
-    <p class="caption">Trimmed from a real run on the maintainer's machine; the full output also lists the repo link, root docs and checks.</p>
-  </section>
+  managed     4 skills · 6 agents · 1 mcp · 1 hooks
+codex   <span class="g">✓ synced</span>
+  managed     4 skills · 6 agents · 1 mcp · 1 hooks
+hermes   <span class="g">✓ synced</span>
+  managed     4 skills
+omp   <span class="g">✓ synced</span>
+  managed     4 skills · 6 agents
+pi   <span class="g">✓ synced</span>
+  managed     4 skills · 6 agents · 1 mcp
+qwen-code   <span class="g">✓ synced</span>
+  managed     4 skills · 6 agents
 
-  <section>
-    <div class="head">
-      <h2>Other people's skills, pinned like dependencies</h2>
-      <p class="lede">An external skill is prompt code from someone else's repo. tackroom records the exact commit in <code>tackroom.lock</code>, never moves it until you run <code>tackroom skill update</code>, and scans the source with <code>tackroom doctor</code>.</p>
-    </div>
-    <div class="pair">
-      <div class="term"><div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><b>tackroom.lock</b></div>
-<pre>- name: brag
-  url: https://github.com/latent-spaces/brag
-  branch: main
-  commit: <span class="k">c893c5ed52aed84e3e2ee56787de869fccdae6b0</span></pre></div>
-      <div class="term"><div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><b>~/.agents</b></div>
-<pre><span class="p">$</span> tackroom doctor
-external skill lock ..... <span class="g">pass</span>
-  <span class="d">1 sources pinned and in sync</span>
-external skill audit .... <span class="g">pass</span>
-  <span class="d">1 skills scanned, no risky patterns</span></pre></div>
-    </div>
-    <p class="caption">From the maintainer's own <code>~/.agents</code>, which pins the brag skill that made the video above.</p>
-  </section>
+Everything is synced.</pre>
+          </figure>
+        </div>
+        <div class="out" id="out-check" data-step="check">
+          <div class="out-text"><h3>Check</h3><p>Validates every skill, confirms lock pins and scans third-party skills before they reach an agent.</p></div>
+          <figure class="term">
+            <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>doctor</figcaption>
+<pre><span class="k">$</span> tackroom doctor
+  skill frontmatter .............. <span class="g">pass</span> (4 skills valid)
+  skill spec ..................... <span class="g">pass</span> (4 skills conform to agentskills.io spec)
+  agent roles .................... <span class="g">pass</span> (6 roles valid)
+  package age .................... <span class="g">pass</span> (1 references at least 3 days old)
+  external skill lock ............ <span class="g">pass</span> (1 sources pinned and in sync)
+  external skill audit ........... <span class="g">pass</span> (1 skills scanned, no risky patterns)
+  native hooks ................... <span class="g">pass</span> (2 registrations, 2 managed, 0 unmanaged)
+<span class="c">...</span>
+14 passed, 3 warning, 0 failed</pre>
+          </figure>
+        </div>
+      </div>
+    </section>
 
-  <section>
-    <div class="head">
-      <h2>Next to similar tools</h2>
-      <p class="lede">rulesync and ruler generate per-project config for many tools. tackroom carries one personal setup deeply into the agents you use every day.</p>
-    </div>
-    <div class="tablewrap">
-      <table>
-        <thead><tr><th scope="col"></th><th scope="col">tackroom</th><th scope="col"><a href="https://github.com/dyoshikawa/rulesync">rulesync</a></th><th scope="col"><a href="https://github.com/intellectronica/ruler">ruler</a></th><th scope="col"><a href="https://github.com/numman-ali/openskills">openskills</a></th></tr></thead>
-        <tbody>
-          <tr><th scope="row">Scope</th><td class="w">one user, every project</td><td>per project</td><td>per project</td><td>user and project</td></tr>
-          <tr><th scope="row">Skills</th><td class="w">yes</td><td>yes</td><td>experimental</td><td>yes</td></tr>
-          <tr><th scope="row">MCP servers</th><td class="w">yes</td><td>yes</td><td>yes</td><td>no</td></tr>
-          <tr><th scope="row">Hooks</th><td class="w">yes</td><td>yes</td><td>no</td><td>no</td></tr>
-          <tr><th scope="row">Agent roles</th><td class="w">native per agent</td><td>yes</td><td>experimental</td><td>no</td></tr>
-          <tr><th scope="row">External skills</th><td class="w">pinned and audited</td><td>not pinned</td><td>not pinned</td><td>tracks source</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
+    <section id="view" aria-labelledby="view-title">
+      <div class="view-head">
+        <h2 id="view-title">Rather click than edit YAML?</h2>
+        <p class="lead"><code>tackroom view</code> opens a local page over the same config. Switch an agent or MCP server off, then sync. It listens on 127.0.0.1 behind a session token.</p>
+      </div>
+    </section>
+  </div>
 
-  <section>
-    <div class="head"><h2>Pairs well with</h2></div>
-    <div class="tools">
-      <div class="tool"><h3><a href="https://github.com/RealZST/HarnessKit">HarnessKit</a></h3><p>A browser view of every agent's skills, MCP servers and hooks. Use it to look; let tackroom do the writing.</p></div>
-      <div class="tool"><h3><a href="https://github.com/kenn-io/agentsview">AgentsView</a></h3><p>Search and replay past sessions across agents, with token usage and cost.</p></div>
-    </div>
-  </section>
+  <figure class="shot">
+    <img src="view.webp" width="2880" height="1800" loading="lazy" decoding="async" alt="tackroom view in a browser: agents claude-code, codex, hermes, omp, pi and qwen-code with toggles, Hermes switched off, a context7 MCP server, and a Sync now button">
+    <figcaption>The demo config from above, right after switching Hermes off. The toggle edits tackroom.yaml; the next sync skips Hermes.</figcaption>
+  </figure>
 
-  <footer>
-    <span>tackroom was called dotagents until 1.0. MIT licensed.</span>
-    <a href="https://github.com/yourconscience/tackroom">github.com/yourconscience/tackroom</a>
-  </footer>
-</div>
+  <div class="wrap">
+    <section id="agents" aria-labelledby="agents-title">
+      <div class="ex-head">
+        <h2 id="agents-title">One entry in <code style="font-size:.86em;background:none;border:0;padding:0">~/.agents</code>, each agent's own format.</h2>
+        <p class="lead">The MCP server and hook from the demo, as written into each agent's files. Pick an agent.</p>
+      </div>
+      <div class="ex">
+        <figure class="term ex-src">
+          <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-git-branch"/></svg>~/.agents/tackroom.yaml<span class="tag">you edit this</span></figcaption>
+<pre><span class="k">mcp_servers:</span>
+  - name: context7
+    enabled: true
+    command: npx
+    args:
+      - -y
+      - <span class="s">'@upstash/context7-mcp'</span>
+    agents:
+      - claude-code
+      - codex
+      - pi
+<span class="k">hooks:</span>
+  - name: notify-on-stop
+    enabled: true
+    event: Stop
+    command: ~/.agents/hooks/notify.sh
+    timeout: 10
+    agents:
+      - claude-code
+      - codex</pre>
+        </figure>
+        <div class="ex-out">
+          <div class="tabs" role="tablist" aria-label="Agent">
+            <button class="tab" role="tab" type="button" id="ag-claude" aria-controls="p-claude" aria-selected="true">Claude Code</button>
+            <button class="tab" role="tab" type="button" id="ag-codex" aria-controls="p-codex" aria-selected="false" tabindex="-1">Codex</button>
+            <button class="tab" role="tab" type="button" id="ag-pi" aria-controls="p-pi" aria-selected="false" tabindex="-1">Pi</button>
+            <button class="tab" role="tab" type="button" id="ag-qwen" aria-controls="p-qwen" aria-selected="false" tabindex="-1">Qwen Code</button>
+            <button class="tab" role="tab" type="button" id="ag-hermes" aria-controls="p-hermes" aria-selected="false" tabindex="-1">Hermes</button>
+          </div>
+          <div class="ex-panel" role="tabpanel" id="p-claude" aria-labelledby="ag-claude">
+            <div class="file"><div class="term-head">~/.claude.json<span class="what">MCP</span></div>
+<pre><span class="k">"mcpServers"</span>: {
+  <span class="k">"context7"</span>: {
+    "type": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "@upstash/context7-mcp"
+    ]
+  }
+}</pre></div>
+            <div class="file"><div class="term-head">~/.claude/settings.json<span class="what">hook</span></div>
+<pre><span class="k">"hooks"</span>: {
+  <span class="k">"Stop"</span>: [
+    {
+      "hooks": [
+        {
+          "command": "~/.agents/hooks/notify.sh",
+          "timeout": 10,
+          "type": "command"
+        }
+      ]
+    }
+  ]
+}</pre></div>
+            <div class="file"><div class="term-head">~/.claude/<span class="what">skills, root doc</span></div>
+<pre>skills/grilling -&gt; ~/.agents/skills/grilling
+skills/tackroom -&gt; ~/.agents/skills/tackroom
+CLAUDE.md       -&gt; ~/.agents/AGENTS.md</pre></div>
+          </div>
+          <div class="ex-panel" role="tabpanel" id="p-codex" aria-labelledby="ag-codex" hidden>
+            <div class="file"><div class="term-head">~/.codex/config.toml<span class="what">MCP</span></div>
+<pre><span class="k">[mcp_servers.context7]</span>
+command = "npx"
+args = ["-y", "@upstash/context7-mcp"]
+
+<span class="k">[features]</span>
+hooks = true</pre></div>
+            <div class="file"><div class="term-head">~/.codex/hooks.json<span class="what">hook</span></div>
+<pre><span class="k">"Stop"</span>: [
+  {
+    "hooks": [
+      {
+        "command": "~/.agents/hooks/notify.sh",
+        "timeout": 10,
+        "type": "command"
+      }
+    ]
+  }
+]</pre></div>
+            <div class="file"><div class="term-head">~/.codex/agents/reviewer.toml<span class="what">role</span></div>
+<pre><span class="c"># Generated by tackroom from agents/reviewer.md; do not edit directly.</span>
+name = "reviewer"
+description = "Reviews code changes, PRs, and implementations against specs..."</pre></div>
+          </div>
+          <div class="ex-panel" role="tabpanel" id="p-pi" aria-labelledby="ag-pi" hidden>
+            <div class="file"><div class="term-head">~/.pi/agent/mcp.json<span class="what">MCP</span></div>
+<pre><span class="k">"mcpServers"</span>: {
+  <span class="k">"context7"</span>: {
+    "args": [
+      "-y",
+      "@upstash/context7-mcp"
+    ],
+    "command": "npx"
+  }
+}</pre></div>
+            <div class="file"><div class="term-head">~/.pi/agent/<span class="what">skills, root doc</span></div>
+<pre>skills/grilling -&gt; ~/.agents/skills/grilling
+AGENTS.md       -&gt; ~/.agents/AGENTS.md</pre></div>
+            <p class="ex-note">Pi reads MCP servers and roles through the <code>pi-mcp-adapter</code> and <code>pi-subagents</code> packages, which tackroom can pin in Pi's settings. Pi has no managed hook surface yet, so this demo only sent the hook to Claude Code and Codex.</p>
+          </div>
+          <div class="ex-panel" role="tabpanel" id="p-qwen" aria-labelledby="ag-qwen" hidden>
+            <div class="file"><div class="term-head">~/.qwen/settings.json<span class="what">skills</span></div>
+<pre>{
+  <span class="k">"skills"</span>: {
+    <span class="k">"directories"</span>: [
+      "~/.agents/skills"
+    ]
+  }
+}</pre></div>
+            <div class="file"><div class="term-head">~/.qwen/<span class="what">root doc</span></div>
+<pre>QWEN.md -&gt; ~/.agents/AGENTS.md</pre></div>
+            <p class="ex-note">Qwen Code reads skills straight from <code>~/.agents/skills</code>, so tackroom only points its settings there. This demo did not target Qwen Code with the MCP server or hook.</p>
+          </div>
+          <div class="ex-panel" role="tabpanel" id="p-hermes" aria-labelledby="ag-hermes" hidden>
+            <div class="file"><div class="term-head">~/.hermes/config.yaml<span class="what">skills</span></div>
+<pre><span class="k">skills:</span>
+    external_dirs:
+        - ~/.agents/skills</pre></div>
+            <p class="ex-note">Hermes also takes MCP servers under <code>mcp_servers</code> and hooks in the same file when you target it.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="matrix">
+        <h3>What each agent gets</h3>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th scope="col">Agent</th><th scope="col">Skills</th><th scope="col">Roles</th><th scope="col">MCP servers</th><th scope="col">Hooks</th><th scope="col">Plugins</th></tr></thead>
+            <tbody id="matrix"></tbody>
+          </table>
+        </div>
+        <p class="legend"><span><svg class="icon" style="color:var(--accent);vertical-align:-2px" aria-hidden="true"><use href="#i-check"/></svg> <b>synced</b> tackroom writes it</span><span><b>settings</b> tackroom points the agent at <code>~/.agents/skills</code></span><span><b>native</b> the agent reads <code>~/.agents/skills</code> on its own</span><span><b>planned</b> on the roadmap</span></p>
+      </div>
+    </section>
+
+    <section id="safety" aria-labelledby="safety-title">
+      <h2 id="safety-title">Made to live next to the config you already have</h2>
+      <div class="bento">
+        <article class="cell c-audit">
+          <svg class="icon mark" aria-hidden="true"><use href="#i-stethoscope"/></svg>
+          <h3>Third-party skills get checked first</h3>
+          <p>A skill from someone else's repo is prompt code. <code>tackroom doctor</code> scans it for risky patterns and checks it against the agentskills.io spec. It also flags npm and PyPI packages your config pulls in if they are less than three days old.</p>
+          <figure class="term">
+<pre><span class="k">$</span> tackroom doctor
+  package age .............. <span class="g">pass</span> (1 references at least 3 days old)
+  external skills .......... <span class="g">pass</span> (1 sources valid)
+  external skill lock ...... <span class="g">pass</span> (1 sources pinned and in sync)
+  external skill audit ..... <span class="g">pass</span> (1 skills scanned, no risky patterns)</pre>
+          </figure>
+        </article>
+        <article class="cell c-pin">
+          <svg class="icon mark" aria-hidden="true"><use href="#i-push-pin"/></svg>
+          <h3>Pinned to a commit</h3>
+          <p><code>tackroom.lock</code> records the exact commit. Nothing moves until you run <code>tackroom skill update</code>.</p>
+        </article>
+        <article class="cell c-own">
+          <svg class="icon mark" aria-hidden="true"><use href="#i-check"/></svg>
+          <h3>Your entries stay yours</h3>
+          <p>tackroom marks what it manages. Everything else in <code>.claude.json</code> or <code>config.toml</code> stays as you wrote it.</p>
+        </article>
+        <article class="cell c-sync">
+          <svg class="icon mark" aria-hidden="true"><use href="#i-git-branch"/></svg>
+          <h3>Same setup on every machine</h3>
+          <p><code>~/.agents</code> is a git repo. Push it to a private remote, then pull on the next machine.</p>
+          <figure class="term"><pre><span class="k">$</span> git clone git@github.com:you/agents.git ~/.agents
+<span class="k">$</span> tackroom sync --pull</pre></figure>
+        </article>
+        <article class="cell c-local">
+          <svg class="icon mark" aria-hidden="true"><use href="#i-devices"/></svg>
+          <h3>Machine-only settings</h3>
+          <p><code>tackroom.local.yaml</code> overlays the shared config and stays out of git, for a work laptop or a GPU box.</p>
+          <figure class="term"><pre><span class="c"># ~/.agents/tackroom.local.yaml</span>
+<span class="k">agents:</span>
+  - name: hermes
+    enabled: false</pre></figure>
+        </article>
+      </div>
+    </section>
+
+    <section id="compare" class="compare" aria-labelledby="compare-title">
+      <div class="compare-side">
+        <h2 id="compare-title">Next to similar tools</h2>
+        <p class="lead">rulesync and ruler generate per-project config for many tools. tackroom carries one personal setup into the agents you use every day.</p>
+      </div>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th scope="col"></th><th scope="col" class="us">tackroom</th><th scope="col"><a href="https://github.com/dyoshikawa/rulesync">rulesync</a></th><th scope="col"><a href="https://github.com/intellectronica/ruler">ruler</a></th><th scope="col"><a href="https://github.com/numman-ali/openskills">openskills</a></th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Scope</th><td class="us">one user, every project</td><td>per project</td><td>per project</td><td>user and project</td></tr>
+            <tr><th scope="row">Skills</th><td class="us">yes</td><td>yes</td><td>experimental</td><td>yes</td></tr>
+            <tr><th scope="row">MCP servers</th><td class="us">yes</td><td>yes</td><td>yes</td><td>no</td></tr>
+            <tr><th scope="row">Hooks</th><td class="us">yes</td><td>yes</td><td>no</td><td>no</td></tr>
+            <tr><th scope="row">Agent roles</th><td class="us">native per agent</td><td>yes</td><td>experimental</td><td>no</td></tr>
+            <tr><th scope="row">External skills</th><td class="us">pinned and audited</td><td>not pinned</td><td>not pinned</td><td>tracks source</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="faq" aria-labelledby="faq-title">
+      <h2 id="faq-title">Before you install</h2>
+      <dl class="faq">
+        <div><dt>Will it overwrite what my agents already have?</dt><dd>No. <code>setup</code> copies existing skills, MCP servers and roles into <code>~/.agents</code> after you review each one, and <code>sync</code> only touches entries tackroom manages.</dd></div>
+        <div><dt>Which systems does it run on?</dt><dd>macOS and Linux, on Apple silicon, ARM and x86. Homebrew and npm install the same checksum-verified binary from GitHub Releases.</dd></div>
+        <div><dt>Do I have to use every surface?</dt><dd>No. Start with skills. MCP servers, hooks, roles and memory are separate sections of <code>tackroom.yaml</code>, and an agent you switch off is left alone.</dd></div>
+        <div><dt>What about Cursor?</dt><dd>Cursor reads <code>~/.agents/skills</code> on its own, so your skills already show up there. A Cursor adapter for MCP servers, rules and hooks is planned.</dd></div>
+        <div><dt>Can someone use one of my skills without tackroom?</dt><dd>Yes. Any skill in your repo installs with <code>npx skills add you/agents -s name --copy</code>.</dd></div>
+        <div><dt>What pairs well with it?</dt><dd><a href="https://github.com/RealZST/HarnessKit">HarnessKit</a> to look at what each agent loaded, and <a href="https://github.com/kenn-io/agentsview">AgentsView</a> to search past sessions. Let tackroom do the writing.</dd></div>
+      </dl>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="./">tackroom</a>
+    <span>MIT licensed</span>
+    <nav aria-label="Footer">
+      <a href="https://github.com/yourconscience/tackroom">GitHub</a>
+      <a href="https://github.com/yourconscience/tackroom/releases">Releases</a>
+      <a href="https://www.npmjs.com/package/tackroom">npm</a>
+      <a href="https://github.com/yourconscience/homebrew-tap">Homebrew tap</a>
+      <a href="https://github.com/yourconscience/tackroom/tree/main/docs">Docs</a>
+    </nav>
+  </div>
+</footer>
 
 <script>
-  // Agent icons from the previous site; surfaces from the README sync table (v1.0).
-  const I = {
-    claude: '<svg viewBox="0 0 24 24"> <path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z" fill="#d97757"/> </svg>',
-    codex: '<svg viewBox="0 0 40 40"> <path d="M36.8671 16.3718C37.7746 13.648 37.4621 10.6642 36.0108 8.18661C33.8282 4.38653 29.4407 2.43149 25.1556 3.35151C23.2493 1.20396 20.5105-.0173148 17.6392.000185533C13.2591-.00981468 9.37273 2.81025 8.0252 6.97783C5.21139 7.5541 2.78258 9.31538 1.3613 11.8117C-.837493 15.6018-.336232 20.3794 2.60133 23.6294C1.69381 26.3532 2.00632 29.3371 3.4576 31.8146C5.64015 35.6147 10.0277 37.5697 14.3128 36.6497C16.2179 38.7973 18.9579 40.0185 21.8292 39.9998C26.2118 40.011 30.0994 37.1885 31.4469 33.0171C34.2608 32.4409 36.6896 30.6796 38.1108 28.1833C40.3071 24.3932 39.8046 19.6194 36.8683 16.3693L36.8671 16.3718ZM21.8317 37.386C20.078 37.3885 18.3792 36.7747 17.0329 35.6509C17.0941 35.6184 17.2004 35.5597 17.2691 35.5172L25.2343 30.9171C25.6418 30.6858 25.8918 30.2521 25.8893 29.7833V18.5543L29.2557 20.4981C29.2919 20.5156 29.3157 20.5506 29.3207 20.5906V29.8896C29.3157 34.0247 25.9668 37.3772 21.8317 37.386ZM5.7264 30.5071C4.84763 28.9896 4.53137 27.2108 4.83263 25.4845C4.89138 25.5195 4.99513 25.5832 5.06888 25.6257L13.0341 30.2258C13.4378 30.4621 13.9378 30.4621 14.3428 30.2258L24.0668 24.6107V28.4983C24.0693 28.5383 24.0505 28.577 24.0193 28.602L15.9679 33.2509C12.3815 35.3159 7.80144 34.0884 5.72765 30.5071H5.7264ZM3.6301 13.1205C4.50512 11.6004 5.8864 10.4379 7.53144 9.83415C7.53144 9.9029 7.52769 10.0242 7.52769 10.1092V19.3106C7.52519 19.7781 7.77519 20.2119 8.18145 20.4431L17.9054 26.057L14.5391 28.0008C14.5053 28.027 14.4628 28.0233 14.4253 28.0108L6.37266 23.3582C2.79383 21.2856 1.56631 16.7068 3.62885 13.1217L3.6301 13.1205ZM31.2882 19.5569L21.5642 13.9417L24.9306 11.9992C24.9643 11.9767 25.0068 11.9729 25.0443 11.9892L33.097 16.638C36.6821 18.7093 37.9108 23.2957 35.8395 26.8808C34.9633 28.3983 33.5832 29.5608 31.9395 30.1658V20.6894C31.9432 20.2219 31.6945 19.7894 31.2894 19.5569H31.2882ZM34.6383 14.5142C34.5795 14.478 34.4758 14.4155 34.402 14.373L26.4368 9.77289C26.0331 9.53664 25.5331 9.53664 25.1281 9.77289L15.4041 15.388V11.5004C15.4016 11.4604 15.4204 11.4217 15.4516 11.3967L23.503 6.75158C27.0894 4.68279 31.6745 5.91406 33.742 9.50164C34.6158 11.0167 34.932 12.7905 34.6358 14.5142H34.6383ZM13.5741 21.4431L10.2065 19.4994C10.1702 19.4819 10.1465 19.4468 10.1415 19.4068V10.1079C10.144 5.96781 13.5028 2.61274 17.6429 2.61524C19.3942 2.61524 21.0892 3.23025 22.4355 4.35028C22.3743 4.38278 22.2693 4.44153 22.1992 4.48403L14.2341 9.08413C13.8266 9.31538 13.5766 9.74789 13.5791 10.2167L13.5741 21.4406V21.4431ZM15.4029 17.5006L19.7342 14.9993L24.0655 17.4993V22.5007L19.7342 25.0007L15.4029 22.5007V17.5006Z" fill="#f5f1e8"/> </svg>',
-    cursor: '<svg viewBox="0 0 24 24"><path d="M12 2 21 7v10l-9 5-9-5V7z" fill="none" stroke="#f5f1e8" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 2v10l9 5M12 12 3 17" fill="none" stroke="#f5f1e8" stroke-width="1.2" opacity=".6"/></svg>',
-    opencode: '<svg viewBox="0 0 512 512"> <path d="M320 224V352H192V224H320Z" fill="#aaa39a"/> <path fill-rule="evenodd" clip-rule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="#f5f1e8"/> </svg>',
-    pi: '<svg viewBox="0 0 24 24"> <text x="12" y="18" text-anchor="middle" font-family="ui-serif,Georgia,serif" font-size="20" font-weight="700" fill="#73e6df">&#960;</text> </svg>',
-    droid: '<svg viewBox="0 0 508 508"> <path d="M321.997 150.712C321.401 150.568 320.844 150.299 320.363 149.925C319.883 149.551 319.491 149.08 319.215 148.544C318.938 148.008 318.783 147.42 318.76 146.821C318.738 146.22 318.848 145.624 319.084 145.07C327.226 125.716 330.819 110.23 325.021 103.747C309.666 86.5471 248.085 120.749 228.451 132.333C227.925 132.642 227.337 132.837 226.728 132.903C226.118 132.969 225.501 132.906 224.918 132.719C224.336 132.531 223.801 132.223 223.351 131.815C222.902 131.407 222.548 130.909 222.313 130.356C214.06 111.043 205.384 97.6094 196.589 97.0268C173.279 95.4688 154.491 162.187 148.991 183.932C148.844 184.515 148.57 185.06 148.188 185.528C147.805 185.998 147.323 186.381 146.775 186.651C146.227 186.921 145.626 187.072 145.012 187.094C144.399 187.116 143.788 187.009 143.221 186.778C123.406 178.825 107.545 175.316 100.914 180.98C83.305 195.978 118.315 256.126 130.175 275.304C130.492 275.816 130.692 276.391 130.76 276.987C130.829 277.582 130.765 278.186 130.573 278.755C130.381 279.325 130.065 279.847 129.647 280.286C129.228 280.725 128.718 281.07 128.15 281.298C108.384 289.359 94.6306 297.834 94.0272 306.424C92.439 329.192 160.74 347.544 183.01 352.916C183.605 353.061 184.16 353.33 184.64 353.704C185.118 354.077 185.509 354.548 185.785 355.083C186.061 355.618 186.215 356.205 186.237 356.803C186.26 357.402 186.151 357.998 185.916 358.551C177.773 377.905 174.181 393.398 179.979 399.874C195.334 417.074 256.921 382.877 276.556 371.293C277.081 370.984 277.67 370.789 278.28 370.722C278.889 370.655 279.507 370.717 280.09 370.905C280.673 371.093 281.207 371.402 281.657 371.81C282.106 372.219 282.46 372.717 282.694 373.271C290.947 392.578 299.616 406.012 308.417 406.601C331.728 408.153 350.516 341.44 356.009 319.688C356.157 319.106 356.432 318.562 356.816 318.094C357.2 317.625 357.682 317.243 358.231 316.974C358.779 316.705 359.381 316.554 359.995 316.533C360.608 316.511 361.219 316.619 361.786 316.85C381.601 324.803 397.455 328.304 404.093 322.648C421.702 307.65 386.684 247.495 374.825 228.317C374.51 227.804 374.312 227.229 374.245 226.634C374.177 226.039 374.242 225.436 374.434 224.868C374.626 224.299 374.941 223.777 375.358 223.338C375.775 222.899 376.284 222.552 376.85 222.323C396.623 214.261 410.376 205.786 410.973 197.196C412.568 174.428 344.26 156.078 321.997 150.712ZM295.254 128.885C299.734 136.73 276.646 189 259.474 225.561C259.186 226.172 258.715 226.682 258.121 227.024C257.528 227.365 256.842 227.521 256.155 227.47C255.468 227.419 254.814 227.164 254.28 226.739C253.746 226.314 253.358 225.739 253.169 225.093C246.234 201.322 238.306 173.392 229.824 149.683C229.491 148.752 229.508 147.736 229.871 146.817C230.235 145.897 230.921 145.133 231.808 144.662C252.989 133.363 289.234 118.358 295.254 128.885ZM193.746 135.355C202.589 137.807 224.103 190.714 238.424 228.426C238.664 229.056 238.699 229.742 238.527 230.393C238.354 231.044 237.983 231.627 237.461 232.065C236.939 232.503 236.292 232.775 235.608 232.844C234.923 232.913 234.234 232.775 233.632 232.45C211.501 220.453 185.694 206.159 162.529 195.253C161.622 194.823 160.901 194.093 160.493 193.192C160.085 192.292 160.018 191.279 160.303 190.335C167.12 167.736 181.865 132.069 193.746 135.355ZM126.652 210.04C134.676 205.664 188.197 228.216 225.621 244.989C226.248 245.269 226.771 245.73 227.12 246.31C227.47 246.889 227.629 247.56 227.577 248.23C227.524 248.901 227.264 249.54 226.828 250.062C226.393 250.582 225.805 250.962 225.143 251.147C200.813 257.921 172.211 265.664 147.937 273.949C146.985 274.272 145.946 274.255 145.007 273.9C144.067 273.545 143.286 272.876 142.805 272.011C131.257 251.322 115.867 215.92 126.652 210.04ZM133.275 309.188C135.779 300.551 189.952 279.537 228.562 265.548C229.207 265.315 229.91 265.28 230.576 265.448C231.243 265.617 231.84 265.98 232.288 266.49C232.736 266.999 233.015 267.631 233.085 268.299C233.155 268.968 233.015 269.641 232.682 270.23C220.392 291.846 205.758 317.053 194.592 339.672C194.156 340.561 193.409 341.269 192.486 341.668C191.563 342.068 190.525 342.134 189.557 341.853C166.42 335.235 129.905 320.792 133.275 309.188ZM209.739 374.722C205.252 366.884 228.347 314.608 245.519 278.054C245.806 277.442 246.279 276.931 246.872 276.59C247.465 276.249 248.151 276.093 248.838 276.144C249.525 276.194 250.179 276.45 250.713 276.875C251.247 277.3 251.634 277.874 251.824 278.521C258.759 302.285 266.686 330.222 275.169 353.932C275.499 354.862 275.481 355.877 275.117 356.795C274.752 357.713 274.064 358.475 273.178 358.945C252.004 370.223 215.752 385.256 209.76 374.722H209.739ZM311.247 368.252C302.397 365.807 280.883 312.894 266.562 275.182C266.322 274.55 266.285 273.862 266.458 273.21C266.63 272.559 267.003 271.974 267.526 271.536C268.049 271.097 268.697 270.826 269.382 270.758C270.068 270.69 270.759 270.83 271.361 271.157C293.485 283.154 319.299 297.455 342.457 308.362C343.366 308.789 344.089 309.519 344.497 310.42C344.905 311.321 344.971 312.335 344.683 313.28C337.872 335.912 323.128 371.544 311.247 368.252ZM378.341 293.566C370.31 297.949 316.795 275.391 279.365 258.618C278.738 258.338 278.215 257.877 277.866 257.297C277.516 256.718 277.357 256.047 277.409 255.377C277.461 254.706 277.722 254.067 278.158 253.546C278.593 253.025 279.181 252.646 279.843 252.461C304.18 245.687 332.775 237.943 357.049 229.658C358.003 229.335 359.043 229.353 359.984 229.709C360.925 230.065 361.706 230.737 362.188 231.603C373.729 252.285 389.119 287.693 378.341 293.566ZM371.718 194.419C369.207 203.063 315.041 224.077 276.431 238.066C275.784 238.3 275.08 238.335 274.413 238.167C273.746 237.999 273.148 237.635 272.698 237.124C272.249 236.613 271.972 235.98 271.903 235.31C271.833 234.641 271.975 233.966 272.311 233.377C284.594 211.768 299.228 186.554 310.394 163.935C310.833 163.048 311.58 162.343 312.502 161.945C313.425 161.546 314.462 161.481 315.429 161.76C338.566 168.413 375.081 182.815 371.718 194.419Z" fill="#7edc98"/> </svg>',
-    qwen: '<svg viewBox="0 0 24 24" aria-hidden="true"> <circle cx="12" cy="12" r="9" fill="none" stroke="#c9a7ff" stroke-width="2"/> <path d="M15.8 15.8 19 19M8 12a4 4 0 1 0 8 0 4 4 0 1 0-8 0" fill="none" stroke="#c9a7ff" stroke-width="2" stroke-linecap="round"/> </svg>',
-    amp: '<svg viewBox="0 0 21 21"> <path d="M3.76879 18.3015L8.49839 13.505L10.2196 20.0399L12.72 19.3561L10.2288 9.86749L.890876 7.33844L.22594 9.89331L6.65134 11.6388L1.94138 16.4282L3.76879 18.3015Z" fill="#F34E3F"/> <path d="M17.4074 12.7414L19.9078 12.0575L17.4167 2.56897L8.07873.0399246L7.4138 2.5948L15.2992 4.73685L17.4074 12.7414Z" fill="#F34E3F"/> <path d="M13.8184 16.3883L16.3188 15.7044L13.8276 6.21588L4.48971 3.68683L3.82477 6.24171L11.7101 8.38376L13.8184 16.3883Z" fill="#F34E3F"/> </svg>',
-    hermes: '<svg viewBox="0 0 16 16" fill="none"> <path d="M8 1.5v13" stroke="#f5c86a" stroke-width="1.5" stroke-linecap="round"/> <path d="M8 3.25c-2.35-1.4-4.7-.95-6.25.35 1.85-.2 3.8.2 5.55 1.55" stroke="#f5c86a" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/> <path d="M8 3.25c2.35-1.4 4.7-.95 6.25.35-1.85-.2-3.8.2-5.55 1.55" stroke="#f5c86a" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/> <path d="M8 13.25c-2.3-1-3.05-2.65-1.35-4.15-2 .8-2.35 2.95-.35 4" stroke="#f5c86a" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/> <path d="M8 13.25c2.3-1 3.05-2.65 1.35-4.15 2 .8 2.35 2.95.35 4" stroke="#f5c86a" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/> <circle cx="8" cy="1.8" r="1.1" fill="#f5c86a"/> </svg>',
-    omp: '<svg viewBox="0 0 24 24"><text x="12" y="17" text-anchor="middle" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="800" fill="#73e6df">omp</text></svg>',
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const store = {
+    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
   };
-  // s = synced (tackroom writes it), n = native, p = planned, x = not synced, k = plugin skills and MCP projected
-  const AGENTS = [
-    ['Claude Code', 'claude', 's', 's', 's', 's', 'p'],
-    ['Codex', 'codex', 's', 's', 's', 's', 'p'],
-    ['Cursor', 'cursor', 'n', 'p', 'p', 'p', 'x'],
-    ['OpenCode', 'opencode', 'n', 's', 's', 'x', 'x'],
-    ['Pi', 'pi', 's', 's', 's', 'x', 'k'],
-    ['OMP', 'omp', 's', 's', 's', 'x', 'x'],
-    ['Factory Droid', 'droid', 's', 's', 's', 's', 'x'],
-    ['Qwen Code', 'qwen', 's', 's', 's', 's', 'k'],
-    ['Amp', 'amp', 's', 'x', 's', 'x', 'x'],
-    ['Hermes', 'hermes', 's', 'x', 's', 's', 'x'],
-  ];
-  const CELL = { s: '<td class="w">Synced</td>', n: '<td class="n">Native</td>', p: '<td>Planned</td>', x: '<td>—</td>', k: '<td class="w">Skills + MCP</td>' };
-  document.getElementById('matrix').innerHTML = AGENTS.map(([name, key, ...cells]) =>
-    `<tr><th scope="row"><span>${I[key]}${name}</span></th>${cells.map(c => CELL[c]).join('')}</tr>`).join('');
-  document.getElementById('works').innerHTML = AGENTS.map(([name, key]) => `<span>${I[key]}${name}</span>`).join('');
 
-  document.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', async () => {
-    try { await navigator.clipboard.writeText(btn.dataset.copy); btn.textContent = 'Copied'; }
-    catch { const r = document.createRange(); r.selectNodeContents(btn.previousElementSibling); getSelection().removeAllRanges(); getSelection().addRange(r); }
-    setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+  // Install switcher
+  const CMDS = {
+    brew: ['brew install yourconscience/tap/tackroom', 'tackroom setup'],
+    npm: ['npm install -g tackroom', 'tackroom setup'],
+    npx: ['npx tackroom setup', null],
+    curl: ['curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh', 'tackroom setup'],
+  };
+  const installTabs = $$('.install .tab');
+  function pickInstall(pm, focus) {
+    if (!CMDS[pm]) return;
+    installTabs.forEach(t => {
+      const on = t.dataset.pm === pm;
+      t.setAttribute('aria-selected', on);
+      t.tabIndex = on ? 0 : -1;
+      if (on && focus) t.focus();
+    });
+    $('#install-panel').setAttribute('aria-labelledby', 'tab-' + pm);
+    const [a, b] = CMDS[pm];
+    const codeA = $('#cmd-install'), codeB = $('#cmd-setup');
+    codeA.classList.add('is-swapping');
+    setTimeout(() => {
+      codeA.textContent = a;
+      $('#row-setup').hidden = !b;
+      if (b) codeB.textContent = b;
+      codeA.classList.remove('is-swapping');
+    }, 120);
+    store.set('tackroom-install', pm);
+  }
+  const mac = /Mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
+  pickInstall(store.get('tackroom-install') || (mac ? 'brew' : 'npm'));
+  wireTabs(installTabs, t => pickInstall(t.dataset.pm, true));
+
+  // Copy buttons
+  $$('.copy').forEach(btn => btn.addEventListener('click', async () => {
+    const text = $('#' + btn.dataset.copy).textContent;
+    const label = $('.label', btn);
+    try {
+      await navigator.clipboard.writeText(text);
+      btn.classList.add('is-done');
+      label.textContent = 'Copied';
+    } catch {
+      const r = document.createRange();
+      r.selectNodeContents($('#' + btn.dataset.copy));
+      getSelection().removeAllRanges();
+      getSelection().addRange(r);
+      label.textContent = mac ? 'Press ⌘C' : 'Press Ctrl+C';
+    }
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => { btn.classList.remove('is-done'); label.textContent = 'Copy'; }, 1800);
   }));
 
-  // The poster is the picture; the film only loads when someone asks for it.
-  document.getElementById('play').addEventListener('click', () => {
-    const film = document.getElementById('film');
-    film.innerHTML = '<video src="brag.mp4" poster="brag.jpg" controls autoplay playsinline width="1920" height="1080"></video>';
-    film.querySelector('video').focus();
+  // Video: swap the poster for the player on demand, so the page never downloads it unasked
+  $('#play').addEventListener('click', () => {
+    const v = document.createElement('video');
+    v.src = 'brag.mp4';
+    v.poster = 'brag.jpg';
+    v.controls = true;
+    v.playsInline = true;
+    v.autoplay = true;
+    v.setAttribute('aria-label', 'tackroom tour video');
+    $('#film').replaceChildren(v);
+    v.play().catch(() => {});
+    v.focus();
   });
+
+  // Agent explorer tabs
+  const agentTabs = $$('.ex-out .tab');
+  wireTabs(agentTabs, t => {
+    agentTabs.forEach(x => {
+      const on = x === t;
+      x.setAttribute('aria-selected', on);
+      x.tabIndex = on ? 0 : -1;
+      const panel = document.getElementById(x.getAttribute('aria-controls'));
+      panel.hidden = !on;
+      if (on) { panel.classList.remove('is-entering'); void panel.offsetWidth; panel.classList.add('is-entering'); }
+    });
+    t.focus();
+  });
+
+  function wireTabs(tabs, select) {
+    tabs.forEach((t, i) => {
+      t.addEventListener('click', () => select(t));
+      t.addEventListener('keydown', e => {
+        const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
+        if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); select(tabs[e.key === 'Home' ? 0 : tabs.length - 1]); }
+        if (d) { e.preventDefault(); select(tabs[(i + d + tabs.length) % tabs.length]); }
+      });
+    });
+  }
+
+  // Support matrix
+  const Y = '<svg class="icon yes" role="img" aria-label="synced"><use href="#i-check"/></svg>';
+  const T = s => `<span class="t">${s}</span>`;
+  const N = '<span class="no" aria-label="not synced">-</span>';
+  const rows = [
+    ['Claude Code', Y, Y, Y, Y, N],
+    ['Codex', Y, Y, Y, Y, T('planned')],
+    ['Factory Droid', Y, Y, Y, Y, N],
+    ['OpenCode', T('native'), Y, Y, N, N],
+    ['Qwen Code', T('settings'), Y, Y, Y, T('skills and MCP')],
+    ['Pi', Y, T('with pi-subagents'), T('with pi-mcp-adapter'), N, T('skills and MCP')],
+    ['OMP', Y, Y, Y, N, N],
+    ['Hermes', T('settings'), N, Y, Y, N],
+    ['Amp', T('settings'), N, Y, N, N],
+    ['Cursor', T('native'), T('planned'), T('planned'), T('planned'), N],
+  ];
+  $('#matrix').innerHTML = rows.map(([name, ...cells]) =>
+    `<tr><th scope="row">${name}</th>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
+
+  // Nav hairline once the page scrolls past the top
+  const nav = $('#nav');
+  const sentinel = document.createElement('div');
+  sentinel.style.cssText = 'position:absolute;top:0;height:1px;width:1px';
+  document.body.prepend(sentinel);
+  new IntersectionObserver(([e]) => nav.classList.toggle('is-stuck', !e.isIntersecting)).observe(sentinel);
+
+  // First-run walkthrough: highlight the step whose output is in the middle of the viewport
+  const steps = $$('.steps li');
+  const outs = $$('.out');
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      steps.forEach(s => s.classList.toggle('is-active', s.dataset.step === e.target.dataset.step));
+    });
+  }, { rootMargin: '-40% 0px -45% 0px' });
+  outs.forEach(o => io.observe(o));
+})();
 </script>
 </body>
 </html>

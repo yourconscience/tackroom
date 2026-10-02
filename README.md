@@ -2,17 +2,16 @@
 
 Dotfiles for your AI agents. One `~/.agents` repo, rendered into every coding agent.
 
-[![tackroom in 22 seconds: one ~/.agents repo wired into Claude Code, Codex, Droid, Hermes, Qwen Code, Pi, OpenCode and Amp](docs/site/brag.jpg)](https://yourconscience.github.io/tackroom/brag.mp4)
+[![The tackroom tour: install, setup, sync into six agents, and the tackroom view config page](docs/site/brag.jpg)](https://yourconscience.github.io/tackroom/brag.mp4)
 
-[Watch the 22-second tour](https://yourconscience.github.io/tackroom/brag.mp4) · [Website](https://yourconscience.github.io/tackroom/)
+[Watch the 23-second tour](https://yourconscience.github.io/tackroom/brag.mp4) · [Website](https://yourconscience.github.io/tackroom/)
 
 [![Release](https://img.shields.io/github/v/release/yourconscience/tackroom)](https://github.com/yourconscience/tackroom/releases) [![brew](https://img.shields.io/badge/brew-yourconscience%2Ftap-orange)](https://github.com/yourconscience/homebrew-tap) [![npm](https://img.shields.io/npm/v/tackroom)](https://www.npmjs.com/package/tackroom) [![CI](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml/badge.svg)](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
 ```bash
-brew install yourconscience/tap/tackroom
+brew install yourconscience/tap/tackroom   # Homebrew
+npm install -g tackroom                    # npm, or run once with: npx tackroom setup
 ```
-
-> Formerly `dotagents`. Renamed in v1.0 because several unrelated tools, including Sentry's `@sentry/dotagents`, ship a `dotagents` binary that manages the same `~/.agents` directory.
 
 **[Overview & comparison →](https://yourconscience.github.io/tackroom/)** · [Releases](https://github.com/yourconscience/tackroom/releases) · [Docs](docs/)
 
@@ -23,7 +22,7 @@ If you use more than one coding agent, you maintain the same skills, MCP servers
 ## Quick start
 
 ```bash
-brew install yourconscience/tap/tackroom   # or: npm i -g tackroom
+brew install yourconscience/tap/tackroom   # or: npm install -g tackroom
 # no brew/npm? curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
 tackroom setup                             # detect harnesses, import, first sync
 ```
@@ -34,27 +33,6 @@ tackroom setup                             # detect harnesses, import, first syn
 tackroom status   # per-harness sync state
 tackroom doctor   # health checks: frontmatter, lock pins, audits, hooks
 ```
-
-## Upgrading from dotagents
-
-tackroom 1.0 is the dotagents CLI under a new name. An existing config root needs its files renamed once; tackroom refuses to run until they are.
-
-```bash
-dotagents cron --remove                        # only if you installed the cron entry
-cd ~/.agents
-git mv dotagents.yaml tackroom.yaml
-git mv dotagents.lock tackroom.lock
-git mv .dotagents-starter.json .tackroom-starter.json
-mv dotagents.local.yaml tackroom.local.yaml    # only if you have one
-```
-
-Then:
-
-- In `.gitignore`, replace `dotagents.local.yaml` with `tackroom.local.yaml` so machine-local overrides stay out of git.
-- Move `skills/dotagents` to `skills/tackroom`. If you never edited it, copy this repo's `skills/tackroom` over it; otherwise replace `dotagents` with `tackroom` inside it.
-- Install tackroom, run `tackroom sync`, then `tackroom cron` if you use it, and remove the old `dotagents` binary.
-
-Role files that dotagents rendered into harness folders are adopted and rewritten on the first sync.
 
 ## What it syncs
 
