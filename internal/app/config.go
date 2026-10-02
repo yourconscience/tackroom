@@ -458,7 +458,7 @@ func refuseLegacyRoot(repoRoot string) error {
 	if len(missing) == 0 {
 		return nil
 	}
-	return fmt.Errorf("config root %s still uses dotagents file names; rename them first (README: Upgrading from dotagents):\n  %s", repoRoot, strings.Join(missing, "\n  "))
+	return fmt.Errorf("config root %s still uses dotagents file names; rename them first (see docs/upgrading.md):\n  %s", repoRoot, strings.Join(missing, "\n  "))
 }
 
 func refuseWorktreeRoot(repoRoot string) error {
