@@ -104,3 +104,7 @@ Five of the top seven harnesses read `~/.agents/skills` themselves, so skill mir
 - `refuseLegacyRoot` (from the rename) stays until 1.1.
 
 ## Outcome / Deviations
+
+- v1.0.0 shipped on 2026-10-02 with the rename, the trims and the unscoped npm package. The maintainer asked to release right away, so the Cursor adapter and the memory split move to 1.1.
+- The landing page and the launch video shipped with 1.0. Cursor appears on the page with native skills and planned roles, MCP and hooks.
+- The npm job failed on the first run (`403 OIDC permission denied`) and waits on the trusted-publisher settings on npmjs.com. Homebrew and the GitHub release published normally.
