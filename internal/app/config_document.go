@@ -84,7 +84,7 @@ func newConfigDocument(path string, home string) (*configDocument, error) {
 		}
 	}
 	path = filepath.Clean(path)
-	if err := refuseWorktreeRoot(filepath.Dir(path)); err != nil {
+	if err := checkConfigRoot(filepath.Dir(path)); err != nil {
 		return nil, err
 	}
 	doc := &configDocument{home: home, sharedPath: path, localPath: filepath.Join(filepath.Dir(path), "tackroom.local.yaml")}
@@ -960,7 +960,7 @@ func configPathFor(opts runOptions, home string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if err := refuseWorktreeRoot(filepath.Dir(path)); err != nil {
+	if err := checkConfigRoot(filepath.Dir(path)); err != nil {
 		return "", err
 	}
 	return path, nil

@@ -127,7 +127,7 @@ func runPublish(opts publishOptions) error {
 		return err
 	}
 	repoRoot := filepath.Dir(configPath)
-	if err := refuseWorktreeRoot(repoRoot); err != nil {
+	if err := checkConfigRoot(repoRoot); err != nil {
 		return err
 	}
 	cfg, err := loadConfig(repoRoot, home, configPath)

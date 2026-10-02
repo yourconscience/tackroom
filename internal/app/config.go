@@ -20,7 +20,7 @@ func loadContext(opts runOptions) (string, string, config, []agentConfig, error)
 		return "", "", config{}, nil, err
 	}
 	repoRoot := filepath.Dir(configPath)
-	if err := refuseWorktreeRoot(repoRoot); err != nil {
+	if err := checkConfigRoot(repoRoot); err != nil {
 		return "", "", config{}, nil, err
 	}
 
@@ -429,6 +429,38 @@ func absoluteExpandedPath(path string, home string) (string, error) {
 // dir (the canonical checkout has a .git directory or none), and the
 // project convention places worktrees under .worktrees/, which catches
 // roots whose .git check cannot run (missing dir, odd layouts).
+// checkConfigRoot runs every guard a config root must pass before use.
+func checkConfigRoot(repoRoot string) error {
+	if err := refuseWorktreeRoot(repoRoot); err != nil {
+		return err
+	}
+	return refuseLegacyRoot(repoRoot)
+}
+
+// legacyRootFiles maps files written before the rename from dotagents to
+// their tackroom names.
+var legacyRootFiles = [][2]string{
+	{"dotagents.yaml", "tackroom.yaml"},
+	{"dotagents.local.yaml", "tackroom.local.yaml"},
+	{".dotagents-starter.json", ".tackroom-starter.json"},
+}
+
+// refuseLegacyRoot stops when a config root still holds pre-rename files
+// without their tackroom counterparts. Running anyway would start a parallel
+// config or silently drop machine-local overrides.
+func refuseLegacyRoot(repoRoot string) error {
+	var missing []string
+	for _, pair := range legacyRootFiles {
+		if hasFile(filepath.Join(repoRoot, pair[0])) && !hasFile(filepath.Join(repoRoot, pair[1])) {
+			missing = append(missing, fmt.Sprintf("mv %s %s", pair[0], pair[1]))
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	return fmt.Errorf("config root %s still uses dotagents file names; rename them first (README: Upgrading from dotagents):\n  %s", repoRoot, strings.Join(missing, "\n  "))
+}
+
 func refuseWorktreeRoot(repoRoot string) error {
 	resolved := repoRoot
 	if real, err := filepath.EvalSymlinks(repoRoot); err == nil {

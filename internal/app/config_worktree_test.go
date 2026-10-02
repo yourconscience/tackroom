@@ -53,3 +53,38 @@ func TestRefuseWorktreeRoot(t *testing.T) {
 		t.Fatal("symlinked worktree root must be refused")
 	}
 }
+
+func TestRefuseLegacyRoot(t *testing.T) {
+	root := t.TempDir()
+	write := func(name string) {
+		t.Helper()
+		if err := os.WriteFile(filepath.Join(root, name), []byte("version: 1\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	write("tackroom.yaml")
+	if err := checkConfigRoot(root); err != nil {
+		t.Fatalf("migrated root must be accepted: %v", err)
+	}
+
+	// A machine-local overlay left behind would silently drop local overrides.
+	write("dotagents.local.yaml")
+	err := checkConfigRoot(root)
+	if err == nil || !strings.Contains(err.Error(), "mv dotagents.local.yaml tackroom.local.yaml") {
+		t.Fatalf("legacy overlay must be refused with a rename hint, got %v", err)
+	}
+
+	write("tackroom.local.yaml")
+	if err := checkConfigRoot(root); err != nil {
+		t.Fatalf("legacy file next to its renamed counterpart must be accepted: %v", err)
+	}
+
+	legacyOnly := t.TempDir()
+	if err := os.WriteFile(filepath.Join(legacyOnly, "dotagents.yaml"), []byte("version: 1\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := checkConfigRoot(legacyOnly); err == nil || !strings.Contains(err.Error(), "mv dotagents.yaml tackroom.yaml") {
+		t.Fatalf("legacy root must be refused before setup scaffolds a parallel config, got %v", err)
+	}
+}
