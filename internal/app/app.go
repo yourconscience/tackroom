@@ -178,10 +178,6 @@ func Run(args []string) error {
 		return runConfigCommand(args[1:])
 	case "view":
 		return runView(args[1:])
-	case "inspect":
-		return runInspect(args[1:])
-	case "sessions":
-		return runSessions(args[1:])
 	case "skill":
 		return runSkillCommand(args[1:])
 	case "publish":
@@ -197,52 +193,14 @@ func Run(args []string) error {
 		}
 		return runCron(opts)
 	case "pull":
-		printRenameNotice("pull", "sync --pull")
+		// Kept as the cron entrypoint; installed crontab lines call it.
 		opts, err := parseSubcommandFlags("pull", args[1:])
 		if err != nil {
 			return err
 		}
 		return runPull(opts)
-	case "deps":
-		return runDeprecatedDeps(args[1:])
 	case "memsearch":
 		return runDeprecatedMemsearch(args[1:])
-	case "skillify":
-		printRenameNotice("skillify", "skill new")
-		return runSkillCommand(append([]string{"new"}, args[1:]...))
-	case "render":
-		printRenameNotice("render", "sync")
-		opts, err := parseSubcommandFlags("render", args[1:])
-		if err != nil {
-			return err
-		}
-		return runRender(opts)
-	case "audit":
-		printRenameNotice("audit", "doctor")
-		opts, err := parseSubcommandFlags("audit", args[1:])
-		if err != nil {
-			return err
-		}
-		return runAudit(opts)
-	case "external":
-		if len(args) > 1 && args[1] == "list" {
-			printRenameNotice("external list", "status")
-		} else if len(args) > 1 && args[1] == "update" {
-			printRenameNotice("external update", "skill update")
-		} else {
-			printRenameNotice("external", "status or skill update")
-		}
-		return runExternal(args[1:])
-	case "promote":
-		printRenameNotice("promote", "skill promote")
-		return runSkillCommand(append([]string{"promote"}, args[1:]...))
-	case "dogfood":
-		printRenameNotice("dogfood", "doctor --e2e")
-		opts, err := parseSubcommandFlags("dogfood", args[1:])
-		if err != nil {
-			return err
-		}
-		return runDogfood(opts)
 	case "help":
 		if len(args) == 1 {
 			printUsage()
@@ -317,26 +275,12 @@ func parseStatusFlags(args []string) (runOptions, error) {
 func runSyncCommand(args []string) error {
 	if len(args) > 0 {
 		switch args[0] {
-		case "pull":
-			printRenameNotice("sync pull", "sync --pull")
-			opts, err := parseSubcommandFlags("sync pull", args[1:])
-			if err != nil {
-				return err
-			}
-			return runPull(opts)
 		case "deps":
 			opts, err := parseDepsFlags("sync deps", args[1:])
 			if err != nil {
 				return err
 			}
 			return runDepsUpdate(opts)
-		case "render":
-			printRenameNotice("sync render", "sync")
-			opts, err := parseSubcommandFlags("sync render", args[1:])
-			if err != nil {
-				return err
-			}
-			return runRender(opts)
 		}
 	}
 	opts, err := parseSyncFlags(args)
@@ -365,13 +309,6 @@ func runDoctorCommand(args []string) error {
 				return err
 			}
 			return runDepsCheck(opts)
-		case "dogfood":
-			printRenameNotice("doctor dogfood", "doctor --e2e")
-			opts, err := parseSubcommandFlags("doctor dogfood", args[1:])
-			if err != nil {
-				return err
-			}
-			return runDogfood(opts)
 		}
 	}
 	opts, err := parseDoctorFlags(args)
@@ -400,33 +337,9 @@ func runSkillCommand(args []string) error {
 		return runSkillInfo(args[1:])
 	case "promote":
 		return runPromote(args[1:])
-	case "external":
-		if len(args) > 1 && args[1] == "list" {
-			printRenameNotice("skill external list", "status")
-		} else if len(args) > 1 && args[1] == "update" {
-			printRenameNotice("skill external update", "skill update")
-		} else {
-			printRenameNotice("skill external", "status or skill update")
-		}
-		return runExternal(args[1:])
 	default:
 		return fmt.Errorf("unknown skill subcommand %q", args[0])
 	}
-}
-
-func runDeprecatedDeps(args []string) error {
-	if len(args) > 0 {
-		switch args[0] {
-		case "check":
-			printRenameNotice("deps check", "doctor deps")
-			return runDoctorCommand(append([]string{"deps"}, args[1:]...))
-		case "update":
-			printRenameNotice("deps update", "sync deps")
-			return runSyncCommand(append([]string{"deps"}, args[1:]...))
-		}
-	}
-	printRenameNotice("deps", "doctor deps or sync deps")
-	return runDeps(args)
 }
 
 func runDeprecatedMemsearch(args []string) error {
@@ -545,12 +458,8 @@ func printUsage() {
 	fmt.Println("  status   Show harness, external lock, and memsearch state")
 	fmt.Println("  sync     Regenerate committed artifacts and reconcile harnesses")
 	fmt.Println("  doctor   Check pins, dependencies, and local health")
-	fmt.Println("  config   Author the canonical YAML in an interactive TUI")
+	fmt.Println("  config   Validate or print the canonical YAML")
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
-	fmt.Println()
-	fmt.Println("Supported integrations:")
-	fmt.Println("  inspect  Launch HarnessKit for cross-harness configuration inspection")
-	fmt.Println("  sessions Launch AgentsView for session search, telemetry, and usage")
 	fmt.Println()
 	fmt.Println("Command groups:")
 	fmt.Println("  skill    Inspect, create, update, and promote skills")
@@ -558,7 +467,7 @@ func printUsage() {
 	fmt.Println("  mcp      Manage MCP servers")
 	fmt.Println("  hook     Review and remove native hook registrations")
 	fmt.Println()
-	fmt.Println("Run \"tackroom help --all\" for flags, maintenance commands, and compatibility aliases.")
+	fmt.Println("Run \"tackroom help --all\" for flags and maintenance commands.")
 }
 
 func printAllUsage() {
@@ -569,10 +478,8 @@ func printAllUsage() {
 	fmt.Println("  tackroom status [--verbose] [--agents ...]")
 	fmt.Println("  tackroom sync [--pull] [--agents ...]")
 	fmt.Println("  tackroom doctor [--e2e] [--agents ...]")
-	fmt.Println("  tackroom config [validate|print] [--config PATH]")
+	fmt.Println("  tackroom config <validate|print> [--config PATH]")
 	fmt.Println("  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]")
-	fmt.Println("  tackroom inspect [--no-open] [--ssh-host user@host] [hk serve flags: --port N, --host ADDR, --no-token]")
-	fmt.Println("  tackroom sessions [--no-open] [--ssh-host user@host] [agentsview serve flags: --port N, --host ADDR, --no-sync]")
 	fmt.Println("  tackroom skill new <name> [--description ...]")
 	fmt.Println("  tackroom skill list [--agents ...]")
 	fmt.Println("  tackroom skill info <name>")
@@ -583,15 +490,10 @@ func printAllUsage() {
 	fmt.Println("  tackroom hook list [--agents ...] [query]")
 	fmt.Println("  tackroom hook remove [--dry-run] [--agents ...] <query>")
 	fmt.Println()
-	fmt.Println("Maintenance and compatibility aliases:")
+	fmt.Println("Maintenance:")
 	fmt.Println("  tackroom cron [--interval 30m|--deps|--remove]")
-	fmt.Println("  tackroom deps <check|update> [options]")
+	fmt.Println("  tackroom pull [options]          # git pull --ff-only, then sync; what cron runs")
+	fmt.Println("  tackroom doctor <audit|deps> [options]")
+	fmt.Println("  tackroom sync deps [options]")
 	fmt.Println("  tackroom memsearch <setup|status> [options]")
-	fmt.Println("  tackroom pull [options]")
-	fmt.Println("  tackroom render [options]")
-	fmt.Println("  tackroom audit [options]")
-	fmt.Println("  tackroom external <list|update> [name ...]")
-	fmt.Println("  tackroom skillify <name> [options]")
-	fmt.Println("  tackroom promote <name-or-path> [--dry-run]")
-	fmt.Println("  tackroom dogfood [options]")
 }

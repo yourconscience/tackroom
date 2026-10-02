@@ -37,16 +37,16 @@ var openInBrowser = func(url string) error {
 // legacyInspectFlags are the HarnessKit-only flags that `tackroom view`
 // forwarded to `hk serve` before the cutover. They no longer control `view`
 // (which now opens the config UI); using one prints concise rename guidance
-// pointing at `tackroom inspect` instead of silently launching a browser.
+// pointing at HarnessKit itself instead of silently launching a browser.
 var legacyInspectFlags = []string{"--port", "--host", "--no-token", "--name"}
 
 // runView launches the canonical tackroom configuration experience: the
 // loopback-only web UI for authoring the canonical YAML (shared/local layers,
 // read-only effective view, revision-guarded saves, explicit sync preview and
-// confirmation). It is the browser front door; `tackroom config` is the TUI.
+// confirmation). It is the only interactive config editor.
 func runView(args []string) error {
 	if flag := firstLegacyInspectFlag(args); flag != "" {
-		return fmt.Errorf("tackroom view no longer launches HarnessKit, so %s is not a view flag; run \"tackroom inspect\" for the harness inspector (it takes --port/--host/--no-token). \"tackroom view\" now opens the config UI — set its loopback bind with --addr", flag)
+		return fmt.Errorf("tackroom view no longer launches HarnessKit, so %s is not a view flag; run HarnessKit directly (\"hk serve --port N\") for the harness inspector. \"tackroom view\" now opens the config UI — set its loopback bind with --addr", flag)
 	}
 	opts, err := parseViewFlags(args)
 	if err != nil {

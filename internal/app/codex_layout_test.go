@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestSyncRenderUpdatesCommittedArtifacts(t *testing.T) {
+func TestSyncUpdatesCommittedArtifacts(t *testing.T) {
 	repoRoot := t.TempDir()
 	home := t.TempDir()
 	t.Setenv("TACKROOM_HOME", repoRoot)
@@ -31,7 +31,7 @@ Review the change.
 	writeSyncTestFile(t, filepath.Join(repoRoot, "skills", "sample", "SKILL.md"), []byte("---\nname: sample\n---\n"))
 	writeSyncTestFile(t, filepath.Join(repoRoot, "README.md"), []byte("# Skills\n\n"+readmeSkillsBeginMarker+"\n0 skills ship with this repo:\n\n``\n"+readmeSkillsEndMarker+"\n"))
 
-	if err := Run([]string{"sync", "render"}); err != nil {
+	if err := Run([]string{"sync"}); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(repoRoot, "README.md"))
@@ -39,7 +39,7 @@ Review the change.
 		t.Fatal(err)
 	}
 	if want := "1 skills ship with this repo:\n\n`sample`"; !bytes.Contains(data, []byte(want)) {
-		t.Fatalf("sync render did not complete canonical outputs:\n%s", data)
+		t.Fatalf("sync did not render committed outputs:\n%s", data)
 	}
 }
 
