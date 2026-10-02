@@ -423,3 +423,27 @@ func TestOneFieldEditProducesMinimalDiff(t *testing.T) {
 		t.Fatalf("diff does not show the changed line:\n%s", saved.Diff)
 	}
 }
+
+func TestSaveConfigDocumentExpandsEmptyFlowPlaceholder(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	path := filepath.Join(root, "tackroom.yaml")
+	if err := os.WriteFile(path, []byte("version: 1\nagents: [] # populated by tackroom setup\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := config{Version: 1, Agents: []agentConfig{
+		{Name: agentClaudeCode, Enabled: true, SkillRoot: "~/.claude/skills", AgentRoot: "~/.claude/agents", Detect: "claude"},
+		{Name: agentCodex, Enabled: true, SkillRoot: "~/.codex/skills", AgentRoot: "~/.codex/agents", Detect: "codex"},
+	}}
+	if err := saveConfigDocument(path, home, cfg); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(data)
+	if strings.Contains(got, "[{") || !strings.Contains(got, "\n  - name: claude-code\n") {
+		t.Fatalf("setup agents should be written as a block list:\n%s", got)
+	}
+}

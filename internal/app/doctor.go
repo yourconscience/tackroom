@@ -63,7 +63,7 @@ func runDoctor(opts runOptions) error {
 	results = append(results, checkAgnix(repoRoot))
 	results = append(results, checkAgentsMDSize(repoRoot))
 	results = append(results, checkREADMESkillInventory(repoRoot))
-	results = append(results, checkMemsearchIndex(home))
+	results = append(results, checkMemsearchIndex(repoRoot, home))
 	results = append(results, checkHerdrPluginHealth())
 	results = append(results, checkExternalPackageAge(repoRoot, cfg, opts.SkipPackageAge, timeNow()))
 	results = append(results, checkExternalSkillSources(cfg, home))
@@ -457,7 +457,21 @@ func checkREADMESkillInventory(repoRoot string) checkResult {
 	return checkResult{"README skills", checkStatusPass, fmt.Sprintf("exact inventory of %d skills", count)}
 }
 
-func checkMemsearchIndex(home string) checkResult {
+// memsearchSetUp reports whether this machine opted into the memsearch
+// memory tier: setup writes memsearch.conf and creates ~/.memsearch.
+func memsearchSetUp(repoRoot string, home string) bool {
+	for _, path := range []string{filepath.Join(repoRoot, "memsearch.conf"), filepath.Join(home, ".memsearch")} {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func checkMemsearchIndex(repoRoot string, home string) checkResult {
+	if !memsearchSetUp(repoRoot, home) {
+		return checkResult{"memsearch index", checkStatusPass, "not set up (enable with setup --memory memsearch)"}
+	}
 	if _, err := exec.LookPath("memsearch"); err == nil {
 		out, err := exec.Command("memsearch", "stats", "--collection", "ai").CombinedOutput()
 		if err == nil {
