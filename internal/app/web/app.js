@@ -140,26 +140,12 @@ async function load(nextLayer = layer) {
   try { state = await api(`/api/state?layer=${encodeURIComponent(layer)}`); render(); setStatus(state.read_only ? 'Effective merge is read-only.' : 'Flip a toggle to apply it immediately.'); }
   catch (error) { setStatus(error.message, 'error'); }
 }
-// Report fields from the sync plan, in the order a reader cares about them.
-const PLAN_CHANGES = [
-  ['Adds','add skill'], ['AddsAgent','add role'], ['AddsMCP','add MCP'], ['AddsHook','add hook'],
-  ['Updates','update skill'], ['UpdatesAgent','overwrite role'], ['UpdatesMCP','update MCP'], ['UpdatesHook','update hook'], ['UpdatesPackage','update package'],
-  ['Removes','remove skill'], ['RemovesAgent','remove role'], ['RemovesPackage','remove package'],
-];
-function summarizePlan(plan) {
-  const reports = (plan?.reports || []).filter((report) => report.Detected !== false);
-  if (!reports.length) return 'No enabled agents to sync.';
-  return reports.map((report) => {
-    const changes = PLAN_CHANGES.flatMap(([key, label]) => (report[key] || []).map((item) => `  ${label} ${item}`));
-    return changes.length ? `${report.Name}\n${changes.join('\n')}` : `${report.Name}: up to date`;
-  }).join('\n');
-}
 async function syncNow() {
   setStatus('Previewing sync...');
   try {
     const preview = await api('/api/sync/preview', {method:'POST', body:'{}'});
     const destructive = preview.plan?.destructive || [];
-    $('#plan').textContent = summarizePlan(preview.plan);
+    $('#plan').textContent = (preview.plan?.summary || []).join('\n') || 'No enabled agents to sync.';
     if (destructive.length && !confirm(`Sync includes ${destructive.length} destructive change(s):\n\n${destructive.join('\n')}\n\nApply anyway?`)) {
       setStatus('Sync canceled.');
       return;
