@@ -201,6 +201,12 @@ func Run(args []string) error {
 		return runPull(opts)
 	case "memsearch":
 		return runDeprecatedMemsearch(args[1:])
+	case "version", "--version":
+		if len(args) != 1 {
+			return errors.New("usage: tackroom version")
+		}
+		fmt.Println("tackroom " + versionString())
+		return nil
 	case "help":
 		if len(args) == 1 {
 			printUsage()
@@ -496,4 +502,5 @@ func printAllUsage() {
 	fmt.Println("  tackroom doctor <audit|deps> [options]")
 	fmt.Println("  tackroom sync deps [options]")
 	fmt.Println("  tackroom memsearch <setup|status> [options]")
+	fmt.Println("  tackroom version                 # also --version")
 }

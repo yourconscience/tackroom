@@ -658,6 +658,11 @@ func mergeKnownSequence(dst, src *yaml.Node, section string) {
 		return
 	}
 	if len(dst.Content) == 0 || dst.Content[0].Kind != yaml.MappingNode || src.Content[0].Kind != yaml.MappingNode {
+		// An empty `[]` placeholder filled with whole entries reads better as a
+		// block list than as one long flow line.
+		if len(dst.Content) == 0 && src.Content[0].Kind == yaml.MappingNode {
+			dst.Style &^= yaml.FlowStyle
+		}
 		dst.Content = cloneNodePtrs(src.Content)
 		return
 	}

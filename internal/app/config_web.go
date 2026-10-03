@@ -415,7 +415,49 @@ type syncPlan struct {
 	Repo        repoLinkReport `json:"repo"`
 	Reports     []agentReport  `json:"reports"`
 	Destructive []string       `json:"destructive"`
+	Summary     []string       `json:"summary"`
 	Digest      string         `json:"digest"`
+}
+
+// summarizeSyncPlan renders one line per agent for the view UI: what sync
+// will change, or what blocks it, so "up to date" only appears when it is.
+func summarizeSyncPlan(reports []agentReport) []string {
+	var lines []string
+	for _, report := range reports {
+		if !report.Detected {
+			lines = append(lines, report.Name+": not installed, skipped")
+			continue
+		}
+		var parts []string
+		for _, group := range []struct {
+			label string
+			items []string
+		}{
+			{"add skill", report.Adds}, {"add role", report.AddsAgent}, {"add MCP", report.AddsMCP}, {"add hook", report.AddsHook},
+			{"update skill", report.Updates}, {"overwrite role", report.UpdatesAgent}, {"update MCP", report.UpdatesMCP},
+			{"update hook", report.UpdatesHook}, {"update package", report.UpdatesPackage},
+			{"remove skill", report.Removes}, {"remove role", report.RemovesAgent}, {"remove package", report.RemovesPackage},
+		} {
+			for _, item := range group.items {
+				parts = append(parts, group.label+" "+item)
+			}
+		}
+		for _, item := range report.Conflicts {
+			parts = append(parts, "conflict "+item+" (not managed by tackroom)")
+		}
+		if report.RootState != "" && report.RootState != stateSynced {
+			parts = append(parts, "root instructions "+report.RootState)
+		}
+		switch {
+		case len(parts) > 0:
+			lines = append(lines, report.Name+": "+strings.Join(parts, ", "))
+		case report.Synced:
+			lines = append(lines, report.Name+": up to date")
+		default:
+			lines = append(lines, report.Name+": needs sync")
+		}
+	}
+	return lines
 }
 
 func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) {
@@ -440,7 +482,7 @@ func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) 
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}
-	plan := syncPlan{RepoRoot: snapshot.repoRoot, Repo: repo, Reports: reports}
+	plan := syncPlan{RepoRoot: snapshot.repoRoot, Repo: repo, Reports: reports, Summary: summarizeSyncPlan(reports)}
 	for _, report := range reports {
 		for _, item := range report.Removes {
 			plan.Destructive = append(plan.Destructive, report.Name+": remove "+item)

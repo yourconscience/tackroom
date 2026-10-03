@@ -304,7 +304,10 @@ func printStatusReport(repoRoot string, repoReport repoLinkReport, reports []age
 
 	fmt.Println()
 	fmt.Println(p.dim("checks"))
-	checks := []checkResult{checkExternalSkillLock(repoRoot, cfg, home), checkMemsearchIndex(home)}
+	checks := []checkResult{checkExternalSkillLock(repoRoot, cfg, home)}
+	if memsearchSetUp(repoRoot, home) {
+		checks = append(checks, checkMemsearchIndex(repoRoot, home))
+	}
 	width := 0
 	for _, chk := range checks {
 		if len(chk.name) > width {

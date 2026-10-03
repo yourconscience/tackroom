@@ -145,14 +145,14 @@ async function syncNow() {
   try {
     const preview = await api('/api/sync/preview', {method:'POST', body:'{}'});
     const destructive = preview.plan?.destructive || [];
-    $('#plan').textContent = JSON.stringify(preview.plan, null, 2);
+    $('#plan').textContent = (preview.plan?.summary || []).join('\n') || 'No enabled agents to sync.';
     if (destructive.length && !confirm(`Sync includes ${destructive.length} destructive change(s):\n\n${destructive.join('\n')}\n\nApply anyway?`)) {
       setStatus('Sync canceled.');
       return;
     }
     await api('/api/sync/apply', {method:'POST', body:JSON.stringify({expected_revision:preview.revision, plan_digest:preview.digest, confirmed_destructive:destructive})});
-    setStatus('Synced to your agents.', 'ok');
     await load(layer);
+    setStatus('Synced to your agents.', 'ok');
   } catch (error) { setStatus(error.message, 'error'); }
 }
 document.querySelectorAll('.source').forEach((node) => node.addEventListener('click', () => load(node.dataset.layer)));

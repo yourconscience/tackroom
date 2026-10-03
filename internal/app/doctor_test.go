@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -122,5 +123,25 @@ func TestCheckAgnixMissingBinaryWarns(t *testing.T) {
 	res := checkAgnix(t.TempDir())
 	if res.status != checkStatusWarn {
 		t.Fatalf("agnix missing-binary status = %q, want %q (%+v)", res.status, checkStatusWarn, res)
+	}
+}
+
+func TestMemsearchIndexCheckPassesWhenMemsearchIsNotSetUp(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	got := checkMemsearchIndex(t.TempDir(), t.TempDir())
+	if got.status != checkStatusPass || !strings.Contains(got.detail, "not set up") {
+		t.Fatalf("memory off should not warn about memsearch, got %+v", got)
+	}
+}
+
+func TestMemsearchIndexCheckWarnsWhenSetUpWithoutIndex(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "memsearch.conf"), []byte("collection=ai\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got := checkMemsearchIndex(root, t.TempDir())
+	if got.status != checkStatusWarn {
+		t.Fatalf("memsearch set up without an index should warn, got %+v", got)
 	}
 }
