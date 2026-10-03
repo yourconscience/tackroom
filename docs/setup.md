@@ -42,7 +42,9 @@ tackroom config validate
 tackroom config print
 ```
 
-The shared file and `tackroom.local.yaml` remain separate layers. The
+`view` opens a dashboard: per-agent sync state, skill and role matrices, MCP
+and hook targeting per agent, unmanaged items in agent folders, and a YAML
+editor. The shared file and `tackroom.local.yaml` remain separate layers. The
 effective view is read-only, and saving YAML never runs `sync`. The web UI
 binds to loopback, requires a session cookie and CSRF header, and keeps sync
 behind an explicit preview/apply confirmation.

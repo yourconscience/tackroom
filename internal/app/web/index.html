@@ -3,35 +3,59 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <title>tackroom config</title>
+  <meta name="color-scheme" content="light dark">
+  <title>tackroom</title>
   <link rel="stylesheet" href="./style.css">
 </head>
 <body>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1c1c28"/><path d="M14 20H50" stroke="#b4befe" stroke-width="7" stroke-linecap="round"/><path d="M28 20V40a8 8 0 0 0 16 0" fill="none" stroke="#e6e7f2" stroke-width="7" stroke-linecap="round"/></symbol>
+    <symbol id="i-sync" viewBox="0 0 256 256"><path fill="currentColor" d="M224,48V96a8,8,0,0,1-8,8H168a8,8,0,0,1,0-16h28.69L182.06,73.37a79.56,79.56,0,0,0-56.13-23.43h-.45A79.52,79.52,0,0,0,69.59,72.71,8,8,0,0,1,58.41,61.27a96,96,0,0,1,135,.79L208,76.69V48a8,8,0,0,1,16,0ZM186.41,183.29a80,80,0,0,1-112.47-.66L59.31,168H88a8,8,0,0,0,0-16H40a8,8,0,0,0-8,8v48a8,8,0,0,0,16,0V179.31l14.63,14.63A95.43,95.43,0,0,0,130,222.06h.53a95.36,95.36,0,0,0,67.07-27.33,8,8,0,0,0-11.18-11.44Z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 256 256"><path fill="currentColor" d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></symbol>
+    <symbol id="i-close" viewBox="0 0 256 256"><path fill="currentColor" d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
+  </svg>
+
   <header class="topbar">
-    <div><strong>tackroom</strong><span class="eyebrow">canonical config</span></div>
-    <nav id="links" aria-label="Configured links"></nav>
+    <a class="brand" href="#overview"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span>tackroom</span></a>
+    <nav class="tabs" aria-label="Views">
+      <a href="#overview" data-view="overview">Overview</a>
+      <a href="#skills" data-view="skills">Skills <span class="count" data-count="skills"></span></a>
+      <a href="#roles" data-view="roles">Roles <span class="count" data-count="roles"></span></a>
+      <a href="#wiring" data-view="wiring">MCP &amp; hooks <span class="count" data-count="wiring"></span></a>
+      <a href="#unmanaged" data-view="unmanaged">Unmanaged <span class="count" data-count="unmanaged"></span></a>
+      <a href="#config" data-view="config">Config</a>
+    </nav>
+    <div class="top-actions">
+      <details id="links-menu" class="menu" hidden><summary>Links</summary><nav id="links" class="menu-list" aria-label="Configured links"></nav></details>
+      <button id="open-sync" class="sync-button" type="button"><svg aria-hidden="true"><use href="#i-sync"/></svg><span id="sync-label">Sync</span></button>
+    </div>
   </header>
-  <main class="shell">
-    <aside class="sources" aria-label="Configuration layers">
-      <p class="label">Sources</p>
-      <button class="source active" data-layer="shared">Shared <small>tackroom.yaml</small></button>
-      <button class="source" data-layer="local">Local <small>tackroom.local.yaml</small></button>
-      <button class="source" data-layer="effective">Effective <small>read-only merge</small></button>
-      <div class="source-meta" id="source-meta"></div>
-    </aside>
-    <section class="workspace">
-      <div class="section-head"><div><p class="label">Configuration</p><h1 id="heading">Shared configuration</h1></div><span id="revision" class="mono"></span></div>
-      <p class="intro">Flip a toggle to change your canonical config immediately. Then Sync to apply it to your agents.</p>
-      <div id="structured" class="ledger" aria-live="polite"></div>
-    </section>
-    <aside class="rail">
-      <p class="label">Sync</p>
-      <p id="status" class="status">Loading canonical config...</p>
-      <button id="sync" class="primary">Sync now</button>
-      <pre id="plan" class="diff" aria-label="Sync plan"></pre>
-    </aside>
+
+  <main id="main" class="main">
+    <section id="view-overview" class="view" data-view="overview"></section>
+    <section id="view-skills" class="view" data-view="skills" hidden></section>
+    <section id="view-roles" class="view" data-view="roles" hidden></section>
+    <section id="view-wiring" class="view" data-view="wiring" hidden></section>
+    <section id="view-unmanaged" class="view" data-view="unmanaged" hidden></section>
+    <section id="view-config" class="view" data-view="config" hidden></section>
   </main>
-  <footer class="mobile-actions"><button id="msync" class="primary">Sync now</button></footer>
+
+  <dialog id="sync-panel" class="panel" aria-labelledby="sync-title">
+    <div class="panel-head">
+      <div><p class="eyebrow">Sync to agents</p><h2 id="sync-title">Review changes</h2></div>
+      <button id="close-sync" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <div id="sync-body" class="panel-body"></div>
+    <div class="panel-foot">
+      <p id="sync-note" class="note"></p>
+      <div class="foot-actions">
+        <button id="cancel-sync" type="button">Cancel</button>
+        <button id="apply-sync" class="primary" type="button" disabled>Apply sync</button>
+      </div>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

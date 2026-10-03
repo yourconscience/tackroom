@@ -149,6 +149,8 @@ func (s *configWebServer) handler() http.Handler {
 			s.handleSyncApply(w, r)
 		case "/api/status":
 			s.handleStatus(w, r)
+		case "/api/inventory":
+			s.handleInventory(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -177,6 +179,9 @@ func (s *configWebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 		writeAPIError(w, http.StatusUnauthorized, "invalid_config", "open the tokenized startup URL")
 		return
 	}
+	// A restarted server keeps the session token (--token-file) but mints a new
+	// CSRF secret; reissue it so a reloaded page can still save.
+	s.setSessionCookies(w)
 	data, err := configWebAssets.ReadFile("web/index.html")
 	if err != nil {
 		http.Error(w, "asset unavailable", http.StatusInternalServerError)
