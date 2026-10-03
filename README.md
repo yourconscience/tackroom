@@ -1,3 +1,5 @@
+<img src="docs/site/logo.svg" alt="tackroom logo" width="72">
+
 # tackroom
 
 Dotfiles for your AI agents. One `~/.agents` repo, rendered into every coding agent.

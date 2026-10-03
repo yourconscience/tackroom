@@ -14,7 +14,7 @@
 <meta property="og:url" content="https://yourconscience.github.io/tackroom/">
 <meta property="og:image" content="https://yourconscience.github.io/tackroom/brag.jpg">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%234f56c9'/%3E%3Cpath d='M26 14v26a8 8 0 0 0 8 8h8M18 24h22' fill='none' stroke='%23fbfbfd' stroke-width='7' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2215%22 fill=%22%231c1c28%22/%3E%3Cpath d=%22M14 20H50%22 stroke=%22%23b4befe%22 stroke-width=%227%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M28 20V40a8 8 0 0 0 16 0%22 fill=%22none%22 stroke=%22%23e6e7f2%22 stroke-width=%227%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap" rel="stylesheet">
@@ -156,6 +156,33 @@
   .film > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: var(--r-lg); }
   .film > button:active .play { transform: scale(.98); }
 
+
+  /* brand mark */
+  .brand { display: inline-flex; align-items: center; gap: 10px; }
+  .brand .mark { width: 30px; height: 30px; flex: none; border-radius: 7px; box-shadow: 0 0 0 1px var(--line); }
+  footer .brand .mark { width: 24px; height: 24px; }
+
+  /* name: a rail of pegs, one nameplate per agent */
+  .name { display: grid; gap: clamp(28px, 4vw, 44px); }
+  .name-copy { display: grid; gap: 14px; max-width: 62ch; }
+  .name-copy p { color: var(--muted); font-size: 1.06rem; }
+  .wall { position: relative; padding-top: 10px; }
+  .rail { position: absolute; left: 0; right: 0; top: 10px; height: 16px; border-radius: 8px; background: linear-gradient(180deg, color-mix(in srgb, var(--line) 60%, var(--surface)), var(--line)); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .06); display: flex; justify-content: space-between; padding: 0 14px; align-items: center; }
+  .rail span { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); }
+  .pegs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; position: relative; }
+  .pegs li { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .peg { width: 14px; height: 14px; margin-top: 1px; border-radius: 50%; background: var(--accent); box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 55%, #000); position: relative; z-index: 1; }
+  .cord { width: 2px; height: 26px; background: var(--faint); }
+  .plate { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 12px 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); position: relative; transform-origin: 50% -26px; transition: transform .5s var(--ease); }
+  .plate::before { content: ""; position: absolute; top: 9px; left: 50%; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--line); }
+  .pegs li:nth-child(odd) .plate { transform: rotate(-2deg); }
+  .pegs li:nth-child(even) .plate { transform: rotate(1.6deg); }
+  .pegs li:hover .plate { transform: rotate(0); }
+  .plate b { font-family: var(--display); font-weight: 600; font-size: 1.02rem; text-align: center; }
+  .gear { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
+  .gear i { font: 500 .72rem/1 var(--mono); font-style: normal; color: var(--muted); padding: 4px 7px; border-radius: 6px; background: var(--accent-soft); }
+  @media (max-width: 920px) { .pegs { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; } .rail { display: none; } }
+  @media (max-width: 560px) { .pegs { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pegs li:last-child:nth-child(odd) { grid-column: 1 / -1; } .pegs li:last-child:nth-child(odd) .plate { max-width: calc(50% - 8px); } }
 
   /* agent board */
   .board { padding-block: clamp(48px, 6vw, 72px) 0; }
@@ -328,6 +355,7 @@
 <symbol id="a-omp" viewBox="0 0 64 64"> <rect width="64" height="64" rx="12" fill="#0f0a14" /> <path fill="url(#tr-omp-grad)" d="M14 16h36v8H40v32h-8V24h-6v22h-8V24h-4z" /></symbol>
 <symbol id="a-qwen-code" viewBox="0 0 141.38 140"><path fill="#6D44E8" d="m140.93 85-16.35-28.33-1.93-3.34 8.66-15a3.323 3.323 0 0 0 0-3.34l-9.62-16.67c-.3-.51-.72-.93-1.22-1.22s-1.07-.45-1.67-.45H82.23l-8.66-15a3.33 3.33 0 0 0-2.89-1.67H51.43c-.59 0-1.17.16-1.66.45-.5.29-.92.71-1.22 1.22L32.19 29.98l-1.92 3.33H12.96c-.59 0-1.17.16-1.66.45-.5.29-.93.71-1.22 1.22L.45 51.66a3.323 3.323 0 0 0 0 3.34l18.28 31.67-8.66 15a3.32 3.32 0 0 0 0 3.34l9.62 16.67c.3.51.72.93 1.22 1.22s1.07.45 1.67.45h36.56l8.66 15a3.35 3.35 0 0 0 2.89 1.67h19.25a3.34 3.34 0 0 0 2.89-1.67l18.28-31.67h17.32c.6 0 1.17-.16 1.67-.45s.92-.71 1.22-1.22l9.62-16.67a3.323 3.323 0 0 0 0-3.34ZM51.44 3.33 61.07 20l-9.63 16.66h76.98l-9.62 16.66H45.67l-11.54-20zM57.21 120H22.58l9.63-16.67h19.25l-38.5-66.67h19.25l9.62 16.67L68.78 100l-11.55 20Zm61.59-33.34-9.62-16.67-38.49 66.67-9.63-16.67 9.63-16.66 26.94-46.67h23.1l17.32 30z" /></symbol>
 <symbol id="a-droid" viewBox="140 140 620 620"> <path d="M582.594 251.356C581.452 251.073 580.385 250.547 579.466 249.813C578.546 249.08 577.795 248.156 577.266 247.106C576.736 246.055 576.44 244.903 576.397 243.728C576.354 242.552 576.565 241.381 577.017 240.295C592.606 202.357 599.485 172.002 588.384 159.294C558.984 125.58 441.083 192.624 403.49 215.331C402.484 215.936 401.358 216.316 400.19 216.446C399.023 216.577 397.841 216.454 396.725 216.086C395.61 215.718 394.587 215.113 393.727 214.314C392.866 213.515 392.188 212.539 391.739 211.453C375.937 173.596 359.325 147.264 342.487 146.122C297.857 143.068 261.885 273.85 251.355 316.475C251.074 317.616 250.55 318.683 249.817 319.603C249.085 320.522 248.162 321.273 247.113 321.803C246.064 322.332 244.912 322.629 243.738 322.672C242.563 322.715 241.393 322.504 240.308 322.052C202.37 306.463 172.002 299.584 159.307 310.685C125.593 340.085 192.624 457.987 215.33 495.579C215.938 496.585 216.32 497.711 216.451 498.879C216.583 500.047 216.46 501.229 216.092 502.346C215.724 503.462 215.119 504.485 214.318 505.346C213.517 506.206 212.54 506.883 211.453 507.33C173.609 523.132 147.277 539.744 146.121 556.581C143.08 601.211 273.85 637.184 316.488 647.714C317.627 647.998 318.691 648.525 319.608 649.259C320.525 649.992 321.273 650.914 321.801 651.963C322.329 653.011 322.624 654.161 322.668 655.335C322.711 656.508 322.501 657.677 322.052 658.761C306.463 696.699 299.584 727.067 310.685 739.762C340.084 773.476 458 706.445 495.592 683.739C496.598 683.131 497.724 682.749 498.892 682.618C500.06 682.486 501.243 682.609 502.359 682.977C503.475 683.345 504.498 683.95 505.358 684.751C506.219 685.552 506.896 686.529 507.344 687.616C523.145 725.46 539.744 751.792 556.594 752.948C601.224 755.989 637.196 625.219 647.713 582.581C647.998 581.441 648.525 580.375 649.259 579.457C649.993 578.539 650.917 577.79 651.967 577.262C653.017 576.733 654.169 576.438 655.344 576.396C656.519 576.354 657.689 576.566 658.775 577.018C696.712 592.607 727.067 599.472 739.775 588.384C773.49 558.985 706.445 441.069 683.738 403.477C683.136 402.47 682.757 401.345 682.628 400.178C682.499 399.011 682.622 397.83 682.99 396.715C683.358 395.6 683.961 394.577 684.76 393.717C685.558 392.856 686.532 392.177 687.616 391.726C725.473 375.924 751.805 359.312 752.947 342.475C756.001 297.845 625.219 261.873 582.594 251.356ZM531.391 208.572C539.969 223.948 495.765 326.408 462.886 398.073C462.337 399.271 461.433 400.273 460.297 400.942C459.161 401.611 457.847 401.917 456.532 401.817C455.217 401.717 453.964 401.217 452.942 400.384C451.92 399.551 451.178 398.424 450.816 397.157C437.537 350.561 422.36 295.813 406.12 249.338C405.482 247.514 405.513 245.522 406.209 243.719C406.905 241.917 408.219 240.42 409.917 239.498C450.471 217.349 519.865 187.936 531.391 208.572ZM337.044 221.253C353.974 226.06 395.165 329.767 422.585 403.69C423.042 404.925 423.111 406.271 422.781 407.546C422.451 408.821 421.739 409.965 420.74 410.824C419.741 411.683 418.503 412.215 417.193 412.35C415.882 412.485 414.562 412.215 413.409 411.577C371.037 388.061 321.627 360.043 277.276 338.664C275.539 337.822 274.157 336.39 273.377 334.625C272.596 332.86 272.468 330.875 273.013 329.023C286.066 284.726 314.297 214.813 337.044 221.253ZM208.585 367.651C223.948 359.073 326.42 403.278 398.073 436.156C399.271 436.706 400.272 437.61 400.942 438.746C401.611 439.882 401.916 441.196 401.816 442.51C401.717 443.825 401.217 445.078 400.383 446.1C399.55 447.122 398.424 447.864 397.156 448.227C350.575 461.506 295.813 476.683 249.337 492.923C247.515 493.557 245.526 493.524 243.727 492.828C241.927 492.133 240.433 490.82 239.511 489.125C217.402 448.572 187.936 379.177 208.585 367.651ZM221.266 561.999C226.06 545.069 329.78 503.878 403.703 476.457C404.938 476 406.284 475.932 407.559 476.262C408.834 476.592 409.978 477.304 410.837 478.303C411.695 479.301 412.228 480.539 412.363 481.85C412.498 483.16 412.228 484.48 411.59 485.633C388.06 528.006 360.042 577.416 338.663 621.754C337.827 623.496 336.398 624.884 334.631 625.668C332.864 626.451 330.876 626.579 329.023 626.029C284.725 613.056 214.813 584.746 221.266 561.999ZM367.664 690.458C359.073 675.094 403.291 572.622 436.169 500.97C436.719 499.772 437.623 498.77 438.759 498.101C439.895 497.431 441.209 497.126 442.523 497.226C443.838 497.326 445.091 497.826 446.113 498.659C447.135 499.492 447.877 500.618 448.24 501.886C461.518 548.468 476.696 603.23 492.936 649.705C493.569 651.529 493.534 653.518 492.836 655.318C492.137 657.118 490.822 658.612 489.125 659.532C448.585 681.641 379.177 711.106 367.704 690.458H367.664ZM562.012 677.777C545.068 672.983 503.877 569.263 476.457 495.34C475.997 494.103 475.927 492.754 476.257 491.477C476.587 490.199 477.301 489.053 478.302 488.193C479.304 487.334 480.545 486.802 481.858 486.669C483.171 486.537 484.493 486.81 485.646 487.452C528.005 510.969 577.429 539 621.767 560.379C623.507 561.217 624.891 562.648 625.672 564.414C626.453 566.181 626.58 568.168 626.029 570.02C612.989 614.384 584.759 684.23 562.012 677.777ZM690.47 531.378C675.094 539.97 572.635 495.751 500.969 462.873C499.771 462.323 498.77 461.42 498.1 460.284C497.431 459.148 497.126 457.834 497.226 456.519C497.325 455.204 497.825 453.952 498.659 452.93C499.492 451.908 500.618 451.165 501.886 450.803C548.481 437.524 603.229 422.346 649.705 406.106C651.531 405.472 653.522 405.508 655.325 406.206C657.127 406.904 658.622 408.219 659.544 409.918C681.64 450.458 711.106 519.866 690.47 531.378ZM677.789 337.03C672.983 353.974 569.275 395.165 495.353 422.586C494.116 423.046 492.767 423.115 491.489 422.785C490.212 422.455 489.066 421.742 488.206 420.74C487.346 419.739 486.815 418.498 486.682 417.185C486.55 415.872 486.823 414.549 487.465 413.396C510.982 371.037 539 321.614 560.379 277.276C561.219 275.537 562.65 274.154 564.416 273.374C566.182 272.593 568.168 272.465 570.019 273.013C614.317 286.053 684.23 314.284 677.789 337.03Z" fill="currentColor"/></symbol>
+<symbol id="logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1c1c28"/><path d="M14 20H50" stroke="#b4befe" stroke-width="7" stroke-linecap="round"/><path d="M28 20V40a8 8 0 0 0 16 0" fill="none" stroke="#e6e7f2" stroke-width="7" stroke-linecap="round"/></symbol>
 <symbol id="i-copy" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></symbol>
 <symbol id="i-check" viewBox="0 0 256 256"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></symbol>
 <symbol id="i-github-logo" viewBox="0 0 256 256"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></symbol>
@@ -345,7 +373,7 @@
 
 <header class="nav" id="nav">
   <div class="wrap">
-    <a class="brand" href="./">tackroom</a>
+    <a class="brand" href="./"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg>tackroom</a>
     <nav class="nav-links" aria-label="Main">
       <a class="hide-sm" href="#first-run">How it works</a>
       <a class="hide-sm" href="#agents">Agents</a>
@@ -396,6 +424,24 @@
       <li><svg class="ag-big" aria-hidden="true"><use href="#a-amp"/></svg><b>Amp</b><span>skills, MCP</span></li>
       <li><svg class="ag-big" aria-hidden="true"><use href="#a-cursor"/></svg><b>Cursor</b><span>reads skills natively</span></li>
       </ul>
+    </section>
+
+    <section class="name" aria-labelledby="name-title">
+      <div class="name-copy">
+        <h2 id="name-title">Why “tackroom”</h2>
+        <p>In a stable, the tack room is where the riding gear lives. Every horse has its own peg, with a saddle and bridle fitted to that horse and a plate with its name.</p>
+        <p>tackroom is that room for your coding agents. Skills, MCP servers, hooks and roles live in one place, <code>~/.agents</code>, and every agent gets its gear fitted to its own config format.</p>
+      </div>
+      <div class="wall" role="img" aria-label="A rail of pegs, one per agent, each holding a nameplate for Claude Code, Codex, Pi, Qwen Code and Hermes with the gear tackroom syncs to it">
+        <div class="rail"><span></span><span></span><span></span></div>
+        <ul class="pegs">
+        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-claude-code"/></svg><b>Claude Code</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i><i>hooks</i></span></div></li>
+        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-codex"/></svg><b>Codex</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i><i>hooks</i></span></div></li>
+        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-pi"/></svg><b>Pi</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i></span></div></li>
+        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-qwen-code"/></svg><b>Qwen Code</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i><i>hooks</i></span></div></li>
+        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-hermes"/></svg><b>Hermes</b><span class="gear"><i>skills</i><i>MCP</i><i>hooks</i></span></div></li>
+        </ul>
+      </div>
     </section>
 
     <section id="first-run" class="run" aria-labelledby="run-title">
@@ -732,7 +778,7 @@ AGENTS.md       -&gt; ~/.agents/AGENTS.md</pre></div>
 
 <footer>
   <div class="wrap">
-    <a class="brand" href="./">tackroom</a>
+    <a class="brand" href="./"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg>tackroom</a>
     <span>MIT licensed. Agent logos belong to their owners.</span>
     <nav aria-label="Footer">
       <a href="https://github.com/yourconscience/tackroom">GitHub</a>
