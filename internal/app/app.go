@@ -83,6 +83,9 @@ type repoLinkReport struct {
 
 type agentReport struct {
 	Name            string
+	// Error is set when the agent's native config could not be read; the rest
+	// of the report is empty and sync leaves the agent untouched.
+	Error           string
 	SkillRoot       string
 	AgentRoot       string
 	ExpectedSkills  map[string]string

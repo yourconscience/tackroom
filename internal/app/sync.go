@@ -31,6 +31,9 @@ func runStatus(opts runOptions) error {
 	}
 
 	printStatusReport(repoRoot, repoReport, reports, home, cfg, opts.Verbose)
+	if err := agentFailures(reports); err != nil {
+		return err
+	}
 	if repoReport.State != stateSynced {
 		return errors.New("tackroom is not fully synced")
 	}
@@ -89,10 +92,11 @@ func runSync(opts runOptions) error {
 	if err != nil {
 		return err
 	}
-	reports, err := inspectAgents(selected, expected, repoRoot, home, cfg)
+	inspected, err := inspectAgents(selected, expected, repoRoot, home, cfg)
 	if err != nil {
 		return err
 	}
+	reports := readableReports(inspected)
 	if opts.ConfirmRemovals {
 		confirmDestructiveSyncActions(reports, setupStreams(opts))
 	}
@@ -138,7 +142,7 @@ func runSync(opts runOptions) error {
 	restoreSyncActions(reports, preflight)
 
 	printReport("sync", repoRoot, repoReport, reports, home, cfg)
-	return nil
+	return agentFailures(reports)
 }
 
 func applyAgentRootInstructionSync(reports []agentReport) error {

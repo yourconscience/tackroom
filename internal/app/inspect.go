@@ -159,25 +159,49 @@ func inspectAgents(selected []agentConfig, expected map[string]string, repoRoot 
 	reports := make([]agentReport, 0, len(selected))
 	agentsSkillRoot := filepath.Join(repoRoot, "skills")
 	for _, agent := range selected {
-		if !isDetected(agent) {
-			report, err := inspectAgent(agent, expected, repoRoot, agentsSkillRoot, cfg, home)
-			if err != nil {
-				return nil, err
-			}
-			reports = append(reports, report)
-			continue
+		agentExpected := expected
+		var err error
+		if isDetected(agent) {
+			agentExpected, err = expectedSkillsForAgent(expected, home, cfg, agent.Name)
 		}
-		agentExpected, err := expectedSkillsForAgent(expected, home, cfg, agent.Name)
-		if err != nil {
-			return nil, err
+		report := agentReport{}
+		if err == nil {
+			report, err = inspectAgent(agent, agentExpected, repoRoot, agentsSkillRoot, cfg, home)
 		}
-		report, err := inspectAgent(agent, agentExpected, repoRoot, agentsSkillRoot, cfg, home)
+		// One unreadable native config (a hand-edited YAML, say) must not hide
+		// every other agent: record the failure on that agent and keep going.
 		if err != nil {
-			return nil, err
+			report = agentReport{Name: agent.Name, SkillRoot: agent.SkillRoot, AgentRoot: agent.AgentRoot, Detected: true, Error: err.Error()}
 		}
 		reports = append(reports, report)
 	}
 	return reports, nil
+}
+
+// readableReports drops agents whose native config could not be read, so the
+// sync steps only touch agents tackroom fully understands.
+func readableReports(reports []agentReport) []agentReport {
+	readable := make([]agentReport, 0, len(reports))
+	for _, report := range reports {
+		if report.Error == "" {
+			readable = append(readable, report)
+		}
+	}
+	return readable
+}
+
+// agentFailures folds every unreadable agent into one error, or returns nil.
+func agentFailures(reports []agentReport) error {
+	var failed []string
+	for _, report := range reports {
+		if report.Error != "" {
+			failed = append(failed, report.Name+": "+report.Error)
+		}
+	}
+	if len(failed) == 0 {
+		return nil
+	}
+	return fmt.Errorf("could not read the config of %d agent(s), left them unchanged: %s", len(failed), strings.Join(failed, "; "))
 }
 
 func inspectAgent(agent agentConfig, expected map[string]string, repoRoot string, agentsSkillRoot string, cfg config, home string) (agentReport, error) {
