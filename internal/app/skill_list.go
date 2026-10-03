@@ -189,6 +189,9 @@ func runSkillList(args []string) error {
 	if err != nil {
 		return err
 	}
+	if err := agentFailures(reports); err != nil {
+		return err
+	}
 	origins, err := skillOrigins(cfg, repoRoot, home, expected)
 	if err != nil {
 		return err
@@ -286,6 +289,9 @@ func runSkillInfo(args []string) error {
 
 	reports, err := inspectAgents(selected, single, repoRoot, home, cfg)
 	if err != nil {
+		return err
+	}
+	if err := agentFailures(reports); err != nil {
 		return err
 	}
 	for _, report := range reports {

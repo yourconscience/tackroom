@@ -40,6 +40,12 @@ func printReport(mode string, repoRoot string, repoReport repoLinkReport, report
 
 	for _, report := range reports {
 		fmt.Printf("%s\n", report.Name)
+		if report.Error != "" {
+			fmt.Printf("  error: %s\n", report.Error)
+			fmt.Println("  left unchanged; fix the file and run tackroom sync again")
+			fmt.Println()
+			continue
+		}
 		if !report.Detected {
 			fmt.Println("  not detected (binary not on PATH)")
 			fmt.Println()
@@ -293,11 +299,14 @@ func printStatusReport(repoRoot string, repoReport repoLinkReport, reports []age
 		}
 	}
 
-	var drifted []string
+	var drifted, failed []string
 	for _, report := range reports {
 		fmt.Println()
 		printHarnessStatus(p, report, repoRoot, home, cfg, verbose)
-		if report.Detected && !report.Synced {
+		switch {
+		case report.Error != "":
+			failed = append(failed, report.Name)
+		case report.Detected && !report.Synced:
 			drifted = append(drifted, report.Name)
 		}
 	}
@@ -319,8 +328,14 @@ func printStatusReport(repoRoot string, repoReport repoLinkReport, reports []age
 	}
 
 	fmt.Println()
-	if len(drifted) == 0 && repoReport.State == stateSynced {
+	if len(failed) > 0 {
+		fmt.Printf("%s %s (config could not be read; fix it, then run %s)\n", p.red("failed:"), strings.Join(failed, ", "), p.bold("tackroom sync"))
+	}
+	if len(drifted) == 0 && len(failed) == 0 && repoReport.State == stateSynced {
 		fmt.Println(p.green("Everything is synced."))
+		return
+	}
+	if len(drifted) == 0 && repoReport.State == stateSynced {
 		return
 	}
 	if repoReport.State != stateSynced {
@@ -345,6 +360,11 @@ func checkMarkKind(status string) string {
 }
 
 func printHarnessStatus(p palette, report agentReport, repoRoot string, home string, cfg config, verbose bool) {
+	if report.Error != "" {
+		fmt.Printf("%s   %s %s\n", p.bold(report.Name), p.mark("fail"), p.red("config unreadable"))
+		fmt.Printf("  error       %s\n", report.Error)
+		return
+	}
 	if !report.Detected {
 		fmt.Printf("%s   %s\n", p.bold(report.Name), p.dim("not detected (binary not on PATH)"))
 		return

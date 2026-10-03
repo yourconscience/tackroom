@@ -424,6 +424,10 @@ type syncPlan struct {
 func summarizeSyncPlan(reports []agentReport) []string {
 	var lines []string
 	for _, report := range reports {
+		if report.Error != "" {
+			lines = append(lines, report.Name+": config unreadable, skipped ("+report.Error+")")
+			continue
+		}
 		if !report.Detected {
 			lines = append(lines, report.Name+": not installed, skipped")
 			continue

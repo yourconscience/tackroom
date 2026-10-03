@@ -32,3 +32,10 @@ func TestSummarizeSyncPlanNeverCallsUnsyncedAgentUpToDate(t *testing.T) {
 		t.Fatalf("unsynced agent rendered as up to date: %q", got)
 	}
 }
+
+func TestSummarizeSyncPlanNamesUnreadableAgents(t *testing.T) {
+	got := summarizeSyncPlan([]agentReport{{Name: "hermes", Detected: true, Error: "parse ~/.hermes/config.yaml: yaml: line 4"}})
+	if len(got) != 1 || !strings.HasPrefix(got[0], "hermes: config unreadable, skipped (parse ~/.hermes/config.yaml") {
+		t.Fatalf("summary = %q", got)
+	}
+}
