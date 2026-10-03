@@ -139,11 +139,15 @@ That path copies editable files (the "fork" model); tackroom users get the symli
 
 ### Canonical config authoring
 
-`tackroom view` (browser web UI) edits the resolved canonical YAML through a
-review-first flow. Shared and `tackroom.local.yaml` are separate editable
-layers; the effective view is read-only. Structured edits preserve comments and
-unknown fields, and a save never runs `sync` implicitly. `tackroom config`
-validates or prints the result.
+`tackroom view` opens a local dashboard over the canonical config. It shows
+every agent's sync state, a skills × agents and roles × agents matrix of what is
+on disk, editable MCP server and hook targeting per agent, and the items in agent
+folders that tackroom does not manage. The Config view edits the YAML directly:
+Shared and `tackroom.local.yaml` are separate editable layers, and the effective
+merge is read-only. Structured edits preserve comments and unknown fields, and a
+save never runs `sync` implicitly. Sync opens a per-agent plan, and each
+destructive item has to be ticked before it applies. `tackroom config` validates
+or prints the result.
 
 ```bash
 tackroom view --no-open --addr 127.0.0.1:8765   # loopback web UI, print the URL

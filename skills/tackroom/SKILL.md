@@ -34,8 +34,10 @@ tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]
 tackroom mcp <list|add|import|remove> [options]
 ```
 
-`view` (browser web UI) is the canonical authoring surface. It edits shared YAML
-or the machine-local overlay; effective configuration is read-only. Each toggle
+`view` (browser web UI) is the canonical authoring surface: a dashboard with
+per-agent sync state, skill and role matrices, MCP and hook targeting per agent,
+unmanaged items in agent folders, and a YAML editor. It edits shared YAML or the
+machine-local overlay; effective configuration is read-only. Each toggle
 applies immediately, and `view` never runs `sync` implicitly. It binds only to
 loopback and uses a session cookie plus CSRF and origin protection. `config`
 validates or prints the result. HarnessKit (`hk serve`) and AgentsView
@@ -163,7 +165,7 @@ tackroom doctor --e2e
 
 ## view
 
-Opens the canonical config UI in your browser: the review-first authoring surface, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no HarnessKit, Node, or separate daemon). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
+Opens the canonical config UI in your browser: the review-first authoring surface, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no HarnessKit, Node, or separate daemon). Views: Overview (agent cards with sync state, counts and estimated skill-listing tokens), Skills and Roles (matrices of what is on disk per agent), MCP & hooks (toggle an entry or the agents it targets), Unmanaged (foreign skills, conflicts, stale links with the next command), and Config (edit, check and save the YAML). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step in which every destructive item must be ticked. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
 
 It prints the tokenized URL on its own line and, when running locally, opens it in your default browser. `--no-open` suppresses the browser launch. `--addr` sets the loopback bind (default `127.0.0.1:8765`). `--secure-cookie` marks the session cookie `Secure` for HTTPS loopback access (e.g. behind a Tailscale HTTPS proxy). On a remote host, pass `--ssh-host user@host` (or run inside an SSH session, where it derives the host from `SSH_CONNECTION`) to print a ready `ssh -L` tunnel command instead of auto-opening.
 
