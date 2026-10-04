@@ -87,4 +87,4 @@ tackroom setup --memory memsearch
 
 ## Root instructions
 
-`~/.agents/AGENTS.md` is your single root instruction file. During sync, tackroom links it into each harness's native memory path — `~/.config/amp/AGENTS.md` for Amp, `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex, `~/.factory/AGENTS.md` for Droid, and `~/.qwen/QWEN.md` for Qwen Code — so an edit in one place reaches every agent. `tackroom status` reports drift, and a file that exists but is not a symlink is never touched without your confirmation.
+`~/.agents/AGENTS.md` is your single root instruction file. During sync, tackroom links it into each harness's native memory path — `~/.config/amp/AGENTS.md` for Amp, `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex, `~/.factory/AGENTS.md` for Droid, `~/.qwen/QWEN.md` for Qwen Code, `~/.copilot/copilot-instructions.md` for GitHub Copilot CLI, and `~/.grok/AGENTS.md` for Grok Build (Cursor has no global instructions file) — so an edit in one place reaches every agent. `tackroom status` reports drift, and a file that exists but is not a symlink is never touched without your confirmation.

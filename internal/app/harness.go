@@ -219,7 +219,7 @@ func initHarnesses() {
 
 		agentOpenCode: {
 			Skills:           skillsSymlink,
-			SkillsNativeRoot: openCodeReadsAgentsSkills,
+			SkillsNativeRoot: readsAgentsSkillsRoot,
 			MCP: mcpTargetPtr(mcpTarget{
 				agentName:  agentOpenCode,
 				configPath: openCodeConfigPath,
@@ -293,6 +293,74 @@ func initHarnesses() {
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 			},
 			IntegrationNote: "config-driven via ~/.qwen/settings.json -> skills.directories",
+		},
+
+		agentCursor: {
+			Skills:           skillsSymlink,
+			SkillsNativeRoot: readsAgentsSkillsRoot,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentCursor,
+				configPath: func(home string) string { return filepath.Join(home, ".cursor", "mcp.json") },
+				inspect:    inspectJSONMCPServer,
+				patch:      patchJSONMCPServer,
+				read:       readJSONMCPServer,
+				rootKey:    "mcpServers",
+			}),
+			roles: roleRenderer(agentCursor),
+			Hooks: &hookTarget{
+				agentName: agentCursor,
+				inspect:   inspectCursorHook,
+				patch:     patchCursorHook,
+			},
+			IntegrationNote: "skills read natively from ~/.agents/skills; if Cursor's third-party configs are on, Claude Code hooks also run there",
+		},
+
+		agentCopilot: {
+			Skills:           skillsSymlink,
+			SkillsNativeRoot: readsAgentsSkillsRoot,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentCopilot,
+				configPath: copilotMCPConfigPath,
+				inspect:    inspectJSONMCPServer,
+				patch:      patchCopilotMCPServer,
+				read:       readJSONMCPServer,
+				rootKey:    "mcpServers",
+				defaults:   map[string]interface{}{"type": "local"},
+			}),
+			roles: roleRenderer(agentCopilot),
+			Hooks: &hookTarget{
+				agentName: agentCopilot,
+				inspect:   inspectCopilotHook,
+				patch:     patchCopilotHook,
+			},
+			RootInstructions: &rootInstructionsCapability{
+				Path:     func(home string) string { return filepath.Join(copilotHome(home), "copilot-instructions.md") },
+				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
+			},
+			IntegrationNote: "skills read natively from ~/.agents/skills",
+		},
+
+		agentGrok: {
+			Skills:           skillsSymlink,
+			SkillsNativeRoot: readsAgentsSkillsRoot,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentGrok,
+				configPath: func(home string) string { return filepath.Join(grokHome(home), "config.toml") },
+				inspect:    inspectCodexMCPServer,
+				patch:      patchCodexMCPServer,
+				read:       readCodexMCPServer,
+			}),
+			roles: roleRenderer(agentGrok),
+			Hooks: &hookTarget{
+				agentName: agentGrok,
+				inspect:   inspectGrokHook,
+				patch:     patchGrokHook,
+			},
+			RootInstructions: &rootInstructionsCapability{
+				Path:     func(home string) string { return filepath.Join(grokHome(home), "AGENTS.md") },
+				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
+			},
+			IntegrationNote: "skills read natively from ~/.agents/skills; Grok also reads Claude Code's skills, roles, hooks and MCP and dedups them by name",
 		},
 	}
 }

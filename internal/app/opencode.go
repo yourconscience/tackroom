@@ -25,12 +25,12 @@ func openCodeConfigPath(home string) string {
 	return filepath.Join(openCodeConfigDir(home), "opencode.json")
 }
 
-// openCodeReadsAgentsSkills reports whether OpenCode already reads tackroom
-// skills directly from the config root. OpenCode natively loads
-// ~/.agents/skills, so when the tackroom config root IS ~/.agents there is no
-// need to mirror skills into ~/.config/opencode/skills (doing so would
-// double-list every skill).
-func openCodeReadsAgentsSkills(repoRoot string, home string) bool {
+// readsAgentsSkillsRoot reports whether a harness that natively loads
+// ~/.agents/skills (OpenCode, Cursor, Copilot CLI, Grok Build) already reads
+// tackroom skills from the config root. When the config root IS ~/.agents
+// there is no need to mirror skills into the harness's own skill root (doing
+// so would double-list every skill).
+func readsAgentsSkillsRoot(repoRoot string, home string) bool {
 	agentsRoot := filepath.Join(home, ".agents")
 	if filepath.Clean(repoRoot) == filepath.Clean(agentsRoot) {
 		return true

@@ -26,6 +26,9 @@ const (
 	agentPi                 = "pi"
 	agentOMP                = "omp"
 	agentQwenCode           = "qwen-code"
+	agentCursor             = "cursor"
+	agentCopilot            = "copilot"
+	agentGrok               = "grok"
 	tackroomSkillsPathValue = "~/.agents/skills"
 )
 
