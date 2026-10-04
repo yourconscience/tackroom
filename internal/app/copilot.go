@@ -5,9 +5,15 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
+// copilotHome resolves Copilot CLI's config directory, honoring $COPILOT_HOME
+// when set (per the CLI config directory reference).
 func copilotHome(home string) string {
+	if env := strings.TrimSpace(os.Getenv("COPILOT_HOME")); env != "" {
+		return env
+	}
 	return filepath.Join(home, ".copilot")
 }
 

@@ -1,8 +1,17 @@
 package app
 
-import "path/filepath"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
 
+// grokHome resolves Grok Build's config directory, honoring $GROK_HOME when set
+// (per the Grok Build README).
 func grokHome(home string) string {
+	if env := strings.TrimSpace(os.Getenv("GROK_HOME")); env != "" {
+		return env
+	}
 	return filepath.Join(home, ".grok")
 }
 

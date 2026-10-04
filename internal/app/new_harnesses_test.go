@@ -91,6 +91,8 @@ func TestNewHarnessesSyncEndToEnd(t *testing.T) {
 		t.Run(probe.name, func(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
+			t.Setenv("COPILOT_HOME", "")
+			t.Setenv("GROK_HOME", "")
 			var c newHarnessCase
 			for _, candidate := range newHarnessCases(home) {
 				if candidate.name == probe.name {
@@ -175,6 +177,8 @@ func TestNewHarnessesMirrorSkillsForOtherConfigRoots(t *testing.T) {
 		t.Run(probe.name, func(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
+			t.Setenv("COPILOT_HOME", "")
+			t.Setenv("GROK_HOME", "")
 			var c newHarnessCase
 			for _, candidate := range newHarnessCases(home) {
 				if candidate.name == probe.name {
@@ -192,6 +196,40 @@ func TestNewHarnessesMirrorSkillsForOtherConfigRoots(t *testing.T) {
 				t.Fatalf("%s needs a skill mirror when the config root is not ~/.agents: %v", c.name, err)
 			}
 		})
+	}
+}
+
+func TestCopilotAndGrokHonorHomeOverrides(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	copilotDir := filepath.Join(home, "copilot-elsewhere")
+	grokDir := filepath.Join(home, "grok-elsewhere")
+	t.Setenv("COPILOT_HOME", copilotDir)
+	t.Setenv("GROK_HOME", grokDir)
+	for _, c := range newHarnessCases(home)[1:] {
+		fakePath(t, c.detect)
+		repoRoot := filepath.Join(home, ".agents")
+		writeNewHarnessRoot(t, repoRoot, c)
+		if err := runSync(runOptions{ConfigPath: filepath.Join(repoRoot, "tackroom.yaml"), Agents: c.name}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, path := range []string{
+		filepath.Join(copilotDir, "mcp-config.json"),
+		filepath.Join(copilotDir, "hooks", "tackroom.json"),
+		filepath.Join(copilotDir, "copilot-instructions.md"),
+		filepath.Join(grokDir, "config.toml"),
+		filepath.Join(grokDir, "hooks", "tackroom.json"),
+		filepath.Join(grokDir, "AGENTS.md"),
+	} {
+		if _, err := os.Lstat(path); err != nil {
+			t.Errorf("expected %s: %v", path, err)
+		}
+	}
+	for _, dir := range []string{".copilot/hooks", ".grok/hooks"} {
+		if _, err := os.Stat(filepath.Join(home, dir)); !os.IsNotExist(err) {
+			t.Errorf("nothing should be written under ~/%s when the home override is set (%v)", dir, err)
+		}
 	}
 }
 

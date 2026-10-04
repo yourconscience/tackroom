@@ -49,6 +49,8 @@ Event mapping:
 - Shipped as specified. `readsAgentsSkillsRoot` (renamed from `openCodeReadsAgentsSkills`) now serves OpenCode, Cursor, Copilot CLI and Grok Build.
 - Copilot MCP entries get `tools: ["*"]` only when missing, in a small patch wrapper; putting a slice in the target `defaults` would panic in `validateNativeDefaults`, which compares with `!=`.
 - `hook list` reads every `*.json` file in `~/.copilot/hooks/` and `~/.grok/hooks/`, not only `tackroom.json`. Copilot's inline `hooks` in `settings.json` (JSONC) are not listed. The flat hook remover now writes JSON for `.json` files instead of YAML.
+- `$COPILOT_HOME` and `$GROK_HOME` relocate the MCP, hook and root-instruction paths (Codex review). Role and skill roots still come from `agent_root`/`skill_root` in `tackroom.yaml`; Grok also keeps reading legacy `~/.grok/agents` when `GROK_HOME` points elsewhere.
+- Codex review comments not taken, checked against Grok Build source: role `tools` keep Claude names, because the agent builder resolves every `tools:` allowlist entry through `claude_alias.rs` (`xai-grok-agent/src/tool_list.rs`); `effort: minimal` stays dropped, because agent frontmatter parses into the `Effort` enum (`low`..`max`), and `minimal` exists only on the `--effort` CLI flag.
 - The landing page adds GitHub Copilot and Grok marks from lobe-icons 1.95.1 (MIT, already credited) and marks Cursor as supported.
 - Real-binary checks:
   - Cursor `cursor-agent` 2026.10.01 on m1 in a temp `HOME`: tackroom sync wrote `~/.cursor/{mcp.json,hooks.json,agents/reviewer.md}`; `cursor-agent mcp list` showed `local: not loaded (needs approval)`. It ran from a herdr pane, because over SSH `cursor-agent` refuses to start with a locked login keychain.
