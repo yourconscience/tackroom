@@ -68,7 +68,7 @@ func TestMarkIdenticalSingleSource(t *testing.T) {
 func TestMarkIdenticalMatching(t *testing.T) {
 	item := &detectedItem{
 		Sources: []detectedSource{
-			{Harness: "claude-code", Hash: "abc123"},
+			{Harness: "claude", Hash: "abc123"},
 			{Harness: "codex", Hash: "abc123"},
 		},
 	}
@@ -81,7 +81,7 @@ func TestMarkIdenticalMatching(t *testing.T) {
 func TestMarkIdenticalDiffering(t *testing.T) {
 	item := &detectedItem{
 		Sources: []detectedSource{
-			{Harness: "claude-code", Hash: "abc123"},
+			{Harness: "claude", Hash: "abc123"},
 			{Harness: "codex", Hash: "def456"},
 		},
 	}
@@ -116,7 +116,7 @@ func TestDetectNativeSkillsSkipsSymlinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	agent := agentConfig{Name: "claude-code"}
+	agent := agentConfig{Name: "claude"}
 	found, err := detectNativeSkills(agent, harnessSkills, canonicalSkills)
 	if err != nil {
 		t.Fatal(err)
@@ -169,7 +169,7 @@ func TestRunDetectionAutoResolvesIdentical(t *testing.T) {
 
 	cfg := config{Version: 1}
 	detected := []agentConfig{
-		{Name: "claude-code", Enabled: true, SkillRoot: harness1Skills},
+		{Name: "claude", Enabled: true, SkillRoot: harness1Skills},
 		{Name: "codex", Enabled: true, SkillRoot: harness2Skills},
 	}
 

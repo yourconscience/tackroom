@@ -116,10 +116,10 @@ func initHarnesses() {
 			TrailerExample:  "Co-authored-by: amp[bot] <amp[bot]@users.noreply.github.com>",
 		},
 
-		"claude-code": {
+		agentClaudeCode: {
 			Skills: skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
-				agentName:  "claude-code",
+				agentName:  agentClaudeCode,
 				configPath: func(home string) string { return filepath.Join(home, ".claude.json") },
 				inspect:    inspectJSONMCPServer,
 				patch:      patchJSONMCPServer,
@@ -127,9 +127,9 @@ func initHarnesses() {
 				rootKey:    "mcpServers",
 				defaults:   map[string]interface{}{"type": "stdio"},
 			}),
-			roles: roleRenderer("claude-code"),
+			roles: roleRenderer(agentClaudeCode),
 			Hooks: &hookTarget{
-				agentName: "claude-code",
+				agentName: agentClaudeCode,
 				inspect:   inspectClaudeHook,
 				patch:     patchClaudeHook,
 			},

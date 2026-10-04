@@ -56,7 +56,7 @@ func TestCoexistenceWarnsOnCCSwitchSkillLinksInAgentRoots(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := checkAgentManagerCoexistence(repoRoot, home, cfg)
-	if got.status != checkStatusWarn || !strings.Contains(got.detail, "claude-code: pdf-tools") {
+	if got.status != checkStatusWarn || !strings.Contains(got.detail, "claude: pdf-tools") {
 		t.Fatalf("got %+v", got)
 	}
 }

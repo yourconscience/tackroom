@@ -13,7 +13,7 @@ func TestLoadConfigWithLocalOverlay(t *testing.T) {
 	base := `version: 1
 context_note_tokens: 8000
 agents:
-  - name: claude-code
+  - name: claude
     enabled: true
     skill_root: ~/.claude/skills
   - name: codex
@@ -79,7 +79,7 @@ func TestLoadConfigWithoutLocalOverlay(t *testing.T) {
 	home := t.TempDir()
 	base := `version: 1
 agents:
-  - name: claude-code
+  - name: claude
     enabled: true
     skill_root: ~/.claude/skills
 `
@@ -100,7 +100,7 @@ func TestLoadConfigWithInvalidLocalOverlay(t *testing.T) {
 	home := t.TempDir()
 	base := `version: 1
 agents:
-  - name: claude-code
+  - name: claude
     enabled: true
     skill_root: ~/.claude/skills
 `

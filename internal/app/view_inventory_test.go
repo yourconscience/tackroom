@@ -13,7 +13,7 @@ import (
 func inventoryFixtureConfig() config {
 	return config{
 		Agents: []agentConfig{
-			{Name: "claude-code", Enabled: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents"},
+			{Name: "claude", Enabled: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents"},
 			{Name: "pi", Enabled: true, SkillRoot: "/h/.pi/agent/skills"},
 			{Name: "droid", Enabled: true, SkillRoot: "/h/.factory/skills"},
 			{Name: "hermes", Enabled: true, SkillRoot: "/h/.hermes/skills"},
@@ -21,7 +21,7 @@ func inventoryFixtureConfig() config {
 		},
 		MCPServers: []mcpServerConfig{
 			{Name: "everywhere", Enabled: true, Command: "a"},
-			{Name: "claude-only", Enabled: true, Command: "b", Agents: []string{"claude-code"}},
+			{Name: "claude-only", Enabled: true, Command: "b", Agents: []string{"claude"}},
 			{Name: "parked", Enabled: false, Command: "c"},
 		},
 		Hooks: []hookConfig{{Name: "on-stop", Enabled: true, Event: "Stop", Command: "d"}},
@@ -31,7 +31,7 @@ func inventoryFixtureConfig() config {
 func inventoryFixtureReports() []agentReport {
 	return []agentReport{
 		{
-			Name: "claude-code", Detected: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents",
+			Name: "claude", Detected: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents",
 			ExpectedSkills: map[string]string{"alpha": "/r/skills/alpha", "beta": "/r/skills/beta", "gamma": "/r/skills/gamma", "delta": "/r/skills/delta"},
 			Managed:        []string{"alpha"},
 			Drifted:        []string{"beta"},
@@ -72,10 +72,10 @@ func TestAssembleInventoryMapsSkillAndRoleStates(t *testing.T) {
 	}
 	claude := inv.Agents[0]
 	if !claude.Inspected || claude.Pending != 2 || claude.Counts["drifted"] != 1 || claude.Counts["missing"] != 1 || claude.Counts["unmanaged"] != 2 {
-		t.Fatalf("claude-code agent = %+v", claude)
+		t.Fatalf("claude agent = %+v", claude)
 	}
 	if !claude.SupportsMCP || !claude.SupportsHooks || !claude.SupportsRoles {
-		t.Fatalf("claude-code supports = %+v", claude)
+		t.Fatalf("claude supports = %+v", claude)
 	}
 	if codex := inv.Agents[4]; codex.Enabled || codex.Inspected {
 		t.Fatalf("disabled codex should be listed but not inspected: %+v", codex)
@@ -86,10 +86,10 @@ func TestAssembleInventoryMapsSkillAndRoleStates(t *testing.T) {
 		states[skill.Name] = skill.States
 	}
 	want := map[string]map[string]string{
-		"alpha": {"claude-code": cellOK, "pi": cellOK, "droid": cellAbsent, "hermes": cellError},
-		"beta":  {"claude-code": cellDrift},
-		"gamma": {"claude-code": cellMissing},
-		"delta": {"claude-code": cellConflict},
+		"alpha": {"claude": cellOK, "pi": cellOK, "droid": cellAbsent, "hermes": cellError},
+		"beta":  {"claude": cellDrift},
+		"gamma": {"claude": cellMissing},
+		"delta": {"claude": cellConflict},
 	}
 	for skill, agents := range want {
 		for agent, state := range agents {
@@ -109,7 +109,7 @@ func TestAssembleInventoryMapsSkillAndRoleStates(t *testing.T) {
 	for _, role := range inv.Roles {
 		roles[role.Name] = role.States
 	}
-	if roles["builder"]["claude-code"] != cellOK || roles["reviewer"]["claude-code"] != cellMissing || roles["builder"]["pi"] != cellUnsupported {
+	if roles["builder"]["claude"] != cellOK || roles["reviewer"]["claude"] != cellMissing || roles["builder"]["pi"] != cellUnsupported {
 		t.Errorf("roles = %+v", roles)
 	}
 }
@@ -121,11 +121,11 @@ func TestAssembleInventoryWiring(t *testing.T) {
 		mcp[row.Name] = row
 	}
 	cases := []struct{ server, agent, want string }{
-		{"everywhere", "claude-code", cellOK},
+		{"everywhere", "claude", cellOK},
 		{"everywhere", "pi", cellDrift},
-		{"claude-only", "claude-code", cellMissing},
+		{"claude-only", "claude", cellMissing},
 		{"claude-only", "pi", cellOff},
-		{"parked", "claude-code", cellDisabled},
+		{"parked", "claude", cellDisabled},
 		{"everywhere", "droid", cellAbsent},
 	}
 	for _, c := range cases {
@@ -137,7 +137,7 @@ func TestAssembleInventoryWiring(t *testing.T) {
 		t.Errorf("explicit flags wrong: %+v", mcp)
 	}
 	hook := inv.Hooks[0]
-	if hook.States["claude-code"] != cellOK || hook.States["pi"] != cellUnsupported || hook.Event != "Stop" {
+	if hook.States["claude"] != cellOK || hook.States["pi"] != cellUnsupported || hook.Event != "Stop" {
 		t.Errorf("hook = %+v", hook)
 	}
 
@@ -162,10 +162,10 @@ func TestAssembleInventoryGroupsUnmanaged(t *testing.T) {
 			foreign = &inv.Unmanaged[i]
 		}
 	}
-	if foreign == nil || strings.Join(foreign.Agents, ",") != "claude-code,pi" {
+	if foreign == nil || strings.Join(foreign.Agents, ",") != "claude,pi" {
 		t.Fatalf("foreign skill should be one row across agents: %+v", inv.Unmanaged)
 	}
-	if !strings.HasPrefix(foreign.Hint, "tackroom skill promote ") || foreign.Detail != "claude-code:foreign-skill" {
+	if !strings.HasPrefix(foreign.Hint, "tackroom skill promote ") || foreign.Detail != "claude:foreign-skill" {
 		t.Errorf("foreign row = %+v", foreign)
 	}
 	for _, item := range inv.Unmanaged {
@@ -195,7 +195,7 @@ func TestConfigWebInventoryEndpoint(t *testing.T) {
 	}
 	path := filepath.Join(root, "tackroom.yaml")
 	writeConfig := func(enabled bool) {
-		data := "version: 1\nagents:\n  - name: claude-code\n    enabled: " + map[bool]string{true: "true", false: "false"}[enabled] + "\n    skill_root: ~/.claude/skills\n"
+		data := "version: 1\nagents:\n  - name: claude\n    enabled: " + map[bool]string{true: "true", false: "false"}[enabled] + "\n    skill_root: ~/.claude/skills\n"
 		if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
 			t.Fatal(err)
 		}
@@ -231,7 +231,7 @@ func TestConfigWebInventoryEndpoint(t *testing.T) {
 	if len(inv.Skills) != 1 || inv.Skills[0].Description != "Alpha checks the inventory." || inv.Skills[0].Origin != "local" {
 		t.Fatalf("skills = %+v", inv.Skills)
 	}
-	if inv.Skills[0].States["claude-code"] != cellMissing || inv.Revision == "" {
+	if inv.Skills[0].States["claude"] != cellMissing || inv.Revision == "" {
 		t.Fatalf("expected an unsynced skill and a revision: %+v rev=%q", inv.Skills[0], inv.Revision)
 	}
 
@@ -275,7 +275,7 @@ func TestConfigWebIndexReissuesCSRFCookie(t *testing.T) {
 func TestListEditWritesPlainStrings(t *testing.T) {
 	root := t.TempDir()
 	path := filepath.Join(root, "tackroom.yaml")
-	data := "version: 1\nagents:\n  - name: claude-code\n    enabled: true\n    skill_root: ~/.claude/skills\n  - name: codex\n    enabled: true\n    skill_root: ~/.codex/skills\nmcp_servers:\n  - name: tracker\n    enabled: true\n    command: echo\n    args: [x]\n    agents:\n      - claude-code\n"
+	data := "version: 1\nagents:\n  - name: claude\n    enabled: true\n    skill_root: ~/.claude/skills\n  - name: codex\n    enabled: true\n    skill_root: ~/.codex/skills\nmcp_servers:\n  - name: tracker\n    enabled: true\n    command: echo\n    args: [x]\n    agents:\n      - claude\n"
 	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -283,7 +283,7 @@ func TestListEditWritesPlainStrings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	targets, _ := json.Marshal([]string{"claude-code", "codex"})
+	targets, _ := json.Marshal([]string{"claude", "codex"})
 	args, _ := json.Marshal([]string{"true"})
 	saved, err := doc.applyOperations(configLayerShared, doc.revision(configLayerShared), []configOperation{
 		{Path: "/mcp_servers/tracker/agents", Op: "set", Value: targets},
@@ -293,7 +293,7 @@ func TestListEditWritesPlainStrings(t *testing.T) {
 		t.Fatal(err)
 	}
 	after := string(saved.After)
-	if !strings.Contains(after, "      - claude-code\n      - codex\n") {
+	if !strings.Contains(after, "      - claude\n      - codex\n") {
 		t.Fatalf("list items should be written unquoted:\n%s", after)
 	}
 	if !strings.Contains(after, `"true"`) {
@@ -302,10 +302,10 @@ func TestListEditWritesPlainStrings(t *testing.T) {
 }
 
 func TestAssembleInventoryUsesCanonicalRolesAndExactConflicts(t *testing.T) {
-	cfg := config{Agents: []agentConfig{{Name: "pi", Enabled: true, SkillRoot: "/h/.pi/agent/skills"}, {Name: "claude-code", Enabled: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents"}}}
+	cfg := config{Agents: []agentConfig{{Name: "pi", Enabled: true, SkillRoot: "/h/.pi/agent/skills"}, {Name: "claude", Enabled: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents"}}}
 	reports := []agentReport{
 		{Name: "pi", Detected: true, SkillRoot: "/h/.pi/agent/skills", Managed: []string{"foo"}, Conflicts: []string{"/h/.pi/agent/skills/foo-bar is a real directory that differs from canonical"}},
-		{Name: "claude-code", Detected: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents", Conflicts: []string{"agent /h/.claude/agents/builder.md exists but is not tackroom-managed"}},
+		{Name: "claude", Detected: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents", Conflicts: []string{"agent /h/.claude/agents/builder.md exists but is not tackroom-managed"}},
 	}
 	inv := assembleInventory(cfg, reports, map[string]skillMeta{"foo": {}}, []string{"builder", "tester"}, nil)
 	if got := inv.Skills[0].States["pi"]; got != cellOK {
@@ -318,7 +318,7 @@ func TestAssembleInventoryUsesCanonicalRolesAndExactConflicts(t *testing.T) {
 	if len(roles) != 2 || roles["tester"]["pi"] != cellUnsupported {
 		t.Fatalf("canonical roles must show even where unsupported: %+v", roles)
 	}
-	if roles["builder"]["claude-code"] != cellConflict {
-		t.Errorf("unmanaged role file = %q, want conflict", roles["builder"]["claude-code"])
+	if roles["builder"]["claude"] != cellConflict {
+		t.Errorf("unmanaged role file = %q, want conflict", roles["builder"]["claude"])
 	}
 }

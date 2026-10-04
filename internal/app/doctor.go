@@ -18,7 +18,7 @@ import (
 
 const (
 	agentAmp                = "amp"
-	agentClaudeCode         = "claude-code"
+	agentClaudeCode         = "claude"
 	agentCodex              = "codex"
 	agentDroid              = "droid"
 	agentHermes             = "hermes"

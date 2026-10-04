@@ -114,7 +114,7 @@ func TestApplyAgentRootInstructionSyncCreatesMissingLink(t *testing.T) {
 func claudeCodeRootInstructions() *rootInstructionsCapability {
 	h := harnessFor(agentClaudeCode)
 	if h == nil || h.RootInstructions == nil {
-		panic("claude-code harness missing RootInstructions")
+		panic("claude harness missing RootInstructions")
 	}
 	return h.RootInstructions
 }

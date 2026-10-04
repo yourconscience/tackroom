@@ -12,13 +12,13 @@ import (
 
 func testDetection() *detectionResult {
 	return &detectionResult{
-		Harnesses: []string{"claude-code", "codex"},
+		Harnesses: []string{"claude", "codex"},
 		Items: []detectedItem{
 			{
 				Surface: "skill",
 				Name:    "linter",
 				Sources: []detectedSource{
-					{Harness: "claude-code", Path: "/tmp/a", Hash: "h1"},
+					{Harness: "claude", Path: "/tmp/a", Hash: "h1"},
 					{Harness: "codex", Path: "/tmp/b", Hash: "h2"},
 				},
 			},
@@ -34,7 +34,7 @@ func testDetection() *detectionResult {
 				Name:      "shared",
 				Identical: true,
 				Sources: []detectedSource{
-					{Harness: "claude-code", Path: "/tmp/s", Hash: "h4"},
+					{Harness: "claude", Path: "/tmp/s", Hash: "h4"},
 					{Harness: "codex", Path: "/tmp/s2", Hash: "h4"},
 				},
 			},
@@ -190,7 +190,7 @@ func TestShareAllDecisions(t *testing.T) {
 			t.Fatalf("%s should be share, got %s", d.Name, d.Action)
 		}
 	}
-	if decisions[0].Source.Harness != "claude-code" {
+	if decisions[0].Source.Harness != "claude" {
 		t.Fatalf("differing item should pick first source, got %s", decisions[0].Source.Harness)
 	}
 }
@@ -221,7 +221,7 @@ func TestApplyReviewDecisionsSkill(t *testing.T) {
 
 	cfg := config{Version: 1}
 	decisions := []reviewDecision{
-		{Surface: "skill", Name: "linter", Action: actionShare, Source: detectedSource{Harness: "claude-code", Path: srcSkill}},
+		{Surface: "skill", Name: "linter", Action: actionShare, Source: detectedSource{Harness: "claude", Path: srcSkill}},
 		{Surface: "skill", Name: "other", Action: actionSkip, Source: detectedSource{Harness: "codex", Path: filepath.Join(srcRoot, "missing")}},
 	}
 	shared, err := applyReviewDecisions(root, &cfg, decisions, nil, nil, nil)

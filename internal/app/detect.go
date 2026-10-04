@@ -206,7 +206,7 @@ func detectNativeRoles(agent agentConfig, agentRoot string, canonicalAgents stri
 		if isManagedAgentFile(path, data, filepath.Dir(filepath.Dir(canonicalAgents))) {
 			continue
 		}
-		name := normalizeAgentName(strings.TrimSuffix(entry.Name(), h.roles.Extension()))
+		name := strings.ToLower(strings.TrimSpace(strings.TrimSuffix(entry.Name(), h.roles.Extension())))
 		hash := hashBytes(data)
 		out = append(out, detectedEntry{Name: name, Path: path, Hash: hash})
 	}

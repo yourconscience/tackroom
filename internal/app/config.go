@@ -492,6 +492,16 @@ func expandPath(path string, home string) string {
 	}
 }
 
+// legacyAgentNames maps former harness names to their current ones, so older
+// configs and CLI arguments keep working.
+var legacyAgentNames = map[string]string{
+	"claude-code": agentClaudeCode,
+}
+
 func normalizeAgentName(name string) string {
-	return strings.ToLower(strings.TrimSpace(name))
+	name = strings.ToLower(strings.TrimSpace(name))
+	if current, ok := legacyAgentNames[name]; ok {
+		return current
+	}
+	return name
 }
