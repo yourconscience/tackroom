@@ -846,10 +846,24 @@ func operationValue(raw json.RawMessage) (*yaml.Node, error) {
 	if err := yaml.Unmarshal(raw, &node); err != nil {
 		return nil, fmt.Errorf("decode config operation value: %w", err)
 	}
+	out := &node
 	if node.Kind == yaml.DocumentNode && len(node.Content) == 1 {
-		return cloneNodePtr(node.Content[0]), nil
+		out = cloneNodePtr(node.Content[0])
 	}
-	return &node, nil
+	plainStrings(out)
+	return out, nil
+}
+
+// plainStrings drops the double quotes JSON-decoded strings carry, so an edit
+// like `agents: [a, b]` writes `- a` the way a person would. The encoder still
+// quotes any string that would otherwise read back as another type.
+func plainStrings(node *yaml.Node) {
+	if node.Kind == yaml.ScalarNode && node.Tag == "!!str" {
+		node.Style &^= yaml.DoubleQuotedStyle | yaml.SingleQuotedStyle
+	}
+	for _, child := range node.Content {
+		plainStrings(child)
+	}
 }
 
 func unifiedConfigDiff(path string, before, after []byte) string {
