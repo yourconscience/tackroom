@@ -65,7 +65,7 @@ func TestAssembleInventoryMapsSkillAndRoleStates(t *testing.T) {
 		"beta":  {Origin: "owner/repo@abc1234"},
 		"gamma": {}, "delta": {},
 	}
-	inv := assembleInventory(inventoryFixtureConfig(), inventoryFixtureReports(), skills, nil)
+	inv := assembleInventory(inventoryFixtureConfig(), inventoryFixtureReports(), skills, nil, nil)
 
 	if len(inv.Agents) != 5 {
 		t.Fatalf("agents = %d, want every configured agent", len(inv.Agents))
@@ -115,7 +115,7 @@ func TestAssembleInventoryMapsSkillAndRoleStates(t *testing.T) {
 }
 
 func TestAssembleInventoryWiring(t *testing.T) {
-	inv := assembleInventory(inventoryFixtureConfig(), inventoryFixtureReports(), map[string]skillMeta{}, nil)
+	inv := assembleInventory(inventoryFixtureConfig(), inventoryFixtureReports(), map[string]skillMeta{}, nil, nil)
 	mcp := map[string]viewWired{}
 	for _, row := range inv.MCP {
 		mcp[row.Name] = row
@@ -144,7 +144,7 @@ func TestAssembleInventoryWiring(t *testing.T) {
 	custom := assembleInventory(config{
 		Agents:     []agentConfig{{Name: "custom-agent", Enabled: true}},
 		MCPServers: []mcpServerConfig{{Name: "x", Enabled: true}},
-	}, []agentReport{{Name: "custom-agent", Detected: true}}, map[string]skillMeta{}, nil)
+	}, []agentReport{{Name: "custom-agent", Detected: true}}, map[string]skillMeta{}, nil, nil)
 	if got := custom.MCP[0].States["custom-agent"]; got != cellUnsupported {
 		t.Errorf("unknown harness MCP = %q, want unsupported", got)
 	}
@@ -152,7 +152,7 @@ func TestAssembleInventoryWiring(t *testing.T) {
 
 func TestAssembleInventoryGroupsUnmanaged(t *testing.T) {
 	describe := func(report agentReport, name string) string { return report.Name + ":" + name }
-	inv := assembleInventory(inventoryFixtureConfig(), inventoryFixtureReports(), map[string]skillMeta{}, describe)
+	inv := assembleInventory(inventoryFixtureConfig(), inventoryFixtureReports(), map[string]skillMeta{}, nil, describe)
 	var foreign *viewUnmanaged
 	kinds := map[string]int{}
 	for i := range inv.Unmanaged {
@@ -298,5 +298,27 @@ func TestListEditWritesPlainStrings(t *testing.T) {
 	}
 	if !strings.Contains(after, `"true"`) {
 		t.Fatalf("a string that reads as a bool must stay quoted:\n%s", after)
+	}
+}
+
+func TestAssembleInventoryUsesCanonicalRolesAndExactConflicts(t *testing.T) {
+	cfg := config{Agents: []agentConfig{{Name: "pi", Enabled: true, SkillRoot: "/h/.pi/agent/skills"}, {Name: "claude-code", Enabled: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents"}}}
+	reports := []agentReport{
+		{Name: "pi", Detected: true, SkillRoot: "/h/.pi/agent/skills", Managed: []string{"foo"}, Conflicts: []string{"/h/.pi/agent/skills/foo-bar is a real directory that differs from canonical"}},
+		{Name: "claude-code", Detected: true, SkillRoot: "/h/.claude/skills", AgentRoot: "/h/.claude/agents", Conflicts: []string{"agent /h/.claude/agents/builder.md exists but is not tackroom-managed"}},
+	}
+	inv := assembleInventory(cfg, reports, map[string]skillMeta{"foo": {}}, []string{"builder", "tester"}, nil)
+	if got := inv.Skills[0].States["pi"]; got != cellOK {
+		t.Errorf("managed foo next to a foo-bar conflict = %q, want ok", got)
+	}
+	roles := map[string]map[string]string{}
+	for _, role := range inv.Roles {
+		roles[role.Name] = role.States
+	}
+	if len(roles) != 2 || roles["tester"]["pi"] != cellUnsupported {
+		t.Fatalf("canonical roles must show even where unsupported: %+v", roles)
+	}
+	if roles["builder"]["claude-code"] != cellConflict {
+		t.Errorf("unmanaged role file = %q, want conflict", roles["builder"]["claude-code"])
 	}
 }

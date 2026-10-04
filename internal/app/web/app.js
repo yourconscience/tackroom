@@ -151,6 +151,9 @@ async function refresh() {
   store.invError = inv.status === 'rejected' ? inv.reason.message : '';
   store.shared = shared.status === 'fulfilled' ? shared.value : null;
   store.local = local.status === 'fulfilled' ? local.value : null;
+  // Drop the cached Config layer so it reloads with the new revision; an
+  // unsaved draft keeps its base, so saving it reports the conflict instead.
+  if (!store.drafts[store.configLayer]) store.configState = null;
   renderChrome();
   renderView();
 }

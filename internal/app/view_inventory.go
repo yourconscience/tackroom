@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/yourconscience/tackroom/internal/agentrole"
 )
 
 // Cell states the view UI renders. They describe what is on disk for one
@@ -94,7 +96,7 @@ type skillMeta struct {
 // assembleInventory turns inspect reports into the per-agent matrices the view
 // UI renders. It is pure so state mapping can be tested with synthetic reports;
 // describe resolves an unmanaged skill entry's detail line.
-func assembleInventory(cfg config, reports []agentReport, skills map[string]skillMeta, describe func(agent agentReport, name string) string) viewInventory {
+func assembleInventory(cfg config, reports []agentReport, skills map[string]skillMeta, roleNames []string, describe func(agent agentReport, name string) string) viewInventory {
 	byName := make(map[string]agentReport, len(reports))
 	for _, report := range reports {
 		byName[report.Name] = report
@@ -103,7 +105,7 @@ func assembleInventory(cfg config, reports []agentReport, skills map[string]skil
 	var columns []string
 	for _, agent := range cfg.Agents {
 		_, hooks := hookTargetForHarness(agent.Name)
-		view := viewAgent{Name: agent.Name, Enabled: agent.Enabled, SkillRoot: agent.SkillRoot, Counts: map[string]int{}, SupportsMCP: hasMCPSupport(agent.Name), SupportsHooks: hooks, SupportsRoles: agent.AgentRoot != ""}
+		view := viewAgent{Name: agent.Name, Enabled: agent.Enabled, SkillRoot: agent.SkillRoot, Counts: map[string]int{}, SupportsMCP: hasMCPSupport(agent.Name), SupportsHooks: hooks, SupportsRoles: supportsRoles(agent.Name, agent.AgentRoot)}
 		if report, ok := byName[agent.Name]; ok {
 			view.Inspected = true
 			view.Detected = report.Detected
@@ -144,6 +146,9 @@ func assembleInventory(cfg config, reports []agentReport, skills map[string]skil
 	}
 
 	roleSet := map[string]string{}
+	for _, name := range roleNames {
+		roleSet[name] = name
+	}
 	for _, report := range reports {
 		for _, list := range [][]string{report.ManagedAgent, report.DriftedAgent, report.MissingAgent} {
 			for _, name := range list {
@@ -226,10 +231,10 @@ func skillCell(report agentReport, name string) string {
 		return cellDrift
 	case containsString(report.Missing, name):
 		return cellMissing
-	case conflictMentions(report.Conflicts, filepath.Join(report.SkillRoot, name)):
-		return cellConflict
 	case containsString(report.Managed, name):
 		return cellOK
+	case mentionsPath(report.Conflicts, filepath.Join(report.SkillRoot, name), ""):
+		return cellConflict
 	}
 	return cellUnknown
 }
@@ -239,7 +244,7 @@ func roleCell(report agentReport, name string) string {
 		return state
 	}
 	switch {
-	case report.AgentRoot == "":
+	case !supportsRoles(report.Name, report.AgentRoot):
 		return cellUnsupported
 	case containsString(report.DriftedAgent, name):
 		return cellDrift
@@ -247,8 +252,39 @@ func roleCell(report agentReport, name string) string {
 		return cellMissing
 	case containsString(report.ManagedAgent, name):
 		return cellOK
+	case mentionsPath(report.Conflicts, filepath.Join(report.AgentRoot, name), "."):
+		return cellConflict
 	}
 	return cellUnknown
+}
+
+func supportsRoles(agentName, agentRoot string) bool {
+	h := harnessFor(agentName)
+	return agentRoot != "" && h != nil && h.roles != nil
+}
+
+// mentionsPath reports whether a conflict sentence names path itself, not a
+// longer sibling: "/skills/foo" must not match "/skills/foo-bar". A role
+// target may continue with its file extension, passed as suffix.
+func mentionsPath(conflicts []string, path, suffix string) bool {
+	for _, conflict := range conflicts {
+		for rest := conflict; ; {
+			i := strings.Index(rest, path)
+			if i < 0 {
+				break
+			}
+			after := rest[i+len(path):]
+			if after == "" || !isPathChar(after[0]) || (suffix != "" && strings.HasPrefix(after, suffix)) {
+				return true
+			}
+			rest = after
+		}
+	}
+	return false
+}
+
+func isPathChar(c byte) bool {
+	return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '-' || c == '_' || c == '.'
 }
 
 func wiredCell(report agentReport, name string, enabled, supported, targeted bool, managed, drifted, missing, unsupported []string) string {
@@ -365,8 +401,14 @@ func buildViewInventory(doc *configDocument) (viewInventory, error) {
 		}
 		skills[name] = meta
 	}
+	var roleNames []string
+	if roles, roleErr := agentrole.Load(snapshot.repoRoot); roleErr == nil {
+		for _, role := range roles {
+			roleNames = append(roleNames, role.Name)
+		}
+	}
 	home := snapshot.home
-	inv := assembleInventory(cfg, reports, skills, func(report agentReport, name string) string {
+	inv := assembleInventory(cfg, reports, skills, roleNames, func(report agentReport, name string) string {
 		return describeExternalSkillEntry(filepath.Join(report.SkillRoot, name), home)
 	})
 	inv.Revision = snapshot.revision
