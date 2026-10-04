@@ -74,6 +74,8 @@ agents:
 § Qwen Code natively loads Agent Plugins v1 skills and MCP servers; tackroom manages those same surfaces without rewriting the plugin.
 ⁑ Amp's hook and role surfaces use plugin-based models incompatible with tackroom' script-based hooks and per-agent role files.
 
+In `tackroom.yaml` and `--agents`, Claude Code is `claude`. The former name `claude-code` is still accepted; a tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config.
+
 OpenClaw is not currently supported. Native skill discovery from `~/.agents/skills` may work due to OpenClaw's multi-tier skill precedence, but this is unverified and unmanaged. A managed harness entry is planned for a future release. A "yes" above only appears after end-to-end verification.
 
 ## Skills

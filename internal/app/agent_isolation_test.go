@@ -19,7 +19,7 @@ func setupBrokenHermesFixture(t *testing.T) (home string, repoRoot string) {
 	t.Setenv("TACKROOM_HOME", repoRoot)
 	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
 agents:
-  - name: claude-code
+  - name: claude
     enabled: true
     skill_root: ~/.claude/skills
   - name: hermes
@@ -39,7 +39,7 @@ func TestRunSyncContinuesPastBrokenAgentConfig(t *testing.T) {
 		t.Fatalf("sync should fail and name hermes, got err=%v", err)
 	}
 	if _, statErr := os.Lstat(filepath.Join(home, ".claude", "skills", "sample")); statErr != nil {
-		t.Fatalf("claude-code was not synced past the broken Hermes config: %v\n%s", statErr, stdout)
+		t.Fatalf("claude was not synced past the broken Hermes config: %v\n%s", statErr, stdout)
 	}
 	if !strings.Contains(stdout, "config.yaml") {
 		t.Fatalf("sync output should show the Hermes parse error:\n%s", stdout)
@@ -59,8 +59,8 @@ func TestRunStatusReportsBrokenAgentAndOthers(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "hermes") {
 		t.Fatalf("status should fail and name hermes, got err=%v", err)
 	}
-	if !strings.Contains(stdout, "claude-code") || !strings.Contains(stdout, "config.yaml") {
-		t.Fatalf("status should report claude-code and the Hermes parse error:\n%s", stdout)
+	if !strings.Contains(stdout, "claude") || !strings.Contains(stdout, "config.yaml") {
+		t.Fatalf("status should report claude and the Hermes parse error:\n%s", stdout)
 	}
 	if strings.Contains(stdout, "Everything is synced.") {
 		t.Fatalf("status claimed everything is synced with a broken agent:\n%s", stdout)

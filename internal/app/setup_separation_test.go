@@ -143,8 +143,8 @@ func TestDetectDefaultAgentsFromPATH(t *testing.T) {
 	for _, agent := range detected {
 		names = append(names, agent.Name)
 	}
-	if strings.Join(names, ",") != "claude-code,codex" {
-		t.Fatalf("detected agents = %v, want claude-code,codex", names)
+	if strings.Join(names, ",") != "claude,codex" {
+		t.Fatalf("detected agents = %v, want claude,codex", names)
 	}
 }
 
@@ -307,7 +307,7 @@ func TestSetupMemoryOffRemovesNativeBasicHooksPreservingUnrelated(t *testing.T) 
 	configPath := filepath.Join(home, ".agents", "tackroom.yaml")
 	writeSyncTestFile(t, configPath, []byte(`version: 1
 agents:
-  - name: claude-code
+  - name: claude
     enabled: true
     skill_root: ~/.claude/skills
     agent_root: ~/.claude/agents
@@ -317,13 +317,13 @@ hooks:
     event: SessionStart
     command: ~/.agents/memory/hooks/basic-session-start.py
     timeout: 15
-    agents: [claude-code]
+    agents: [claude]
   - name: memory-session-end
     enabled: true
     event: SessionEnd
     command: ~/.agents/memory/hooks/basic-session-end.py
     timeout: 30
-    agents: [claude-code]
+    agents: [claude]
 `))
 	claudeSettings := filepath.Join(home, ".claude", "settings.json")
 	writeSyncTestFile(t, claudeSettings, []byte(`{
@@ -360,7 +360,7 @@ func TestSetupMemoryBasicReplacesNativeMemsearchHooksPreservingUnrelated(t *test
 	configPath := filepath.Join(home, ".agents", "tackroom.yaml")
 	writeSyncTestFile(t, configPath, []byte(`version: 1
 agents:
-  - name: claude-code
+  - name: claude
     enabled: true
     skill_root: ~/.claude/skills
     agent_root: ~/.claude/agents
@@ -370,19 +370,19 @@ hooks:
     event: SessionStart
     command: ~/.agents/memory/hooks/session-start.sh
     timeout: 15
-    agents: [claude-code]
+    agents: [claude]
   - name: memory-stop
     enabled: true
     event: Stop
     command: ~/.agents/memory/hooks/stop.sh
     timeout: 15
-    agents: [claude-code]
+    agents: [claude]
   - name: memory-session-end
     enabled: true
     event: SessionEnd
     command: ~/.agents/memory/hooks/session-end.sh
     timeout: 30
-    agents: [claude-code]
+    agents: [claude]
 `))
 	claudeSettings := filepath.Join(home, ".claude", "settings.json")
 	writeSyncTestFile(t, claudeSettings, []byte(`{
@@ -425,7 +425,7 @@ func TestSetupMemoryBasicUsesCustomRootCommands(t *testing.T) {
 	configPath := filepath.Join(root, "tackroom.yaml")
 	writeSyncTestFile(t, configPath, []byte(`version: 1
 agents:
-  - name: claude-code
+  - name: claude
     enabled: true
     skill_root: ~/.claude/skills
     agent_root: ~/.claude/agents
@@ -678,16 +678,16 @@ func TestValidateConfigPiMCPTargetIsPreserved(t *testing.T) {
 	cfg := config{
 		Agents: []agentConfig{
 			{Name: "pi", Enabled: true, SkillRoot: "~/.pi/agent/skills"},
-			{Name: "claude-code", Enabled: true, SkillRoot: "~/.claude/skills"},
+			{Name: "claude", Enabled: true, SkillRoot: "~/.claude/skills"},
 		},
 		MCPServers: []mcpServerConfig{
-			{Name: "linkedin", Command: "uvx", Agents: []string{"pi", "claude-code"}},
+			{Name: "linkedin", Command: "uvx", Agents: []string{"pi", "claude"}},
 		},
 	}
 	if err := validateConfig(&cfg, "/home/u", false); err != nil {
 		t.Fatalf("Pi MCP target rejected: %v", err)
 	}
-	if !reflect.DeepEqual(cfg.MCPServers[0].Agents, []string{"pi", "claude-code"}) {
+	if !reflect.DeepEqual(cfg.MCPServers[0].Agents, []string{"pi", "claude"}) {
 		t.Fatalf("Pi MCP target changed: %#v", cfg.MCPServers[0].Agents)
 	}
 }

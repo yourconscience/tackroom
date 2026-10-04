@@ -151,7 +151,7 @@ publish_targets:
 ```bash
 tackroom mcp list
 tackroom mcp add local --command uvx --arg pkg@1.2.3 --env KEY=value
-tackroom mcp import claude-code local --agents=codex,hermes,droid,pi,omp
+tackroom mcp import claude local --agents=codex,hermes,droid,pi,omp
 tackroom sync
 tackroom mcp remove local
 ```

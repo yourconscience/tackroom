@@ -484,17 +484,17 @@ Commands:
             <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>setup</figcaption>
 <pre><span class="k">$</span> tackroom setup --dry-run
 needs review:
-  mcp     context7  [claude-code]
-  skill   pr-review  [claude-code]
+  mcp     context7  [claude]
+  skill   pr-review  [claude]
 identical everywhere (would be shared automatically):
-  skill   release-notes  [claude-code codex]
+  skill   release-notes  [claude codex]
 
 <span class="k">$</span> tackroom setup --yes --memory off
 config root: ~/.agents
 
 imported 3 item(s) without prompting (--yes)
 
-claude-code: config already set
+claude: config already set
 codex: config already set
 hermes: config patched (added ~/.agents/skills)
 omp: config already set
@@ -509,7 +509,7 @@ qwen-code: config patched (added ~/.agents/skills)
             <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>sync</figcaption>
 <pre><span class="k">$</span> tackroom sync
 <span class="k">$</span> tackroom status
-claude-code   <span class="g">✓ synced</span>
+claude   <span class="g">✓ synced</span>
   managed     4 skills · 6 agents · 1 mcp · 1 hooks
 codex   <span class="g">✓ synced</span>
   managed     4 skills · 6 agents · 1 mcp · 1 hooks
@@ -574,7 +574,7 @@ Everything is synced.</pre>
       - -y
       - <span class="s">'@upstash/context7-mcp'</span>
     agents:
-      - claude-code
+      - claude
       - codex
       - pi
 <span class="k">hooks:</span>
@@ -584,7 +584,7 @@ Everything is synced.</pre>
     command: ~/.agents/hooks/notify.sh
     timeout: 10
     agents:
-      - claude-code
+      - claude
       - codex</pre>
         </figure>
         <div class="ex-out">

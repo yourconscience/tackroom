@@ -453,7 +453,7 @@ func scanNativeRoles(agent agentConfig, canonicalAgents string) ([]nativeRoleCan
 		if isManagedAgentFile(path, data, filepath.Dir(filepath.Dir(canonicalAgents))) {
 			continue
 		}
-		name := normalizeAgentName(strings.TrimSuffix(entry.Name(), h.roles.Extension()))
+		name := strings.ToLower(strings.TrimSpace(strings.TrimSuffix(entry.Name(), h.roles.Extension())))
 		candidate := nativeRoleCandidate{nativeImportCandidate: nativeImportCandidate{Name: name, Origin: agent.Name, Path: path}, TargetName: name, Data: append([]byte(nil), data...)}
 		switch agent.Name {
 		case agentCodex:

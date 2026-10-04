@@ -120,7 +120,7 @@ func TestContextSkillsForReportUsesExpectedSkills(t *testing.T) {
 
 func TestContextNoteLines(t *testing.T) {
 	costs := []harnessContextCost{
-		{Name: "claude-code", Skills: 40, Bytes: 40000, Tokens: 10000},
+		{Name: "claude", Skills: 40, Bytes: 40000, Tokens: 10000},
 		{Name: "codex", Skills: 5, Bytes: 4000, Tokens: 1000},
 	}
 	tests := []struct {
@@ -130,7 +130,7 @@ func TestContextNoteLines(t *testing.T) {
 		wantCount int
 		wantName  string
 	}{
-		{"triggers over threshold", 8000, costs, 1, "claude-code"},
+		{"triggers over threshold", 8000, costs, 1, "claude"},
 		{"not triggered under threshold", 20000, costs, 0, ""},
 		{"disabled zero threshold", 0, costs, 0, ""},
 		{"disabled negative threshold", -1, costs, 0, ""},

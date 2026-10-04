@@ -443,7 +443,7 @@ func TestSaveConfigDocumentExpandsEmptyFlowPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := string(data)
-	if strings.Contains(got, "[{") || !strings.Contains(got, "\n  - name: claude-code\n") {
+	if strings.Contains(got, "[{") || !strings.Contains(got, "\n  - name: claude\n") {
 		t.Fatalf("setup agents should be written as a block list:\n%s", got)
 	}
 }

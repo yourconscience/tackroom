@@ -7,7 +7,7 @@ import (
 
 func TestSummarizeSyncPlanShowsChangesAndBlockers(t *testing.T) {
 	reports := []agentReport{
-		{Name: "claude-code", Detected: true, Synced: true, RootState: stateSynced},
+		{Name: "claude", Detected: true, Synced: true, RootState: stateSynced},
 		{Name: "codex", Detected: true, AddsMCP: []string{"context7"}, AddsHook: []string{"notify-on-stop"}},
 		{Name: "pi", Detected: true, Conflicts: []string{"release-notes"}},
 		{Name: "qwen-code", Detected: true, RootState: stateMissing},
@@ -15,7 +15,7 @@ func TestSummarizeSyncPlanShowsChangesAndBlockers(t *testing.T) {
 	}
 	got := summarizeSyncPlan(reports)
 	want := []string{
-		"claude-code: up to date",
+		"claude: up to date",
 		"codex: add MCP context7, add hook notify-on-stop",
 		"pi: conflict release-notes (not managed by tackroom)",
 		"qwen-code: root instructions missing",

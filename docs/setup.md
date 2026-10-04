@@ -13,9 +13,9 @@ The review screen in step 3 looks like this — `space` cycles share/keep/skip p
 ```
 tackroom setup — review 3 item(s)  (2 identical, shared automatically)
 
-  skill   grilling   claude-code✓ codex✓ droid·   [share]
-  skill   my-notes   claude-code✓ codex· droid✓   [share] (differ) from claude-code
-  role    reviewer   claude-code✓ codex✓ droid✓   [skip]
+  skill   grilling   claude✓      codex✓ droid·   [share]
+  skill   my-notes   claude✓      codex· droid✓   [share] (differ) from claude
+  role    reviewer   claude✓      codex✓ droid✓   [skip]
 
 ↑↓ move  space cycle action  ←→ pick source  a share-all  s skip-all  enter apply  q abort
 ```

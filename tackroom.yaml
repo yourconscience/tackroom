@@ -13,10 +13,10 @@ hooks:
     event: SessionStart
     command: python3 ~/.agents/memory/hooks/basic-session-start.py
     timeout: 15
-    agents: [claude-code]
+    agents: [claude]
   - name: memory-session-end
     enabled: true
     event: SessionEnd
     command: python3 ~/.agents/memory/hooks/basic-session-end.py
     timeout: 30
-    agents: [claude-code]
+    agents: [claude]

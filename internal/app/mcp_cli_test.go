@@ -20,7 +20,7 @@ func writeTestTackroomConfig(t *testing.T, path string) {
 	t.Helper()
 	data := []byte(`version: 1
 agents:
-  - name: claude-code
+  - name: claude
     enabled: true
     skill_root: ~/.claude/skills
   - name: codex
@@ -63,7 +63,7 @@ func TestMCPCLIAddListRemove(t *testing.T) {
 	configPath := filepath.Join(t.TempDir(), "tackroom.yaml")
 	writeTestTackroomConfig(t, configPath)
 
-	if err := runMCP([]string{"add", "local", "--command", mcpTestUVXCommand, "--arg", "pkg@latest", "--env", "SECRET=value", "--agents", "claude-code,droid", "--config", configPath}); err != nil {
+	if err := runMCP([]string{"add", "local", "--command", mcpTestUVXCommand, "--arg", "pkg@latest", "--env", "SECRET=value", "--agents", "claude,droid", "--config", configPath}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -78,7 +78,7 @@ func TestMCPCLIAddListRemove(t *testing.T) {
 	if server.Name != "local" || server.Command != mcpTestUVXCommand || !stringSlicesEqual(server.Args, []string{"pkg@latest"}) {
 		t.Fatalf("unexpected server: %#v", server)
 	}
-	if !stringSlicesEqual(server.Agents, []string{"claude-code", "droid"}) {
+	if !stringSlicesEqual(server.Agents, []string{"claude", "droid"}) {
 		t.Fatalf("agents = %#v", server.Agents)
 	}
 	if server.Env["SECRET"] != "value" {
@@ -122,7 +122,7 @@ func TestMCPCLIImport(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := runMCP([]string{"import", "claude-code", "imported", "--agents", "codex,hermes", "--config", configPath}); err != nil {
+	if err := runMCP([]string{"import", "claude", "imported", "--agents", "codex,hermes", "--config", configPath}); err != nil {
 		t.Fatal(err)
 	}
 	cfg, _, err := loadEditableMCPConfig(configPath)
@@ -173,7 +173,7 @@ env = {
 		t.Fatal(err)
 	}
 
-	if err := runMCP([]string{"import", "codex", "foo", "--agents", "claude-code", "--config", configPath}); err != nil {
+	if err := runMCP([]string{"import", "codex", "foo", "--agents", "claude", "--config", configPath}); err != nil {
 		t.Fatal(err)
 	}
 	cfg, _, err := loadEditableMCPConfig(configPath)
@@ -219,7 +219,7 @@ env = { TOKEN = 'secret', HASH = 'keep#value' }
 		t.Fatal(err)
 	}
 
-	if err := runMCP([]string{"import", "codex", "foo", "--agents", "claude-code", "--config", configPath}); err != nil {
+	if err := runMCP([]string{"import", "codex", "foo", "--agents", "claude", "--config", configPath}); err != nil {
 		t.Fatal(err)
 	}
 	cfg, _, err := loadEditableMCPConfig(configPath)

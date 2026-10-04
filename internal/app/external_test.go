@@ -536,7 +536,7 @@ func TestDoctorRejectsDirectCacheLinkForMaterializedSkill(t *testing.T) {
 	}
 
 	result := checkMaterializedExternalSkills(repoRoot, cfg, home)
-	if result.status != checkStatusFail || !strings.Contains(result.detail, "claude-code/alpha is linked directly from "+externalCacheDir(home)) {
+	if result.status != checkStatusFail || !strings.Contains(result.detail, "claude/alpha is linked directly from "+externalCacheDir(home)) {
 		t.Fatalf("doctor direct-cache result = %s (%s), want fail identifying direct cache link", result.status, result.detail)
 	}
 	if err := os.Remove(link); err != nil {

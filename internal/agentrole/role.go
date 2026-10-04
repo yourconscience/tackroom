@@ -105,16 +105,16 @@ func (r renderer) Extension() string       { return r.extension }
 func (r renderer) Render(role Role) string { return r.render(role) }
 
 var renderers = map[string]Renderer{
-	"claude-code": renderer{extension: ".md", render: renderClaude},
-	"codex":       renderer{extension: ".toml", render: renderCodex},
-	"droid":       renderer{extension: ".md", render: renderDroid},
-	"opencode":    renderer{extension: ".md", render: renderOpenCode},
-	"pi":          renderer{extension: ".md", render: renderPi},
-	"omp":         renderer{extension: ".md", render: renderOMP},
-	"qwen-code":   renderer{extension: ".md", render: renderQwen},
-	"cursor":      renderer{extension: ".md", render: renderCursor},
-	"copilot":     renderer{extension: ".agent.md", render: renderCopilot},
-	"grok":        renderer{extension: ".md", render: renderGrok},
+	"claude":    renderer{extension: ".md", render: renderClaude},
+	"codex":     renderer{extension: ".toml", render: renderCodex},
+	"droid":     renderer{extension: ".md", render: renderDroid},
+	"opencode":  renderer{extension: ".md", render: renderOpenCode},
+	"pi":        renderer{extension: ".md", render: renderPi},
+	"omp":       renderer{extension: ".md", render: renderOMP},
+	"qwen-code": renderer{extension: ".md", render: renderQwen},
+	"cursor":    renderer{extension: ".md", render: renderCursor},
+	"copilot":   renderer{extension: ".agent.md", render: renderCopilot},
+	"grok":      renderer{extension: ".md", render: renderGrok},
 }
 
 // Lookup returns the registered renderer for a harness name.
