@@ -148,6 +148,9 @@ func defaultAgentConfigs() []agentConfig {
 		{Name: agentOpenCode, Enabled: true, SkillRoot: "~/.config/opencode/skills", AgentRoot: "~/.config/opencode/agents", Detect: "opencode"},
 		{Name: agentPi, Enabled: true, SkillRoot: "~/.pi/agent/skills", AgentRoot: "~/.pi/agent/agents", Detect: "pi"},
 		{Name: agentQwenCode, Enabled: true, SkillRoot: "~/.qwen/skills", AgentRoot: "~/.qwen/agents", Detect: "qwen"},
+		{Name: agentCursor, Enabled: true, SkillRoot: "~/.cursor/skills", AgentRoot: "~/.cursor/agents", Detect: "cursor-agent"},
+		{Name: agentCopilot, Enabled: true, SkillRoot: "~/.copilot/skills", AgentRoot: "~/.copilot/agents", Detect: "copilot"},
+		{Name: agentGrok, Enabled: true, SkillRoot: "~/.grok/skills", AgentRoot: "~/.grok/agents", Detect: "grok"},
 	}
 }
 

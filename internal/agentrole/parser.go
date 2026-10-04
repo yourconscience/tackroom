@@ -56,6 +56,12 @@ func (role *Role) UnmarshalYAML(value *yaml.Node) error {
 			err = node.Decode(&decoded.Opencode)
 		case "qwen":
 			err = node.Decode(&decoded.Qwen)
+		case "cursor":
+			err = node.Decode(&decoded.Cursor)
+		case "copilot":
+			err = node.Decode(&decoded.Copilot)
+		case "grok":
+			err = node.Decode(&decoded.Grok)
 		}
 		if err != nil {
 			return err

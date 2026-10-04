@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Hermes, Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, GitHub Copilot CLI, Grok Build, Hermes, Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
 ---
 
 # tackroom
@@ -94,7 +94,7 @@ Missing, drifted, conflicting, stale managed, and unrelated external entries are
 
 Reconciles only configured managed entries. Unrelated native content remains untouched.
 
-For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Hermes uses `skills.external_dirs: ["~/.agents/skills"]`; Qwen Code uses `skills.directories: ["~/.agents/skills"]`. Both consume the canonical tree without creating a duplicate mirror.
+For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Hermes uses `skills.external_dirs: ["~/.agents/skills"]`; Qwen Code uses `skills.directories: ["~/.agents/skills"]`. Both consume the canonical tree without creating a duplicate mirror. OpenCode, Cursor, GitHub Copilot CLI and Grok Build read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
 
 Agent roles are canonical Markdown files under `~/.agents/agents/` and render to:
 
@@ -105,6 +105,9 @@ Agent roles are canonical Markdown files under `~/.agents/agents/` and render to
 - Pi with `pi-subagents`: `~/.pi/agent/agents/<name>.md`
 - OMP: `~/.omp/agent/agents/<name>.md`
 - Qwen Code: `~/.qwen/agents/<name>.md`
+- Cursor: `~/.cursor/agents/<name>.md`
+- GitHub Copilot CLI: `~/.copilot/agents/<name>.agent.md`
+- Grok Build: `~/.grok/agents/<name>.md`
 
 Pi always has managed skills. With `pi-subagents` installed, tackroom renders canonical roles into Pi's user agent directory. With `pi-mcp-adapter` installed, it patches canonical and Agent Plugin MCP entries into `~/.pi/agent/mcp.json`. Put pinned package sources under the Pi target's `packages` list to make `sync` reconcile `~/.pi/agent/settings.json`; Pi installs missing declared packages at startup. Tackroom does not install the Pi executable. The role and MCP files remain inert when their packages are absent. OMP is a separate target.
 
@@ -189,5 +192,8 @@ Legacy HarnessKit flags on `view` (`--port`, `--host`, `--no-token`) are rejecte
 | Pi | yes | yes, via `pi-subagents` | yes, via `pi-mcp-adapter` | no |
 | OMP | yes | yes | yes | no |
 | Qwen Code | yes, config-driven | yes | yes | yes |
+| Cursor | yes | yes | yes, `~/.cursor/mcp.json` | yes, `~/.cursor/hooks.json` |
+| GitHub Copilot CLI | yes | yes | yes, `~/.copilot/mcp-config.json` | yes, `~/.copilot/hooks/tackroom.json` |
+| Grok Build | yes | yes | yes, `~/.grok/config.toml` | yes, `~/.grok/hooks/tackroom.json` |
 
 Do not add a surface without a verified native adapter and focused tests.

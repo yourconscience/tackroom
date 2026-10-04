@@ -45,6 +45,9 @@ Five surfaces, each rendered into the harness's own format — tackroom does not
 | Amp | yes, config-driven | --⁑ | yes | --⁑ | -- |
 | Claude Code | yes | yes | yes | yes | -- |
 | Codex | yes | yes | yes | yes | planned |
+| Cursor | yes† | yes | yes | yes¶ | -- |
+| GitHub Copilot CLI | yes† | yes | yes | yes | -- |
+| Grok Build | yes† | yes | yes | yes | -- |
 | Factory Droid | yes | yes | yes | yes | -- |
 | Hermes | yes | -- | yes | yes | -- |
 | OpenCode | yes† | yes | yes | -- | -- |
@@ -65,7 +68,8 @@ agents:
       - npm:pi-mcp-adapter@2.33.0
       - npm:pi-subagents@0.67.0
 ```
-† OpenCode reads `~/.agents/skills/` natively; its only hook surface is a JS plugin API.
+† OpenCode, Cursor, GitHub Copilot CLI and Grok Build read `~/.agents/skills/` natively, so tackroom mirrors skills into their own skill roots only when the config root is not `~/.agents`. OpenCode's only hook surface is a JS plugin API.
+¶ Cursor hooks go to `~/.cursor/hooks.json` with Cursor's event names. If Cursor's third-party configs setting is on, Cursor also runs Claude Code's hooks, so a hook synced to both runs twice there.
 ‡ OMP has no managed hook surface yet; register memory hooks manually if needed.
 § Qwen Code natively loads Agent Plugins v1 skills and MCP servers; tackroom manages those same surfaces without rewriting the plugin.
 ⁑ Amp's hook and role surfaces use plugin-based models incompatible with tackroom' script-based hooks and per-agent role files.
@@ -91,7 +95,7 @@ Candidates are inert until you promote them into durable instructions — consol
 
 ## Roles
 
-Markdown role definitions in `~/.agents/agents/`, rendered to each harness's native format (Claude Markdown, Codex TOML, Qwen Markdown, Droid). Generic `model` tiers (`haiku`/`sonnet`/`opus`) render natively for Claude and Droid; Codex omits them and uses its own default unless a per-harness override pins an exact id. Six starter roles ship with the tool; yours win on name collision. Details in [docs/roles.md](docs/roles.md).
+Markdown role definitions in `~/.agents/agents/`, rendered to each harness's native format (Claude Markdown, Codex TOML, Qwen Markdown, Droid, Cursor and Grok Markdown, Copilot `.agent.md`). Generic `model` tiers (`haiku`/`sonnet`/`opus`) render natively for Claude and Droid; Codex omits them and uses its own default unless a per-harness override pins an exact id. Six starter roles ship with the tool; yours win on name collision. Details in [docs/roles.md](docs/roles.md).
 
 ## Commands
 
@@ -190,7 +194,7 @@ The script refuses to run unless the tree is clean, `HEAD` matches `origin/main`
 - [Troubleshooting](docs/troubleshooting.md)
 - [memory/README.md](memory/README.md) — memory layer layout, hooks, and tools
 
-Project-level generators (rulesync, ruler) win on tool breadth; tackroom is user-level — one private repo, nine targets deep, pinned externals, review-first memory. Full table in [docs/comparison.md](docs/comparison.md).
+Project-level generators (rulesync, ruler) win on tool breadth; tackroom is user-level — one private repo, twelve targets deep, pinned externals, review-first memory. Full table in [docs/comparison.md](docs/comparison.md).
 
 ## License
 

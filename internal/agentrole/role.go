@@ -35,6 +35,9 @@ type Role struct {
 	Droid        DroidOptions    `yaml:"droid"`
 	Opencode     OpenCodeOptions `yaml:"opencode"`
 	Qwen         QwenOptions     `yaml:"qwen"`
+	Cursor       CursorOptions   `yaml:"cursor"`
+	Copilot      CopilotOptions  `yaml:"copilot"`
+	Grok         GrokOptions     `yaml:"grok"`
 }
 
 type ClaudeOptions struct {
@@ -74,6 +77,19 @@ type QwenOptions struct {
 	Tools        []string `yaml:"tools"`
 }
 
+type CursorOptions struct {
+	Model    string `yaml:"model"`
+	Readonly bool   `yaml:"readonly"`
+}
+
+type CopilotOptions struct {
+	Model string `yaml:"model"`
+}
+
+type GrokOptions struct {
+	Model string `yaml:"model"`
+}
+
 // Renderer is a harness projection of a canonical role.
 type Renderer interface {
 	Extension() string
@@ -96,6 +112,9 @@ var renderers = map[string]Renderer{
 	"pi":          renderer{extension: ".md", render: renderPi},
 	"omp":         renderer{extension: ".md", render: renderOMP},
 	"qwen-code":   renderer{extension: ".md", render: renderQwen},
+	"cursor":      renderer{extension: ".md", render: renderCursor},
+	"copilot":     renderer{extension: ".agent.md", render: renderCopilot},
+	"grok":        renderer{extension: ".md", render: renderGrok},
 }
 
 // Lookup returns the registered renderer for a harness name.

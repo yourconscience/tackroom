@@ -172,6 +172,12 @@ func nativeHookConfigPaths(agent string, home string) ([]string, bool, bool) {
 		return []string{filepath.Join(home, ".hermes", "config.yaml")}, true, true
 	case agentQwenCode:
 		return []string{qwenSettingsPath(home)}, false, true
+	case agentCursor:
+		return []string{cursorHooksConfigPath(home)}, true, true
+	case agentCopilot:
+		return hookDirFiles(filepath.Dir(copilotHooksConfigPath(home))), true, true
+	case agentGrok:
+		return hookDirFiles(filepath.Dir(grokHooksConfigPath(home))), false, true
 	default:
 		return nil, false, false
 	}
@@ -216,9 +222,9 @@ func readSimpleNativeHooks(agent string, path string) ([]nativeHookEntry, error)
 		}
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
+	raw, err := parseSimpleHookFile(path, data)
+	if err != nil {
+		return nil, err
 	}
 	root, _ := raw["hooks"].(map[string]interface{})
 	var entries []nativeHookEntry
@@ -241,12 +247,17 @@ func nativeHookIsManaged(entry nativeHookEntry, cfg config) bool {
 			continue
 		}
 		event := hook.Event
-		if entry.Agent == agentHermes {
-			var ok bool
+		var ok bool
+		switch entry.Agent {
+		case agentHermes:
 			event, ok = hermesHookEvent(event)
-			if !ok {
-				continue
-			}
+		case agentCursor:
+			event, ok = cursorHookEvent(event)
+		default:
+			ok = true
+		}
+		if !ok {
+			continue
 		}
 		if event == entry.Event && hookCommandMatches(entry.Command, hook.Command) {
 			return true
@@ -308,7 +319,7 @@ func removeNativeHookEntries(entries []nativeHookEntry) (int, error) {
 	for path, pathEntries := range byPath {
 		var didChange bool
 		var err error
-		if agentByPath[path] == agentHermes {
+		if agent := agentByPath[path]; agent == agentHermes || agent == agentCursor || agent == agentCopilot {
 			didChange, err = removeSimpleNativeHookEntries(path, pathEntries)
 		} else {
 			didChange, err = removeGroupedNativeHookEntries(path, pathEntries)
@@ -395,9 +406,9 @@ func removeSimpleNativeHookEntries(path string, entries []nativeHookEntry) (bool
 	if err != nil {
 		return false, fmt.Errorf("read %s: %w", path, err)
 	}
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return false, fmt.Errorf("parse %s: %w", path, err)
+	raw, err := parseSimpleHookFile(path, data)
+	if err != nil {
+		return false, err
 	}
 	root, ok := raw["hooks"].(map[string]interface{})
 	if !ok {
@@ -426,7 +437,13 @@ func removeSimpleNativeHookEntries(path string, entries []nativeHookEntry) (bool
 	if len(root) == 0 {
 		delete(raw, "hooks")
 	}
-	out, err := yaml.Marshal(raw)
+	var out []byte
+	if strings.HasSuffix(path, ".json") {
+		out, err = json.MarshalIndent(raw, "", "  ")
+		out = append(out, '\n')
+	} else {
+		out, err = yaml.Marshal(raw)
+	}
 	if err != nil {
 		return false, fmt.Errorf("marshal %s: %w", path, err)
 	}
@@ -434,6 +451,22 @@ func removeSimpleNativeHookEntries(path string, entries []nativeHookEntry) (bool
 		return false, fmt.Errorf("write %s: %w", path, err)
 	}
 	return true, nil
+}
+
+// parseSimpleHookFile reads a flat hook file: Hermes YAML, or the JSON hook
+// files of Cursor and Copilot CLI.
+func parseSimpleHookFile(path string, data []byte) (map[string]interface{}, error) {
+	var raw map[string]interface{}
+	if strings.HasSuffix(path, ".json") {
+		if err := parseJSONConfig(path, data, &raw); err != nil {
+			return nil, fmt.Errorf("parse %s: %w", path, err)
+		}
+		return raw, nil
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("parse %s: %w", path, err)
+	}
+	return raw, nil
 }
 
 func nativeHookCommandsByEvent(entries []nativeHookEntry) map[string][]string {
@@ -465,4 +498,12 @@ func missingHookTarget(command string, home string) string {
 		}
 	}
 	return ""
+}
+
+// hookDirFiles lists the *.json hook files in a harness's user hooks
+// directory, sorted, so `hook list` shows registrations tackroom did not write.
+func hookDirFiles(dir string) []string {
+	matches, _ := filepath.Glob(filepath.Join(dir, "*.json"))
+	sort.Strings(matches)
+	return matches
 }

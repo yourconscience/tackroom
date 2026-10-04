@@ -962,3 +962,53 @@ func upsertTOMLBlockBool(block string, key string, value bool) string {
 	lines[insertAt] = line
 	return strings.Join(lines, newline)
 }
+
+// inspectVersionedHookFile reads a `{"version": 1, "hooks": {event: [...]}}`
+// file (Cursor and Copilot CLI) with flat command entries.
+func inspectVersionedHookFile(configPath string, event string, hook hookConfig) (string, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return stateMissing, nil
+		}
+		return stateMissing, fmt.Errorf("read %s: %w", configPath, err)
+	}
+	var raw map[string]interface{}
+	if err := parseJSONConfig(configPath, data, &raw); err != nil {
+		return stateMissing, fmt.Errorf("parse %s: %w", configPath, err)
+	}
+	state := inspectSimpleHookMap(raw, "hooks", event, hook)
+	if state == stateSynced && raw["version"] == nil {
+		return stateDrifted, nil
+	}
+	return state, nil
+}
+
+func patchVersionedHookFile(configPath string, event string, hook hookConfig) error {
+	data, err := os.ReadFile(configPath)
+	raw := map[string]interface{}{}
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("read %s: %w", configPath, err)
+		}
+	} else if err := parseJSONConfig(configPath, data, &raw); err != nil {
+		return fmt.Errorf("parse %s: %w", configPath, err)
+	}
+	if raw["version"] == nil {
+		raw["version"] = 1
+	}
+	if err := upsertSimpleHookMap(raw, "hooks", event, hook); err != nil {
+		return fmt.Errorf("patch %s: %w", configPath, err)
+	}
+	out, err := json.MarshalIndent(raw, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal %s: %w", configPath, err)
+	}
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		return fmt.Errorf("create %s: %w", filepath.Dir(configPath), err)
+	}
+	if err := os.WriteFile(configPath, append(out, '\n'), 0o644); err != nil {
+		return fmt.Errorf("write %s: %w", configPath, err)
+	}
+	return nil
+}
