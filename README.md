@@ -6,7 +6,7 @@ Dotfiles for your AI agents. One `~/.agents` repo, rendered into every coding ag
 
 [![The tackroom tour: install, setup, sync into six agents, and the tackroom view config page](docs/site/brag.jpg)](https://yourconscience.github.io/tackroom/brag.mp4)
 
-[Watch the 23-second tour](https://yourconscience.github.io/tackroom/brag.mp4) · [Website](https://yourconscience.github.io/tackroom/)
+[Watch the 23-second tour](https://yourconscience.github.io/tackroom/brag.mp4) · [Website](https://yourconscience.github.io/tackroom/) · Music: [Chill House Vol. 1](https://ende.app/en/song/13007-chill-house-vol-1) by Sascha Ende, [CC BY 4.0](https://ende.app/standard-license)
 
 [![Release](https://img.shields.io/github/v/release/yourconscience/tackroom)](https://github.com/yourconscience/tackroom/releases) [![brew](https://img.shields.io/badge/brew-yourconscience%2Ftap-orange)](https://github.com/yourconscience/homebrew-tap) [![npm](https://img.shields.io/npm/v/tackroom)](https://www.npmjs.com/package/tackroom) [![CI](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml/badge.svg)](https://github.com/yourconscience/tackroom/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/license-MIT-green)](./LICENSE)
 
