@@ -362,6 +362,38 @@ func initHarnesses() {
 			},
 			IntegrationNote: "skills read natively from ~/.agents/skills; Grok also reads Claude Code's skills, roles, hooks and MCP and dedups them by name",
 		},
+
+		agentOpenClaw: {
+			Skills:           skillsSymlink,
+			SkillsNativeRoot: openClawReadsAgentsSkills,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentOpenClaw,
+				configPath: openClawConfigPath,
+				inspect:    inspectJSONMCPServer,
+				patch:      patchJSONMCPServer,
+				read:       readJSONMCPServer,
+				parentKey:  "mcp",
+				rootKey:    "servers",
+			}),
+			IntegrationNote: "skills read natively from ~/.agents/skills; MCP goes to openclaw.json mcp.servers (run `openclaw mcp reload` for a running Gateway)",
+		},
+
+		agentDSH: {
+			Skills:           skillsSymlink,
+			SkillsNativeRoot: dshReadsAgentsSkills,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentDSH,
+				configPath: dshPatchPath,
+				inspect:    inspectDSHMCPServer,
+				patch:      patchDSHMCPServer,
+				read:       readDSHMCPServer,
+			}),
+			RootInstructions: &rootInstructionsCapability{
+				Path:     func(home string) string { return filepath.Join(dshHome(home), "AGENTS.md") },
+				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
+			},
+			IntegrationNote: "skills read natively from ~/.agents/skills; MCP goes to tackroom-mcp-* rows in ~/.dsh/cordis.patch.yml (every profile)",
+		},
 	}
 }
 
