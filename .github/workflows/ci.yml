@@ -96,3 +96,12 @@ jobs:
 
       - name: Test npm wrapper
         run: node --test npm/install.test.js
+
+  macos-app:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test the macOS app
+        working-directory: macos
+        run: swift build && swift test
