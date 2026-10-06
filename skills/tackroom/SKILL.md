@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, GitHub Copilot CLI, Grok Build, Hermes, Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, GitHub Copilot CLI, Grok Build, OpenClaw, DeepSeek Harness (dsh), Hermes, Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
 ---
 
 # tackroom
@@ -94,7 +94,7 @@ Missing, drifted, conflicting, stale managed, and unrelated external entries are
 
 Reconciles only configured managed entries. Unrelated native content remains untouched.
 
-For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Hermes uses `skills.external_dirs: ["~/.agents/skills"]`; Qwen Code uses `skills.directories: ["~/.agents/skills"]`. Both consume the canonical tree without creating a duplicate mirror. OpenCode, Cursor, GitHub Copilot CLI and Grok Build read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
+For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Hermes uses `skills.external_dirs: ["~/.agents/skills"]`; Qwen Code uses `skills.directories: ["~/.agents/skills"]`. Both consume the canonical tree without creating a duplicate mirror. OpenCode, Cursor, GitHub Copilot CLI, Grok Build, OpenClaw and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
 
 Agent roles are canonical Markdown files under `~/.agents/agents/` and render to:
 
@@ -195,5 +195,7 @@ Legacy HarnessKit flags on `view` (`--port`, `--host`, `--no-token`) are rejecte
 | Cursor | yes | yes | yes, `~/.cursor/mcp.json` | yes, `~/.cursor/hooks.json` |
 | GitHub Copilot CLI | yes | yes | yes, `~/.copilot/mcp-config.json` | yes, `~/.copilot/hooks/tackroom.json` |
 | Grok Build | yes | yes | yes, `~/.grok/config.toml` | yes, `~/.grok/hooks/tackroom.json` |
+| OpenClaw | yes | no | yes, `~/.openclaw/openclaw.json` `mcp.servers` | no |
+| DeepSeek Harness | yes | no | yes, `tackroom-mcp-*` rows in `~/.dsh/cordis.patch.yml` | no |
 
 Do not add a surface without a verified native adapter and focused tests.

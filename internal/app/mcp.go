@@ -28,7 +28,10 @@ type mcpTarget struct {
 	patch      func(mcpTarget, mcpServerConfig, string) error
 	read       func(mcpTarget, string, string) (mcpServerConfig, error)
 	rootKey    string
-	defaults   map[string]interface{}
+	// parentKey, when set, names the top-level object that holds rootKey
+	// (OpenClaw keeps servers under "mcp" -> "servers").
+	parentKey string
+	defaults  map[string]interface{}
 }
 
 const yamlMapTag = "!!map"
@@ -140,7 +143,20 @@ func inspectJSONMCPServer(target mcpTarget, server mcpServerConfig, home string)
 	if err := parseJSONConfig(configPath, data, &raw); err != nil {
 		return stateMissing, fmt.Errorf("parse %s: %w", configPath, err)
 	}
-	return inspectMapMCPServer(raw, target.rootKey, server, target.defaults), nil
+	return inspectMapMCPServer(jsonMCPParent(raw, target), target.rootKey, server, target.defaults), nil
+}
+
+// jsonMCPParent returns the object that holds target.rootKey: the document
+// itself, or the object under target.parentKey (empty when absent).
+func jsonMCPParent(raw map[string]interface{}, target mcpTarget) map[string]interface{} {
+	if target.parentKey == "" {
+		return raw
+	}
+	parent, _ := asMap(raw[target.parentKey])
+	if parent == nil {
+		return map[string]interface{}{}
+	}
+	return parent
 }
 
 func patchJSONMCPServer(target mcpTarget, server mcpServerConfig, home string) error {
@@ -154,7 +170,17 @@ func patchJSONMCPServer(target mcpTarget, server mcpServerConfig, home string) e
 	} else if err := parseJSONConfig(configPath, data, &raw); err != nil {
 		return fmt.Errorf("parse %s: %w", configPath, err)
 	}
-	upsertMapMCPServer(raw, target.rootKey, server, target.defaults)
+	parent := raw
+	if target.parentKey != "" {
+		if existing, ok := raw[target.parentKey]; ok {
+			if _, isMap := asMap(existing); !isMap {
+				return fmt.Errorf("%s: %q is not an object", configPath, target.parentKey)
+			}
+		}
+		parent = jsonMCPParent(raw, target)
+		raw[target.parentKey] = parent
+	}
+	upsertMapMCPServer(parent, target.rootKey, server, target.defaults)
 
 	out, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
@@ -180,7 +206,7 @@ func readJSONMCPServer(target mcpTarget, name string, home string) (mcpServerCon
 	if err := parseJSONConfig(configPath, data, &raw); err != nil {
 		return mcpServerConfig{}, fmt.Errorf("parse %s: %w", configPath, err)
 	}
-	entry, ok := mapMCPEntry(raw, target.rootKey, name)
+	entry, ok := mapMCPEntry(jsonMCPParent(raw, target), target.rootKey, name)
 	if !ok {
 		return mcpServerConfig{}, fmt.Errorf("MCP server %q not found in %s", name, target.agentName)
 	}

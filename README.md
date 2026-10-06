@@ -48,6 +48,8 @@ Five surfaces, each rendered into the harness's own format — tackroom does not
 | Cursor | yes† | yes | yes | yes¶ | -- |
 | GitHub Copilot CLI | yes† | yes | yes | yes | -- |
 | Grok Build | yes† | yes | yes | yes | -- |
+| OpenClaw | yes† | -- | yes | -- | -- |
+| DeepSeek Harness (dsh) | yes† | -- | yes | -- | -- |
 | Factory Droid | yes | yes | yes | yes | -- |
 | Hermes | yes | -- | yes | yes | -- |
 | OpenCode | yes† | yes | yes | -- | -- |
@@ -68,7 +70,7 @@ agents:
       - npm:pi-mcp-adapter@2.33.0
       - npm:pi-subagents@0.67.0
 ```
-† OpenCode, Cursor, GitHub Copilot CLI and Grok Build read `~/.agents/skills/` natively, so tackroom mirrors skills into their own skill roots only when the config root is not `~/.agents`. OpenCode's only hook surface is a JS plugin API.
+† OpenCode, Cursor, GitHub Copilot CLI, Grok Build, OpenClaw and DeepSeek Harness read `~/.agents/skills/` natively, so tackroom mirrors skills into their own skill roots only when the config root is not `~/.agents` (or, for OpenClaw, when `$OPENCLAW_STATE_DIR` is set). OpenCode's only hook surface is a JS plugin API.
 ¶ Cursor hooks go to `~/.cursor/hooks.json` with Cursor's event names. If Cursor's third-party configs setting is on, Cursor also runs Claude Code's hooks, so a hook synced to both runs twice there.
 ‡ OMP has no managed hook surface yet; register memory hooks manually if needed.
 § Qwen Code natively loads Agent Plugins v1 skills and MCP servers; tackroom manages those same surfaces without rewriting the plugin.
@@ -76,7 +78,7 @@ agents:
 
 In `tackroom.yaml` and `--agents`, Claude Code is `claude`. The former name `claude-code` is still accepted; a tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config.
 
-OpenClaw is not currently supported. Native skill discovery from `~/.agents/skills` may work due to OpenClaw's multi-tier skill precedence, but this is unverified and unmanaged. A managed harness entry is planned for a future release. A "yes" above only appears after end-to-end verification.
+OpenClaw MCP servers go to `mcp.servers` in `~/.openclaw/openclaw.json`; a running Gateway picks them up after `openclaw mcp reload`. DeepSeek Harness MCP servers go to `tackroom-mcp-*` rows in the home-level `~/.dsh/cordis.patch.yml`, which every dsh profile applies, and its root instructions link to `~/.dsh/AGENTS.md`. Neither has a role or hook format tackroom can render: OpenClaw agents are separate gateway personas, and dsh roles and hooks are Cordis plugins. A "yes" above only appears after end-to-end verification.
 
 ## Skills
 

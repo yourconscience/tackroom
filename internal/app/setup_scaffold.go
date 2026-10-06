@@ -151,6 +151,8 @@ func defaultAgentConfigs() []agentConfig {
 		{Name: agentCursor, Enabled: true, SkillRoot: "~/.cursor/skills", AgentRoot: "~/.cursor/agents", Detect: "cursor-agent"},
 		{Name: agentCopilot, Enabled: true, SkillRoot: "~/.copilot/skills", AgentRoot: "~/.copilot/agents", Detect: "copilot"},
 		{Name: agentGrok, Enabled: true, SkillRoot: "~/.grok/skills", AgentRoot: "~/.grok/agents", Detect: "grok"},
+		{Name: agentOpenClaw, Enabled: true, SkillRoot: "~/.openclaw/skills", Detect: "openclaw"},
+		{Name: agentDSH, Enabled: true, SkillRoot: "~/.dsh/skills", Detect: "dsh"},
 	}
 }
 
@@ -572,6 +574,9 @@ func nativeMCPServerNames(agentName string, home string) ([]string, error) {
 	if agentName == agentHermes {
 		return yamlMCPServerNames(path, data, target.rootKey)
 	}
+	if agentName == agentDSH {
+		return dshMCPServerNames(path)
+	}
 	var raw map[string]interface{}
 	if err := parseJSONConfig(path, data, &raw); err != nil {
 		return nil, fmt.Errorf("parse %s: %w", path, err)
@@ -583,7 +588,7 @@ func nativeMCPServerNames(agentName string, home string) ([]string, error) {
 			entry, _ = claudeProjectMCPMap(raw)
 		}
 	} else {
-		entry, _ = asMap(raw[target.rootKey])
+		entry, _ = asMap(jsonMCPParent(raw, target)[target.rootKey])
 	}
 	var names []string
 	for name := range entry {
