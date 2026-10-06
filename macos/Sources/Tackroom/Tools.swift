@@ -48,24 +48,33 @@ enum Tools {
             let err = Pipe()
             process.standardOutput = out
             process.standardError = err
+
+            // Wait with a termination handler. `waitUntilExit` can miss the exit of a fast command
+            // and block forever (seen with `agentsview session search`). Both pipes are drained
+            // concurrently so a chatty command cannot block on a full pipe.
+            let finished = DispatchGroup()
+            var outData = Data()
+            var errData = Data()
+            finished.enter()
+            process.terminationHandler = { _ in finished.leave() }
             do {
                 try process.run()
             } catch {
+                finished.leave()
                 continuation.resume(throwing: error)
                 return
             }
+            finished.enter()
             DispatchQueue.global().async {
-                // Drain stderr concurrently so a chatty command cannot block on a full pipe.
-                var errData = Data()
-                let group = DispatchGroup()
-                group.enter()
-                DispatchQueue.global().async {
-                    errData = err.fileHandleForReading.readDataToEndOfFile()
-                    group.leave()
-                }
-                let outData = out.fileHandleForReading.readDataToEndOfFile()
-                group.wait()
-                process.waitUntilExit()
+                outData = out.fileHandleForReading.readDataToEndOfFile()
+                finished.leave()
+            }
+            finished.enter()
+            DispatchQueue.global().async {
+                errData = err.fileHandleForReading.readDataToEndOfFile()
+                finished.leave()
+            }
+            finished.notify(queue: .global()) {
                 continuation.resume(returning: Output(status: process.terminationStatus, stdout: outData, stderr: String(decoding: errData, as: UTF8.self)))
             }
         }
@@ -88,6 +97,23 @@ enum Tools {
         process.standardError = handle
         try process.run()
         return process
+    }
+
+    /// A TCP port on 127.0.0.1 that nothing listens on right now.
+    static func freePort() -> Int? {
+        let fd = socket(AF_INET, SOCK_STREAM, 0)
+        guard fd >= 0 else { return nil }
+        defer { close(fd) }
+        var address = sockaddr_in()
+        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_addr.s_addr = inet_addr("127.0.0.1")
+        let size = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let bound = withUnsafePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, size) } }
+        var length = size
+        let named = withUnsafeMutablePointer(to: &address) { $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(fd, $0, &length) } }
+        guard bound == 0, named == 0 else { return nil }
+        return Int(UInt16(bigEndian: address.sin_port))
     }
 
     static func readTrimmed(_ path: String) -> String? {

@@ -8,7 +8,26 @@ struct WebEndpoint: Equatable {
 
 struct ServerError: LocalizedError {
     let message: String
+    var status: Int?
+    /// The API's error code, such as "stale_revision".
+    var code: String?
     var errorDescription: String? { message }
+
+    var isStaleRevision: Bool { code == "stale_revision" }
+}
+
+/// Where a `tackroom view` server lives and how to start it.
+struct TackroomServer {
+    let port: Int
+    let tokenFile: String
+    let config: String?
+    let log: URL
+
+    /// The app's own server: stable port and token, default config.
+    static var app: TackroomServer {
+        TackroomServer(port: TackroomClient.port, tokenFile: Tools.appSupport.appendingPathComponent("view.token").path,
+                       config: nil, log: Tools.logs.appendingPathComponent("tackroom-view.log"))
+    }
 }
 
 /// Client for the app's own `tackroom view` server. It signs in with the
@@ -55,6 +74,20 @@ final class TackroomClient {
         try await send(path, method: "POST", body: body, decoder: decoder)
     }
 
+    /// PATCH /api/config: applies edit operations to the shared layer. The server refuses
+    /// the save with 409 `stale_revision` when the file changed since `expectedRevision`.
+    func patchConfig(expectedRevision: String, operations: [ConfigOperation]) async throws -> ConfigSave {
+        struct Reply: Decodable {
+            let revision: String
+            let diff: String
+        }
+        let body = ConfigEdit.requestBody(expectedRevision: expectedRevision, operations: operations)
+        let reply: Reply = try await send("api/config", method: "PATCH", body: body, decoder: JSONDecoder())
+        // The server's diff keeps every line of the file, env values included.
+        let redacted = ConfigText.redactedDiff(reply.diff)
+        return ConfigSave(revision: reply.revision, diff: redacted.text, maskedEnvLines: redacted.masked)
+    }
+
     private func send<T: Decodable>(_ path: String, method: String, body: Data?, decoder: JSONDecoder, retry: Bool = true) async throws -> T {
         if !signedIn { try await signIn() }
         var request = URLRequest(url: base.appendingPathComponent(path))
@@ -74,42 +107,41 @@ final class TackroomClient {
             signedIn = false
             return try await send(path, method: method, body: body, decoder: decoder, retry: false)
         }
-        guard (200..<300).contains(status) else {
-            throw ServerError(message: Self.apiMessage(data) ?? "tackroom view returned HTTP \(status)")
-        }
+        guard (200..<300).contains(status) else { throw Self.apiError(data, status: status) }
         return try decoder.decode(T.self, from: data)
     }
 
-    private static func apiMessage(_ data: Data) -> String? {
-        guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        if let error = object["error"] as? [String: Any], let message = error["message"] as? String { return message }
-        return object["message"] as? String ?? object["error"] as? String
+    private static func apiError(_ data: Data, status: Int) -> ServerError {
+        let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+        let error = object?["error"] as? [String: Any]
+        let message = error?["message"] as? String ?? object?["message"] as? String ?? object?["error"] as? String
+        return ServerError(message: message ?? "tackroom view returned HTTP \(status)", status: status, code: error?["code"] as? String)
     }
 
-    /// Attaches to the app's `tackroom view` on 127.0.0.1:8791, or starts it.
-    /// The token file keeps the token stable, so a server left running by an
-    /// earlier app session is reused instead of fighting over the port.
-    static func connect() async throws -> (TackroomClient, Process?) {
+    /// Attaches to a `tackroom view` on 127.0.0.1, or starts one. By default that is the
+    /// app's own server on :8791. The token file keeps the token stable, so a server left
+    /// running by an earlier app session is reused instead of fighting over the port.
+    static func connect(_ server: TackroomServer = .app) async throws -> (TackroomClient, Process?) {
         guard let tackroom = Tools.find("tackroom") else {
             throw ServerError(message: "tackroom not found. Install it with `brew install yourconscience/tap/tackroom`.")
         }
-        try FileManager.default.createDirectory(at: Tools.appSupport, withIntermediateDirectories: true)
-        let tokenFile = Tools.appSupport.appendingPathComponent("view.token").path
-        let base = URL(string: "http://127.0.0.1:\(port)")!
+        try FileManager.default.createDirectory(at: URL(fileURLWithPath: server.tokenFile).deletingLastPathComponent(), withIntermediateDirectories: true)
+        let base = URL(string: "http://127.0.0.1:\(server.port)")!
 
-        if let token = Tools.readTrimmed(tokenFile) {
+        if let token = Tools.readTrimmed(server.tokenFile) {
             let client = TackroomClient(base: base, token: token)
             if (try? await client.signIn()) != nil { return (client, nil) }
         }
 
-        let process = try Tools.spawn(tackroom, ["view", "--no-open", "--addr", "127.0.0.1:\(port)", "--token-file", tokenFile],
-                                      log: Tools.logs.appendingPathComponent("tackroom-view.log"))
+        var arguments = ["view", "--no-open", "--addr", "127.0.0.1:\(server.port)", "--token-file", server.tokenFile]
+        if let config = server.config { arguments += ["--config", config] }
+        let process = try Tools.spawn(tackroom, arguments, log: server.log)
         for _ in 0..<50 {
             try await Task.sleep(nanoseconds: 200_000_000)
             if !process.isRunning {
-                throw ServerError(message: "tackroom view exited (status \(process.terminationStatus)); see ~/Library/Logs/Tackroom/tackroom-view.log")
+                throw ServerError(message: "tackroom view exited (status \(process.terminationStatus)); see \(NSString(string: server.log.path).abbreviatingWithTildeInPath)")
             }
-            if let token = Tools.readTrimmed(tokenFile) {
+            if let token = Tools.readTrimmed(server.tokenFile) {
                 let client = TackroomClient(base: base, token: token)
                 if (try? await client.signIn()) != nil { return (client, process) }
             }
@@ -165,15 +197,30 @@ struct AgentsViewDaemon {
         """
     }
 
-    func skillAnalytics(since: Date) async throws -> SkillAnalytics {
-        var components = URLComponents(url: base.appendingPathComponent("api/v1/analytics/skills"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "from", value: Self.day.string(from: since))]
+    /// Explicit skill calls only; skills that agents load by reading SKILL.md are not counted here.
+    func skillAnalytics(since: Date, machine: String?) async throws -> SkillAnalytics {
+        var query = [URLQueryItem(name: "from", value: Self.day.string(from: since))]
+        if let machine { query.append(URLQueryItem(name: "machine", value: machine)) }
+        let data = try await get("api/v1/analytics/skills", query: query)
+        return try Decoders.snakeCase.decode(SkillAnalytics.self, from: data)
+    }
+
+    /// The machines AgentsView merges sessions from, such as ["m1.local", "m4"].
+    func machines() async throws -> [String] {
+        struct Reply: Decodable { let machines: [String]? }
+        let data = try await get("api/v1/machines", query: [])
+        return try JSONDecoder().decode(Reply.self, from: data).machines ?? []
+    }
+
+    private func get(_ path: String, query: [URLQueryItem]) async throws -> Data {
+        var components = URLComponents(url: base.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
+        components.queryItems = query.isEmpty ? nil : query
         var request = URLRequest(url: components.url!)
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard status == 200 else { throw ServerError(message: "AgentsView returned HTTP \(status) for skill analytics") }
-        return try Decoders.snakeCase.decode(SkillAnalytics.self, from: data)
+        guard status == 200 else { throw ServerError(message: "AgentsView returned HTTP \(status) for /\(path)", status: status) }
+        return data
     }
 
     private static let day: DateFormatter = {

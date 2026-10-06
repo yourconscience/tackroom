@@ -84,22 +84,77 @@ struct AgentReport: Decodable, Identifiable {
 // tackroom view: /api/inventory (snake_case JSON).
 struct Inventory: Decodable {
     let revision: String
+    let agents: [InventoryAgent]
     let skills: [InventorySkill]
     let mcp: [InventoryEntry]
     let hooks: [InventoryEntry]
     let unmanaged: [UnmanagedItem]
+
+    private enum CodingKeys: String, CodingKey { case revision, agents, skills, mcp, hooks, unmanaged }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        revision = try container.decode(String.self, forKey: .revision)
+        // The server sends null, not [], when the config lists no agents.
+        agents = try container.decodeIfPresent([InventoryAgent].self, forKey: .agents) ?? []
+        skills = try container.decode([InventorySkill].self, forKey: .skills)
+        mcp = try container.decode([InventoryEntry].self, forKey: .mcp)
+        hooks = try container.decode([InventoryEntry].self, forKey: .hooks)
+        unmanaged = try container.decode([UnmanagedItem].self, forKey: .unmanaged)
+    }
 }
 
-struct InventorySkill: Decodable {
+struct InventoryAgent: Decodable, Identifiable {
+    var id: String { name }
+    let name: String
+    let enabled: Bool
+    let detected: Bool
+    let synced: Bool
+    let supportsMcp: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case name, enabled, detected, synced
+        case supportsMcp = "supports_mcp"
+    }
+
+    /// This agent's cell in a skill's or server's `states`. tackroom does not inspect agents
+    /// that are turned off, so they have no entry.
+    func state(in states: [String: String]?) -> CellState {
+        enabled ? CellState(states?[name] ?? "unknown") : .agentOff
+    }
+}
+
+struct InventorySkill: Decodable, Identifiable {
+    var id: String { name }
     let name: String
     let description: String?
+    /// "local", or "owner/repo@abc1234" for a skill that comes from an external repo.
     let origin: String?
+    let path: String?
     let tokens: Int?
+    /// Per agent: ok, drift, missing, conflict, unknown, absent or error. Disabled agents have no entry.
+    let states: [String: String]?
+
+    var isExternal: Bool { origin != nil && origin != "local" }
+
+    /// `tackroom skill update` takes the external repo's name, not the skill's:
+    /// "owner/repo@abc1234" and "owner/repo (unpinned)" both give "repo".
+    var sourceName: String? {
+        guard isExternal, let origin else { return nil }
+        let label = origin.split(whereSeparator: { $0 == "@" || $0 == " " }).first.map(String.init) ?? origin
+        return label.split(separator: "/").last.map(String.init)
+    }
 }
 
+/// An MCP server or hook as the inventory lists it.
 struct InventoryEntry: Decodable {
     let name: String
+    let enabled: Bool?
     let command: String?
+    /// False when the entry lists no agents, which tackroom reads as "every agent".
+    let explicit: Bool?
+    let targets: [String]?
+    let states: [String: String]?
 }
 
 struct UnmanagedItem: Decodable {
@@ -158,19 +213,6 @@ struct HKRow: Decodable {
     let pack: String?
 }
 
-/// A row in the Skills view: one canonical skill joined with its AgentsView usage.
-struct SkillRow: Identifiable {
-    var id: String { name }
-    let name: String
-    let tokens: Int
-    let calls: Int
-    let sessions: Int
-    let lastUsed: Date?
-    let agents: String
-
-    var lastUsedSortKey: Date { lastUsed ?? .distantPast }
-}
-
 /// A row in the Foreign view: something in a harness that tackroom does not manage.
 struct ForeignItem: Identifiable {
     var id: String { "\(source)/\(kind)/\(name)/\(agents.joined(separator: ","))" }
@@ -197,11 +239,19 @@ enum Decoders {
         decoder.keyDecodingStrategy = .convertFromSnakeCase
         decoder.dateDecodingStrategy = .custom { decoder in
             let text = try decoder.singleValueContainer().decode(String.self)
-            if let date = try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(text) { return date }
-            return try Date.ISO8601FormatStyle().parse(text)
+            guard let date = timestamp(text) else {
+                throw DecodingError.dataCorrupted(.init(codingPath: decoder.codingPath, debugDescription: "bad timestamp \(text)"))
+            }
+            return date
         }
         return decoder
     }()
+
+    /// AgentsView writes RFC 3339 with any number of fractional digits ("…02.5Z", "…21.572Z", "…47Z").
+    static func timestamp(_ text: String) -> Date? {
+        if let date = try? Date.ISO8601FormatStyle(includingFractionalSeconds: true).parse(text) { return date }
+        return try? Date.ISO8601FormatStyle().parse(text)
+    }
 
     private struct LowercasedKey: CodingKey {
         let stringValue: String

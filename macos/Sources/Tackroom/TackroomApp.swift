@@ -15,7 +15,12 @@ enum Entry {
             return
         }
         if arguments.contains("--check") {
+            setvbuf(stdout, nil, _IOLBF, 0) // progress shows up as it happens when piped
             Task { @MainActor in exit(await HeadlessCheck.run()) }
+            dispatchMain()
+        }
+        if arguments.contains("--e2e") {
+            Task { @MainActor in exit(await HeadlessE2E.run()) }
             dispatchMain()
         }
         TackroomApp.main()

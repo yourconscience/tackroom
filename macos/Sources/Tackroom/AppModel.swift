@@ -5,7 +5,7 @@ import UserNotifications
 import WebKit
 
 enum Pane: String, Hashable, Identifiable {
-    case overview, sync, skills, foreign, config, sessions, inspector
+    case overview, sync, skills, usage, mcp, foreign, config, sessions, inspector
 
     var id: String { rawValue }
 
@@ -13,7 +13,9 @@ enum Pane: String, Hashable, Identifiable {
         switch self {
         case .overview: "Overview"
         case .sync: "Sync"
-        case .skills: "Skill usage"
+        case .skills: "Skills"
+        case .usage: "Skill usage"
+        case .mcp: "MCP servers"
         case .foreign: "Foreign items"
         case .config: "Config"
         case .sessions: "Sessions"
@@ -25,7 +27,9 @@ enum Pane: String, Hashable, Identifiable {
         switch self {
         case .overview: "gauge.with.dots.needle.33percent"
         case .sync: "arrow.triangle.2.circlepath"
-        case .skills: "chart.bar.xaxis"
+        case .skills: "puzzlepiece.extension"
+        case .usage: "chart.bar.xaxis"
+        case .mcp: "server.rack"
         case .foreign: "questionmark.folder"
         case .config: "slider.horizontal.3"
         case .sessions: "text.bubble"
@@ -50,14 +54,32 @@ final class AppModel {
     var inventory: Inventory?
     var inventoryError: String?
 
+    // Config edits go through PATCH /api/config; configState holds the revision they are based on.
+    var configState: ConfigState?
+    var configError: String?
+    var lastSave: ConfigSave?
+    var configBusy = false
+    var probes: [String: MCPProbeOutcome] = [:]
+    var probing: Set<String> = []
+    var unmanagedMCP: [HKRow] = []
+    var unmanagedMCPError: String?
+    var mcpLoading = false
+    /// Output of the last CLI the app ran for the user (skill update, MCP import).
+    var actionResult: ActionResult?
+    var actionBusy = false
+
     // AgentsView daemon.
     private(set) var agentsView: AgentsViewDaemon?
     var todayCost: String?
     var usageDays = 30
+    /// nil means every machine AgentsView merges sessions from.
+    var usageMachine: String?
+    var machines: [String] = []
     var skillRows: [SkillRow] = []
-    var untrackedSkills: [(name: String, calls: Int)] = []
+    var untrackedSkills: [UntrackedSkill] = []
     var usageError: String?
     var usageLoading = false
+    @ObservationIgnored var usageGeneration = 0
 
     // HarnessKit (optional).
     let hkInstalled = HarnessKit.installed
@@ -103,13 +125,15 @@ final class AppModel {
             }
         }
         await connectHarnessKit()
+        await loadForeign() // fills the sidebar count
     }
 
-    /// Finds AgentsView and finds or starts `tackroom view`. `--check` calls this without the UI.
-    func connectTackroom() async {
+    /// Finds AgentsView and finds or starts `tackroom view`. `--check` calls this without the UI;
+    /// `--e2e` points it at a throwaway server.
+    func connectTackroom(_ server: TackroomServer = .app) async {
         agentsView = AgentsViewDaemon.discover()
         do {
-            let (client, process) = try await TackroomClient.connect()
+            let (client, process) = try await TackroomClient.connect(server)
             self.client = client
             if let process { children.append(process) }
         } catch {
@@ -139,7 +163,7 @@ final class AppModel {
         await cost
     }
 
-    private func loadStatus() async {
+    func loadStatus() async {
         guard let client else { return }
         do {
             let next: StatusResponse = try await client.get("api/status", decoder: Decoders.tackroomStatus)
@@ -242,51 +266,6 @@ final class AppModel {
             inventoryError = nil
         } catch {
             inventoryError = error.localizedDescription
-        }
-    }
-
-    func loadSkillUsage() async {
-        guard let agentsView else {
-            usageError = "AgentsView is not running. Start it with `agentsview daemon start`."
-            return
-        }
-        usageLoading = true
-        defer { usageLoading = false }
-        await loadInventory()
-        guard let inventory else {
-            usageError = inventoryError
-            return
-        }
-        do {
-            let since = Calendar.current.date(byAdding: .day, value: -usageDays, to: Date()) ?? Date()
-            let analytics = try await agentsView.skillAnalytics(since: since)
-
-            // AgentsView keeps namespaced names ("plugin:skill") apart; tackroom names are bare.
-            struct Merged { var calls = 0, sessions = 0, last: Date?, agents: [String: Int] = [:] }
-            var merged: [String: Merged] = [:]
-            for usage in analytics.bySkill {
-                let name = usage.skillName.split(separator: ":").last.map(String.init) ?? usage.skillName
-                var entry = merged[name, default: Merged()]
-                entry.calls += usage.callCount
-                entry.sessions += usage.sessionCount
-                if let last = usage.lastUsedAt, last > (entry.last ?? .distantPast) { entry.last = last }
-                for agent in usage.agentBreakdown ?? [] { entry.agents[agent.agent, default: 0] += agent.count }
-                merged[name] = entry
-            }
-
-            let canonical = Set(inventory.skills.map(\.name))
-            skillRows = inventory.skills.map { skill in
-                let usage = merged[skill.name] ?? Merged()
-                let agents = usage.agents.sorted { $0.value > $1.value }.map { "\($0.key) \($0.value)" }.joined(separator: " · ")
-                return SkillRow(name: skill.name, tokens: skill.tokens ?? 0, calls: usage.calls, sessions: usage.sessions,
-                                lastUsed: usage.last, agents: agents)
-            }
-            untrackedSkills = merged.filter { !canonical.contains($0.key) }
-                .map { (name: $0.key, calls: $0.value.calls) }
-                .sorted { $0.calls > $1.calls }
-            usageError = nil
-        } catch {
-            usageError = error.localizedDescription
         }
     }
 

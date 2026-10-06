@@ -179,12 +179,14 @@ struct MainView: View {
         NavigationSplitView {
             List(selection: $model.selection) {
                 Section("Status") {
-                    row(.overview)
+                    row(.overview).badge(model.needsSyncCount)
                     row(.sync)
                 }
                 Section("Inventory") {
                     row(.skills)
-                    row(.foreign)
+                    row(.usage)
+                    row(.mcp)
+                    row(.foreign).badge(model.foreignItems.count)
                 }
                 Section("Web") {
                     row(.config)
@@ -192,12 +194,15 @@ struct MainView: View {
                     if model.hkInstalled { row(.inspector) }
                 }
             }
+            .listStyle(.sidebar)
             .navigationSplitViewColumnWidth(min: 180, ideal: 200)
         } detail: {
             switch model.selection ?? .overview {
             case .overview: OverviewView(model: model)
             case .sync: SyncView(model: model)
             case .skills: SkillsView(model: model)
+            case .usage: UsageView(model: model)
+            case .mcp: MCPView(model: model)
             case .foreign: ForeignView(model: model)
             case .config: WebDetail(model: model, pane: .config)
             case .sessions: WebDetail(model: model, pane: .sessions)
@@ -283,7 +288,9 @@ struct OverviewView: View {
                 }
             }
             .padding(20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
     private var subtitle: String {
@@ -380,67 +387,9 @@ struct SyncView: View {
                 }
             }
             .padding(20)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-    }
-}
-
-// MARK: Skill usage
-
-struct SkillsView: View {
-    @Bindable var model: AppModel
-    @State private var sortOrder = [KeyPathComparator(\SkillRow.calls, order: .reverse)]
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            PageHeader(title: "Skill usage", subtitle: subtitle) {
-                if model.usageLoading { ProgressView().controlSize(.small) }
-                Picker("Window", selection: $model.usageDays) {
-                    Text("7 days").tag(7)
-                    Text("30 days").tag(30)
-                    Text("90 days").tag(90)
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .frame(width: 220)
-            }
-            if let error = model.usageError {
-                Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
-            }
-            Table(model.skillRows.sorted(using: sortOrder), sortOrder: $sortOrder) {
-                TableColumn("Skill", value: \.name)
-                TableColumn("Calls", value: \.calls) { row in
-                    Text("\(row.calls)").monospacedDigit().foregroundStyle(row.calls == 0 ? .orange : .primary)
-                }
-                .width(min: 50, ideal: 60)
-                TableColumn("Sessions", value: \.sessions) { Text("\($0.sessions)").monospacedDigit() }
-                    .width(min: 60, ideal: 70)
-                TableColumn("Last used", value: \.lastUsedSortKey) { row in
-                    Text(row.lastUsed.map { $0.formatted(.relative(presentation: .named)) } ?? "not in window")
-                        .foregroundStyle(row.lastUsed == nil ? .secondary : .primary)
-                }
-                TableColumn("By agent") { Text($0.agents).foregroundStyle(.secondary) }
-                TableColumn("Tokens", value: \.tokens) { Text("\($0.tokens)").monospacedDigit() }
-                    .width(min: 50, ideal: 60)
-            }
-            if !model.untrackedSkills.isEmpty {
-                DisclosureGroup("Called but not in tackroom (\(model.untrackedSkills.count))") {
-                    Text(model.untrackedSkills.map { "\($0.name) \($0.calls)" }.joined(separator: " · "))
-                        .font(.caption.monospaced())
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-        }
-        .padding(20)
-        .task(id: model.usageDays) { await model.loadSkillUsage() }
-    }
-
-    private var subtitle: String {
-        let unused = model.skillRows.filter { $0.calls == 0 }
-        guard !model.skillRows.isEmpty else { return "Calls per tackroom skill, from AgentsView session history." }
-        let tokens = unused.reduce(0) { $0 + $1.tokens }
-        return "\(unused.count) of \(model.skillRows.count) skills had no calls in the last \(model.usageDays) days. Their descriptions cost about \(tokens) tokens in every agent."
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 }
 
@@ -449,6 +398,7 @@ struct SkillsView: View {
 struct ForeignView: View {
     var model: AppModel
     @State private var kind = "all"
+    @State private var search = ""
     @State private var selection = Set<ForeignItem.ID>()
 
     var body: some View {
@@ -476,6 +426,12 @@ struct ForeignView: View {
                 TableColumn("Found by", value: \.source).width(min: 70, ideal: 90)
                 TableColumn("Detail", value: \.detail)
             }
+            .frame(minHeight: 160, maxHeight: .infinity)
+            .overlay {
+                if filtered.isEmpty, !model.foreignLoading, model.foreignError == nil {
+                    Text(model.foreignItems.isEmpty ? "Nothing outside tackroom's control." : "No item matches.").foregroundStyle(.secondary)
+                }
+            }
             .contextMenu(forSelectionType: ForeignItem.ID.self) { ids in
                 let hints = model.foreignItems.filter { ids.contains($0.id) && !$0.hint.isEmpty }.map(\.hint)
                 if !hints.isEmpty {
@@ -487,13 +443,19 @@ struct ForeignView: View {
             }
         }
         .padding(20)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .searchable(text: $search, prompt: "Filter items")
         .task { await model.loadForeign() }
     }
 
     private var kinds: [String] { Array(Set(model.foreignItems.map(\.kind))).sorted() }
 
     private var filtered: [ForeignItem] {
-        kind == "all" ? model.foreignItems : model.foreignItems.filter { $0.kind == kind }
+        let needle = search.trimmingCharacters(in: .whitespaces).lowercased()
+        return model.foreignItems.filter {
+            (kind == "all" || $0.kind == kind)
+                && (needle.isEmpty || $0.name.lowercased().contains(needle) || $0.detail.lowercased().contains(needle))
+        }
     }
 
     private var subtitle: String {
