@@ -125,6 +125,8 @@ tackroom does one job. These tools pair well with it; install and run them on th
 
 Treat HarnessKit as read-mostly: its enable, disable and deploy actions bypass tackroom, so reconcile any changes with `tackroom sync`.
 
+On macOS, the experimental [Tackroom app](macos/) puts all three in one window, with sync state in the menu bar, AgentsView skill usage next to each skill, and a list of what tackroom does not manage. Build it with `macos/bundle.sh`.
+
 `tackroom skill list` remains the built-in provenance view for each harness skill root. It reports managed links, foreign symlinks, unmanaged directories, drift, broken links, and estimated context cost.
 
 `tackroom hook list [query]` inventories native hook registrations and marks canonical entries as managed and missing script targets as stale. To clean up a hook installed outside tackroom, preview with `tackroom hook remove --dry-run <query>`, then rerun without `--dry-run`; unrelated hook entries are preserved. `tackroom doctor` reports stale native hooks, and `tackroom sync` reconciles the remaining canonical hooks afterward.
