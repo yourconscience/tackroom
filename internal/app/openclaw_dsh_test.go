@@ -216,3 +216,52 @@ func TestOpenClawMCPRefusesNonObjectParent(t *testing.T) {
 		t.Fatal(`expected an error when "mcp" is not an object`)
 	}
 }
+
+func TestOpenClawAndDSHSetupDiscoversNativeMCP(t *testing.T) {
+	home := t.TempDir()
+	clearGatewayEnv(t)
+	for _, name := range []string{agentOpenClaw, agentDSH} {
+		c := gatewayCase(home, name)
+		writeSyncTestFile(t, c.mcpFile, []byte(c.preexisting))
+	}
+	want := map[string]string{agentOpenClaw: "mine", agentDSH: "reference_memory"}
+	command := map[string]string{agentOpenClaw: "mine-mcp", agentDSH: "mcp-server-memory"}
+	for name, server := range want {
+		names, err := nativeMCPServerNames(name, home)
+		if err != nil || len(names) != 1 || names[0] != server {
+			t.Fatalf("%s discovery = %v, %v", name, names, err)
+		}
+		candidates, err := scanNativeMCP(agentConfig{Name: name}, config{}, home)
+		if err != nil || len(candidates) != 1 || candidates[0].Server.Command != command[name] {
+			t.Fatalf("%s import scan = %+v, %v", name, candidates, err)
+		}
+	}
+}
+
+func TestDSHSyncAdoptsExistingServerRow(t *testing.T) {
+	home := t.TempDir()
+	clearGatewayEnv(t)
+	c := gatewayCase(home, agentDSH)
+	writeSyncTestFile(t, c.mcpFile, []byte(c.preexisting))
+	target, err := mcpTargetForHarness(agentDSH)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := mcpServerConfig{Name: "reference_memory", Command: "mcp-server-memory", Args: []string{"--quiet"}}
+	if err := target.patch(target, server, home); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(c.mcpFile)
+	text := string(data)
+	if strings.Count(text, "serverName: reference_memory") != 1 || strings.Contains(text, dshMCPRowPrefix) {
+		t.Fatalf("expected the existing row to be updated, not duplicated:\n%s", text)
+	}
+	for _, keep := range []string{"id: memory-mcp-reference", "cwd: !!js process.cwd()", "--quiet"} {
+		if !strings.Contains(text, keep) {
+			t.Fatalf("missing %q after adopting the row:\n%s", keep, text)
+		}
+	}
+	if state, err := target.inspect(target, server, home); err != nil || state != stateSynced {
+		t.Fatalf("inspect after adopt = %s, %v", state, err)
+	}
+}

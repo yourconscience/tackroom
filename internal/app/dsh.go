@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -112,16 +113,71 @@ func dshRowID(row *yaml.Node) string {
 	return ""
 }
 
-// findDSHRow locates the row with the given id: its insert list and index.
-func findDSHRow(ops *yaml.Node, id string) (*yaml.Node, int) {
-	for _, list := range dshInsertLists(ops) {
+// dshMappingValue returns the value node for key in a mapping node, or nil.
+func dshMappingValue(mapping *yaml.Node, key string) *yaml.Node {
+	if mapping == nil || mapping.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i+1 < len(mapping.Content); i += 2 {
+		if mapping.Content[i].Value == key {
+			return mapping.Content[i+1]
+		}
+	}
+	return nil
+}
+
+// dshRowServerName returns the serverName of a dsh-mcp-client row, or "".
+func dshRowServerName(row *yaml.Node) string {
+	if plugin := dshMappingValue(row, "name"); plugin == nil || plugin.Value != dshMCPClientPlugin {
+		return ""
+	}
+	if name := dshMappingValue(dshMappingValue(row, "config"), "serverName"); name != nil {
+		return name.Value
+	}
+	return ""
+}
+
+// findDSHRow locates the row for an MCP server: tackroom's own row first,
+// then any dsh-mcp-client row with that serverName, since dsh refuses two
+// rows with the same serverName.
+func findDSHRow(ops *yaml.Node, name string) (*yaml.Node, int) {
+	lists := dshInsertLists(ops)
+	for _, list := range lists {
 		for i, row := range list.Content {
-			if dshRowID(row) == id {
+			if dshRowID(row) == dshMCPRowPrefix+name {
+				return list, i
+			}
+		}
+	}
+	for _, list := range lists {
+		for i, row := range list.Content {
+			if dshRowServerName(row) == name {
 				return list, i
 			}
 		}
 	}
 	return nil, -1
+}
+
+// dshMCPServerNames lists the serverName of every dsh-mcp-client row in the
+// patch file, for setup's import scan.
+func dshMCPServerNames(path string) ([]string, error) {
+	doc, err := loadDSHPatch(path)
+	if err != nil {
+		return nil, err
+	}
+	seen := map[string]bool{}
+	var names []string
+	for _, list := range dshInsertLists(doc.Content[0]) {
+		for _, row := range list.Content {
+			if name := dshRowServerName(row); name != "" && !seen[name] {
+				seen[name] = true
+				names = append(names, name)
+			}
+		}
+	}
+	sort.Strings(names)
+	return names, nil
 }
 
 func readDSHRow(home string, name string) (dshMCPRow, bool, error) {
@@ -130,13 +186,13 @@ func readDSHRow(home string, name string) (dshMCPRow, bool, error) {
 	if err != nil {
 		return dshMCPRow{}, false, err
 	}
-	list, index := findDSHRow(doc.Content[0], dshMCPRowPrefix+name)
+	list, index := findDSHRow(doc.Content[0], name)
 	if list == nil {
 		return dshMCPRow{}, false, nil
 	}
 	var row dshMCPRow
 	if err := list.Content[index].Decode(&row); err != nil {
-		return dshMCPRow{}, true, fmt.Errorf("%s: decode row %s: %w", path, dshMCPRowPrefix+name, err)
+		return dshMCPRow{}, true, fmt.Errorf("%s: decode MCP row %s: %w", path, name, err)
 	}
 	return row, true, nil
 }
@@ -175,6 +231,21 @@ func patchDSHMCPServer(_ mcpTarget, server mcpServerConfig, home string) error {
 		return err
 	}
 	ops := doc.Content[0]
+	if list, index := findDSHRow(ops, server.Name); list != nil {
+		// Update the existing row in place so its id and any other config
+		// (cwd, timeouts, !!js values) stay as they are.
+		row := list.Content[index]
+		setMappingString(row, "name", dshMCPClientPlugin)
+		cfg := ensureMappingValue(row, "config")
+		setMappingString(cfg, "serverName", server.Name)
+		setMappingString(cfg, "transport", "stdio")
+		setMappingString(cfg, "command", server.Command)
+		setMappingStringSlice(cfg, "args", server.Args)
+		if len(server.Env) > 0 {
+			setMappingStringMap(ensureMappingValue(cfg, "env"), server.Env)
+		}
+		return writeDSHPatch(path, doc)
+	}
 	var rowNode yaml.Node
 	if err := rowNode.Encode(dshMCPRow{
 		ID:   dshMCPRowPrefix + server.Name,
@@ -190,9 +261,7 @@ func patchDSHMCPServer(_ mcpTarget, server mcpServerConfig, home string) error {
 		return fmt.Errorf("encode dsh MCP row: %w", err)
 	}
 
-	if list, index := findDSHRow(ops, dshMCPRowPrefix+server.Name); list != nil {
-		list.Content[index] = &rowNode
-	} else if managed := dshManagedInsertList(ops); managed != nil {
+	if managed := dshManagedInsertList(ops); managed != nil {
 		managed.Content = append(managed.Content, &rowNode)
 	} else {
 		ops.Content = append(ops.Content, &yaml.Node{Kind: yaml.MappingNode, Tag: yamlMapTag, Content: []*yaml.Node{
@@ -200,7 +269,10 @@ func patchDSHMCPServer(_ mcpTarget, server mcpServerConfig, home string) error {
 			{Kind: yaml.SequenceNode, Tag: "!!seq", Content: []*yaml.Node{&rowNode}},
 		}})
 	}
+	return writeDSHPatch(path, doc)
+}
 
+func writeDSHPatch(path string, doc *yaml.Node) error {
 	var builder strings.Builder
 	encoder := yaml.NewEncoder(&builder)
 	encoder.SetIndent(2)
