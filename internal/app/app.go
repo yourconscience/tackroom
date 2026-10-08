@@ -99,6 +99,7 @@ type agentReport struct {
 	ManagedMCP      []string
 	ManagedHook     []string
 	ManagedPackage  []string
+	ManagedPlugin   []string
 	Drifted         []string
 	DriftedAgent    []string
 	DriftedMCP      []string
@@ -108,6 +109,9 @@ type agentReport struct {
 	MissingAgent    []string
 	MissingMCP      []string
 	MissingHook     []string
+	MissingPlugin   []string
+	DisabledPlugin  []string
+	StalePlugin     []string
 	UnsupportedHook []string
 	Conflicts       []string
 	StaleManaged    []string
@@ -116,6 +120,7 @@ type agentReport struct {
 	AddsAgent       []string
 	AddsMCP         []string
 	AddsHook        []string
+	AddsPlugin      []string
 	Updates         []string
 	UpdatesAgent    []string
 	UpdatesMCP      []string
@@ -124,6 +129,7 @@ type agentReport struct {
 	Removes         []string
 	RemovesAgent    []string
 	RemovesPackage  []string
+	RemovesPlugin   []string
 	Synced          bool
 }
 

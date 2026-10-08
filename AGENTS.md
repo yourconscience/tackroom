@@ -13,7 +13,7 @@ Never restore project-directory config discovery or make the public checkout the
 # Architecture invariants
 
 - tackroom syncs exactly five surfaces: skills, MCP servers, hooks, agent roles, and plugins.
-- Plugins follow the agent-plugins-spec v1.0.0 format. For harnesses with native plugin systems (Codex), tackroom projects spec-format plugins into the native format. Claude Code plugins (`.claude/plugins/*.ts`) are a planned addition.
+- Plugins follow the agent-plugins-spec v1.0.0 format. For harnesses with native plugin systems (Codex), tackroom projects spec-format plugins into the native format. Claude Code plugins stay in Claude's native layout: the config root's `.claude-plugin/marketplace.json` is registered as a directory marketplace and its relative-path plugins are enabled in `~/.claude/settings.json`.
 - `setup` owns first-run scaffolding, harness detection, optional copy/convert import, memory-tier selection, and the first sync. There is no separate `init` command.
 - Native import is copy-only. Never move or delete the source content.
 - Existing unrelated native harness configuration must remain untouched.

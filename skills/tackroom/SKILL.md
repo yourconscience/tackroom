@@ -115,6 +115,8 @@ For MCP servers, sync patches only named canonical entries and preserves unrelat
 
 For hooks, sync registers only declared entries on harnesses with verified hook support. Host-local review and approval state remains outside tackroom; Hermes keys first-use consent by the exact event and command and reports script mtime drift through `hermes hooks doctor`.
 
+Claude Code plugins (mods, workflows, monitors, output styles, LSP, `bin/`) stay in Claude's native layout under the config root, listed in `<config-root>/.claude-plugin/marketplace.json`. `sync` registers that directory as a marketplace in `~/.claude/settings.json` (`extraKnownMarketplaces`) and enables each relative-path entry (`enabledPlugins`). Claude Code reads it in place: edit, then `/reload-plugins`. User disables and `defaultEnabled: false` are respected; stale enable keys for that marketplace are pruned. `doctor` runs `claude plugin validate` on it.
+
 `sync --pull` runs `git pull --ff-only` in the private canonical repository before reconciliation.
 
 ## External skills

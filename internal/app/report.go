@@ -94,6 +94,18 @@ func printReport(mode string, repoRoot string, repoReport repoLinkReport, report
 		if len(report.ManagedPackage)+len(report.DriftedPackage) > 0 {
 			fmt.Printf("  package managed (%d): %s\n", len(report.ManagedPackage), displayList(report.ManagedPackage))
 		}
+		if len(report.ManagedPlugin)+len(report.MissingPlugin)+len(report.DisabledPlugin)+len(report.StalePlugin) > 0 {
+			fmt.Printf("  plugin managed (%d): %s\n", len(report.ManagedPlugin), displayList(report.ManagedPlugin))
+		}
+		if len(report.DisabledPlugin) > 0 {
+			fmt.Printf("  plugin disabled (%d): %s\n", len(report.DisabledPlugin), displayList(report.DisabledPlugin))
+		}
+		if len(report.MissingPlugin) > 0 {
+			fmt.Printf("  plugin missing (%d): %s\n", len(report.MissingPlugin), displayList(report.MissingPlugin))
+		}
+		if len(report.StalePlugin) > 0 {
+			fmt.Printf("  plugin stale (%d): %s\n", len(report.StalePlugin), displayList(report.StalePlugin))
+		}
 		if len(report.Missing) > 0 {
 			fmt.Printf("  missing (%d): %s\n", len(report.Missing), displayList(report.Missing))
 		}
@@ -131,7 +143,7 @@ func printReport(mode string, repoRoot string, repoReport repoLinkReport, report
 			fmt.Printf("  conflicts (%d): %s\n", len(report.Conflicts), displayList(report.Conflicts))
 		}
 		if mode == "sync" {
-			fmt.Printf("  sync actions: add=%d update=%d remove=%d agent-add=%d agent-update=%d agent-remove=%d mcp-add=%d mcp-update=%d hook-add=%d hook-update=%d package-update=%d package-remove=%d\n", len(report.Adds), len(report.Updates), len(report.Removes), len(report.AddsAgent), len(report.UpdatesAgent), len(report.RemovesAgent), len(report.AddsMCP), len(report.UpdatesMCP), len(report.AddsHook), len(report.UpdatesHook), len(report.UpdatesPackage), len(report.RemovesPackage))
+			fmt.Printf("  sync actions: add=%d update=%d remove=%d agent-add=%d agent-update=%d agent-remove=%d mcp-add=%d mcp-update=%d hook-add=%d hook-update=%d package-update=%d package-remove=%d plugin-add=%d plugin-remove=%d\n", len(report.Adds), len(report.Updates), len(report.Removes), len(report.AddsAgent), len(report.UpdatesAgent), len(report.RemovesAgent), len(report.AddsMCP), len(report.UpdatesMCP), len(report.AddsHook), len(report.UpdatesHook), len(report.UpdatesPackage), len(report.RemovesPackage), len(report.AddsPlugin), len(report.RemovesPlugin))
 		}
 		fmt.Println()
 	}
@@ -150,6 +162,10 @@ func sortReportLists(report *agentReport) {
 	sort.Strings(report.ManagedMCP)
 	sort.Strings(report.ManagedHook)
 	sort.Strings(report.ManagedPackage)
+	sort.Strings(report.ManagedPlugin)
+	sort.Strings(report.MissingPlugin)
+	sort.Strings(report.DisabledPlugin)
+	sort.Strings(report.StalePlugin)
 	sort.Strings(report.Drifted)
 	sort.Strings(report.DriftedAgent)
 	sort.Strings(report.DriftedMCP)
@@ -201,6 +217,8 @@ func restoreSyncActions(current []agentReport, preflight []agentReport) {
 			current[i].UpdatesHook = append([]string{}, original.UpdatesHook...)
 			current[i].UpdatesPackage = append([]string{}, original.UpdatesPackage...)
 			current[i].RemovesPackage = append([]string{}, original.RemovesPackage...)
+			current[i].AddsPlugin = append([]string{}, original.AddsPlugin...)
+			current[i].RemovesPlugin = append([]string{}, original.RemovesPlugin...)
 			current[i].Removes = append([]string{}, original.Removes...)
 		}
 	}
@@ -433,6 +451,9 @@ func surfaceCounts(r agentReport) string {
 	if n := len(r.ManagedPackage); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d packages", n))
 	}
+	if n := len(r.ManagedPlugin); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d plugins", n))
+	}
 	out := strings.Join(parts, " · ")
 	if n := len(r.External); n > 0 {
 		out += fmt.Sprintf("  (+%d external)", n)
@@ -461,6 +482,8 @@ func driftBuckets(r agentReport) []driftBucket {
 		{"hooks unsupported", r.UnsupportedHook},
 		{"packages drifted", r.DriftedPackage},
 		{"packages removed", r.RemovesPackage},
+		{"plugins missing", r.MissingPlugin},
+		{"plugins stale", r.StalePlugin},
 		{"conflicts", r.Conflicts},
 	}
 }
@@ -480,6 +503,9 @@ func printVerboseSurfaceLists(report agentReport) {
 	}
 	if len(report.ManagedPackage) > 0 {
 		fmt.Printf("  packages (%d): %s\n", len(report.ManagedPackage), displayList(report.ManagedPackage))
+	}
+	if len(report.ManagedPlugin)+len(report.DisabledPlugin) > 0 {
+		fmt.Printf("  plugins (%d):  %s\n", len(report.ManagedPlugin), displayList(append(append([]string{}, report.ManagedPlugin...), report.DisabledPlugin...)))
 	}
 	if len(report.External) > 0 {
 		fmt.Printf("  external (%d): %s\n", len(report.External), displayList(report.External))
