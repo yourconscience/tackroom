@@ -131,6 +131,8 @@ tackroom mcp      list|add|import|remove
 tackroom hook     list [query] | remove [--dry-run] <query>
 ```
 
+`sync` prints what the run changed (grouped across harnesses), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` stays compact; `--verbose` adds the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.
+
 ## Companion tools
 
 tackroom does one job. These tools pair well with it; install and run them on their own:

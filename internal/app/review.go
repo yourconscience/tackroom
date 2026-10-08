@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/yourconscience/tackroom/internal/ui"
 )
 
 type reviewAction int
@@ -58,11 +59,11 @@ type reviewModel struct {
 }
 
 var (
-	reviewHeaderStyle = lipgloss.NewStyle().Bold(true)
-	reviewDimStyle    = lipgloss.NewStyle().Faint(true)
+	reviewHeaderStyle = ui.Bold
+	reviewDimStyle    = ui.Dim
 	reviewCursorStyle = lipgloss.NewStyle().Reverse(true)
-	reviewShareStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("2"))
-	reviewSkipStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("3"))
+	reviewShareStyle  = ui.Green
+	reviewSkipStyle   = ui.Yellow
 )
 
 func newReviewModel(detection *detectionResult) reviewModel {
