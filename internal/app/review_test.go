@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/yourconscience/tackroom/internal/agentrole"
 )
 
@@ -46,24 +46,24 @@ func testDetection() *detectionResult {
 func press(t *testing.T, m reviewModel, keys ...string) reviewModel {
 	t.Helper()
 	for _, k := range keys {
-		var msg tea.KeyMsg
+		var msg tea.KeyPressMsg
 		switch k {
 		case " ":
-			msg = tea.KeyMsg{Type: tea.KeySpace}
+			msg = tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 		case "enter":
-			msg = tea.KeyMsg{Type: tea.KeyEnter}
+			msg = tea.KeyPressMsg{Code: tea.KeyEnter}
 		case "esc":
-			msg = tea.KeyMsg{Type: tea.KeyEsc}
+			msg = tea.KeyPressMsg{Code: tea.KeyEsc}
 		case "up":
-			msg = tea.KeyMsg{Type: tea.KeyUp}
+			msg = tea.KeyPressMsg{Code: tea.KeyUp}
 		case "down":
-			msg = tea.KeyMsg{Type: tea.KeyDown}
+			msg = tea.KeyPressMsg{Code: tea.KeyDown}
 		case "left":
-			msg = tea.KeyMsg{Type: tea.KeyLeft}
+			msg = tea.KeyPressMsg{Code: tea.KeyLeft}
 		case "right":
-			msg = tea.KeyMsg{Type: tea.KeyRight}
+			msg = tea.KeyPressMsg{Code: tea.KeyRight}
 		default:
-			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+			msg = tea.KeyPressMsg{Code: []rune(k)[0], Text: k}
 		}
 		next, _ := m.Update(msg)
 		m = next.(reviewModel)

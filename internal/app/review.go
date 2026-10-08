@@ -5,8 +5,8 @@ import (
 	"sort"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type reviewAction int
@@ -82,7 +82,7 @@ func newReviewModel(detection *detectionResult) reviewModel {
 func (m reviewModel) Init() tea.Cmd { return nil }
 
 func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	keyMsg, ok := msg.(tea.KeyMsg)
+	keyMsg, ok := msg.(tea.KeyPressMsg)
 	if !ok {
 		return m, nil
 	}
@@ -114,7 +114,7 @@ func (m reviewModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.cursor < len(m.rows)-1 {
 			m.cursor++
 		}
-	case " ":
+	case "space":
 		if len(m.rows) > 0 {
 			m.rows[m.cursor].action = reviewAction((int(m.rows[m.cursor].action) + 1) % numReviewActions)
 		}
@@ -146,7 +146,11 @@ func (m *reviewModel) cycleSource(delta int) {
 	row.sourceIdx = (row.sourceIdx + delta + n) % n
 }
 
-func (m reviewModel) View() string {
+func (m reviewModel) View() tea.View {
+	return tea.NewView(m.render())
+}
+
+func (m reviewModel) render() string {
 	var b strings.Builder
 	title := fmt.Sprintf("tackroom setup — review %d item(s)", len(m.rows))
 	if m.resolved > 0 {

@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 	"github.com/mattn/go-isatty"
 	"github.com/yourconscience/tackroom/internal/agentrole"
 )
