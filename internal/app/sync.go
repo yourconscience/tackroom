@@ -57,7 +57,7 @@ func runSync(opts runOptions) error {
 		return err
 	}
 	if repoReport.State == stateConflict {
-		printReport("sync", repoRoot, repoReport, nil, home, cfg)
+		printReport(setupStreams(opts).out, false, repoReport, nil, home, cfg)
 		return fmt.Errorf("sync aborted due to conflicts: repo link: %s", repoReport.Path)
 	}
 	if err := applyRepoLink(repoReport); err != nil {
@@ -109,7 +109,7 @@ func runSync(opts runOptions) error {
 		}
 	}
 	if len(conflicts) > 0 {
-		printReport("sync", repoRoot, repoReport, reports, home, cfg)
+		printReport(streams.out, false, repoReport, reports, home, cfg)
 		return fmt.Errorf("sync aborted due to conflicts: %s", strings.Join(conflicts, "; "))
 	}
 	if err := applyAgentSync(reports, cfg, repoRoot, home); err != nil {
@@ -144,7 +144,7 @@ func runSync(opts runOptions) error {
 	}
 	restoreSyncActions(reports, preflight)
 
-	printReport("sync", repoRoot, repoReport, reports, home, cfg)
+	printReport(streams.out, true, repoReport, reports, home, cfg)
 	return agentFailures(reports)
 }
 
