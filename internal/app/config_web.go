@@ -444,8 +444,9 @@ func summarizeSyncPlan(reports []agentReport) []string {
 		}{
 			{"add skill", report.Adds}, {"add role", report.AddsAgent}, {"add MCP", report.AddsMCP}, {"add hook", report.AddsHook},
 			{"update skill", report.Updates}, {"overwrite role", report.UpdatesAgent}, {"update MCP", report.UpdatesMCP},
-			{"update hook", report.UpdatesHook}, {"update package", report.UpdatesPackage},
+			{"update hook", report.UpdatesHook}, {"update package", report.UpdatesPackage}, {"add plugin", report.AddsPlugin},
 			{"remove skill", report.Removes}, {"remove role", report.RemovesAgent}, {"remove package", report.RemovesPackage},
+			{"remove plugin", report.RemovesPlugin},
 		} {
 			for _, item := range group.items {
 				parts = append(parts, group.label+" "+item)
@@ -501,6 +502,9 @@ func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) 
 		}
 		for _, item := range report.UpdatesAgent {
 			plan.Destructive = append(plan.Destructive, report.Name+": overwrite role "+item)
+		}
+		for _, item := range report.RemovesPlugin {
+			plan.Destructive = append(plan.Destructive, report.Name+": remove plugin "+item)
 		}
 	}
 	planData, _ := json.Marshal(struct {

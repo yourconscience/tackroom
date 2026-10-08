@@ -43,7 +43,7 @@ Five surfaces, each rendered into the harness's own format — tackroom does not
 | Harness | Skills | Roles | MCP | Hooks | Plugins |
 |---|---|---|---|---|---|
 | Amp | yes, config-driven | --⁑ | yes | --⁑ | -- |
-| Claude Code | yes | yes | yes | yes | -- |
+| Claude Code | yes | yes | yes | yes | yes‖ |
 | Codex | yes | yes | yes | yes | planned |
 | Cursor | yes† | yes | yes | yes¶ | -- |
 | GitHub Copilot CLI | yes† | yes | yes | yes | -- |
@@ -74,6 +74,7 @@ agents:
 ¶ Cursor hooks go to `~/.cursor/hooks.json` with Cursor's event names. If Cursor's third-party configs setting is on, Cursor also runs Claude Code's hooks, so a hook synced to both runs twice there.
 ‡ OMP has no managed hook surface yet; register memory hooks manually if needed.
 § Qwen Code natively loads Agent Plugins v1 skills and MCP servers; tackroom manages those same surfaces without rewriting the plugin.
+‖ Claude Code plugins load in place from a directory marketplace at the config root; see [Claude Code plugins](#claude-code-plugins).
 ⁑ Amp's hook and role surfaces use plugin-based models incompatible with tackroom' script-based hooks and per-agent role files.
 
 In `tackroom.yaml` and `--agents`, Claude Code is `claude`. The former name `claude-code` is still accepted; a tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config.
@@ -100,6 +101,20 @@ Candidates are inert until you promote them into durable instructions — consol
 ## Roles
 
 Markdown role definitions in `~/.agents/agents/`, rendered to each harness's native format (Claude Markdown, Codex TOML, Qwen Markdown, Droid, Cursor and Grok Markdown, Copilot `.agent.md`). Generic `model` tiers (`haiku`/`sonnet`/`opus`) render natively for Claude and Droid; Codex omits them and uses its own default unless a per-harness override pins an exact id. Six starter roles ship with the tool; yours win on name collision. Details in [docs/roles.md](docs/roles.md).
+
+## Claude Code plugins
+
+Claude Code plugins carry what the other surfaces cannot: [mods](https://code.claude.com/docs/en/plugins/mods/overview) (in-process function hooks that draw panes, status lines and commands), [workflows](https://code.claude.com/docs/en/workflows), monitors, output styles, themes, LSP servers and `bin/` tools. Put each plugin in its native layout under the config root and list it in `.claude-plugin/marketplace.json` there:
+
+```json
+{
+  "name": "my-agents",
+  "owner": { "name": "you" },
+  "plugins": [{ "name": "my-mods", "source": "./plugins/my-mods" }]
+}
+```
+
+`sync` registers the config root under `extraKnownMarketplaces` in `~/.claude/settings.json` as a `directory` source and sets `enabledPlugins["<plugin>@<marketplace>"]` for each relative-path entry. Claude Code reads a directory marketplace in place, so there is no install step or plugin cache: edit a plugin, run `/reload-plugins`, and the change is live. A plugin you turn off in `/plugin` stays off, also across a marketplace rename. Entries with `defaultEnabled: false` are left for you to enable, entries that point at the config root itself (`"."`) or outside it are skipped, and bare names resolve under `metadata.pluginRoot`. Enable keys for plugins the marketplace no longer lists are removed, and deleting the marketplace file removes the registration. A marketplace name already registered with another source, or a malformed `marketplace.json` or settings key, is reported as a conflict and nothing is written. `doctor` runs `claude plugin validate` on the marketplace when Claude Code is a detected target.
 
 ## Commands
 

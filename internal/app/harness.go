@@ -137,6 +137,11 @@ func initHarnesses() {
 				Path:     func(home string) string { return filepath.Join(home, ".claude", "CLAUDE.md") },
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 			},
+			doctorChecks: []doctorCheck{
+				{Name: "claude plugins", Run: func(repoRoot, _ string, cfg config) checkResult {
+					return checkClaudePlugins(repoRoot, cfg)
+				}},
+			},
 			TrailerExample: "Co-authored-by: claude[bot] <claude[bot]@users.noreply.github.com>",
 		},
 
