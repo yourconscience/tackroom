@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 // Claude Code plugins are distributed by registering the config root as a
@@ -22,17 +24,14 @@ func claudeMarketplacePath(repoRoot string) string {
 	return filepath.Join(repoRoot, ".claude-plugin", "marketplace.json")
 }
 
-func claudeSettingsPath(home string) string {
-	return filepath.Join(home, ".claude", "settings.json")
-}
-
 type claudeMarketplace struct {
 	Name string
 	// Plugins lists relative-path entries that should be enabled.
 	Plugins []string
 	// Disabled lists relative-path entries that set defaultEnabled: false.
 	Disabled []string
-	// Skipped lists entries tackroom does not manage (non-relative sources).
+	// Skipped lists entries tackroom does not manage (remote sources, or the
+	// config root itself, which tackroom already syncs as skills and roles).
 	Skipped []string
 }
 
@@ -54,7 +53,10 @@ func readClaudeMarketplace(repoRoot string) (claudeMarketplace, bool, error) {
 		return claudeMarketplace{}, false, fmt.Errorf("read %s: %w", path, err)
 	}
 	var raw struct {
-		Name    string                   `json:"name"`
+		Name     string `json:"name"`
+		Metadata struct {
+			PluginRoot string `json:"pluginRoot"`
+		} `json:"metadata"`
 		Plugins []claudeMarketplaceEntry `json:"plugins"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -68,14 +70,14 @@ func readClaudeMarketplace(repoRoot string) (claudeMarketplace, bool, error) {
 		if entry.Name == "" {
 			continue
 		}
-		var source string
-		if err := json.Unmarshal(entry.Source, &source); err != nil || (source != "." && !strings.HasPrefix(source, "./")) {
+		dir, ok := relativePluginDir(entry.Source, raw.Metadata.PluginRoot)
+		if !ok {
 			m.Skipped = append(m.Skipped, entry.Name)
 			continue
 		}
 		enabled := entry.DefaultEnabled
 		if enabled == nil {
-			enabled = pluginDefaultEnabled(filepath.Join(repoRoot, filepath.FromSlash(source)))
+			enabled = pluginDefaultEnabled(filepath.Join(repoRoot, filepath.FromSlash(dir)))
 		}
 		if enabled != nil && !*enabled {
 			m.Disabled = append(m.Disabled, entry.Name)
@@ -84,7 +86,26 @@ func readClaudeMarketplace(repoRoot string) (claudeMarketplace, bool, error) {
 		m.Plugins = append(m.Plugins, entry.Name)
 	}
 	sort.Strings(m.Plugins)
+	sort.Strings(m.Disabled)
 	return m, true, nil
+}
+
+// relativePluginDir resolves a marketplace entry source that lives inside the
+// marketplace: "./path", or a bare name under metadata.pluginRoot.
+func relativePluginDir(raw json.RawMessage, pluginRoot string) (string, bool) {
+	var source string
+	if json.Unmarshal(raw, &source) != nil {
+		return "", false
+	}
+	switch {
+	case source == "." || source == "./":
+		return "", false
+	case strings.HasPrefix(source, "./"):
+		return source, true
+	case pluginRoot != "" && source != "" && !strings.Contains(source, "/"):
+		return pluginRoot + "/" + source, true
+	}
+	return "", false
 }
 
 func pluginDefaultEnabled(pluginRoot string) *bool {
@@ -102,7 +123,7 @@ func pluginDefaultEnabled(pluginRoot string) *bool {
 }
 
 func readClaudeSettings(home string) (map[string]interface{}, error) {
-	path := claudeSettingsPath(home)
+	path := claudeHooksConfigPath(home)
 	raw := map[string]interface{}{}
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
@@ -120,148 +141,224 @@ func readClaudeSettings(home string) (map[string]interface{}, error) {
 	return raw, nil
 }
 
-// directoryMarketplaceNames lists extraKnownMarketplaces entries whose
-// directory source is the config root.
-func directoryMarketplaceNames(settings map[string]interface{}, repoRoot string) []string {
-	known, _ := asMap(settings["extraKnownMarketplaces"])
-	var names []string
+// claudePluginPlan is the one description of what sync changes for Claude
+// Code plugins; status reports it and sync applies it.
+type claudePluginPlan struct {
+	Marketplace string
+	Register    bool
+	// Set holds enabledPlugins keys to write: true for a plugin to enable, or a
+	// value carried over from a renamed marketplace (a user's false stays false).
+	Set                map[string]bool
+	Remove             []string
+	RemoveMarketplaces []string
+	Managed            []string
+	Disabled           []string
+	Conflicts          []string
+}
+
+func planClaudePlugins(repoRoot string, home string) (claudePluginPlan, error) {
+	plan := claudePluginPlan{Set: map[string]bool{}}
+	settings, err := readClaudeSettings(home)
+	if err != nil {
+		return plan, err
+	}
+	known, okKnown := asMap(settings["extraKnownMarketplaces"])
+	enabled, okEnabled := asMap(settings["enabledPlugins"])
+	for key, ok := range map[string]bool{"extraKnownMarketplaces": okKnown, "enabledPlugins": okEnabled} {
+		if !ok && settings[key] != nil {
+			plan.Conflicts = append(plan.Conflicts, fmt.Sprintf("%s: %s is not an object", claudeHooksConfigPath(home), key))
+		}
+	}
+	m, ok, err := readClaudeMarketplace(repoRoot)
+	if err != nil {
+		plan.Conflicts = append(plan.Conflicts, err.Error())
+	}
+	if len(plan.Conflicts) > 0 {
+		sort.Strings(plan.Conflicts)
+		return plan, nil
+	}
+
+	var sameRoot []string
 	for name, value := range known {
 		entry, _ := asMap(value)
 		source, _ := asMap(entry["source"])
-		if source["source"] != "directory" {
+		path, _ := source["path"].(string)
+		if source["source"] == "directory" && path != "" && (path == repoRoot || sameResolvedPath(path, repoRoot)) {
+			sameRoot = append(sameRoot, name)
+		}
+	}
+	sort.Strings(sameRoot)
+
+	removeMarketplace := func(name string) {
+		plan.RemoveMarketplaces = append(plan.RemoveMarketplaces, name)
+		for key := range enabled {
+			if strings.HasSuffix(key, "@"+name) {
+				plan.Remove = append(plan.Remove, key)
+			}
+		}
+	}
+
+	if !ok {
+		// The marketplace file is gone: drop registrations tackroom made for it.
+		for _, name := range sameRoot {
+			removeMarketplace(name)
+		}
+		sort.Strings(plan.Remove)
+		return plan, nil
+	}
+
+	plan.Marketplace = m.Name
+	if _, taken := known[m.Name]; taken && !stringInSlice(m.Name, sameRoot) {
+		plan.Conflicts = append(plan.Conflicts, fmt.Sprintf("marketplace %q is already registered in %s with another source", m.Name, claudeHooksConfigPath(home)))
+		return plan, nil
+	}
+	plan.Register = !stringInSlice(m.Name, sameRoot)
+
+	value := func(plugin string) (interface{}, bool) {
+		v, set := enabled[plugin+"@"+m.Name]
+		return v, set
+	}
+	for _, old := range sameRoot {
+		if old == m.Name {
 			continue
 		}
-		if path, _ := source["path"].(string); path != "" && samePath(path, repoRoot) {
-			names = append(names, name)
+		removeMarketplace(old)
+		for key, v := range enabled {
+			plugin, found := strings.CutSuffix(key, "@"+old)
+			if b, isBool := v.(bool); found && isBool {
+				if _, set := value(plugin); !set {
+					plan.Set[plugin+"@"+m.Name] = b
+				}
+			}
 		}
 	}
-	sort.Strings(names)
-	return names
-}
 
-func samePath(a, b string) bool {
-	if a == b {
-		return true
+	for _, plugin := range m.Plugins {
+		key := plugin + "@" + m.Name
+		v, _ := value(plugin)
+		if carried, isCarried := plan.Set[key]; isCarried {
+			v = carried
+		}
+		switch v {
+		case true:
+			plan.Managed = append(plan.Managed, plugin)
+		case false:
+			plan.Disabled = append(plan.Disabled, plugin+" (disabled in settings)")
+		default:
+			plan.Set[key] = true
+		}
 	}
-	ra, errA := filepath.EvalSymlinks(a)
-	rb, errB := filepath.EvalSymlinks(b)
-	return errA == nil && errB == nil && ra == rb
+	for _, plugin := range m.Disabled {
+		key := plugin + "@" + m.Name
+		v, _ := value(plugin)
+		if carried, isCarried := plan.Set[key]; isCarried {
+			v = carried
+		}
+		if v == true {
+			plan.Managed = append(plan.Managed, plugin)
+		} else {
+			plan.Disabled = append(plan.Disabled, plugin+" (defaultEnabled: false)")
+		}
+	}
+
+	listed := map[string]bool{}
+	for _, plugin := range append(append(append([]string{}, m.Plugins...), m.Disabled...), m.Skipped...) {
+		listed[plugin] = true
+	}
+	for key := range enabled {
+		if plugin, found := strings.CutSuffix(key, "@"+m.Name); found && !listed[plugin] {
+			plan.Remove = append(plan.Remove, key)
+		}
+	}
+	for key := range plan.Set {
+		plugin, _ := strings.CutSuffix(key, "@"+m.Name)
+		if !listed[plugin] {
+			delete(plan.Set, key)
+		}
+	}
+	sort.Strings(plan.Remove)
+	sort.Strings(plan.Managed)
+	sort.Strings(plan.Disabled)
+	return plan, nil
 }
 
 func augmentClaudePluginReport(report *agentReport, agent agentConfig, repoRoot string, home string) error {
 	if normalizeAgentName(agent.Name) != agentClaudeCode {
 		return nil
 	}
-	m, ok, err := readClaudeMarketplace(repoRoot)
-	if err != nil || !ok {
-		return err
-	}
-	settings, err := readClaudeSettings(home)
+	plan, err := planClaudePlugins(repoRoot, home)
 	if err != nil {
 		return err
 	}
-
-	registered := false
-	for _, name := range directoryMarketplaceNames(settings, repoRoot) {
-		if name == m.Name {
-			registered = true
-			continue
+	for _, conflict := range plan.Conflicts {
+		report.Conflicts = append(report.Conflicts, "plugins: "+conflict)
+	}
+	if plan.Register {
+		report.MissingPlugin = append(report.MissingPlugin, "marketplace "+plan.Marketplace)
+	}
+	for key, v := range plan.Set {
+		plugin, _ := strings.CutSuffix(key, "@"+plan.Marketplace)
+		if v {
+			report.MissingPlugin = append(report.MissingPlugin, plugin)
+		} else {
+			report.MissingPlugin = append(report.MissingPlugin, plugin+" (kept disabled)")
 		}
+	}
+	for _, name := range plan.RemoveMarketplaces {
 		report.StalePlugin = append(report.StalePlugin, "marketplace "+name)
 	}
-	if !registered {
-		report.MissingPlugin = append(report.MissingPlugin, "marketplace "+m.Name)
-	}
-
-	enabled, _ := asMap(settings["enabledPlugins"])
-	for _, plugin := range m.Plugins {
-		switch enabled[plugin+"@"+m.Name] {
-		case true:
-			report.ManagedPlugin = append(report.ManagedPlugin, plugin)
-		case false:
-			report.DisabledPlugin = append(report.DisabledPlugin, plugin+" (disabled in settings)")
-		default:
-			report.MissingPlugin = append(report.MissingPlugin, plugin)
-		}
-	}
-	for _, plugin := range m.Disabled {
-		report.DisabledPlugin = append(report.DisabledPlugin, plugin+" (defaultEnabled: false)")
-	}
-	listed := map[string]bool{}
-	for _, plugin := range append(append(append([]string{}, m.Plugins...), m.Disabled...), m.Skipped...) {
-		listed[plugin] = true
-	}
-	for key := range enabled {
-		plugin, ok := strings.CutSuffix(key, "@"+m.Name)
-		if ok && !listed[plugin] {
-			report.StalePlugin = append(report.StalePlugin, key)
-		}
-	}
+	report.StalePlugin = append(report.StalePlugin, plan.Remove...)
+	report.ManagedPlugin = append(report.ManagedPlugin, plan.Managed...)
+	report.DisabledPlugin = append(report.DisabledPlugin, plan.Disabled...)
 	report.AddsPlugin = append([]string{}, report.MissingPlugin...)
 	report.RemovesPlugin = append([]string{}, report.StalePlugin...)
 	return nil
 }
 
-// syncClaudePlugins registers the config root marketplace, enables its
-// plugins, and drops tackroom-owned entries the marketplace no longer lists.
-func syncClaudePlugins(repoRoot string, home string) error {
-	m, ok, err := readClaudeMarketplace(repoRoot)
-	if err != nil || !ok {
+// syncClaudePlugins applies the current plan. Removals are skipped when the
+// caller declined them (setup's confirmation, the view's destructive list).
+func syncClaudePlugins(repoRoot string, home string, allowRemovals bool) error {
+	plan, err := planClaudePlugins(repoRoot, home)
+	if err != nil {
 		return err
+	}
+	if len(plan.Conflicts) > 0 {
+		return fmt.Errorf("claude plugins: %s", strings.Join(plan.Conflicts, "; "))
+	}
+	if !plan.Register && len(plan.Set) == 0 && (!allowRemovals || len(plan.Remove)+len(plan.RemoveMarketplaces) == 0) {
+		return nil
 	}
 	settings, err := readClaudeSettings(home)
 	if err != nil {
 		return err
 	}
-
-	known, isMap := asMap(settings["extraKnownMarketplaces"])
-	if !isMap {
-		if settings["extraKnownMarketplaces"] != nil {
-			return fmt.Errorf("%s: extraKnownMarketplaces is not an object", claudeSettingsPath(home))
-		}
+	known, _ := asMap(settings["extraKnownMarketplaces"])
+	if known == nil {
 		known = map[string]interface{}{}
 	}
-	enabled, isMap := asMap(settings["enabledPlugins"])
-	if !isMap {
-		if settings["enabledPlugins"] != nil {
-			return fmt.Errorf("%s: enabledPlugins is not an object", claudeSettingsPath(home))
-		}
+	enabled, _ := asMap(settings["enabledPlugins"])
+	if enabled == nil {
 		enabled = map[string]interface{}{}
 	}
-
-	for _, name := range directoryMarketplaceNames(settings, repoRoot) {
-		if name == m.Name {
-			continue
+	if allowRemovals {
+		for _, name := range plan.RemoveMarketplaces {
+			delete(known, name)
 		}
-		delete(known, name)
-		for key := range enabled {
-			if strings.HasSuffix(key, "@"+name) {
-				delete(enabled, key)
-			}
-		}
-	}
-	known[m.Name] = map[string]interface{}{
-		"source": map[string]interface{}{"source": "directory", "path": repoRoot},
-	}
-
-	listed := map[string]bool{}
-	for _, plugin := range append(append(append([]string{}, m.Plugins...), m.Disabled...), m.Skipped...) {
-		listed[plugin] = true
-	}
-	for key := range enabled {
-		if plugin, ok := strings.CutSuffix(key, "@"+m.Name); ok && !listed[plugin] {
+		for _, key := range plan.Remove {
 			delete(enabled, key)
 		}
 	}
-	for _, plugin := range m.Plugins {
-		if _, set := enabled[plugin+"@"+m.Name]; !set {
-			enabled[plugin+"@"+m.Name] = true
+	if plan.Register {
+		known[plan.Marketplace] = map[string]interface{}{
+			"source": map[string]interface{}{"source": "directory", "path": repoRoot},
 		}
 	}
-
+	for key, v := range plan.Set {
+		enabled[key] = v
+	}
 	settings["extraKnownMarketplaces"] = known
 	settings["enabledPlugins"] = enabled
-	return writeJSONConfig(claudeSettingsPath(home), settings)
+	return writeJSONConfig(claudeHooksConfigPath(home), settings)
 }
 
 func writeJSONConfig(path string, raw map[string]interface{}) error {
@@ -284,10 +381,10 @@ func applyClaudePluginSync(reports []agentReport, repoRoot string, home string) 
 		if !report.Detected || normalizeAgentName(report.Name) != agentClaudeCode {
 			continue
 		}
-		if len(report.MissingPlugin)+len(report.StalePlugin) == 0 {
+		if len(report.AddsPlugin)+len(report.RemovesPlugin) == 0 {
 			continue
 		}
-		if err := syncClaudePlugins(repoRoot, home); err != nil {
+		if err := syncClaudePlugins(repoRoot, home, len(report.RemovesPlugin) > 0); err != nil {
 			return err
 		}
 	}
@@ -297,11 +394,26 @@ func applyClaudePluginSync(reports []agentReport, repoRoot string, home string) 
 // claudePluginValidate runs Claude Code's own validator; a var so tests can
 // stand in for the claude executable.
 var claudePluginValidate = func(claude string, root string) ([]byte, error) {
-	return exec.Command(claude, "plugin", "validate", root).CombinedOutput()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	return exec.CommandContext(ctx, claude, "plugin", "validate", root).CombinedOutput()
 }
 
-func checkClaudePlugins(repoRoot string) checkResult {
+func checkClaudePlugins(repoRoot string, cfg config) checkResult {
 	const name = "claude plugins"
+	claude := ""
+	for _, agent := range cfg.Agents {
+		if normalizeAgentName(agent.Name) == agentClaudeCode && isDetected(agent) {
+			detect := agent.Detect
+			if detect == "" {
+				detect = "claude"
+			}
+			claude, _ = exec.LookPath(detect)
+		}
+	}
+	if claude == "" {
+		return checkResult{name, checkStatusPass, agentClaudeCode + " not detected, skipped"}
+	}
 	m, ok, err := readClaudeMarketplace(repoRoot)
 	if err != nil {
 		return checkResult{name, checkStatusFail, err.Error()}
@@ -309,22 +421,20 @@ func checkClaudePlugins(repoRoot string) checkResult {
 	if !ok {
 		return checkResult{name, checkStatusPass, "no .claude-plugin/marketplace.json, skipped"}
 	}
-	claude, err := exec.LookPath("claude")
-	if err != nil {
-		return checkResult{name, checkStatusWarn, "claude not on PATH; marketplace not validated"}
-	}
 	out, err := claudePluginValidate(claude, repoRoot)
 	if err != nil {
-		return checkResult{name, checkStatusFail, "claude plugin validate failed: " + lastLine(string(out))}
+		reason := strings.TrimSpace(string(out))
+		if reason == "" {
+			reason = err.Error()
+		} else {
+			lines := strings.Split(reason, "\n")
+			reason = strings.TrimSpace(lines[len(lines)-1])
+		}
+		return checkResult{name, checkStatusFail, "claude plugin validate failed: " + reason}
 	}
 	detail := fmt.Sprintf("marketplace %s: %d plugins, claude plugin validate passed", m.Name, len(m.Plugins))
 	if strings.Contains(string(out), "with warnings") {
 		detail += " with warnings"
 	}
 	return checkResult{name, checkStatusPass, detail}
-}
-
-func lastLine(s string) string {
-	lines := strings.Split(strings.TrimSpace(s), "\n")
-	return strings.TrimSpace(lines[len(lines)-1])
 }

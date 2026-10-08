@@ -504,8 +504,11 @@ func printVerboseSurfaceLists(report agentReport) {
 	if len(report.ManagedPackage) > 0 {
 		fmt.Printf("  packages (%d): %s\n", len(report.ManagedPackage), displayList(report.ManagedPackage))
 	}
-	if len(report.ManagedPlugin)+len(report.DisabledPlugin) > 0 {
-		fmt.Printf("  plugins (%d):  %s\n", len(report.ManagedPlugin), displayList(append(append([]string{}, report.ManagedPlugin...), report.DisabledPlugin...)))
+	if len(report.ManagedPlugin) > 0 {
+		fmt.Printf("  plugins (%d):  %s\n", len(report.ManagedPlugin), displayList(report.ManagedPlugin))
+	}
+	if len(report.DisabledPlugin) > 0 {
+		fmt.Printf("  plugins off (%d): %s\n", len(report.DisabledPlugin), displayList(report.DisabledPlugin))
 	}
 	if len(report.External) > 0 {
 		fmt.Printf("  external (%d): %s\n", len(report.External), displayList(report.External))

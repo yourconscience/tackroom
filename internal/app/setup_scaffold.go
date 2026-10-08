@@ -696,7 +696,7 @@ func confirmDestructiveSyncActions(reports []agentReport, streams setupIO) {
 		if !r.Detected {
 			continue
 		}
-		if len(r.Removes)+len(r.RemovesAgent)+len(r.UpdatesAgent)+len(r.RemovesPackage) == 0 {
+		if len(r.Removes)+len(r.RemovesAgent)+len(r.UpdatesAgent)+len(r.RemovesPackage)+len(r.RemovesPlugin) == 0 {
 			continue
 		}
 		fmt.Fprintf(streams.out, "\n%s has existing content this sync would change:\n", r.Name)
@@ -712,6 +712,9 @@ func confirmDestructiveSyncActions(reports []agentReport, streams setupIO) {
 		if len(r.RemovesPackage) > 0 {
 			fmt.Fprintf(streams.out, "  remove %d Pi package declaration(s): %s\n", len(r.RemovesPackage), strings.Join(r.RemovesPackage, ", "))
 		}
+		if len(r.RemovesPlugin) > 0 {
+			fmt.Fprintf(streams.out, "  remove %d Claude plugin setting(s): %s\n", len(r.RemovesPlugin), strings.Join(r.RemovesPlugin, ", "))
+		}
 		if !promptYesNoDefaultNo(streams, fmt.Sprintf("Apply these changes to %s?", r.Name)) {
 			fmt.Fprintf(streams.out, "%s: keeping existing content; removals and overwrites skipped this run\n", r.Name)
 			r.Removes = nil
@@ -719,6 +722,7 @@ func confirmDestructiveSyncActions(reports []agentReport, streams setupIO) {
 			r.UpdatesAgent = nil
 			r.RemovesPackage = nil
 			r.UpdatesPackage = nil
+			r.RemovesPlugin = nil
 		}
 	}
 }
