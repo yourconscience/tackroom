@@ -31,15 +31,21 @@ func Mark(kind string) string {
 	}
 }
 
-// Fprint writes s to w, dropping escape codes when w is not a terminal and
-// color when NO_COLOR is set. Any non-empty NO_COLOR counts
-// (https://no-color.org); colorprofile on its own honors only boolean values.
-func Fprint(w io.Writer, s string) error {
+// Writer wraps w so writes carry only what w can show: no escape codes when
+// w is not a terminal, and no color when NO_COLOR is set. Any non-empty
+// NO_COLOR counts (https://no-color.org); colorprofile on its own honors only
+// boolean values. Detection runs once, so reuse the writer for repeated output.
+func Writer(w io.Writer) io.Writer {
 	cw := colorprofile.NewWriter(w, os.Environ())
 	if os.Getenv("NO_COLOR") != "" && cw.Profile > colorprofile.ASCII {
 		cw.Profile = colorprofile.ASCII
 	}
-	_, err := io.WriteString(cw, s)
+	return cw
+}
+
+// Fprint writes s to w through Writer.
+func Fprint(w io.Writer, s string) error {
+	_, err := io.WriteString(Writer(w), s)
 	return err
 }
 

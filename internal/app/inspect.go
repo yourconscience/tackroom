@@ -190,6 +190,16 @@ func readableReports(reports []agentReport) []agentReport {
 	return readable
 }
 
+func unreadableReports(reports []agentReport) []agentReport {
+	var unreadable []agentReport
+	for _, report := range reports {
+		if report.Error != "" {
+			unreadable = append(unreadable, report)
+		}
+	}
+	return unreadable
+}
+
 // agentFailures folds every unreadable agent into one error, or returns nil.
 func agentFailures(reports []agentReport) error {
 	var failed []string

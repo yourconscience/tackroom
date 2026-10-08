@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -19,6 +20,9 @@ import (
 // when sync stopped before changing anything, so the run's actions read as
 // planned rather than done.
 func printReport(w io.Writer, applied bool, repoReport repoLinkReport, reports []agentReport, home string, cfg config) {
+	if w == io.Discard {
+		return
+	}
 	_ = ui.Fprint(w, renderReport(applied, repoReport, reports, home, cfg, ui.Width(w)))
 }
 
@@ -36,7 +40,7 @@ func renderReport(applied bool, repoReport repoLinkReport, reports []agentReport
 		changesLabel = "planned"
 	}
 	head := []field{
-		{label: changesLabel, items: changeGroups(reports), sep: " ·"},
+		{label: changesLabel, value: changesLine(repoReport, reports)},
 		{label: "repo", value: repoLine(repoReport)},
 	}
 	label := "sources"
@@ -74,7 +78,8 @@ func renderReport(applied bool, repoReport repoLinkReport, reports []agentReport
 	}
 
 	if len(problems) > 0 {
-		b.WriteString("\n" + ui.Yellow.Render("needs attention:") + " " + strings.Join(problems, ", ") + "\n")
+		b.WriteString("\n")
+		writeFields(&b, 0, 0, []field{{label: ui.Yellow.Render("needs attention"), items: problems, sep: ","}}, width)
 	}
 	return b.String()
 }
@@ -99,7 +104,11 @@ func reportProblems(repoReport repoLinkReport, reports []agentReport) []string {
 // repoLine, rootDocLine and sourceLines are shared by the sync and status reports.
 func repoLine(repoReport repoLinkReport) string {
 	if repoReport.State == stateSynced {
-		return fmt.Sprintf("%s ~/.agents %s %s", ui.Mark("ok"), ui.Dim.Render("->"), repoReport.ExpectedTarget)
+		line := fmt.Sprintf("%s ~/.agents %s %s", ui.Mark("ok"), ui.Dim.Render("->"), repoReport.ExpectedTarget)
+		if repoReport.Linked {
+			line += " " + ui.Dim.Render("(linked this run)")
+		}
+		return line
 	}
 	detail := fmt.Sprintf("expected %s", repoReport.ExpectedTarget)
 	if repoReport.ActualTarget != "" {
@@ -110,7 +119,11 @@ func repoLine(repoReport repoLinkReport) string {
 
 func rootDocLine(r agentReport) string {
 	if r.RootState == stateSynced {
-		return fmt.Sprintf("%s synced %s %s", ui.Mark("ok"), ui.Dim.Render("->"), r.RootExpected)
+		line := fmt.Sprintf("%s synced %s %s", ui.Mark("ok"), ui.Dim.Render("->"), r.RootExpected)
+		if r.RootLinked {
+			line += " " + ui.Dim.Render("(linked this run)")
+		}
+		return line
 	}
 	detail := fmt.Sprintf("expected %s", r.RootExpected)
 	if r.RootActual != "" {
@@ -156,7 +169,7 @@ func actionsBySurface(r agentReport) []surfaceActions {
 }
 
 // actionPhrase counts a harness's changes, e.g. "+2 -1 skills, ~1 packages".
-// The key lists the changed items, so only identical changes share a phrase.
+// The key names the changed items, so only identical changes share a phrase.
 func actionPhrase(r agentReport) (phrase, key string) {
 	var parts, keys []string
 	for _, s := range actionsBySurface(r) {
@@ -172,15 +185,29 @@ func actionPhrase(r agentReport) (phrase, key string) {
 		}
 		if len(counts) > 0 {
 			parts = append(parts, strings.Join(counts, " ")+" "+s.surface)
-			keys = append(keys, fmt.Sprintf("%s+%v~%v-%v", s.surface, s.add, s.update, s.remove))
+			keys = append(keys, strings.Join([]string{s.surface, sortedJoin(s.add), sortedJoin(s.update), sortedJoin(s.remove)}, "\x00"))
 		}
 	}
-	return strings.Join(parts, ", "), strings.Join(keys, "|")
+	if r.RootLinked {
+		parts = append(parts, "root doc linked")
+		keys = append(keys, "root")
+	}
+	return strings.Join(parts, ", "), strings.Join(keys, "\x00\x00")
 }
 
-// changeGroups merges harnesses that made exactly the same changes, so a skill
-// added to five harnesses reads as one entry instead of five.
-func changeGroups(reports []agentReport) []string {
+func sortedJoin(items []string) string {
+	sorted := slices.Clone(items)
+	slices.Sort(sorted)
+	return strings.Join(sorted, "\x01")
+}
+
+// changesLine summarizes the run, merging harnesses that made exactly the same
+// changes, so a skill added to five harnesses reads as one entry, not five.
+func changesLine(repoReport repoLinkReport, reports []agentReport) string {
+	var groups []string
+	if repoReport.Linked {
+		groups = append(groups, "~/.agents linked")
+	}
 	var order []string
 	phrases := map[string]string{}
 	names := map[string][]string{}
@@ -195,14 +222,13 @@ func changeGroups(reports []agentReport) []string {
 		}
 		names[key] = append(names[key], report.Name)
 	}
-	if len(order) == 0 {
-		return []string{ui.Dim.Render("none")}
-	}
-	groups := make([]string, 0, len(order))
 	for _, key := range order {
 		groups = append(groups, phrases[key]+" "+ui.Dim.Render("("+strings.Join(names[key], ", ")+")"))
 	}
-	return groups
+	if len(groups) == 0 {
+		return ui.Dim.Render("none")
+	}
+	return strings.Join(groups, " · ")
 }
 
 // harnessTable is the at-a-glance view: state and managed counts per harness.
@@ -274,22 +300,7 @@ func harnessRows(r agentReport, applied bool) []field {
 		rows = append(rows, field{label: "integration", value: ui.Dim.Render(h.IntegrationNote)})
 	}
 
-	list := func(label string, items []string) {
-		if len(items) > 0 {
-			rows = append(rows, field{label: fmt.Sprintf("%s (%d)", label, len(items)), items: items, sep: ","})
-		}
-	}
-	if len(r.Managed) == 0 {
-		rows = append(rows, field{label: "skills (0)", value: ui.Dim.Render("-")})
-	}
-	list("skills", r.Managed)
-	list("agents", r.ManagedAgent)
-	list("mcp", r.ManagedMCP)
-	list("hooks", r.ManagedHook)
-	list("packages", r.ManagedPackage)
-	list("plugins", r.ManagedPlugin)
-	list("plugins off", r.DisabledPlugin)
-	list("external", r.External)
+	rows = append(rows, managedRows(r)...)
 
 	verbs := []struct {
 		done, planned string
@@ -318,17 +329,45 @@ func harnessRows(r agentReport, applied bool) []field {
 	}
 
 	for _, bucket := range driftBuckets(r) {
-		// A package removal is this run's action, already listed above.
-		if len(bucket.items) == 0 || bucket.label == "packages removed" {
+		// Actions are listed above. Before an apply, drift is exactly what the
+		// planned actions fix, so only what sync cannot fix is listed.
+		if len(bucket.items) == 0 || bucket.kind == bucketAction || (!applied && bucket.kind == bucketDrift) {
 			continue
 		}
-		rows = append(rows, field{label: ui.Red.Render(fmt.Sprintf("%s (%d)", bucket.label, len(bucket.items))), items: bucket.items, sep: ","})
+		style := ui.Red
+		if bucket.kind == bucketNotice {
+			style = ui.Yellow
+		}
+		rows = append(rows, field{label: style.Render(fmt.Sprintf("%s (%d)", bucket.label, len(bucket.items))), items: bucket.items, sep: ","})
 	}
 	return rows
 }
 
-// field is one "label  value" row of a report. A field with items is a list:
-// it wraps only between items, each followed by sep except the last.
+// managedRows lists every managed item of a harness, one row per surface.
+func managedRows(r agentReport) []field {
+	var rows []field
+	list := func(label string, items []string) {
+		if len(items) > 0 {
+			rows = append(rows, field{label: fmt.Sprintf("%s (%d)", label, len(items)), items: items, sep: ","})
+		}
+	}
+	if len(r.Managed) == 0 {
+		rows = append(rows, field{label: "skills (0)", value: ui.Dim.Render("-")})
+	}
+	list("skills", r.Managed)
+	list("agents", r.ManagedAgent)
+	list("mcp", r.ManagedMCP)
+	list("hooks", r.ManagedHook)
+	list("packages", r.ManagedPackage)
+	list("plugins", r.ManagedPlugin)
+	list("plugins off", r.DisabledPlugin)
+	list("external", r.External)
+	return rows
+}
+
+// field is one "label  value" row of a report. A value wraps only at spaces,
+// so paths and URLs stay whole. A field with items is a list: it wraps only
+// between items, each followed by sep except the last.
 type field struct {
 	label string
 	value string
@@ -361,7 +400,7 @@ func writeFields(b *strings.Builder, indent, labelWidth int, rows []field, width
 		if row.items != nil {
 			lines = packItems(row.items, row.sep, valueWidth)
 		} else {
-			lines = strings.Split(lipgloss.Wrap(row.value, valueWidth, " "), "\n")
+			lines = packItems(strings.Split(row.value, " "), "", valueWidth)
 		}
 		if stacked {
 			if row.label != "" {
@@ -476,6 +515,7 @@ func restoreSyncActions(current []agentReport, preflight []agentReport) {
 			current[i].AddsPlugin = append([]string{}, original.AddsPlugin...)
 			current[i].RemovesPlugin = append([]string{}, original.RemovesPlugin...)
 			current[i].Removes = append([]string{}, original.Removes...)
+			current[i].RootLinked = original.RootPath != "" && original.RootState != stateSynced && current[i].RootState == stateSynced
 		}
 	}
 }
@@ -505,10 +545,11 @@ func hasFile(path string) bool {
 // counts; --verbose (verbose=true) restores the full lists and native roots.
 // Each section prints as soon as it is ready, so slow checks do not hold back
 // the harness blocks.
-func printStatusReport(repoRoot string, repoReport repoLinkReport, reports []agentReport, home string, cfg config, verbose bool) {
+func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, reports []agentReport, home string, cfg config, verbose bool) {
 	var b strings.Builder
+	out, width := ui.Writer(w), ui.Width(w)
 	flush := func() {
-		_ = ui.Fprint(os.Stdout, b.String())
+		_, _ = io.WriteString(out, b.String())
 		b.Reset()
 	}
 	defer flush()
@@ -527,7 +568,7 @@ func printStatusReport(repoRoot string, repoReport repoLinkReport, reports []age
 	var drifted, failed []string
 	for _, report := range reports {
 		fmt.Fprintln(&b)
-		writeHarnessStatus(&b, report, repoRoot, home, cfg, verbose)
+		writeHarnessStatus(&b, report, repoRoot, home, cfg, verbose, width)
 		flush()
 		switch {
 		case report.Error != "":
@@ -543,14 +584,12 @@ func printStatusReport(repoRoot string, repoReport repoLinkReport, reports []age
 	if memsearchSetUp(repoRoot, home) {
 		checks = append(checks, checkMemsearchIndex(repoRoot, home))
 	}
-	width := 0
+	nameWidth := 0
 	for _, chk := range checks {
-		if len(chk.name) > width {
-			width = len(chk.name)
-		}
+		nameWidth = max(nameWidth, len(chk.name))
 	}
 	for _, chk := range checks {
-		fmt.Fprintf(&b, "  %s %-*s  %s\n", ui.Mark(checkMarkKind(chk.status)), width, chk.name, ui.Dim.Render(chk.detail))
+		fmt.Fprintf(&b, "  %s %-*s  %s\n", ui.Mark(checkMarkKind(chk.status)), nameWidth, chk.name, ui.Dim.Render(chk.detail))
 	}
 
 	fmt.Fprintln(&b)
@@ -585,7 +624,7 @@ func checkMarkKind(status string) string {
 	}
 }
 
-func writeHarnessStatus(b *strings.Builder, report agentReport, repoRoot string, home string, cfg config, verbose bool) {
+func writeHarnessStatus(b *strings.Builder, report agentReport, repoRoot string, home string, cfg config, verbose bool, width int) {
 	if report.Error != "" {
 		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("fail"), ui.Red.Render("config unreadable"))
 		fmt.Fprintf(b, "  error       %s\n", report.Error)
@@ -620,7 +659,7 @@ func writeHarnessStatus(b *strings.Builder, report agentReport, repoRoot string,
 	fmt.Fprintf(b, "  context     %s\n", ui.Dim.Render(fmt.Sprintf("%d skills, %d bytes, %s", len(contextSkills), listingBytes, formatTokenEstimate(estimateTokens(listingBytes)))))
 
 	if verbose {
-		writeVerboseSurfaceLists(b, report)
+		writeFields(b, 2, 0, managedRows(report), width)
 	}
 
 	for _, bucket := range driftBuckets(report) {
@@ -660,53 +699,37 @@ func surfaceCounts(r agentReport) string {
 type driftBucket struct {
 	label string
 	items []string
+	kind  bucketKind
 }
+
+// bucketKind says how a sync run relates to a drift bucket.
+type bucketKind int
+
+const (
+	bucketDrift    bucketKind = iota // sync fixes it
+	bucketAction                     // a sync action list, not drift
+	bucketNotice                     // informational; sync does not change it
+	bucketConflict                   // blocks sync until resolved by hand
+)
 
 // driftBuckets lists the actionable, non-synced surfaces for a harness in a
 // stable order so the concise status view can render only what needs a sync.
 func driftBuckets(r agentReport) []driftBucket {
 	return []driftBucket{
-		{"skills drifted", r.Drifted},
-		{"skills missing", r.Missing},
-		{"skills stale", r.StaleManaged},
-		{"agents drifted", r.DriftedAgent},
-		{"agents missing", r.MissingAgent},
-		{"mcp drifted", r.DriftedMCP},
-		{"mcp missing", r.MissingMCP},
-		{"hooks drifted", r.DriftedHook},
-		{"hooks missing", r.MissingHook},
-		{"hooks unsupported", r.UnsupportedHook},
-		{"packages drifted", r.DriftedPackage},
-		{"packages removed", r.RemovesPackage},
-		{"plugins missing", r.MissingPlugin},
-		{"plugins stale", r.StalePlugin},
-		{"conflicts", r.Conflicts},
-	}
-}
-
-// writeVerboseSurfaceLists restores the full managed and external skill lists
-// that the concise view collapses to counts.
-func writeVerboseSurfaceLists(b *strings.Builder, report agentReport) {
-	fmt.Fprintf(b, "  skills (%d):  %s\n", len(report.Managed), displayList(report.Managed))
-	if len(report.ManagedAgent) > 0 {
-		fmt.Fprintf(b, "  agents (%d):  %s\n", len(report.ManagedAgent), displayList(report.ManagedAgent))
-	}
-	if len(report.ManagedMCP) > 0 {
-		fmt.Fprintf(b, "  mcp (%d):     %s\n", len(report.ManagedMCP), displayList(report.ManagedMCP))
-	}
-	if len(report.ManagedHook) > 0 {
-		fmt.Fprintf(b, "  hooks (%d):   %s\n", len(report.ManagedHook), displayList(report.ManagedHook))
-	}
-	if len(report.ManagedPackage) > 0 {
-		fmt.Fprintf(b, "  packages (%d): %s\n", len(report.ManagedPackage), displayList(report.ManagedPackage))
-	}
-	if len(report.ManagedPlugin) > 0 {
-		fmt.Fprintf(b, "  plugins (%d):  %s\n", len(report.ManagedPlugin), displayList(report.ManagedPlugin))
-	}
-	if len(report.DisabledPlugin) > 0 {
-		fmt.Fprintf(b, "  plugins off (%d): %s\n", len(report.DisabledPlugin), displayList(report.DisabledPlugin))
-	}
-	if len(report.External) > 0 {
-		fmt.Fprintf(b, "  external (%d): %s\n", len(report.External), displayList(report.External))
+		{"skills drifted", r.Drifted, bucketDrift},
+		{"skills missing", r.Missing, bucketDrift},
+		{"skills stale", r.StaleManaged, bucketDrift},
+		{"agents drifted", r.DriftedAgent, bucketDrift},
+		{"agents missing", r.MissingAgent, bucketDrift},
+		{"mcp drifted", r.DriftedMCP, bucketDrift},
+		{"mcp missing", r.MissingMCP, bucketDrift},
+		{"hooks drifted", r.DriftedHook, bucketDrift},
+		{"hooks missing", r.MissingHook, bucketDrift},
+		{"hooks unsupported", r.UnsupportedHook, bucketNotice},
+		{"packages drifted", r.DriftedPackage, bucketDrift},
+		{"packages removed", r.RemovesPackage, bucketAction},
+		{"plugins missing", r.MissingPlugin, bucketDrift},
+		{"plugins stale", r.StalePlugin, bucketDrift},
+		{"conflicts", r.Conflicts, bucketConflict},
 	}
 }

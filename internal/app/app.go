@@ -79,6 +79,7 @@ type repoLinkReport struct {
 	ExpectedTarget string
 	ActualTarget   string
 	State          string
+	Linked         bool // this sync run created or repaired the link
 }
 
 type agentReport struct {
@@ -94,6 +95,7 @@ type agentReport struct {
 	RootExpected    string
 	RootActual      string
 	RootState       string
+	RootLinked      bool // this sync run created or repaired the root link
 	Managed         []string
 	ManagedAgent    []string
 	ManagedMCP      []string

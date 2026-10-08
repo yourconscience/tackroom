@@ -30,7 +30,7 @@ func runStatus(opts runOptions) error {
 		return err
 	}
 
-	printStatusReport(repoRoot, repoReport, reports, home, cfg, opts.Verbose)
+	printStatusReport(setupStreams(opts).out, repoRoot, repoReport, reports, home, cfg, opts.Verbose)
 	if err := agentFailures(reports); err != nil {
 		return err
 	}
@@ -60,6 +60,7 @@ func runSync(opts runOptions) error {
 		printReport(setupStreams(opts).out, false, repoReport, nil, home, cfg)
 		return fmt.Errorf("sync aborted due to conflicts: repo link: %s", repoReport.Path)
 	}
+	linkingRepo := repoReport.State != stateSynced
 	if err := applyRepoLink(repoReport); err != nil {
 		return err
 	}
@@ -109,7 +110,9 @@ func runSync(opts runOptions) error {
 		}
 	}
 	if len(conflicts) > 0 {
-		printReport(streams.out, false, repoReport, reports, home, cfg)
+		// Unreadable harnesses are not synced, but still belong in the report.
+		shown := append(cloneReports(reports), unreadableReports(inspected)...)
+		printReport(streams.out, false, repoReport, shown, home, cfg)
 		return fmt.Errorf("sync aborted due to conflicts: %s", strings.Join(conflicts, "; "))
 	}
 	if err := applyAgentSync(reports, cfg, repoRoot, home); err != nil {
@@ -143,6 +146,7 @@ func runSync(opts runOptions) error {
 		return err
 	}
 	restoreSyncActions(reports, preflight)
+	repoReport.Linked = linkingRepo && repoReport.State == stateSynced
 
 	printReport(streams.out, true, repoReport, reports, home, cfg)
 	return agentFailures(reports)

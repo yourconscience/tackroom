@@ -9,7 +9,7 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/mattn/go-isatty"
+	"github.com/charmbracelet/x/term"
 	"github.com/yourconscience/tackroom/internal/agentrole"
 )
 
@@ -19,7 +19,7 @@ func reviewTTYAvailable(streams setupIO) bool {
 	if streams.in != os.Stdin || streams.out != os.Stdout {
 		return false
 	}
-	return isatty.IsTerminal(os.Stdin.Fd()) && isatty.IsTerminal(os.Stdout.Fd())
+	return term.IsTerminal(os.Stdin.Fd()) && term.IsTerminal(os.Stdout.Fd())
 }
 
 // runReviewImport shows the unified review screen and applies the decisions.

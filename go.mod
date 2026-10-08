@@ -8,7 +8,6 @@ require (
 	github.com/charmbracelet/colorprofile v0.4.3
 	github.com/charmbracelet/x/ansi v0.11.8
 	github.com/charmbracelet/x/term v0.2.2
-	github.com/mattn/go-isatty v0.0.20
 	gopkg.in/yaml.v3 v3.0.1
 )
 

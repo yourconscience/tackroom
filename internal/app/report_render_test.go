@@ -1,12 +1,14 @@
 package app
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/yourconscience/tackroom/internal/ui"
 )
 
 func syncedRepo() repoLinkReport {
@@ -45,17 +47,19 @@ func TestRenderReportGroupsChangesAndListsEveryItem(t *testing.T) {
 		{Name: "hermes"},
 	}
 	out := renderPlain(t, true, reports, 100)
+	// The changes line wraps at spaces; compare it with whitespace collapsed.
+	flat := strings.Join(strings.Fields(out), " ")
 
 	for _, want := range []string{
-		"tackroom sync  ✓ synced",
+		"tackroom sync ✓ synced",
 		"+2 skills, +1 plugins (claude)",
 		// Same counts, different skills: omp is not merged into codex's entry.
 		"+2 skills (codex, droid)",
 		"+2 skills (omp)",
 		"-1 skills, ~1 packages (pi)",
-		"│ hermes  │ not detected │",
+		"│ hermes │ not detected │",
 	} {
-		if !strings.Contains(out, want) {
+		if !strings.Contains(flat, want) {
 			t.Errorf("report missing %q:\n%s", want, out)
 		}
 	}
@@ -105,7 +109,7 @@ func TestRenderReportShowsAbortedActionsAsPlanned(t *testing.T) {
 			t.Errorf("aborted report missing %q:\n%s", want, out)
 		}
 	}
-	for _, unwanted := range []string{"changes ", "added "} {
+	for _, unwanted := range []string{"changes ", "added ", "skills missing"} {
 		if strings.Contains(out, unwanted) {
 			t.Errorf("aborted report claims the run applied changes (%q):\n%s", unwanted, out)
 		}
@@ -125,7 +129,7 @@ func TestRenderReportFlagsProblems(t *testing.T) {
 		"conflicts (1)",
 		"codex  ✗ config unreadable",
 		"parse ~/.codex/config.toml: bad key",
-		"needs attention: claude, codex (config unreadable)",
+		"needs attention  claude, codex (config unreadable)",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("report missing %q:\n%s", want, out)
@@ -140,6 +144,11 @@ func TestRenderReportFitsWidth(t *testing.T) {
 			Missing: skills[:12], UnsupportedHook: []string{"pre-tool-use-guard", "session-end-memory"}},
 		{Name: "codex"},
 	}
+	// The same change in many harnesses makes the longest "changes" entry.
+	for _, name := range []string{"copilot", "cursor", "droid", "grok", "hermes", "omp", "opencode", "pi", "qwen-code"} {
+		reports = append(reports, agentReport{Name: name, Detected: true, Synced: true, SkillRoot: "/h/s",
+			Managed: skills[:2], Adds: []string{"web-search"}, AddsAgent: []string{"reviewer"}})
+	}
 	for width := 40; width <= 120; width++ {
 		out := renderPlain(t, true, reports, width)
 		for _, line := range strings.Split(out, "\n") {
@@ -151,10 +160,69 @@ func TestRenderReportFitsWidth(t *testing.T) {
 			}
 		}
 		block := harnessBlockText(out, "claude")
-		for _, skill := range skills {
-			if !strings.Contains(block, skill) {
-				t.Errorf("width %d: block lost %q", width, skill)
+		for _, want := range skills {
+			if !strings.Contains(block, want) {
+				t.Errorf("width %d: block lost %q", width, want)
 			}
+		}
+		if !strings.Contains(strings.Join(strings.Fields(out), " "), "(copilot, cursor, droid, grok, hermes, omp, opencode, pi, qwen-code)") {
+			t.Errorf("width %d: changes line lost harness names:\n%s", width, out)
+		}
+	}
+}
+
+// Values wrap only at spaces, so a path stays whole even past the width.
+func TestRenderReportKeepsPathsWhole(t *testing.T) {
+	const root = "/home/some-user/agent-config-root/skills"
+	reports := []agentReport{{Name: "claude", Detected: true, Synced: true, SkillRoot: root}}
+	for _, width := range []int{40, 50, 60} {
+		if out := renderPlain(t, true, reports, width); !strings.Contains(out, root) {
+			t.Errorf("width %d: path split across lines:\n%s", width, out)
+		}
+	}
+}
+
+func TestRenderReportNamesRelinks(t *testing.T) {
+	repo := syncedRepo()
+	repo.Linked = true
+	reports := []agentReport{{Name: "claude", Detected: true, Synced: true, SkillRoot: "/h/s",
+		RootPath: "/h/CLAUDE.md", RootState: stateSynced, RootExpected: "/h/.agents/AGENTS.md", RootLinked: true}}
+	out := ansi.Strip(renderReport(true, repo, reports, t.TempDir(), config{}, 100))
+	for _, want := range []string{"changes  ~/.agents linked · root doc linked (claude)", "/home/u/.agents (linked this run)", "AGENTS.md (linked this run)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("report missing %q:\n%s", want, out)
+		}
+	}
+}
+
+func TestRestoreSyncActionsMarksRootRelink(t *testing.T) {
+	preflight := []agentReport{{Name: "claude", RootPath: "/h/CLAUDE.md", RootState: stateMissing}, {Name: "codex", RootPath: "/h/AGENTS.md", RootState: stateSynced}}
+	current := []agentReport{{Name: "claude", RootPath: "/h/CLAUDE.md", RootState: stateSynced}, {Name: "codex", RootPath: "/h/AGENTS.md", RootState: stateSynced}}
+	restoreSyncActions(current, preflight)
+	if !current[0].RootLinked || current[1].RootLinked {
+		t.Fatalf("RootLinked = %v, %v; want only the relinked harness", current[0].RootLinked, current[1].RootLinked)
+	}
+}
+
+func TestRenderReportShowsUnsupportedHooksAsNotice(t *testing.T) {
+	reports := []agentReport{{Name: "claude", Detected: true, Synced: true, SkillRoot: "/h/s", UnsupportedHook: []string{"pre-tool-use-guard"}}}
+	out := renderReport(true, syncedRepo(), reports, t.TempDir(), config{}, 100)
+	if !strings.Contains(out, ui.Yellow.Render("hooks unsupported (1)")) || strings.Contains(out, ui.Red.Render("hooks unsupported (1)")) {
+		t.Fatalf("unsupported hooks should be a yellow notice on a synced harness:\n%s", ansi.Strip(out))
+	}
+}
+
+func TestPrintStatusReportWritesToTheGivenWriter(t *testing.T) {
+	var buf bytes.Buffer
+	reports := []agentReport{{Name: "claude", Detected: true, Synced: true, SkillRoot: "/h/s", Managed: hyphenatedSkills(30)}}
+	printStatusReport(&buf, t.TempDir(), syncedRepo(), reports, t.TempDir(), config{}, true)
+	out := buf.String()
+	if strings.Contains(out, "\x1b[") {
+		t.Fatalf("status to a non-terminal carried escape codes: %q", out)
+	}
+	for _, want := range []string{"tackroom status", "claude   ✓ synced", "skills (30)", "skill-29-release-notes-draft", "Everything is synced."} {
+		if !strings.Contains(out, want) {
+			t.Errorf("status missing %q:\n%s", want, out)
 		}
 	}
 }
