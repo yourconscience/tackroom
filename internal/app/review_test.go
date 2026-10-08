@@ -1,12 +1,14 @@
 package app
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/yourconscience/tackroom/internal/agentrole"
 )
 
@@ -46,24 +48,24 @@ func testDetection() *detectionResult {
 func press(t *testing.T, m reviewModel, keys ...string) reviewModel {
 	t.Helper()
 	for _, k := range keys {
-		var msg tea.KeyMsg
+		var msg tea.KeyPressMsg
 		switch k {
 		case " ":
-			msg = tea.KeyMsg{Type: tea.KeySpace}
+			msg = tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
 		case "enter":
-			msg = tea.KeyMsg{Type: tea.KeyEnter}
+			msg = tea.KeyPressMsg{Code: tea.KeyEnter}
 		case "esc":
-			msg = tea.KeyMsg{Type: tea.KeyEsc}
+			msg = tea.KeyPressMsg{Code: tea.KeyEsc}
 		case "up":
-			msg = tea.KeyMsg{Type: tea.KeyUp}
+			msg = tea.KeyPressMsg{Code: tea.KeyUp}
 		case "down":
-			msg = tea.KeyMsg{Type: tea.KeyDown}
+			msg = tea.KeyPressMsg{Code: tea.KeyDown}
 		case "left":
-			msg = tea.KeyMsg{Type: tea.KeyLeft}
+			msg = tea.KeyPressMsg{Code: tea.KeyLeft}
 		case "right":
-			msg = tea.KeyMsg{Type: tea.KeyRight}
+			msg = tea.KeyPressMsg{Code: tea.KeyRight}
 		default:
-			msg = tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(k)}
+			msg = tea.KeyPressMsg{Code: []rune(k)[0], Text: k}
 		}
 		next, _ := m.Update(msg)
 		m = next.(reviewModel)
@@ -271,5 +273,25 @@ func TestApplyReviewDecisionsRoleAndMCP(t *testing.T) {
 	}
 	if len(cfg.MCPServers) != 1 || cfg.MCPServers[0].Name != "tavily" {
 		t.Fatalf("MCP server should be upserted, got %+v", cfg.MCPServers)
+	}
+}
+
+// The program decodes raw terminal bytes into key names; the press helper
+// above skips that step, so drive one real program end to end.
+func TestReviewProgramDecodesRawKeys(t *testing.T) {
+	var out bytes.Buffer
+	// space cycles row 0 to keep, j moves down, enter opens confirm, y applies.
+	program := tea.NewProgram(newReviewModel(testDetection()),
+		tea.WithInput(strings.NewReader(" j\ry")), tea.WithOutput(&out), tea.WithWindowSize(100, 30))
+	final, err := program.Run()
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := final.(reviewModel)
+	if !m.applied || m.rows[0].action != actionKeep || m.cursor != 1 {
+		t.Fatalf("applied=%v row0=%s cursor=%d, want applied, keep, 1", m.applied, m.rows[0].action, m.cursor)
+	}
+	if screen := ansi.Strip(out.String()); !strings.Contains(screen, "linter") || !strings.Contains(screen, "apply") {
+		t.Fatalf("review screen did not render rows and the confirm prompt:\n%s", screen)
 	}
 }
