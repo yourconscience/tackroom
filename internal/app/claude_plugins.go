@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -361,16 +362,23 @@ func syncClaudePlugins(repoRoot string, home string, allowRemovals bool) error {
 	return writeJSONConfig(claudeHooksConfigPath(home), settings)
 }
 
+// writeJSONConfig replaces the file atomically: Claude Code watches its
+// settings and must never read a half-written file. A symlinked file is written
+// through to its target so the link survives.
 func writeJSONConfig(path string, raw map[string]interface{}) error {
 	out, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal %s: %w", path, err)
 	}
 	out = append(out, '\n')
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(path), err)
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
 	}
-	if err := os.WriteFile(path, out, 0o644); err != nil {
+	mode := fs.FileMode(0o644)
+	if info, err := os.Stat(path); err == nil {
+		mode = info.Mode().Perm()
+	}
+	if err := atomicConfigWrite(path, out, mode); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	return nil

@@ -366,3 +366,34 @@ func sortedCopy(items []string) []string {
 	sort.Strings(out)
 	return out
 }
+
+func TestClaudePluginSyncWritesThroughSymlinkedSettings(t *testing.T) {
+	root := t.TempDir()
+	home := t.TempDir()
+	writeClaudePluginFixture(t, root, twoPluginMarketplace, twoPlugins)
+	target := filepath.Join(t.TempDir(), "settings.json")
+	if err := os.WriteFile(target, []byte(`{"theme":"dark"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	link := claudeHooksConfigPath(home)
+	if err := os.MkdirAll(filepath.Dir(link), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := syncClaudePlugins(root, home, true); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("settings symlink replaced: %v", err)
+	}
+	info, err := os.Stat(target)
+	if err != nil || info.Mode().Perm() != 0o600 {
+		t.Fatalf("target mode = %v, %v", info.Mode().Perm(), err)
+	}
+	if got := readClaudeSettingsForTest(t, home); got["theme"] != "dark" || got["enabledPlugins"] == nil {
+		t.Fatalf("settings = %#v", got)
+	}
+}
