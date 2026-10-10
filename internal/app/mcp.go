@@ -2,13 +2,16 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -553,6 +556,118 @@ func removeTrailingJSONCommas(data []byte) []byte {
 	return out
 }
 
+// errCodexEntryRepairable means the file only fails to parse because some
+// [mcp_servers.NAME] table appears more than once (an older release could
+// write duplicates) and NAME is one of them; rewriting it repairs the file.
+var errCodexEntryRepairable = errors.New("managed MCP sections need repair")
+
+var tomlMCPServerHeader = regexp.MustCompile(`^\[mcp_servers\.([A-Za-z0-9_-]+)\]\s*(#.*)?$`)
+
+// duplicatedMCPServerNames lists server names whose table header repeats.
+func duplicatedMCPServerNames(content string) []string {
+	counts := map[string]int{}
+	var order []string
+	for _, line := range strings.Split(content, "\n") {
+		m := tomlMCPServerHeader.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil {
+			continue
+		}
+		if counts[m[1]] == 0 {
+			order = append(order, m[1])
+		}
+		counts[m[1]]++
+	}
+	var dups []string
+	for _, name := range order {
+		if counts[name] > 1 {
+			dups = append(dups, name)
+		}
+	}
+	return dups
+}
+
+// mergedDuplicateEntry decodes every copy of one server's sections and
+// merges them (later copies win, env tables are combined), so a repair keeps
+// whatever env values the duplicates held.
+func mergedDuplicateEntry(content string, name string) map[string]interface{} {
+	header := fmt.Sprintf("[mcp_servers.%s]", name)
+	merged := map[string]interface{}{}
+	env := map[string]interface{}{}
+	for {
+		start := indexTOMLSectionHeader(content, header)
+		if start == -1 {
+			break
+		}
+		end := endTOMLSectionIncludingDescendants(content, start, header)
+		var doc map[string]interface{}
+		if _, err := toml.Decode(content[start:end], &doc); err == nil {
+			servers, _ := doc["mcp_servers"].(map[string]interface{})
+			if entry, ok := servers[name].(map[string]interface{}); ok {
+				for key, value := range entry {
+					if key == "env" {
+						if table, ok := value.(map[string]interface{}); ok {
+							for k, v := range table {
+								env[k] = v
+							}
+						}
+						continue
+					}
+					merged[key] = value
+				}
+			}
+		}
+		content = content[:start] + content[end:]
+	}
+	if len(env) > 0 {
+		merged["env"] = env
+	}
+	return merged
+}
+
+// decodeCodexMCPEntry parses the whole TOML file (so a broken file is
+// reported instead of appended to) and returns one mcp_servers entry.
+// Duplicated server tables are set aside first: a file that parses without
+// them is still readable, and the duplicated servers are repairable.
+func decodeCodexMCPEntry(path string, data []byte, name string) (map[string]interface{}, bool, error) {
+	content := string(data)
+	var doc map[string]interface{}
+	_, parseErr := toml.Decode(content, &doc)
+	if parseErr != nil {
+		dups := duplicatedMCPServerNames(content)
+		if len(dups) == 0 {
+			return nil, false, fmt.Errorf("parse %s: %w", path, parseErr)
+		}
+		rest := content
+		for _, dup := range dups {
+			rest = removeTOMLSectionsIncludingDescendants(rest, fmt.Sprintf("[mcp_servers.%s]", dup))
+		}
+		doc = nil
+		if _, err := toml.Decode(rest, &doc); err != nil {
+			return nil, false, fmt.Errorf("parse %s: %w", path, parseErr)
+		}
+		if stringInSlice(name, dups) {
+			return mergedDuplicateEntry(content, name), true, errCodexEntryRepairable
+		}
+	}
+	servers, _ := doc["mcp_servers"].(map[string]interface{})
+	entry, ok := servers[name].(map[string]interface{})
+	return entry, ok, nil
+}
+
+func tomlEntryEnv(entry map[string]interface{}) map[string]string {
+	raw, _ := entry["env"].(map[string]interface{})
+	if len(raw) == 0 {
+		return nil
+	}
+	env := make(map[string]string, len(raw))
+	for key, value := range raw {
+		if s, ok := value.(string); ok {
+			env[key] = s
+		}
+	}
+	return env
+}
+
 func inspectCodexMCPServer(target mcpTarget, server mcpServerConfig, home string) (string, error) {
 	configPath := target.configPath(home)
 	data, err := os.ReadFile(configPath)
@@ -562,14 +677,22 @@ func inspectCodexMCPServer(target mcpTarget, server mcpServerConfig, home string
 		}
 		return stateMissing, fmt.Errorf("read %s: %w", configPath, err)
 	}
-	block, ok := extractTOMLSection(string(data), fmt.Sprintf("[mcp_servers.%s]", server.Name))
+	entry, ok, err := decodeCodexMCPEntry(configPath, data, server.Name)
+	if errors.Is(err, errCodexEntryRepairable) {
+		return stateDrifted, nil
+	}
+	if err != nil {
+		return stateMissing, err
+	}
 	if !ok {
 		return stateMissing, nil
 	}
-	if tomlBlockMatchesManagedMCP(block, server) {
-		return stateSynced, nil
+	command, _ := entry["command"].(string)
+	args, _ := toStringSlice(entry["args"])
+	if command != server.Command || !stringSlicesEqual(args, server.Args) || !envSatisfied(server.Env, tomlEntryEnv(entry)) {
+		return stateDrifted, nil
 	}
-	return stateDrifted, nil
+	return stateSynced, nil
 }
 
 func patchCodexMCPServer(target mcpTarget, server mcpServerConfig, home string) error {
@@ -582,6 +705,11 @@ func patchCodexMCPServer(target mcpTarget, server mcpServerConfig, home string) 
 		}
 	} else {
 		content = string(data)
+		entry, _, err := decodeCodexMCPEntry(configPath, data, server.Name)
+		if err != nil && !errors.Is(err, errCodexEntryRepairable) {
+			return err
+		}
+		server.Env = mergeManagedEnv(tomlEntryEnv(entry), server.Env)
 	}
 	header := fmt.Sprintf("[mcp_servers.%s]", server.Name)
 	section := renderCodexMCPSection(server)
@@ -604,24 +732,20 @@ func readCodexMCPServer(target mcpTarget, name string, home string) (mcpServerCo
 	if err != nil {
 		return mcpServerConfig{}, fmt.Errorf("read %s: %w", configPath, err)
 	}
-	block, ok := extractTOMLSection(string(data), fmt.Sprintf("[mcp_servers.%s]", name))
+	entry, ok, err := decodeCodexMCPEntry(configPath, data, name)
+	if err != nil && !errors.Is(err, errCodexEntryRepairable) {
+		return mcpServerConfig{}, err
+	}
 	if !ok {
 		return mcpServerConfig{}, fmt.Errorf("MCP server %q not found in %s", name, target.agentName)
 	}
-	values := parseTOMLBlockValues(block)
-	command, err := parseTOMLString(values["command"])
-	if err != nil || strings.TrimSpace(command) == "" {
+	command, _ := entry["command"].(string)
+	if strings.TrimSpace(command) == "" {
 		return mcpServerConfig{}, fmt.Errorf("MCP server %q in %s has no stdio command", name, target.agentName)
 	}
-	args, err := parseTOMLStringArray(values["args"])
-	if err != nil {
-		return mcpServerConfig{}, fmt.Errorf("parse args for %s/%s: %w", target.agentName, name, err)
-	}
-	env, err := parseTOMLEnvInline(values["env"])
-	if err != nil {
-		return mcpServerConfig{}, fmt.Errorf("parse env for %s/%s: %w", target.agentName, name, err)
-	}
-	return mcpServerConfig{Name: name, Enabled: true, Command: command, Args: args, Env: env}, nil
+	args, _ := toStringSlice(entry["args"])
+	// Inline `env = {...}` and an [mcp_servers.NAME.env] table both land here.
+	return mcpServerConfig{Name: name, Enabled: true, Command: command, Args: args, Env: tomlEntryEnv(entry)}, nil
 }
 
 func renderCodexMCPSection(server mcpServerConfig) string {
@@ -633,20 +757,6 @@ func renderCodexMCPSection(server mcpServerConfig) string {
 		lines = append(lines, fmt.Sprintf("env = %s", renderTOMLEnvInline(server.Env)))
 	}
 	return strings.Join(lines, "\n") + "\n\n"
-}
-
-func tomlBlockMatchesManagedMCP(block string, server mcpServerConfig) bool {
-	values := parseTOMLBlockValues(block)
-	if values["command"] != fmt.Sprintf("%q", server.Command) {
-		return false
-	}
-	if values["args"] != renderTOMLStringArray(server.Args) {
-		return false
-	}
-	if len(server.Env) > 0 && values["env"] != renderTOMLEnvInline(server.Env) {
-		return false
-	}
-	return true
 }
 
 func parseTOMLBlockValues(block string) map[string]string {
@@ -966,66 +1076,6 @@ func parseTOMLString(raw string) (string, error) {
 	return strconv.Unquote(trimmed)
 }
 
-func parseTOMLStringArray(raw string) ([]string, error) {
-	if strings.TrimSpace(raw) == "" {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(stripTOMLInlineComments(raw))
-	if !strings.HasPrefix(trimmed, "[") || !strings.HasSuffix(trimmed, "]") {
-		return nil, fmt.Errorf("expected string array")
-	}
-	body := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "["), "]"))
-	if body == "" {
-		return nil, nil
-	}
-	parts := splitCommaSeparated(body)
-	items := make([]string, 0, len(parts))
-	for _, part := range parts {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		item, err := parseTOMLString(part)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-	return items, nil
-}
-
-func parseTOMLEnvInline(raw string) (map[string]string, error) {
-	if strings.TrimSpace(raw) == "" {
-		return nil, nil
-	}
-	trimmed := strings.TrimSpace(stripTOMLInlineComments(raw))
-	if !strings.HasPrefix(trimmed, "{") || !strings.HasSuffix(trimmed, "}") {
-		return nil, fmt.Errorf("expected inline table")
-	}
-	body := strings.TrimSpace(strings.TrimSuffix(strings.TrimPrefix(trimmed, "{"), "}"))
-	if body == "" {
-		return nil, nil
-	}
-	env := make(map[string]string)
-	for _, part := range splitCommaSeparated(body) {
-		part = strings.TrimSpace(part)
-		if part == "" {
-			continue
-		}
-		kv := strings.SplitN(part, "=", 2)
-		if len(kv) != 2 {
-			return nil, fmt.Errorf("expected key = value")
-		}
-		key := strings.TrimSpace(kv[0])
-		value, err := parseTOMLString(kv[1])
-		if err != nil {
-			return nil, err
-		}
-		env[key] = value
-	}
-	return env, nil
-}
-
 func stripTOMLInlineComments(raw string) string {
 	var out strings.Builder
 	var quote rune
@@ -1068,43 +1118,6 @@ func stripTOMLInlineComments(raw string) string {
 	return out.String()
 }
 
-func splitCommaSeparated(raw string) []string {
-	var parts []string
-	var current strings.Builder
-	var quote rune
-	escaped := false
-	for _, r := range raw {
-		if escaped {
-			current.WriteRune(r)
-			escaped = false
-			continue
-		}
-		if r == '\\' && quote == '"' {
-			current.WriteRune(r)
-			escaped = true
-			continue
-		}
-		if (r == '"' || r == '\'') && quote == 0 {
-			quote = r
-			current.WriteRune(r)
-			continue
-		}
-		if r == quote {
-			quote = 0
-			current.WriteRune(r)
-			continue
-		}
-		if r == ',' && quote == 0 {
-			parts = append(parts, strings.TrimSpace(current.String()))
-			current.Reset()
-			continue
-		}
-		current.WriteRune(r)
-	}
-	parts = append(parts, strings.TrimSpace(current.String()))
-	return parts
-}
-
 func matchManagedMCPMap(entry map[string]interface{}, server mcpServerConfig, defaults map[string]interface{}) bool {
 	if err := validateNativeDefaults(mcpTarget{defaults: defaults}, entry); err != nil {
 		return false
@@ -1124,13 +1137,56 @@ func matchManagedMCPMap(entry map[string]interface{}, server mcpServerConfig, de
 	if !ok {
 		return false
 	}
-	for key, expected := range server.Env {
-		actual, ok := envMap[key].(string)
-		if !ok || actual != expected {
+	native := make(map[string]string, len(envMap))
+	for key, value := range envMap {
+		if s, ok := value.(string); ok {
+			native[key] = s
+		}
+	}
+	return envSatisfied(server.Env, native)
+}
+
+// envSatisfied reports whether an agent's native env covers the canonical
+// one. A ${KEY} reference only records that the server needs KEY, so any
+// value the agent already has satisfies it.
+func envSatisfied(canonical map[string]string, native map[string]string) bool {
+	for key, expected := range canonical {
+		actual, ok := native[key]
+		if !ok {
+			return false
+		}
+		if isEnvReference(expected) {
+			if strings.TrimSpace(actual) == "" {
+				return false
+			}
+			continue
+		}
+		if actual != expected {
 			return false
 		}
 	}
 	return true
+}
+
+// mergeManagedEnv returns the env to write for a managed server: keys the
+// agent already has stay, a literal canonical value wins, and a ${KEY}
+// reference never replaces a value the agent already has, so sync cannot
+// swap a working secret for a placeholder the agent may not expand.
+func mergeManagedEnv(native map[string]string, canonical map[string]string) map[string]string {
+	if len(native) == 0 && len(canonical) == 0 {
+		return nil
+	}
+	merged := make(map[string]string, len(native)+len(canonical))
+	for key, value := range native {
+		merged[key] = value
+	}
+	for key, value := range canonical {
+		if existing, ok := native[key]; ok && strings.TrimSpace(existing) != "" && isEnvReference(value) {
+			continue
+		}
+		merged[key] = value
+	}
+	return merged
 }
 
 func applyManagedMCPMap(entry map[string]interface{}, server mcpServerConfig, defaults map[string]interface{}) {
@@ -1146,6 +1202,9 @@ func applyManagedMCPMap(entry map[string]interface{}, server mcpServerConfig, de
 			envMap = map[string]interface{}{}
 		}
 		for key, value := range server.Env {
+			if existing, ok := envMap[key].(string); ok && strings.TrimSpace(existing) != "" && isEnvReference(value) {
+				continue // keep the agent's real value; see mergeManagedEnv
+			}
 			envMap[key] = value
 		}
 		entry["env"] = envMap

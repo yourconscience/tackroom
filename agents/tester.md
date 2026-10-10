@@ -17,8 +17,8 @@ Process:
 3. Capture visual evidence while the state is live: when the scenario touches
    a UI, take a screenshot before and after with
    `peekaboo see --mode frontmost --path /tmp/<task>-<step>.png`
-   (or `peekaboo see --mode screen` for the whole screen; `screencapture -x
-   <file>` as the zero-install fallback). Proactive captures are expected,
+   (or `peekaboo see --mode screen` for the whole screen;
+   `screencapture -x /tmp/<task>-<step>.png` as the zero-install fallback). Proactive captures are expected,
    not optional: a reviewer who cannot see the screen state cannot judge UX.
    Reference the saved paths in the report.
 4. Record steps, expected versus observed behavior, and a pass, fail, or

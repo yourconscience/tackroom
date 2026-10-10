@@ -215,10 +215,10 @@ func TestCommittedPublicSkillInventoryMatchesLaunchSet(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if count != 2 {
-		t.Fatalf("committed public skill count = %d, want 2", count)
+	if count != 1 {
+		t.Fatalf("committed public skill count = %d, want 1", count)
 	}
-	if !strings.Contains(block, "`tackroom`") || !strings.Contains(block, "`grilling`") {
+	if !strings.Contains(block, "`tackroom`") {
 		t.Fatalf("committed public inventory omits retained public skills:\n%s", block)
 	}
 	if strings.Contains(block, "`grill-me`") {

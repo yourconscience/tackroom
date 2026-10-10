@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -860,6 +861,10 @@ func patchCodexHooksFeature(home string) error {
 		}
 	} else {
 		content = string(data)
+		var doc map[string]interface{}
+		if _, err := toml.Decode(content, &doc); err != nil {
+			return fmt.Errorf("parse %s: %w", configPath, err)
+		}
 	}
 	updated := upsertCodexHooksFeature(content)
 	if updated == content {

@@ -135,11 +135,13 @@ func TestInspectAgentAcceptsMatchingNativeCopyAndRejectsDifferentContent(t *test
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !report.Synced || !stringSlicesEqual(report.Managed, []string{"existing"}) || len(report.Conflicts) != 0 {
+	// An identical copy is not a conflict; sync relinks it so later edits to
+	// the shared skill reach this agent. Inspect itself changes nothing.
+	if report.Synced || !stringSlicesEqual(report.Updates, []string{"existing"}) || len(report.Conflicts) != 0 {
 		t.Fatalf("matching native copy report = %#v", report)
 	}
 	if info, err := os.Lstat(native); err != nil || !info.IsDir() {
-		t.Fatalf("matching native source was replaced: info=%v err=%v", info, err)
+		t.Fatalf("inspect modified the native copy: info=%v err=%v", info, err)
 	}
 
 	writeSyncTestFile(t, filepath.Join(native, "references", "guide.txt"), []byte("different\n"))

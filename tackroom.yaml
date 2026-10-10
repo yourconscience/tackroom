@@ -1,11 +1,7 @@
 version: 1
 agents: [] # populated by tackroom setup
 
-external_skills:
-  - url: https://github.com/mattpocock/skills
-    branch: main
-    skill_dirs: [skills/productivity/grilling]
-    materialize: true
+external_skills: [] # add third-party skill repos with `tackroom skill add`
 
 hooks:
   - name: memory-session-start

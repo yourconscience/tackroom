@@ -1,23 +1,28 @@
-# SPEC: OpenClaw and DeepSeek Harness targets
+# SPEC: a first run that succeeds
 
-Status: requested 2026-10-05 ("support openclaw ... also support deepseek harness"). PR only; merge needs separate approval. Earlier specs are in git history (`git log -- SPEC.md`).
+Status: requested 2026-10-10 ("please fix 1-3", after the 1.2.0 end-to-end test). PR only; merge needs separate approval. Earlier specs are in git history (`git log -- SPEC.md`).
 
 ## Goal
 
-`openclaw` and `dsh` are managed harnesses: detected on PATH, offered by setup, and synced for every surface each one can consume natively.
+`tackroom setup` succeeds for someone who already uses two or more agents with hand-made config, never loses their content, and can be driven by an agent without prompts.
 
 ## Behavior
 
-- Skills: both read `~/.agents/skills` natively (OpenClaw "personal agent skills", dsh `user-agents` root), so tackroom mirrors into `~/.openclaw/skills` or `~/.dsh/skills` only when the config root is elsewhere. OpenClaw drops `~/.agents/skills` when `$OPENCLAW_STATE_DIR` is set, so that case mirrors too. dsh honors `$DSH_AGENTS_HOME`.
-- MCP, OpenClaw: stdio servers upsert into `mcp.servers.<name>` (`command`, `args`, `env`) in `openclaw.json` (`$OPENCLAW_CONFIG_PATH`, else `$OPENCLAW_STATE_DIR/openclaw.json`, else `~/.openclaw/openclaw.json`). Other keys stay.
-- MCP, dsh: each server is an `@deepseek-ai/dsh-mcp-client` row in `$DSH_HOME/cordis.patch.yml` (default `~/.dsh`), the layer every profile applies. New servers get id `tackroom-mcp-<name>` in one `insert` op. A server whose `serverName` already has a row is updated in that row, keeping its id and other config, because dsh rejects two rows with one `serverName`. Other ops and rows, comments and `!!js` values survive. Names outside `[A-Za-z0-9_-]{1,32}` are rejected.
-- Setup import: existing OpenClaw `mcp.servers` entries and dsh `dsh-mcp-client` rows are offered for import like other harnesses' servers.
-- Root instructions: dsh links `~/.dsh/AGENTS.md` to the config root's `AGENTS.md`. OpenClaw gets none: its workspace `AGENTS.md` is the assistant persona.
-- Roles and hooks: not synced for either. No native format matches tackroom's role files or script hooks.
+- **Existing instructions.** With no `~/.agents/AGENTS.md`, setup imports the detected agents' own instructions files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, ...). One distinct file is copied as is; several are kept in full under a heading each. With none, no `AGENTS.md` is created and root instructions stay unmanaged.
+- **Replace with backup.** A native file or skill folder that differs from the shared copy is a replaceable conflict. `sync --replace-conflicts` moves it to `$XDG_STATE_HOME/tackroom/backups/<UTC time>/` (default `~/.local/state/...`), keeping its path relative to home, then links the shared copy. Setup always does this after listing the paths and asking (`--yes` accepts). An identical copy is relinked without a backup.
+- **Per-agent conflicts.** Plain `sync` skips only the agents with conflicts, syncs the rest, and exits 1 with the conflict list and the fix.
+- **Unreadable TOML.** Codex and Grok `config.toml` are parsed in full; a parse error marks that agent "config unreadable" and the file is left untouched. Duplicate sections tackroom wrote for one server stay repairable.
+- **Secrets.** The Codex reader reads `[mcp_servers.NAME.env]` tables, so import keeps the keys as `${KEY}` references. A `${KEY}` reference in the shared config never replaces a value an agent already has (JSON, TOML), so a working secret is never swapped for a placeholder.
+- **Neutral starter.** No `AGENTS.md`, no third-party skills (mattpocock `grilling` removed), a config-root `.gitignore` instead of the repo's, the repo's `.agnix.toml` so a fresh `doctor` passes, and no memory tool sources with `--memory off`.
+- **Agents.** `--yes` answers every prompt with its default without reading stdin. `status`, `sync` and `doctor` take `--json`. `<command> --help` exits 0. The tackroom skill documents the unattended recipe and exit codes.
+
+## Out of scope
+
+- External skill sources as a separate step (mattpocock, poteto, superpowers, ...): next PR.
+- Importing an MCP server for every agent instead of its source agent: unchanged, needs a product decision.
 
 ## Acceptance tests
 
-- A sync into a temp home writes both MCP configs, preserves unrelated content, links dsh root instructions, creates no skill mirror, reports synced, and a second sync changes nothing.
-- A non-`~/.agents` config root, and OpenClaw with `$OPENCLAW_STATE_DIR`, mirror skills.
-- Against real binaries (OpenClaw 2026.9.7, dsh 0.2.0-rc.2): `openclaw mcp list` shows the server, `openclaw skills list` shows a tackroom skill from `agents-skills-personal`, `dsh --dump-config` composes the tackroom row.
-- `go test ./...` passes.
+- A home with differing `CLAUDE.md` and Codex `AGENTS.md`, a skill that differs between Claude and Codex, and a Codex MCP server with a secret env table: `setup --yes --memory off` exits 0 with stdin attached, merges the instructions, backs up the three differing files, links everything, keeps the secret in Codex, and stores `${KEY}` in `tackroom.yaml`.
+- A Claude conflict leaves Codex syncing; `--replace-conflicts` resolves it. A broken Codex TOML is reported and untouched.
+- A fresh `doctor` passes. `go test ./...` passes.

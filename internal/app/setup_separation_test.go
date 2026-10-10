@@ -101,7 +101,7 @@ func TestEnsureStarterAssetsCreatesMissingOnlyAndExecutableHooks(t *testing.T) {
 	root := t.TempDir()
 	customConfig := []byte("version: 1\nagents: []\n")
 	writeSyncTestFile(t, filepath.Join(root, "tackroom.yaml"), customConfig)
-	if err := ensureStarterAssets(root, filepath.Join(root, "tackroom.yaml")); err != nil {
+	if err := ensureStarterAssets(root, filepath.Join(root, "tackroom.yaml"), memoryTierBasic); err != nil {
 		t.Fatal(err)
 	}
 	got, err := os.ReadFile(filepath.Join(root, "tackroom.yaml"))
@@ -112,7 +112,7 @@ func TestEnsureStarterAssetsCreatesMissingOnlyAndExecutableHooks(t *testing.T) {
 		t.Fatalf("tackroom.yaml overwritten:\n%s", got)
 	}
 	for _, path := range []string{
-		filepath.Join(root, "AGENTS.md"),
+		filepath.Join(root, ".gitignore"),
 		filepath.Join(root, "skills", "tackroom", "SKILL.md"),
 		filepath.Join(root, "agents", "architect.md"),
 		filepath.Join(root, "agents", "tester.md"),
@@ -511,7 +511,7 @@ func TestImportedStarterNameWinsOnFreshSetupOrdering(t *testing.T) {
 	if err := importNativeContent(root, &config{Version: 1}, skills, []nativeRoleCandidate{role}, nil, setupIO{in: strings.NewReader("y\ny\n"), out: &bytes.Buffer{}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := ensureStarterAssets(root, filepath.Join(root, "tackroom.yaml")); err != nil {
+	if err := ensureStarterAssets(root, filepath.Join(root, "tackroom.yaml"), memoryTierBasic); err != nil {
 		t.Fatal(err)
 	}
 	skillData, err := os.ReadFile(filepath.Join(root, "skills", "tackroom", "SKILL.md"))
@@ -699,5 +699,32 @@ func TestSetupMemsearchDependencyFailure(t *testing.T) {
 	err := runSetup(runOptions{MemoryTier: memoryTierMemsearch, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}})
 	if err == nil || !strings.Contains(err.Error(), "requires the memsearch binary") {
 		t.Fatalf("setup --memory memsearch error = %v", err)
+	}
+}
+
+func TestStarterShipsNoPersonalInstructionsOrThirdPartySkills(t *testing.T) {
+	root := t.TempDir()
+	configPath := filepath.Join(root, "tackroom.yaml")
+	if err := ensureStarterAssets(root, configPath, memoryTierOff); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"AGENTS.md", filepath.Join("skills", "grilling"), filepath.Join("memory", "tools")} {
+		if _, err := os.Stat(filepath.Join(root, path)); !os.IsNotExist(err) {
+			t.Fatalf("starter must not create %s (err=%v)", path, err)
+		}
+	}
+	gitignore, err := os.ReadFile(filepath.Join(root, ".gitignore"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(gitignore), "npm/bin") || !strings.Contains(string(gitignore), "tackroom.local.yaml") {
+		t.Fatalf("starter .gitignore should be the config-root one:\n%s", gitignore)
+	}
+	cfg, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(cfg), "mattpocock") {
+		t.Fatalf("starter config must not pull third-party skills:\n%s", cfg)
 	}
 }

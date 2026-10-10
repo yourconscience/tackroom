@@ -2,18 +2,21 @@
 
 ## What `tackroom setup` does
 
-1. Creates `~/.agents` if it does not exist and copies in the starter content (two skills, six roles, memory hooks, a minimal `tackroom.yaml`).
+1. Creates `~/.agents` if it does not exist and copies in the starter content: the `tackroom` skill, six roles, memory hooks (skipped with `--memory off`), a minimal `tackroom.yaml` and a `.gitignore`. It ships no instructions file and no third-party skills.
 2. Detects which harnesses are installed and records their native paths.
 3. Scans each harness for skills, roles, and MCP servers you already have and shows a review screen: one row per item, share/keep/skip per row, items identical across harnesses shared automatically. Copy-only, originals untouched. Non-interactive runs fall back to sequential prompts; `--yes` imports everything without prompting, `--dry-run` prints the candidates and exits without changes, `--json` emits the detection result for scripting and exits.
-4. Before its first sync touches a harness that already has content, shows exactly what would be removed or overwritten there and asks per harness. Declining keeps that harness's files.
-5. Offers to `git init` the new repository, and runs the first sync.
+4. Imports the instructions you already have (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and so on) into `~/.agents/AGENTS.md`: one file is copied as is, several different ones are kept in full under a heading each for you to merge. Without any, no `AGENTS.md` is created and every agent keeps its own file.
+5. Before its first sync touches a harness that already has content, shows exactly what would be removed or overwritten there and asks per harness. Declining keeps that harness's files. Native files that differ from the shared copy (your old instructions, a skill imported from another agent) are listed and, once you agree, moved to `~/.local/state/tackroom/backups/<time>/` and linked.
+6. Offers to `git init` the new repository, and runs the first sync.
+
+`--yes` answers every prompt with its default and never reads stdin, so an agent or script can run setup unattended: it imports everything, initializes git, backs up and links differing files, and keeps existing content wherever the safe answer is no.
 
 The review screen in step 3 looks like this — `space` cycles share/keep/skip per row, `enter` applies:
 
 ```
 tackroom setup — review 3 item(s)  (2 identical, shared automatically)
 
-  skill   grilling   claude✓      codex✓ droid·   [share]
+  skill   pr-review  claude✓      codex✓ droid·   [share]
   skill   my-notes   claude✓      codex· droid✓   [share] (differ) from claude
   role    reviewer   claude✓      codex✓ droid✓   [skip]
 
@@ -67,7 +70,7 @@ tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
 
 Ownership is tracked in `.tackroom-starter.json` at the config root (commit it alongside `tackroom.yaml`). Only content tackroom wrote is ever refreshed or removed, so a customized layer is safe.
 
-Everything else in the starter set — `AGENTS.md`, `tackroom.yaml`, `agents/*.md`, `skills/` — is your content: tackroom only creates those when they are missing.
+Everything else in the starter set — `tackroom.yaml`, `agents/*.md`, `skills/`, `.gitignore` — is your content: tackroom only creates those when they are missing. `AGENTS.md` is yours too; setup only creates it from instructions you already had.
 
 ## Memory tier
 
@@ -87,4 +90,4 @@ tackroom setup --memory memsearch
 
 ## Root instructions
 
-`~/.agents/AGENTS.md` is your single root instruction file. During sync, tackroom links it into each harness's native memory path — `~/.config/amp/AGENTS.md` for Amp, `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex, `~/.factory/AGENTS.md` for Droid, `~/.qwen/QWEN.md` for Qwen Code, `~/.copilot/copilot-instructions.md` for GitHub Copilot CLI, `~/.grok/AGENTS.md` for Grok Build, and `~/.dsh/AGENTS.md` for DeepSeek Harness (Cursor has no global instructions file, and OpenClaw's workspace `AGENTS.md` is its assistant persona, so tackroom leaves it alone; `$COPILOT_HOME`, `$GROK_HOME` and `$DSH_HOME` replace `~/.copilot`, `~/.grok` and `~/.dsh` when set) — so an edit in one place reaches every agent. `tackroom status` reports drift, and a file that exists but is not a symlink is never touched without your confirmation.
+`~/.agents/AGENTS.md` is your single root instruction file. During sync, tackroom links it into each harness's native memory path — `~/.config/amp/AGENTS.md` for Amp, `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex, `~/.factory/AGENTS.md` for Droid, `~/.qwen/QWEN.md` for Qwen Code, `~/.copilot/copilot-instructions.md` for GitHub Copilot CLI, `~/.grok/AGENTS.md` for Grok Build, and `~/.dsh/AGENTS.md` for DeepSeek Harness (Cursor has no global instructions file, and OpenClaw's workspace `AGENTS.md` is its assistant persona, so tackroom leaves it alone; `$COPILOT_HOME`, `$GROK_HOME` and `$DSH_HOME` replace `~/.copilot`, `~/.grok` and `~/.dsh` when set) — so an edit in one place reaches every agent. Without `~/.agents/AGENTS.md`, tackroom leaves every agent's instructions file alone. `tackroom status` reports drift; a real file with different content is never replaced without your confirmation, and then only after a backup (`setup`, or `sync --replace-conflicts`). An identical copy is simply relinked.

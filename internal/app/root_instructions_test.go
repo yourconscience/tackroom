@@ -16,8 +16,41 @@ func droidRootInstructions() *rootInstructionsCapability {
 	return h.RootInstructions
 }
 
+// writeSharedAgentsMD creates the canonical AGENTS.md; root instructions are
+// only managed once it exists.
+func writeSharedAgentsMD(t *testing.T, home string) {
+	t.Helper()
+	writeSyncTestFile(t, filepath.Join(home, ".agents", "AGENTS.md"), []byte("# Shared\n"))
+}
+
+func TestInspectRootInstructionsUnmanagedWithoutSharedFile(t *testing.T) {
+	home := t.TempDir()
+	writeSyncTestFile(t, filepath.Join(home, ".factory", "AGENTS.md"), []byte("# Local\n"))
+	report := agentReport{}
+	if err := inspectRootInstructions(&report, droidRootInstructions(), filepath.Join(home, ".agents"), home); err != nil {
+		t.Fatal(err)
+	}
+	if report.RootState != "" || report.RootPath != "" || len(report.Conflicts) != 0 {
+		t.Fatalf("without ~/.agents/AGENTS.md the native file is left alone: %+v", report)
+	}
+}
+
+func TestInspectRootInstructionsIdenticalCopyIsRelinked(t *testing.T) {
+	home := t.TempDir()
+	writeSharedAgentsMD(t, home)
+	writeSyncTestFile(t, filepath.Join(home, ".factory", "AGENTS.md"), []byte("# Shared\n"))
+	report := agentReport{}
+	if err := inspectRootInstructions(&report, droidRootInstructions(), filepath.Join(home, ".agents"), home); err != nil {
+		t.Fatal(err)
+	}
+	if report.RootState != stateDrifted || len(report.Conflicts) != 0 {
+		t.Fatalf("an identical copy should be relinked, not a conflict: %+v", report)
+	}
+}
+
 func TestInspectDroidRootInstructionsMissing(t *testing.T) {
 	home := t.TempDir()
+	writeSharedAgentsMD(t, home)
 	report := agentReport{}
 
 	if err := inspectRootInstructions(&report, droidRootInstructions(), filepath.Join(home, ".agents"), home); err != nil {
@@ -61,6 +94,7 @@ func TestInspectDroidRootInstructionsSynced(t *testing.T) {
 
 func TestInspectDroidRootInstructionsConflict(t *testing.T) {
 	home := t.TempDir()
+	writeSharedAgentsMD(t, home)
 	linkPath := filepath.Join(home, ".factory", "AGENTS.md")
 	if err := os.MkdirAll(filepath.Dir(linkPath), 0o755); err != nil {
 		t.Fatal(err)
@@ -169,6 +203,7 @@ func TestInspectClaudeAndCodexRootInstructions(t *testing.T) {
 	} {
 		t.Run(tc.agent+"/missing", func(t *testing.T) {
 			home := t.TempDir()
+			writeSharedAgentsMD(t, home)
 			report := agentReport{}
 			if err := inspectRootInstructions(&report, tc.cap(), filepath.Join(home, ".agents"), home); err != nil {
 				t.Fatal(err)
@@ -203,6 +238,7 @@ func TestInspectClaudeAndCodexRootInstructions(t *testing.T) {
 		})
 		t.Run(tc.agent+"/conflict", func(t *testing.T) {
 			home := t.TempDir()
+			writeSharedAgentsMD(t, home)
 			linkPath := filepath.Join(home, tc.dir, tc.file)
 			if err := os.MkdirAll(filepath.Dir(linkPath), 0o755); err != nil {
 				t.Fatal(err)

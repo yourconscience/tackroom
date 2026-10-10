@@ -59,7 +59,7 @@ func TestInstallMemoryToolsBuildsAndSkipsFresh(t *testing.T) {
 func TestFreshScaffoldBuildsBothMemoryTools(t *testing.T) {
 	root := t.TempDir()
 	configPath := filepath.Join(root, "tackroom.yaml")
-	if err := ensureStarterAssets(root, configPath); err != nil {
+	if err := ensureStarterAssets(root, configPath, memoryTierBasic); err != nil {
 		t.Fatalf("scaffold starter assets: %v", err)
 	}
 	for _, tool := range []string{"knowledge-sync", "rem"} {

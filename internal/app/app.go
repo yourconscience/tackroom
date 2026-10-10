@@ -116,23 +116,34 @@ type agentReport struct {
 	StalePlugin     []string
 	UnsupportedHook []string
 	Conflicts       []string
-	StaleManaged    []string
-	External        []string
-	Adds            []string
-	AddsAgent       []string
-	AddsMCP         []string
-	AddsHook        []string
-	AddsPlugin      []string
-	Updates         []string
-	UpdatesAgent    []string
-	UpdatesMCP      []string
-	UpdatesHook     []string
-	UpdatesPackage  []string
-	Removes         []string
-	RemovesAgent    []string
-	RemovesPackage  []string
-	RemovesPlugin   []string
-	Synced          bool
+	// Replaceable lists conflicts that `sync --replace-conflicts` (and setup)
+	// may resolve by moving the native path into a backup and linking it.
+	Replaceable    []replaceableConflict
+	StaleManaged   []string
+	External       []string
+	Adds           []string
+	AddsAgent      []string
+	AddsMCP        []string
+	AddsHook       []string
+	AddsPlugin     []string
+	Updates        []string
+	UpdatesAgent   []string
+	UpdatesMCP     []string
+	UpdatesHook    []string
+	UpdatesPackage []string
+	Removes        []string
+	RemovesAgent   []string
+	RemovesPackage []string
+	RemovesPlugin  []string
+	Synced         bool
+}
+
+// replaceableConflict is a native file or skill directory that sits where
+// tackroom wants a symlink and whose content differs from the canonical copy.
+type replaceableConflict struct {
+	Path    string // native path to back up and replace with a link
+	Skill   string // skill name; empty for root instructions
+	Message string // the matching entry in agentReport.Conflicts
 }
 
 func isDetected(agent agentConfig) bool {
@@ -165,12 +176,24 @@ type runOptions struct {
 	// ConfirmRemovals makes sync preview per-harness removals and role
 	// overwrites and ask before applying them. Set by setup-driven syncs.
 	ConfirmRemovals bool
+	// ReplaceConflicts moves native files that differ from the canonical copy
+	// into a timestamped backup and links them. Setup always sets it.
+	ReplaceConflicts bool
 	// Verbose expands `status` back to the full per-surface managed and
 	// external skill lists and native root paths instead of the concise view.
 	Verbose bool
 }
 
 func Run(args []string) error {
+	err := run(args)
+	if errors.Is(err, flag.ErrHelp) {
+		// `<command> --help` already printed its usage; that is a success.
+		return nil
+	}
+	return err
+}
+
+func run(args []string) error {
 	if len(args) == 0 {
 		printUsage()
 		return errors.New("missing subcommand")
@@ -279,6 +302,7 @@ func parseStatusFlags(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
 	fs.BoolVar(&opts.Verbose, "verbose", false, "Show full managed/external skill lists and native root paths")
 	fs.BoolVar(&opts.Verbose, "v", false, "Show full managed/external skill lists and native root paths")
+	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the status as JSON (exit code 1 when anything is out of sync)")
 
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
@@ -407,7 +431,7 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.MemoryTier, "memory", memoryTierBasic, "Memory tier: off, basic, or memsearch")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Emit detection result as JSON and exit")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Show detected import candidates and exit without changes (overrides --yes)")
-	fs.BoolVar(&opts.AssumeYes, "yes", false, "Import all detected items without prompting")
+	fs.BoolVar(&opts.AssumeYes, "yes", false, "Answer every prompt with its default, never read stdin: import everything, initialize git, back up and replace conflicting files")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
@@ -424,6 +448,8 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.Pull, "pull", false, "Pull the repo before syncing")
+	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup and link them")
+	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the resulting status as JSON instead of the text report")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
@@ -441,6 +467,7 @@ func parseDoctorFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.E2E, "e2e", false, "Run sync, status, and doctor end to end")
 	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
+	fs.BoolVar(&opts.JSONOutput, "json", false, "Print check results as JSON")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}

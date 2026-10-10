@@ -34,6 +34,9 @@ var managedMemoryHookNames = map[string]struct{}{
 type setupIO struct {
 	in  io.Reader
 	out io.Writer
+	// assumeYes (setup --yes) answers every yes/no prompt with its default
+	// without reading stdin, so agents and scripts never block.
+	assumeYes bool
 }
 
 type nativeImportCandidate struct {
@@ -59,7 +62,7 @@ type nativeMCPCandidate struct {
 }
 
 func setupStreams(opts runOptions) setupIO {
-	streams := setupIO{in: opts.Stdin, out: opts.Stdout}
+	streams := setupIO{in: opts.Stdin, out: opts.Stdout, assumeYes: opts.AssumeYes}
 	if streams.in == nil {
 		streams.in = os.Stdin
 	}
@@ -69,7 +72,8 @@ func setupStreams(opts runOptions) setupIO {
 	return streams
 }
 
-func ensureStarterAssets(root string, configPath string) error {
+func ensureStarterAssets(root string, configPath string, memoryTier string) error {
+	skipMemoryTools := normalizeMemoryTier(memoryTier) == memoryTierOff
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", root, err)
 	}
@@ -80,7 +84,17 @@ func ensureStarterAssets(root string, configPath string) error {
 		if path == "." {
 			return nil
 		}
+		if skipMemoryTools && (path == "memory/tools" || strings.HasPrefix(path, "memory/tools/")) {
+			// Memory off: don't ship the Go sources sync would build.
+			if d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
 		targetPath := path
+		if targetPath == "starter.gitignore" {
+			targetPath = ".gitignore"
+		}
 		if strings.HasSuffix(targetPath, "/go.mod.template") {
 			targetPath = strings.TrimSuffix(targetPath, ".template")
 		}
@@ -729,6 +743,10 @@ func confirmDestructiveSyncActions(reports []agentReport, streams setupIO) {
 
 func promptYesNoDefaultNo(streams setupIO, prompt string) bool {
 	fmt.Fprintf(streams.out, "%s [y/N] ", prompt)
+	if streams.assumeYes {
+		fmt.Fprintln(streams.out, "no (--yes keeps the safe default)")
+		return false
+	}
 	line, answered := readSetupLine(streams.in)
 	if !answered {
 		fmt.Fprintln(streams.out, "skipped (no input; answering no)")
@@ -740,6 +758,10 @@ func promptYesNoDefaultNo(streams setupIO, prompt string) bool {
 
 func promptYesNo(streams setupIO, prompt string) bool {
 	fmt.Fprintf(streams.out, "%s [Y/n] ", prompt)
+	if streams.assumeYes {
+		fmt.Fprintln(streams.out, "yes (--yes)")
+		return true
+	}
 	line, answered := readSetupLine(streams.in)
 	if !answered {
 		fmt.Fprintln(streams.out, "skipped (no input; answering no)")

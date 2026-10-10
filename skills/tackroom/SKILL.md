@@ -56,12 +56,24 @@ First-run setup:
 3. Detects supported harness binaries.
 4. Scans native skill, role, and MCP locations.
 5. Shows an interactive review screen: share, keep harness-specific, or skip per item; items identical across harnesses are shared automatically. Imports are copy or conversion only; originals remain untouched.
-6. In non-interactive runs it falls back to sequential prompts; `--yes` imports everything without prompting, `--dry-run` prints candidates and exits without changes, `--json` emits the detection result and exits.
+6. In non-interactive runs it falls back to sequential prompts; `--yes` answers every prompt with its default and never reads stdin, `--dry-run` prints candidates and exits without changes, `--json` emits the detection result and exits.
 7. Registers the chosen memory tier.
 8. Patches only the required native harness settings.
 9. Runs the first sync.
 
-The public starter contains `tackroom`, the pinned `grilling` example, six generic roles (`architect` `builder` `general` `researcher` `reviewer` `tester`), and reusable memory scripts. Personal skills, hooks, MCP servers, secrets, and memory data belong only in the private config repository.
+Setup also imports existing instructions files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, ...) into `~/.agents/AGENTS.md`, then backs up the originals to `~/.local/state/tackroom/backups/<time>/` and links them.
+
+### Running setup for a user (agents)
+
+```bash
+tackroom setup --dry-run            # show what would be imported; changes nothing
+tackroom setup --yes --memory basic # unattended: imports, git init, backs up and links differing files
+tackroom status --json              # verify; exit 0 = everything synced
+```
+
+Exit codes: `status` and `sync` exit 1 when anything is out of sync or conflicting; `doctor` exits 1 when any check fails or warns. All exit 0 otherwise. `--json` output on those three is a stable contract: `synced`, `agents[].conflicts`, `agents[].skills|mcp|roles|hooks.{managed,missing,drifted}`. When `sync` reports conflicts, show the listed paths to the user before running `tackroom sync --replace-conflicts`.
+
+The public starter contains `tackroom`, six generic roles (`architect` `builder` `general` `researcher` `reviewer` `tester`), and reusable memory scripts. Personal skills, hooks, MCP servers, secrets, and memory data belong only in the private config repository.
 
 Memory tiers:
 
