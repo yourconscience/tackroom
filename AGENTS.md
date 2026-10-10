@@ -25,7 +25,7 @@ Never restore project-directory config discovery or make the public checkout the
 The distribution intentionally contains:
 
 - `skills/tackroom/`
-- `skills/grilling/`
+- `starter.gitignore` (written as the config root's `.gitignore`)
 - `agents/architect.md`
 - `agents/builder.md`
 - `agents/general.md`

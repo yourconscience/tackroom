@@ -3,7 +3,9 @@ package app
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,8 +54,10 @@ func runDoctor(opts runOptions) error {
 		return err
 	}
 
-	fmt.Println("tackroom doctor")
-	fmt.Printf("repo: %s\n\n", repoRoot)
+	if !opts.JSONOutput {
+		fmt.Println("tackroom doctor")
+		fmt.Printf("repo: %s\n\n", repoRoot)
+	}
 
 	var results []checkResult
 
@@ -77,6 +81,10 @@ func runDoctor(opts runOptions) error {
 	results = append(results, checkExternalSkillLock(repoRoot, cfg, home))
 	results = append(results, checkExternalSkillAudit(cfg, home))
 	results = append(results, checkNativeHookHealth(home, cfg, selected))
+
+	if opts.JSONOutput {
+		return printDoctorJSON(setupStreams(opts).out, repoRoot, results)
+	}
 
 	fmt.Println("checks:")
 	labelWidth := 0
@@ -428,8 +436,11 @@ func checkAgentsMDSize(repoRoot string) checkResult {
 	const limit = 8192
 	path := filepath.Join(repoRoot, "AGENTS.md")
 	info, err := os.Stat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return checkResult{"AGENTS.md size", checkStatusPass, "no shared AGENTS.md; each agent keeps its own instructions"}
+	}
 	if err != nil {
-		return checkResult{"AGENTS.md size", checkStatusFail, "AGENTS.md not found"}
+		return checkResult{"AGENTS.md size", checkStatusFail, err.Error()}
 	}
 	size := info.Size()
 	sizeKB := float64(size) / 1024.0

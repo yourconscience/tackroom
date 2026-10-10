@@ -21,7 +21,6 @@ import (
 // toolchain; without one this is a no-op so syncs never fail on plain hosts.
 func installMemoryTools(repoRoot string) ([]string, error) {
 	if _, err := exec.LookPath("go"); err != nil {
-		fmt.Println("memory tools skipped: go toolchain not found in PATH")
 		return nil, nil
 	}
 	toolsDir := filepath.Join(repoRoot, "memory", "tools")

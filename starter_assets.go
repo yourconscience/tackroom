@@ -10,5 +10,5 @@ import "embed"
 // files at or below its own directory, so the manifest cannot move into
 // internal/. Keep the embed list in sync with the public starter inventory.
 //
-//go:embed .gitignore AGENTS.md tackroom.yaml tackroom.lock plugin.json agents/*.md skills/tackroom skills/grilling memory/hooks memory/lib memory/tools
+//go:embed starter.gitignore .agnix.toml tackroom.yaml tackroom.lock plugin.json agents/*.md skills/tackroom memory/hooks memory/lib memory/tools
 var StarterAssets embed.FS

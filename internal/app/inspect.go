@@ -279,10 +279,15 @@ func inspectAgent(agent agentConfig, expected map[string]string, repoRoot string
 					return agentReport{}, fmt.Errorf("compare %s with %s: %w", linkPath, expected[name], err)
 				}
 				if matches {
-					report.Managed = append(report.Managed, name)
+					// An identical copy (often left by setup's import) is
+					// replaced with a link so later edits reach this agent.
+					report.Drifted = append(report.Drifted, name)
+					report.Updates = append(report.Updates, name)
 					continue
 				}
-				report.Conflicts = append(report.Conflicts, fmt.Sprintf("%s exists but differs from canonical content and is not a symlink", linkPath))
+				msg := fmt.Sprintf("%s exists but differs from canonical content and is not a symlink", linkPath)
+				report.Conflicts = append(report.Conflicts, msg)
+				report.Replaceable = append(report.Replaceable, replaceableConflict{Path: linkPath, Skill: name, Message: msg})
 				continue
 			}
 
@@ -441,6 +446,11 @@ func isReportSynced(report agentReport) bool {
 func inspectRootInstructions(report *agentReport, ri *rootInstructionsCapability, repoRoot string, home string) error {
 	linkPath := ri.Path(home)
 	expectedTarget := ri.Expected(repoRoot)
+	// No canonical AGENTS.md means the user keeps per-agent instructions;
+	// tackroom then leaves every native instructions file alone.
+	if _, err := os.Stat(expectedTarget); errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
 	report.RootPath = linkPath
 	report.RootExpected = expectedTarget
 	report.RootState = stateMissing
@@ -453,9 +463,17 @@ func inspectRootInstructions(report *agentReport, ri *rootInstructionsCapability
 		return fmt.Errorf("stat %s: %w", linkPath, err)
 	}
 	if info.Mode()&os.ModeSymlink == 0 {
+		if same, _ := filesEqual(linkPath, expectedTarget); same {
+			// Identical content: relinking loses nothing.
+			report.RootState = stateDrifted
+			report.RootActual = "identical copy"
+			return nil
+		}
 		report.RootState = stateConflict
 		report.RootActual = "non-symlink path exists"
-		report.Conflicts = append(report.Conflicts, fmt.Sprintf("%s exists but is not a symlink", linkPath))
+		msg := fmt.Sprintf("%s exists but is not a symlink", linkPath)
+		report.Conflicts = append(report.Conflicts, msg)
+		report.Replaceable = append(report.Replaceable, replaceableConflict{Path: linkPath, Message: msg})
 		return nil
 	}
 

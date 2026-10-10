@@ -9,4 +9,3 @@ ignore:
   - .tox
   - node_modules
   - vendor
-  - skills/grilling/

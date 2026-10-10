@@ -59,6 +59,12 @@ func runSetup(opts runOptions) error {
 			return err
 		}
 		fmt.Fprint(streams.out, renderDetectionSummary(detection))
+		if sources := rootInstructionSources(repoRoot, detected, home); len(sources) > 0 {
+			fmt.Fprintln(streams.out, "\nroot instructions to import into AGENTS.md (originals are backed up, then linked):")
+			for _, src := range sources {
+				fmt.Fprintf(streams.out, "  %s (%s)\n", src.Path, src.Agent)
+			}
+		}
 		return nil
 	}
 
@@ -99,7 +105,10 @@ func runSetup(opts runOptions) error {
 	} else if err := importNativeContent(repoRoot, &cfg, skills, roles, mcps, streams); err != nil {
 		return err
 	}
-	if err := ensureStarterAssets(repoRoot, configPath); err != nil {
+	if err := importRootInstructions(repoRoot, detected, home, streams); err != nil {
+		return err
+	}
+	if err := ensureStarterAssets(repoRoot, configPath, opts.MemoryTier); err != nil {
 		return err
 	}
 	if err := ensureMemoryHookExecutables(repoRoot); err != nil {
@@ -139,6 +148,9 @@ func runSetup(opts runOptions) error {
 	syncOpts := opts
 	syncOpts.ConfigPath = configPath
 	syncOpts.ConfirmRemovals = true
+	// Setup adopts this machine: native files that differ from the shared
+	// copy are backed up and linked (after a prompt; --yes accepts).
+	syncOpts.ReplaceConflicts = true
 	return runSync(syncOpts)
 }
 

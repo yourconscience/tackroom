@@ -120,9 +120,9 @@ Claude Code plugins carry what the other surfaces cannot: [mods](https://code.cl
 
 ```bash
 tackroom setup    [--memory off|basic|memsearch] [--yes] [--dry-run] [--json]
-tackroom status   [--verbose] [--agents ...]
-tackroom sync     [--pull] [--agents ...]
-tackroom doctor   [--e2e] [--agents ...]
+tackroom status   [--verbose] [--json] [--agents ...]
+tackroom sync     [--pull] [--replace-conflicts] [--json] [--agents ...]
+tackroom doctor   [--e2e] [--json] [--agents ...]
 tackroom config   validate|print
 tackroom view     [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host]  # loopback web config UI
 tackroom skill    new|list|info|update|promote
@@ -130,6 +130,8 @@ tackroom publish  [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]  #
 tackroom mcp      list|add|import|remove
 tackroom hook     list [query] | remove [--dry-run] <query>
 ```
+
+`status`, `sync` and `doctor` take `--json` for scripts and agents; exit code 1 means something is out of sync or failed. If a native file differs from the shared copy (say a hand-written `~/.claude/CLAUDE.md`), `sync` leaves that agent alone, syncs the others, and says how to resolve it; `sync --replace-conflicts` moves such files to `~/.local/state/tackroom/backups/<time>/` and links the shared copy. `setup` does this for you after asking (`--yes` accepts).
 
 `sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` stays compact; `--verbose` adds the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.
 

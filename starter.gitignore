@@ -1,0 +1,8 @@
+# Machine-local state. Everything else in this folder is meant to be
+# committed and shared across your machines.
+.DS_Store
+external/
+tackroom.local.yaml
+memsearch.conf
+.skill-lock.json
+memory/local/
