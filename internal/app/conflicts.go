@@ -34,13 +34,20 @@ func replaceConflicts(report *agentReport, backupDir string, home string) ([]str
 		return nil, nil
 	}
 	var moved []string
+	var dests []string
 	resolved := map[string]bool{}
 	for _, item := range report.Replaceable {
 		dest := backupPathFor(item.Path, backupDir, home)
 		if err := moveToBackup(item.Path, dest); err != nil {
-			return moved, fmt.Errorf("%s: back up %s: %w", report.Name, item.Path, err)
+			// Put back what this agent already moved, so a failed backup
+			// never leaves a native path empty.
+			for i := len(moved) - 1; i >= 0; i-- {
+				_ = os.Rename(dests[i], moved[i])
+			}
+			return nil, fmt.Errorf("%s: back up %s: %w", report.Name, item.Path, err)
 		}
 		moved = append(moved, item.Path)
+		dests = append(dests, dest)
 		resolved[item.Message] = true
 		if item.Skill == "" {
 			report.RootState = stateMissing
@@ -67,8 +74,10 @@ func backupPathFor(path string, backupDir string, home string) string {
 }
 
 // moveToBackup renames src to dest, copying across filesystems when needed.
+// Backup directories are private (0700): they may hold instructions or skills
+// that sat under a private parent directory before.
 func moveToBackup(src string, dest string) error {
-	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(dest), 0o700); err != nil {
 		return err
 	}
 	if _, err := os.Lstat(dest); err == nil {
@@ -99,7 +108,7 @@ func copyTree(src string, dest string) error {
 		}
 		switch {
 		case d.IsDir():
-			return os.MkdirAll(target, info.Mode().Perm()|0o700)
+			return os.MkdirAll(target, 0o700)
 		case info.Mode()&os.ModeSymlink != 0:
 			link, err := os.Readlink(path)
 			if err != nil {
@@ -107,22 +116,28 @@ func copyTree(src string, dest string) error {
 			}
 			return os.Symlink(link, target)
 		default:
-			in, err := os.Open(path)
-			if err != nil {
-				return err
-			}
-			defer in.Close()
-			out, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_EXCL, info.Mode().Perm())
-			if err != nil {
-				return err
-			}
-			if _, err := io.Copy(out, in); err != nil {
-				out.Close()
-				return err
-			}
-			return out.Close()
+			return copyBackupFile(path, target, info.Mode().Perm())
 		}
 	})
+}
+
+// copyBackupFile closes both files before returning, so a large tree never holds
+// more than two descriptors open.
+func copyBackupFile(src string, dest string, perm fs.FileMode) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dest, os.O_CREATE|os.O_WRONLY|os.O_EXCL, perm)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 // filesEqual reports whether two regular files have identical bytes.

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -555,25 +556,98 @@ func removeTrailingJSONCommas(data []byte) []byte {
 	return out
 }
 
-// errCodexEntryRepairable means the file only fails to parse because of
-// tackroom's own sections for one server (duplicates an older release could
-// write); rewriting those sections repairs it.
+// errCodexEntryRepairable means the file only fails to parse because some
+// [mcp_servers.NAME] table appears more than once (an older release could
+// write duplicates) and NAME is one of them; rewriting it repairs the file.
 var errCodexEntryRepairable = errors.New("managed MCP sections need repair")
+
+var tomlMCPServerHeader = regexp.MustCompile(`^\[mcp_servers\.([A-Za-z0-9_-]+)\]\s*(#.*)?$`)
+
+// duplicatedMCPServerNames lists server names whose table header repeats.
+func duplicatedMCPServerNames(content string) []string {
+	counts := map[string]int{}
+	var order []string
+	for _, line := range strings.Split(content, "\n") {
+		m := tomlMCPServerHeader.FindStringSubmatch(strings.TrimSpace(line))
+		if m == nil {
+			continue
+		}
+		if counts[m[1]] == 0 {
+			order = append(order, m[1])
+		}
+		counts[m[1]]++
+	}
+	var dups []string
+	for _, name := range order {
+		if counts[name] > 1 {
+			dups = append(dups, name)
+		}
+	}
+	return dups
+}
+
+// mergedDuplicateEntry decodes every copy of one server's sections and
+// merges them (later copies win, env tables are combined), so a repair keeps
+// whatever env values the duplicates held.
+func mergedDuplicateEntry(content string, name string) map[string]interface{} {
+	header := fmt.Sprintf("[mcp_servers.%s]", name)
+	merged := map[string]interface{}{}
+	env := map[string]interface{}{}
+	for {
+		start := indexTOMLSectionHeader(content, header)
+		if start == -1 {
+			break
+		}
+		end := endTOMLSectionIncludingDescendants(content, start, header)
+		var doc map[string]interface{}
+		if _, err := toml.Decode(content[start:end], &doc); err == nil {
+			servers, _ := doc["mcp_servers"].(map[string]interface{})
+			if entry, ok := servers[name].(map[string]interface{}); ok {
+				for key, value := range entry {
+					if key == "env" {
+						if table, ok := value.(map[string]interface{}); ok {
+							for k, v := range table {
+								env[k] = v
+							}
+						}
+						continue
+					}
+					merged[key] = value
+				}
+			}
+		}
+		content = content[:start] + content[end:]
+	}
+	if len(env) > 0 {
+		merged["env"] = env
+	}
+	return merged
+}
 
 // decodeCodexMCPEntry parses the whole TOML file (so a broken file is
 // reported instead of appended to) and returns one mcp_servers entry.
+// Duplicated server tables are set aside first: a file that parses without
+// them is still readable, and the duplicated servers are repairable.
 func decodeCodexMCPEntry(path string, data []byte, name string) (map[string]interface{}, bool, error) {
+	content := string(data)
 	var doc map[string]interface{}
-	if _, err := toml.Decode(string(data), &doc); err != nil {
-		header := fmt.Sprintf("[mcp_servers.%s]", name)
-		rest := removeTOMLSectionsIncludingDescendants(string(data), header)
-		var restDoc map[string]interface{}
-		if rest != string(data) {
-			if _, restErr := toml.Decode(rest, &restDoc); restErr == nil {
-				return nil, true, errCodexEntryRepairable
-			}
+	_, parseErr := toml.Decode(content, &doc)
+	if parseErr != nil {
+		dups := duplicatedMCPServerNames(content)
+		if len(dups) == 0 {
+			return nil, false, fmt.Errorf("parse %s: %w", path, parseErr)
 		}
-		return nil, false, fmt.Errorf("parse %s: %w", path, err)
+		rest := content
+		for _, dup := range dups {
+			rest = removeTOMLSectionsIncludingDescendants(rest, fmt.Sprintf("[mcp_servers.%s]", dup))
+		}
+		doc = nil
+		if _, err := toml.Decode(rest, &doc); err != nil {
+			return nil, false, fmt.Errorf("parse %s: %w", path, parseErr)
+		}
+		if stringInSlice(name, dups) {
+			return mergedDuplicateEntry(content, name), true, errCodexEntryRepairable
+		}
 	}
 	servers, _ := doc["mcp_servers"].(map[string]interface{})
 	entry, ok := servers[name].(map[string]interface{})
@@ -659,7 +733,7 @@ func readCodexMCPServer(target mcpTarget, name string, home string) (mcpServerCo
 		return mcpServerConfig{}, fmt.Errorf("read %s: %w", configPath, err)
 	}
 	entry, ok, err := decodeCodexMCPEntry(configPath, data, name)
-	if err != nil {
+	if err != nil && !errors.Is(err, errCodexEntryRepairable) {
 		return mcpServerConfig{}, err
 	}
 	if !ok {
@@ -1042,43 +1116,6 @@ func stripTOMLInlineComments(raw string) string {
 		out.WriteRune(r)
 	}
 	return out.String()
-}
-
-func splitCommaSeparated(raw string) []string {
-	var parts []string
-	var current strings.Builder
-	var quote rune
-	escaped := false
-	for _, r := range raw {
-		if escaped {
-			current.WriteRune(r)
-			escaped = false
-			continue
-		}
-		if r == '\\' && quote == '"' {
-			current.WriteRune(r)
-			escaped = true
-			continue
-		}
-		if (r == '"' || r == '\'') && quote == 0 {
-			quote = r
-			current.WriteRune(r)
-			continue
-		}
-		if r == quote {
-			quote = 0
-			current.WriteRune(r)
-			continue
-		}
-		if r == ',' && quote == 0 {
-			parts = append(parts, strings.TrimSpace(current.String()))
-			current.Reset()
-			continue
-		}
-		current.WriteRune(r)
-	}
-	parts = append(parts, strings.TrimSpace(current.String()))
-	return parts
 }
 
 func matchManagedMCPMap(entry map[string]interface{}, server mcpServerConfig, defaults map[string]interface{}) bool {

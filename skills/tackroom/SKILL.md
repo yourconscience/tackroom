@@ -71,7 +71,7 @@ tackroom setup --yes --memory basic # unattended: imports, git init, backs up an
 tackroom status --json              # verify; exit 0 = everything synced
 ```
 
-Exit codes: `status`, `sync` and `doctor` exit 1 when anything is out of sync, conflicting, or failing, and 0 otherwise. `--json` output on those three is a stable contract: `synced`, `agents[].conflicts`, `agents[].skills|mcp|roles|hooks.{managed,missing,drifted}`. When `sync` reports conflicts, show the listed paths to the user before running `tackroom sync --replace-conflicts`.
+Exit codes: `status` and `sync` exit 1 when anything is out of sync or conflicting; `doctor` exits 1 when any check fails or warns. All exit 0 otherwise. `--json` output on those three is a stable contract: `synced`, `agents[].conflicts`, `agents[].skills|mcp|roles|hooks.{managed,missing,drifted}`. When `sync` reports conflicts, show the listed paths to the user before running `tackroom sync --replace-conflicts`.
 
 The public starter contains `tackroom`, six generic roles (`architect` `builder` `general` `researcher` `reviewer` `tester`), and reusable memory scripts. Personal skills, hooks, MCP servers, secrets, and memory data belong only in the private config repository.
 

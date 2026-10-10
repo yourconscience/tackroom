@@ -121,3 +121,69 @@ func TestMergeManagedEnvNeverReplacesASecretWithAReference(t *testing.T) {
 		t.Fatal("a reference is satisfied by any native value and only by one")
 	}
 }
+
+func TestCodexDuplicateRepairKeepsSecretsAndOtherServersReadable(t *testing.T) {
+	home := t.TempDir()
+	configPath := filepath.Join(home, ".codex", "config.toml")
+	writeSyncTestFile(t, configPath, []byte(`[mcp_servers.dup]
+command = "old"
+
+[mcp_servers.dup]
+command = "old"
+
+[mcp_servers.dup.env]
+API_KEY = "real-secret"
+
+[mcp_servers.fine]
+command = "fine-mcp"
+`))
+	// Another server's duplicates must not make this one unreadable.
+	state, err := inspectMCPServer(agentCodex, mcpServerConfig{Name: "fine", Command: "fine-mcp"}, home)
+	if err != nil || state != stateSynced {
+		t.Fatalf("fine server = %s, %v", state, err)
+	}
+	server := mcpServerConfig{Name: "dup", Command: "new-mcp", Env: map[string]string{"API_KEY": "${API_KEY}"}}
+	if err := patchMCPServer(agentCodex, server, home); err != nil {
+		t.Fatal(err)
+	}
+	data, _ := os.ReadFile(configPath)
+	if strings.Count(string(data), "[mcp_servers.dup]") != 1 || !strings.Contains(string(data), "real-secret") {
+		t.Fatalf("repair should dedupe and keep the secret:\n%s", data)
+	}
+}
+
+func TestConflictBackupsArePrivate(t *testing.T) {
+	home := t.TempDir()
+	native := filepath.Join(home, ".claude", "CLAUDE.md")
+	writeSyncTestFile(t, native, []byte("# mine\n"))
+	backupDir := filepath.Join(home, "backup")
+	report := agentReport{Name: "claude", Conflicts: []string{"c"}, Replaceable: []replaceableConflict{{Path: native, Message: "c"}}}
+	if _, err := replaceConflicts(&report, backupDir, home); err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{backupDir, filepath.Join(backupDir, ".claude")} {
+		info, err := os.Stat(dir)
+		if err != nil || info.Mode().Perm() != 0o700 {
+			t.Fatalf("%s mode = %v, %v; want 0700", dir, info.Mode().Perm(), err)
+		}
+	}
+}
+
+func TestSetupImportsSymlinkedInstructions(t *testing.T) {
+	home := t.TempDir()
+	dotfile := filepath.Join(home, "dotfiles", "CLAUDE.md")
+	writeSyncTestFile(t, dotfile, []byte("# from dotfiles\n"))
+	if err := os.MkdirAll(filepath.Join(home, ".claude"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(dotfile, filepath.Join(home, ".claude", "CLAUDE.md")); err != nil {
+		t.Fatal(err)
+	}
+	repoRoot := filepath.Join(home, ".agents")
+	if err := importRootInstructions(repoRoot, []agentConfig{{Name: agentClaudeCode}}, home, setupIO{out: &bytes.Buffer{}}); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(repoRoot, "AGENTS.md")); string(data) != "# from dotfiles\n" {
+		t.Fatalf("symlinked instructions should be imported, got %q", data)
+	}
+}

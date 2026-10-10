@@ -30,9 +30,14 @@ func rootInstructionSources(repoRoot string, detected []agentConfig, home string
 			continue
 		}
 		path := h.RootInstructions.Path(home)
-		info, err := os.Lstat(path)
+		if linkMatchesExpected(path, filepath.Join(repoRoot, "AGENTS.md")) {
+			continue // already linked to the shared file
+		}
+		// Follow links too: an instructions file symlinked into dotfiles is
+		// still the user's content, and sync will relink it.
+		info, err := os.Stat(path)
 		if err != nil || !info.Mode().IsRegular() {
-			continue // missing, or already a link tackroom manages
+			continue
 		}
 		data, err := os.ReadFile(path)
 		if err != nil || len(bytes.TrimSpace(data)) == 0 {
@@ -79,7 +84,20 @@ func importRootInstructions(repoRoot string, detected []agentConfig, home string
 	if err := os.MkdirAll(repoRoot, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", repoRoot, err)
 	}
-	if err := os.WriteFile(target, content, 0o644); err != nil && !errors.Is(err, fs.ErrExist) {
+	// O_EXCL: never truncate an AGENTS.md that appeared since the check.
+	file, err := os.OpenFile(target, os.O_CREATE|os.O_WRONLY|os.O_EXCL, 0o644)
+	if errors.Is(err, fs.ErrExist) {
+		fmt.Fprintf(streams.out, "root instructions: %s already exists; nothing imported\n\n", target)
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("create %s: %w", target, err)
+	}
+	if _, err := file.Write(content); err != nil {
+		file.Close()
+		return fmt.Errorf("write %s: %w", target, err)
+	}
+	if err := file.Close(); err != nil {
 		return fmt.Errorf("write %s: %w", target, err)
 	}
 	fmt.Fprintf(streams.out, "root instructions: imported %d file(s) into %s\n", len(sources), target)
@@ -88,6 +106,16 @@ func importRootInstructions(repoRoot string, detected []agentConfig, home string
 	}
 	fmt.Fprintln(streams.out)
 	return nil
+}
+
+// linkMatchesExpected reports whether path is a symlink to expected.
+func linkMatchesExpected(path string, expected string) bool {
+	info, err := os.Lstat(path)
+	if err != nil || info.Mode()&os.ModeSymlink == 0 {
+		return false
+	}
+	target, err := os.Readlink(path)
+	return err == nil && linkMatches(path, target, expected)
 }
 
 func displayPath(path string, home string) string {
