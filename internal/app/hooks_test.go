@@ -311,6 +311,60 @@ func TestHookCommandMatchingDoesNotCleanShellArgumentsAsPaths(t *testing.T) {
 	}
 }
 
+func TestCodexMemoryCleanupAcrossTierTransitions(t *testing.T) {
+	for _, tier := range []string{"off", "basic"} {
+		t.Run(tier, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			root := filepath.Join(home, ".agents")
+			prior := config{}
+			for _, event := range []string{"SessionStart", "SessionEnd"} {
+				name, script := "memory-session-start", "session-start.sh"
+				if event == "SessionEnd" {
+					name, script = "memory-session-end", "session-end.sh"
+				}
+				hook := hookConfig{Name: name, Enabled: true, Event: event, Command: filepath.Join(root, "memory", "hooks", script), Timeout: 15, Agents: []string{agentCodex}}
+				prior.Hooks = append(prior.Hooks, hook)
+				if err := patchCodexHook(hook, home); err != nil {
+					t.Fatal(err)
+				}
+			}
+			keep := hookConfig{Name: "unrelated", Event: "SessionStart", Command: "echo keep"}
+			if err := patchCodexHook(keep, home); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := removeNativeManagedMemoryHooks(home, root, prior, config{}); err != nil {
+				t.Fatal(err)
+			}
+			if tier == "basic" {
+				for _, hook := range prior.Hooks {
+					hook.Command = strings.Replace(hook.Command, "session-start.sh", "basic-session-start.py", 1)
+					hook.Command = strings.Replace(hook.Command, "session-end.sh", "basic-session-end.py", 1)
+					if err := patchCodexHook(hook, home); err != nil {
+						t.Fatal(err)
+					}
+				}
+			}
+			entries, err := readGroupedNativeHooks(agentCodex, codexHooksConfigPath(home))
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := 1
+			if tier == "basic" {
+				want = 3
+			}
+			if len(entries) != want {
+				t.Fatalf("hooks after %s = %#v", tier, entries)
+			}
+			for _, entry := range entries {
+				if strings.Contains(entry.Command, "session-start.sh") || strings.Contains(entry.Command, "session-end.sh") {
+					t.Fatalf("old hook survived %s: %s", tier, entry.Command)
+				}
+			}
+		})
+	}
+}
+
 func TestRemoveNativeManagedMemoryHooksCleansSupportedNativeConfigs(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
@@ -651,6 +705,21 @@ func TestCodexSessionEndHookClampsTimeoutToNativeMaximum(t *testing.T) {
 	items := raw["hooks"].(map[string]interface{})["SessionEnd"].([]interface{})[0].(map[string]interface{})["hooks"].([]interface{})
 	if got := items[0].(map[string]interface{})["timeout"]; got != float64(codexSessionEndMaxTimeout) {
 		t.Fatalf("Codex SessionEnd timeout = %#v, want %d", got, codexSessionEndMaxTimeout)
+	}
+	if got, want := items[0].(map[string]interface{})["command"], "DOTAGENTS_MEMORY_SOURCE=codex ~/.agents/memory/hooks/basic-session-end.py"; got != want {
+		t.Fatalf("Codex SessionEnd command = %#v, want %q", got, want)
+	}
+}
+
+func TestCodexMemorySessionStartSetsSourceHint(t *testing.T) {
+	hook := nativeCodexHook(hookConfig{
+		Name:    "memory-session-start",
+		Event:   "SessionStart",
+		Command: "~/.agents/memory/hooks/session-start.sh",
+		Timeout: 15,
+	})
+	if got, want := hook.Command, "DOTAGENTS_MEMORY_SOURCE=codex ~/.agents/memory/hooks/session-start.sh"; got != want {
+		t.Fatalf("Codex SessionStart command = %q, want %q", got, want)
 	}
 }
 

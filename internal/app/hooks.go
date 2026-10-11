@@ -230,6 +230,11 @@ func patchCodexHook(hook hookConfig, home string) error {
 }
 
 func nativeCodexHook(hook hookConfig) hookConfig {
+	// Supply a default for canonical hooks; an explicit source in a custom
+	// command remains user-owned, as in the memory dispatcher's source precedence.
+	if (hook.Name == "memory-session-start" || hook.Name == "memory-session-end") && !strings.Contains(hook.Command, "DOTAGENTS_MEMORY_SOURCE=") {
+		hook.Command = "DOTAGENTS_MEMORY_SOURCE=codex " + hook.Command
+	}
 	// Codex gives SessionEnd hooks at most three seconds, even when a larger
 	// timeout is configured. Render the effective value so status does not
 	// report permanent drift from an impossible desired timeout.
@@ -320,12 +325,16 @@ func managedMemoryNativeCommands(home string, root string, cfgs ...config) []str
 		for _, hook := range cfg.Hooks {
 			if _, managed := managedMemoryHookNames[hook.Name]; managed {
 				add(hook.Command)
+				add(nativeCodexHook(hook).Command)
 			}
 		}
 	}
 	for _, commandRoot := range []string{root, filepath.Join(home, ".agents")} {
 		for _, script := range []string{"basic-session-start.py", "basic-session-end.py", "session-start.sh", "stop.sh", "session-end.sh", "sync-vault-to-memory.sh", "sync-memory-to-vault.sh"} {
 			add(managedMemoryHookCommand(commandRoot, home, script))
+			if script == "basic-session-start.py" || script == "basic-session-end.py" || script == "session-start.sh" || script == "session-end.sh" {
+				add("DOTAGENTS_MEMORY_SOURCE=codex " + managedMemoryHookCommand(commandRoot, home, script))
+			}
 		}
 	}
 	return commands

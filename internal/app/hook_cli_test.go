@@ -71,6 +71,24 @@ func TestMissingHookTarget(t *testing.T) {
 	}
 }
 
+func TestNativeHookIsManagedUsesCodexRenderedCommand(t *testing.T) {
+	entry := nativeHookEntry{
+		Agent:   agentCodex,
+		Event:   "SessionEnd",
+		Command: "DOTAGENTS_MEMORY_SOURCE=codex ~/.agents/memory/hooks/session-end.sh",
+	}
+	cfg := config{Hooks: []hookConfig{{
+		Name:    "memory-session-end",
+		Enabled: true,
+		Event:   "SessionEnd",
+		Command: "~/.agents/memory/hooks/session-end.sh",
+		Agents:  []string{agentCodex},
+	}}}
+	if !nativeHookIsManaged(entry, cfg) {
+		t.Fatal("rendered Codex memory hook was not recognized as managed")
+	}
+}
+
 func TestRemoveNativeHookEntriesScopesRemovalToMatchedEvent(t *testing.T) {
 	home := t.TempDir()
 	path := codexHooksConfigPath(home)

@@ -246,6 +246,9 @@ func nativeHookIsManaged(entry nativeHookEntry, cfg config) bool {
 		if !hook.Enabled || (len(hook.Agents) > 0 && !stringInSlice(entry.Agent, hook.Agents)) {
 			continue
 		}
+		if entry.Agent == agentCodex {
+			hook = nativeCodexHook(hook)
+		}
 		event := hook.Event
 		var ok bool
 		switch entry.Agent {

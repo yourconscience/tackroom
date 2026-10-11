@@ -121,6 +121,53 @@ class BasicMemoryHookTests(unittest.TestCase):
             self.assertIn("skipped replayed session session-1", replay_stdout["systemMessage"])
             self.assertEqual(sorted(path.name for path in sessions.glob("*.md")), ["2026-07-14.md"])
 
+    def test_session_end_skips_payload_without_supported_transcript_messages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            knowledge = Path(tmp) / "knowledge"
+            payload = {
+                "hook_event_name": "SessionEnd",
+                "session_id": "empty-session",
+                "session_start": "2026-07-14T10:11:12Z",
+                "cwd": "/Users/example/project",
+            }
+
+            result = self.run_hook(END_HOOK, payload, env=self.env_with_knowledge(knowledge))
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            output = json.loads(result.stdout)
+            self.assertNotIn("output_file", output)
+            self.assertIn("skipped session without supported transcript messages", output["systemMessage"])
+            self.assertFalse((knowledge / "sessions" / "2026-07-14.md").exists())
+
+    def test_native_codex_rollout_and_hook_fields_capture_real_messages(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            transcript = root / "rollout.jsonl"
+            records = [
+                {"type": "session_meta", "timestamp": "2026-09-25T10:00:00Z", "payload": {"id": "native-codex"}},
+                {"type": "response_item", "payload": {"type": "message", "role": "user", "content": [{"type": "input_text", "text": "User request from rollout"}]}},
+                {"type": "response_item", "payload": {"type": "message", "role": "assistant", "channel": "final", "content": [{"type": "output_text", "text": "Final answer from rollout"}]}},
+                {"type": "response_item", "payload": {"type": "message", "role": "assistant", "channel": "analysis", "content": [{"type": "output_text", "text": "Private reasoning excluded"}]}},
+            ]
+            transcript.write_text("\n".join(json.dumps(record) for record in records) + "\n", encoding="utf-8")
+            for mode in ("rollout", "inline"):
+                knowledge = root / mode
+                payload = {"agent": "codex", "session_start": "2026-09-25T10:00:00Z", "prompt": "Inline request", "last_assistant_message": "Inline answer"}
+                if mode == "rollout":
+                    payload["transcript_path"] = str(transcript)
+                result = self.run_hook(END_HOOK, payload, env=self.env_with_knowledge(knowledge))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                content = (knowledge / "sessions" / "2026-09-25.md").read_text(encoding="utf-8")
+                if mode == "rollout":
+                    self.assertIn("User request from rollout", content)
+                    self.assertIn("Final answer from rollout", content)
+                    self.assertIn("basic-memory-session:native-codex:start", content)
+                    self.assertNotIn("Inline request", content)
+                    self.assertNotIn("Private reasoning excluded", content)
+                else:
+                    self.assertIn("Inline request", content)
+                    self.assertIn("Inline answer", content)
+
     def test_session_end_reads_jsonl_transcript_and_uses_dated_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
@@ -576,6 +623,30 @@ class ClaudeFallbackAndDispatchTests(unittest.TestCase):
             (sessions / "2026-09-09.md").write_text("## Session digest\n- first request: prefer ripgrep\n", encoding="utf-8")
 
             result = self.run_shell(SESSION_START_HOOK, {"hook_event_name": "SessionStart"}, env=self.base_env(knowledge))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            output = json.loads(result.stdout)
+            self.assertEqual(output["hookSpecificOutput"]["hookEventName"], "SessionStart")
+            self.assertIn("prefer ripgrep", output["hookSpecificOutput"]["additionalContext"])
+
+    def test_codex_session_start_uses_basic_context_even_when_claude_plugin_exists(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            knowledge = tmp_path / "knowledge"
+            sessions = knowledge / "sessions"
+            sessions.mkdir(parents=True)
+            (sessions / "2026-09-09.md").write_text("## Session digest\n- first request: prefer ripgrep\n", encoding="utf-8")
+            plugin_root = tmp_path / "plugin"
+            (plugin_root / "hooks").mkdir(parents=True)
+            plugin_start = plugin_root / "hooks" / "session-start.sh"
+            plugin_start.write_text("#!/bin/sh\nprintf 'plugin-output\\n'\n", encoding="utf-8")
+            plugin_start.chmod(plugin_start.stat().st_mode | stat.S_IXUSR)
+            env = self.base_env(
+                knowledge,
+                {"DOTAGENTS_MEMORY_SOURCE": "codex", "MEMSEARCH_PLUGIN_DIR": str(plugin_root)},
+            )
+
+            result = self.run_shell(SESSION_START_HOOK, {"hook_event_name": "SessionStart"}, env=env)
+
             self.assertEqual(result.returncode, 0, result.stderr)
             output = json.loads(result.stdout)
             self.assertEqual(output["hookSpecificOutput"]["hookEventName"], "SessionStart")
