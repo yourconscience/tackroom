@@ -67,6 +67,8 @@ First-run setup:
 
 Setup also imports existing instructions files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, ...) into `~/.agents/AGENTS.md`, then backs up the originals to `~/.local/state/tackroom/backups/<time>/` and links them.
 
+Claude Code's link stays `~/.claude/CLAUDE.md`: Claude Code (2.1.277+) reads `AGENTS.md` only as project instructions and only in a project without `CLAUDE.md`, so `~/.claude/AGENTS.md` would not load everywhere. A repository needs no `CLAUDE.md` that only imports `AGENTS.md`.
+
 ### Running setup for a user (agents)
 
 ```bash
