@@ -33,12 +33,14 @@ Hosts come from `--hosts`, else `crons.hosts` in `tackroom.local.yaml`, else `cr
 
 | Source | Read from | Included |
 | --- | --- | --- |
-| `launchd` | `~/Library/LaunchAgents/*.plist` via `plutil -convert json`, state via `launchctl print gui/$UID/<label>` | `StartCalendarInterval` or `StartInterval` jobs. `KeepAlive`, `RunAtLoad` and other on-demand agents are services, not schedules; they appear only when their last exit is non-zero, with `state: service`. |
+| `launchd` | `~/Library/LaunchAgents/*.plist` via `plutil -convert json -o -` (to stdout, so the file is never rewritten), state via `launchctl print gui/$UID/<label>` | `StartCalendarInterval` or `StartInterval` jobs. `KeepAlive`, `RunAtLoad` and other on-demand agents are services, not schedules; they appear only when their last exit is non-zero, with `state: service`. |
 | `crontab` | `crontab -l` | Every schedule line; `@reboot` is a boot hook and is left out. |
-| `systemd` | `systemctl --user list-timers --all --output=json`, `systemctl --user show` on each timer and its unit | User timers. |
+| `systemd` | `systemctl --user list-timers --all --output=json`, `systemctl --user show` on each timer and its unit | User timers that systemd has loaded. A timer unit file that was installed but never loaded is not listed. |
 | `hermes` | `~/.hermes/cron/jobs.json`, `executions.db`, `ticker_heartbeat` | Every job. An enabled job whose scheduler heartbeat is older than 10 minutes is reported `dead`. |
 | `codex` | `~/.codex/sqlite/codex-dev.db`, tables `automations` and `automation_runs` | Every automation. |
 | `claude-desktop` | `scheduled-tasks.json` under the Claude desktop app's `claude-code-sessions` directory, prompts in `~/.claude/scheduled-tasks/<id>/SKILL.md`, runs from session files that carry `scheduledTaskId` | Every task. |
+
+Scope is the user tackroom runs as (or the SSH user): their LaunchAgents, crontab and user timers. System daemons in `/Library/LaunchDaemons`, other users' crontabs and system timers are out of scope; collecting them needs root, which a read-only probe does not ask for.
 
 Documented gaps, reported as `not_scanned` rather than silently absent:
 
@@ -80,11 +82,12 @@ Every job becomes one JSON record:
 | `last_exit` | Last exit code where the scheduler records one | declared |
 | `last_status` | Harness status string (`ok`, `error`, `blocked_config`, ...) | declared |
 | `last_run` | Last start time; from log mtime where the scheduler keeps none | declared or inferred |
-| `state` | `scheduled`, `disabled`, `paused`, `not_loaded`, `dead`, `missing` | inferred |
+| `state` | `scheduled`, `service` (a failing on-demand launchd agent), `disabled`, `paused`, `not_loaded`, `dead`, `missing` | inferred |
 | `created_by` | `human`, `agent`, or a harness name; `system` for timers shipped under `/usr` or `/lib` | from the manifest, or inferred |
 | `connectors` | Services the job reads or writes | from the manifest; a harness delivery target is inferred |
 | `effect` | Expected observable outcome | from the manifest |
 | `problems` | Findings such as miscased plist keys or a missing program | inferred |
+| `inferred` | Names of the fields above that tackroom derived rather than read or had declared, for example `tz`, `last_run`, `created_by` | inferred |
 
 `inferred` on each record lists which fields tackroom derived rather than read or had declared, so a view can show them differently. The inference rules stay small and explicit; they never guess connectors from free-form command text.
 
@@ -107,7 +110,7 @@ An empty job list means nothing on its own; only `empty` means "looked and there
 
 ## 2. The `crons:` manifest
 
-Authorship and connectors cannot be derived reliably from a command line, so they are declared once in `tackroom.yaml`. The scan merges declared fields into matching records and reports declared jobs it did not find as `state: missing`.
+Authorship and connectors cannot be derived reliably from a command line, so they are declared once in `tackroom.yaml`. Collection merges declared fields into matching records. An entry matches records by scheduler-native id, narrowed by `host` and `source` when they are set; without them it applies to every record with that id on any host, which is the explicit rule for ids that repeat. A declared job that is not found is reported as `state: missing` only when every place it could live was read: the host was reached, and its `source` (when set) came back `found` or `empty`, or (when unset) no source on that host came back `unreadable`. Otherwise it is left out, and the access entries show what could not be read.
 
 ```yaml
 crons:
@@ -115,6 +118,7 @@ crons:
   jobs:
     com.example.backup:            # scheduler-native id
       host: laptop                 # optional; matches any scanned host when omitted
+      source: launchd              # optional; matches any source when omitted
       created_by: human
       connectors: [git, ssh]
       effect: nightly commit pushed to the backup remote
