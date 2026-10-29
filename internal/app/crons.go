@@ -570,9 +570,6 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 				scheduled = true
 			}
 		}
-		if !scheduled {
-			continue
-		}
 		label, _ := plist["Label"].(string)
 		if label == "" {
 			label = strings.TrimSuffix(filepath.Base(s.Key), ".plist")
@@ -648,6 +645,7 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 			job.Inferred = append(job.Inferred, "last_run")
 		}
 
+		running := ""
 		if lc, ok := p.one("launchctl", s.Key); !ok || lc.RC != 0 {
 			job.State = "not_loaded"
 		} else {
@@ -657,12 +655,17 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 					continue
 				}
 				switch k {
+				case "state":
+					if running == "" {
+						running = v
+					}
 				case "runs":
 					if n, err := strconv.Atoi(v); err == nil {
 						job.Runs = &n
 					}
-				case "last exit code":
-					if n, err := strconv.Atoi(v); err == nil {
+				case "last exit code": // "2", or "78: EX_CONFIG"
+					code, _, _ := strings.Cut(v, ":")
+					if n, err := strconv.Atoi(code); err == nil {
 						job.LastExit = &n
 					}
 				}
@@ -670,6 +673,21 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 		}
 		if disabled[label] || plist["Disabled"] == true {
 			job.State = "disabled"
+		}
+		if !scheduled {
+			// Services (KeepAlive, RunAtLoad, WatchPaths) are not schedules;
+			// they are reported only when their last exit was non-zero.
+			if job.LastExit == nil || *job.LastExit == 0 || job.State == "disabled" {
+				continue
+			}
+			job.Schedule = launchdTrigger(plist)
+			job.State, job.LastStatus = "service", running
+			job.Inferred = append(job.Inferred, "state")
+			if plist["KeepAlive"] != nil && plist["KeepAlive"] != false && job.Runs != nil && *job.Runs >= 10 {
+				job.Problems = append(job.Problems, fmt.Sprintf("crash loop: KeepAlive restarted it %d times, last exit %d", *job.Runs, *job.LastExit))
+			} else {
+				job.Problems = append(job.Problems, fmt.Sprintf("last exit %d", *job.LastExit))
+			}
 		}
 		jobs = append(jobs, job)
 	}
@@ -681,6 +699,19 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 		}
 	}
 	return jobs, access
+}
+
+func launchdTrigger(plist map[string]any) string {
+	var out []string
+	for _, key := range []string{"KeepAlive", "RunAtLoad", "WatchPaths", "QueueDirectories", "StartOnMount", "MachServices", "Sockets"} {
+		if v, ok := plist[key]; ok && v != false {
+			out = append(out, key)
+		}
+	}
+	if len(out) == 0 {
+		return "on demand"
+	}
+	return strings.Join(out, ", ")
 }
 
 func shellJoin(args []string) string {
@@ -1021,6 +1052,7 @@ func (p *probeData) hermes() ([]cronJob, cronAccess) {
 			job.Problems = append(job.Problems, "enabled, but the Hermes scheduler is not running on this host")
 		}
 		job.Inferred = append(job.Inferred, "state")
+		missedRuns(&job, time.Unix(p.now, 0))
 		jobs = append(jobs, job)
 	}
 	return jobs, cronAccess{Detail: strings.Join(details, "; ")}
@@ -1105,6 +1137,7 @@ func (p *probeData) claudeDesktop() ([]cronJob, cronAccess) {
 			} else if t.FilePath != "" {
 				job.Problems = append(job.Problems, "task file not found: "+t.FilePath)
 			}
+			missedRuns(&job, time.Unix(p.now, 0))
 			jobs = append(jobs, job)
 		}
 	}
@@ -1175,5 +1208,131 @@ func printCronsTable(result cronsScanResult) {
 		for _, prob := range problems {
 			fmt.Println("  " + prob)
 		}
+	}
+}
+
+// Missed-run check for schedulers that record their own last run. Log mtimes
+// are not used: a job that runs but writes nothing would look stale.
+
+var cronMacros = map[string]string{
+	"@yearly": "0 0 1 1 *", "@annually": "0 0 1 1 *", "@monthly": "0 0 1 * *",
+	"@weekly": "0 0 * * 0", "@daily": "0 0 * * *", "@midnight": "0 0 * * *", "@hourly": "0 * * * *",
+}
+
+type cronSpec struct {
+	fields         [5]map[int]bool
+	domAny, dowAny bool
+}
+
+// parseCronSpec reads a five-field numeric cron expression; names and
+// extensions return false so the caller skips the check.
+func parseCronSpec(expr string) (cronSpec, bool) {
+	if m, ok := cronMacros[strings.TrimSpace(expr)]; ok {
+		expr = m
+	}
+	parts := strings.Fields(expr)
+	if len(parts) != 5 {
+		return cronSpec{}, false
+	}
+	bounds := [5][2]int{{0, 59}, {0, 23}, {1, 31}, {1, 12}, {0, 7}}
+	var spec cronSpec
+	for i, part := range parts {
+		set := map[int]bool{}
+		for _, item := range strings.Split(part, ",") {
+			rangePart, stepPart, hasStep := strings.Cut(item, "/")
+			step := 1
+			if hasStep {
+				n, err := strconv.Atoi(stepPart)
+				if err != nil || n <= 0 {
+					return cronSpec{}, false
+				}
+				step = n
+			}
+			lo, hi := bounds[i][0], bounds[i][1]
+			if rangePart != "*" {
+				a, b, isRange := strings.Cut(rangePart, "-")
+				var err error
+				if lo, err = strconv.Atoi(a); err != nil {
+					return cronSpec{}, false
+				}
+				hi = lo
+				if isRange {
+					if hi, err = strconv.Atoi(b); err != nil {
+						return cronSpec{}, false
+					}
+				} else if hasStep {
+					hi = bounds[i][1]
+				}
+			}
+			if lo < bounds[i][0] || hi > bounds[i][1] || lo > hi {
+				return cronSpec{}, false
+			}
+			for v := lo; v <= hi; v += step {
+				if i == 4 {
+					set[v%7] = true // Sunday is both 0 and 7
+					continue
+				}
+				set[v] = true
+			}
+		}
+		spec.fields[i] = set
+	}
+	spec.domAny, spec.dowAny = parts[2] == "*", parts[4] == "*"
+	return spec, true
+}
+
+func (c cronSpec) matches(t time.Time) bool {
+	if !c.fields[0][t.Minute()] || !c.fields[1][t.Hour()] || !c.fields[3][int(t.Month())] {
+		return false
+	}
+	dom, dow := c.fields[2][t.Day()], c.fields[4][int(t.Weekday())]
+	if c.domAny || c.dowAny {
+		return dom && dow
+	}
+	return dom || dow // cron ORs day-of-month and day-of-week when both are set
+}
+
+// previousFire returns the latest matching minute strictly before t, looking
+// back at most 400 days.
+func (c cronSpec) previousFire(t time.Time) (time.Time, bool) {
+	t = t.Truncate(time.Minute).Add(-time.Minute)
+	for i := 0; i < 400*24*60; i++ {
+		if c.matches(t) {
+			return t, true
+		}
+		t = t.Add(-time.Minute)
+	}
+	return time.Time{}, false
+}
+
+func jobLocation(tz string) (*time.Location, bool) {
+	if loc, err := time.LoadLocation(tz); err == nil && tz != "" {
+		return loc, true
+	}
+	if t, err := time.Parse("-07:00", tz); err == nil {
+		_, offset := t.Zone()
+		return time.FixedZone(tz, offset), true
+	}
+	return nil, false
+}
+
+// missedRuns flags a scheduled job whose recorded last run is older than the
+// two most recent times it should have fired.
+func missedRuns(job *cronJob, now time.Time) {
+	if job.State != "scheduled" || job.LastRun == "" {
+		return
+	}
+	spec, ok := parseCronSpec(job.Schedule)
+	loc, locOK := jobLocation(job.TZ)
+	last, err := time.Parse(time.RFC3339, job.LastRun)
+	if !ok || !locOK || err != nil {
+		return
+	}
+	prev, ok := spec.previousFire(now.In(loc))
+	if !ok {
+		return
+	}
+	if prev2, ok := spec.previousFire(prev); ok && last.Before(prev2) {
+		job.Problems = append(job.Problems, fmt.Sprintf("enabled, but has not run since %s; it should have fired at %s and %s", last.Format("2006-01-02"), prev2.Format("2006-01-02 15:04"), prev.Format("2006-01-02 15:04")))
 	}
 }
