@@ -1,4 +1,4 @@
-const VIEWS = ['overview', 'skills', 'roles', 'wiring', 'unmanaged', 'config'];
+const VIEWS = ['overview', 'skills', 'roles', 'wiring', 'unmanaged', 'crons', 'config'];
 const baseURL = new URL(window.location.pathname.endsWith('/') ? window.location.pathname : `${window.location.pathname}/`, window.location.origin);
 
 const CELLS = {
@@ -33,6 +33,10 @@ const store = {
   configDiff: '',
   configNote: '',
   preview: null,
+  crons: null,
+  cronsError: '',
+  cronsLoading: false,
+  cronFilter: 'all',
 };
 
 // ---------- helpers ----------
@@ -161,7 +165,7 @@ async function refresh() {
 // ---------- chrome ----------
 function renderChrome() {
   const inv = store.inv;
-  const counts = {skills: '', roles: '', wiring: '', unmanaged: ''};
+  const counts = {skills: '', roles: '', wiring: '', unmanaged: '', crons: ''};
   const alerts = {};
   if (inv) {
     const attention = inv.skills.filter((skill) => Object.values(skill.states).some((state) => ATTENTION.has(state))).length;
@@ -170,6 +174,11 @@ function renderChrome() {
     counts.roles = inv.roles.length || '';
     counts.wiring = inv.mcp.length + inv.hooks.length || '';
     counts.unmanaged = inv.unmanaged.length || '';
+  }
+  if (store.crons) {
+    const attention = store.crons.jobs.filter(cronNeedsAttention).length;
+    counts.crons = attention || store.crons.jobs.length || '';
+    alerts.crons = attention > 0;
   }
   document.querySelectorAll('[data-count]').forEach((node) => {
     node.textContent = counts[node.dataset.count] ?? '';
@@ -193,12 +202,14 @@ function route() {
     if (node.dataset.view === store.view) node.setAttribute('aria-current', 'page');
     else node.removeAttribute('aria-current');
   });
+  if (store.view === 'crons' && !store.crons && !store.cronsLoading) loadCrons();
   renderView();
 }
 
 function renderView() {
   const root = document.getElementById(`view-${store.view}`);
   if (store.view === 'config') { renderConfig(root); return; }
+  if (store.view === 'crons') { renderCrons(root); return; }
   if (!store.inv) {
     mount(root, store.invError
       ? h('div', {class: 'error-box'}, h('strong', {text: 'Could not inspect your agents. '}), store.invError, ' Fix the config in the ', h('a', {href: '#config', text: 'Config'}), ' view.')
@@ -440,6 +451,118 @@ function renderUnmanaged(root) {
   mount(root, 
     viewHead('Unmanaged', 'Things in your agents\' folders that tackroom did not put there. tackroom never deletes them.'),
     ...(groups.length ? groups : [h('p', {class: 'empty', text: 'Everything in your agents\' skill folders is managed by tackroom.'})]));
+}
+
+// ---------- crons ----------
+const CRON_OK_STATUS = new Set(['ok', 'success', 'succeeded', 'completed']);
+const CRON_ACCESS = {found: 'ok', empty: '', unreadable: 'bad', not_scanned: ''};
+
+async function loadCrons(refresh = false) {
+  store.cronsLoading = true;
+  if (store.view === 'crons') renderView();
+  try {
+    store.crons = await api(`/api/crons${refresh ? '?refresh=1' : ''}`);
+    store.cronsError = '';
+  } catch (error) {
+    store.cronsError = error.message;
+  }
+  store.cronsLoading = false;
+  renderChrome();
+  if (store.view === 'crons') renderView();
+}
+// A paused or disabled job's old error is not actionable; its own problems
+// (a missing program, miscased keys) still are not, until it is turned on.
+function cronNeedsAttention(job) {
+  if (['disabled', 'paused', 'not_loaded'].includes(job.state)) return false;
+  return (job.problems || []).length > 0 || ['dead', 'missing'].includes(job.state);
+}
+function ago(iso) {
+  const time = Date.parse(iso);
+  if (!time) return iso || '';
+  const minutes = Math.round((Date.now() - time) / 60000);
+  if (minutes < 2) return 'just now';
+  if (minutes < 90) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 36) return `${hours} h ago`;
+  return `${Math.round(hours / 24)} d ago`;
+}
+function cronResult(job) {
+  if (job.last_exit != null) return h('span', {class: `pill ${job.last_exit === 0 ? 'ok' : 'bad'}`, text: `exit ${job.last_exit}`});
+  if (job.last_status) return h('span', {class: `pill ${CRON_OK_STATUS.has(job.last_status) ? 'ok' : 'bad'}`, text: job.last_status});
+  return h('span', {class: 'faint', text: 'not recorded'});
+}
+function cronState(job) {
+  const kind = ['dead', 'missing'].includes(job.state) ? 'bad' : job.state === 'service' && cronNeedsAttention(job) ? 'warn' : '';
+  return h('span', {class: `pill ${kind}`, text: job.state.replace('_', ' ')});
+}
+function cronKey(job) { return `cron:${job.host}/${job.source}/${job.id}`; }
+
+function renderCrons(root) {
+  const data = store.crons;
+  const refresh = h('button', {type: 'button', disabled: store.cronsLoading || undefined, onclick: () => loadCrons(true), text: store.cronsLoading ? 'Collecting…' : 'Collect again'});
+  const collected = data ? h('span', {class: 'mono faint', text: `collected ${new Date(data.scanned_at).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`}) : null;
+  const head = viewHead('Crons', 'Scheduled jobs on every host in crons.hosts: launchd, crontab, systemd timers, and the Hermes, Codex and Claude desktop schedulers. Failing KeepAlive services are listed too. Read-only: tackroom never changes a job.',
+    h('div', {class: 'toolbar'}, collected, refresh));
+  if (!data) {
+    mount(root, head, store.cronsError
+      ? h('div', {class: 'error-box'}, h('strong', {text: 'Could not collect scheduled jobs. '}), store.cronsError)
+      : h('p', {class: 'loading', text: 'Collecting scheduled jobs. SSH hosts can take a few seconds.'}));
+    return;
+  }
+  const jobs = data.jobs || [];
+  const attention = jobs.filter(cronNeedsAttention);
+  const hosts = [...new Set([...jobs.map((job) => job.host), ...(data.access || []).map((entry) => entry.host)])];
+  const stats = h('div', {class: 'stats'},
+    stat(jobs.filter((job) => job.state !== 'service').length, 'scheduled jobs'),
+    stat(jobs.filter((job) => job.state === 'service').length, 'failing services'),
+    stat(hosts.length, hosts.length === 1 ? 'host' : 'hosts'),
+    h('div', {class: 'stat-state'}, attention.length
+      ? h('span', {class: 'pill bad', text: `${plural(attention.length, 'job')} need${attention.length === 1 ? 's' : ''} attention`})
+      : h('span', {class: 'pill ok', text: 'Nothing failing'})));
+  const issues = h('div', {class: 'attention'},
+    h('h2', {text: 'Needs attention'}),
+    attention.length
+      ? h('ul', {}, attention.map((job) => h('li', {},
+        h('span', {}, h('b', {text: `${job.host} · ${job.name || job.id}`}), ` ${(job.problems || [job.state])[0]}`),
+        h('a', {href: '#crons', text: 'Details', onclick: (event) => { event.preventDefault(); store.openRows.add(cronKey(job)); store.cronFilter = 'all'; renderView(); document.getElementById(cronKey(job))?.scrollIntoView({block: 'center'}); }}))))
+      : h('p', {class: 'muted', text: 'Every job that should run did, and nothing is crash-looping.'}));
+  const filters = segmented([['all', 'All'], ['attention', 'Needs attention']], store.cronFilter, (value) => { store.cronFilter = value; renderView(); });
+  const sections = hosts.map((host) => {
+    const access = (data.access || []).filter((entry) => entry.host === host);
+    const rows = jobs.filter((job) => job.host === host && (store.cronFilter === 'all' || cronNeedsAttention(job)));
+    const chips = h('div', {class: 'chips'}, access.map((entry) => h('span', {class: `pill ${CRON_ACCESS[entry.state] ?? ''}`, title: entry.detail || entry.state, text: `${entry.source} · ${entry.state === 'found' ? entry.jobs : entry.state.replace('_', ' ')}`})));
+    return h('section', {class: 'group'}, h('h2', {text: host === 'local' ? 'This machine' : host}), chips,
+      rows.length ? cronTable(rows) : h('p', {class: 'muted', text: store.cronFilter === 'all' ? 'No scheduled jobs found here.' : 'Nothing needs attention here.'}));
+  });
+  mount(root, head, stats, issues, h('div', {class: 'toolbar'}, filters), ...sections,
+    h('p', {class: 'faint', text: 'Add SSH hosts with crons.hosts in tackroom.local.yaml, for example hosts: [local, laptop]. Same data from the CLI: tackroom cron collect --table.'}));
+}
+function cronTable(rows) {
+  const tbody = h('tbody', {});
+  for (const job of rows) {
+    const key = cronKey(job);
+    const open = store.openRows.has(key);
+    const toggle = () => toggleRow(key);
+    tbody.append(h('tr', {id: key, class: cronNeedsAttention(job) ? 'row trouble' : 'row', tabindex: '0', 'aria-expanded': String(open), onclick: toggle, onkeydown: (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } }},
+      h('td', {class: 'lead'},
+        h('div', {class: 'lead-title'}, job.name || job.id, h('span', {class: 'tag', text: job.source})),
+        job.name && job.name !== job.id ? h('div', {class: 'lead-cmd', text: job.id}) : null),
+      h('td', {class: 'mono', text: job.schedule || ''}),
+      h('td', {}, cronState(job)),
+      h('td', {title: job.last_run || '', text: job.last_run ? ago(job.last_run) : ''}),
+      h('td', {}, cronResult(job)),
+      h('td', {class: 'num', text: job.runs != null ? String(job.runs) : ''})));
+    if (open) {
+      const fields = [['id', job.id], ['command', job.command], ['log', job.log && tilde(job.log)], ['time zone', job.tz], ['created by', job.created_by], ['connectors', (job.connectors || []).join(', ')], ['effect', job.effect], ['last run', job.last_run], ['inferred', (job.inferred || []).join(', ')]]
+        .filter(([, value]) => value);
+      tbody.append(h('tr', {class: 'detail'}, h('td', {colspan: '6'}, h('div', {class: 'detail-grid'},
+        (job.problems || []).length ? h('ul', {class: 'problems'}, job.problems.map((problem) => h('li', {text: problem}))) : null,
+        h('dl', {}, fields.flatMap(([label, value]) => [h('dt', {text: label}), h('dd', {class: label === 'command' || label === 'log' ? 'mono' : '', text: value})]))))));
+    }
+  }
+  return h('div', {class: 'matrix-wrap'}, h('table', {class: 'matrix jobs'},
+    h('thead', {}, h('tr', {}, ['Job', 'Schedule', 'State', 'Last run', 'Result', 'Runs'].map((label, i) => h('th', {class: i === 0 ? 'lead' : '', scope: 'col', text: label})))),
+    tbody));
 }
 
 // ---------- config ----------

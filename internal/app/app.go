@@ -237,13 +237,14 @@ func run(args []string) error {
 	case "hook":
 		return runHookCommand(args[1:])
 	case "cron":
+		if len(args) > 1 && args[1] == "collect" {
+			return runCronCollect(args[2:])
+		}
 		opts, err := parseCronFlags(args[1:])
 		if err != nil {
 			return err
 		}
 		return runCron(opts)
-	case "crons":
-		return runCronsCommand(args[1:])
 	case "pull":
 		// Kept as the cron entrypoint; installed crontab lines call it.
 		opts, err := parseSubcommandFlags("pull", args[1:])
@@ -560,7 +561,7 @@ var canonicalForms = []string{
 	"  tackroom restore [<backup> | latest] [--dry-run]",
 	"  tackroom hook list [--agents ...] [query]",
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
-	"  tackroom crons scan [--hosts local,HOST...] [--table] [--config PATH]",
+	"  tackroom cron collect [--hosts local,HOST...] [--table] [--config PATH]",
 }
 
 // printGroupUsage answers `tackroom <group> --help` with that group's forms.

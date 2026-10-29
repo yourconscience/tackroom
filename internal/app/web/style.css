@@ -188,6 +188,11 @@ svg { width: 16px; height: 16px; flex: none; }
 .detail-grid dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 14px; margin: 0; }
 .detail-grid dt { color: var(--faint); font: 12px/1.6 var(--mono); }
 .detail-grid dd { margin: 0; overflow-wrap: anywhere; }
+.matrix.jobs th, .matrix.jobs td { text-align: left; }
+.matrix.jobs td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.matrix.jobs td.mono { font: 12.5px/1.4 var(--mono); white-space: nowrap; }
+.matrix.jobs tr.trouble td.lead { box-shadow: inset 3px 0 0 var(--bad); }
+.problems { margin: 0; padding-left: 18px; display: grid; gap: 2px; color: var(--bad); }
 
 /* cells */
 .cell { display: inline-grid; place-items: center; width: 30px; height: 26px; border-radius: 7px; font: 700 13px/1 var(--mono); }

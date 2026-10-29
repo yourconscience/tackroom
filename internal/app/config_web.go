@@ -250,6 +250,8 @@ func (s *configWebServer) handler() http.Handler {
 			s.handleStatus(w, r)
 		case "/api/inventory":
 			s.handleInventory(w, r)
+		case "/api/crons":
+			s.handleCrons(w, r)
 		default:
 			http.NotFound(w, r)
 		}

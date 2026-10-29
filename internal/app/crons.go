@@ -25,9 +25,9 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// `tackroom crons` observes every scheduled job on every configured host.
-// It is separate from `tackroom cron`, which installs tackroom's own
-// self-update entry. See docs/crons.md.
+// `tackroom cron collect` observes every scheduled job on every configured
+// host. Plain `tackroom cron` still installs tackroom's own self-update entry.
+// The view's Crons tab shows the same result. See docs/crons.md.
 
 //go:embed crons_probe.sh
 var cronsProbeScript string
@@ -83,41 +83,22 @@ type cronManifestJob struct {
 
 var cronSources = []string{"launchd", "crontab", "systemd", "hermes", "codex", "claude-desktop", "claude-cloud", "openbot"}
 
-func runCronsCommand(args []string) error {
-	if len(args) == 0 || isHelpArg(args[0]) {
-		printGroupUsage("crons")
-		if len(args) == 0 {
-			return errors.New("missing crons subcommand")
-		}
-		return nil
-	}
-	if args[0] != "scan" {
-		return fmt.Errorf("unknown crons subcommand %q", args[0])
-	}
-	fs := flag.NewFlagSet("crons scan", flag.ContinueOnError)
+func runCronCollect(args []string) error {
+	fs := flag.NewFlagSet("cron collect", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	configPath := fs.String("config", "", "Path to tackroom YAML config")
 	hostsFlag := fs.String("hosts", "", "Comma-separated hosts: local and SSH aliases (default: crons.hosts, else local)")
 	table := fs.Bool("table", false, "Print a table instead of JSON")
-	if err := fs.Parse(args[1:]); err != nil {
+	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
-		return errors.New("crons scan does not accept positional arguments")
+		return errors.New("cron collect does not accept positional arguments")
 	}
-	manifest, err := loadCronsManifest(*configPath)
+	result, err := collectCrons(*configPath, splitCSV(*hostsFlag))
 	if err != nil {
 		return err
 	}
-	hosts := manifest.Hosts
-	if strings.TrimSpace(*hostsFlag) != "" {
-		hosts = splitCSV(*hostsFlag)
-	}
-	if len(hosts) == 0 {
-		hosts = []string{"local"}
-	}
-
-	result := scanCrons(hosts, manifest)
 	if *table {
 		printCronsTable(result)
 		return nil
@@ -125,6 +106,22 @@ func runCronsCommand(args []string) error {
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetIndent("", "  ")
 	return enc.Encode(result)
+}
+
+// collectCrons scans hosts, or crons.hosts from the config, else this machine.
+// Shared by `tackroom cron collect` and the view's Crons tab.
+func collectCrons(configPath string, hosts []string) (cronsScanResult, error) {
+	manifest, err := loadCronsManifest(configPath)
+	if err != nil {
+		return cronsScanResult{}, err
+	}
+	if len(hosts) == 0 {
+		hosts = manifest.Hosts
+	}
+	if len(hosts) == 0 {
+		hosts = []string{"local"}
+	}
+	return scanCrons(hosts, manifest), nil
 }
 
 func splitCSV(value string) []string {
@@ -159,6 +156,26 @@ func loadCronsManifest(override string) (cronsManifest, error) {
 	}
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return cronsManifest{}, fmt.Errorf("parse %s: %w", path, err)
+	}
+	// Hosts differ per machine, so tackroom.local.yaml may set its own
+	// crons.hosts; its jobs entries override the shared ones by id.
+	localPath := filepath.Join(filepath.Dir(path), "tackroom.local.yaml")
+	if data, err := os.ReadFile(localPath); err == nil {
+		var local struct {
+			Crons cronsManifest `yaml:"crons"`
+		}
+		if err := yaml.Unmarshal(data, &local); err != nil {
+			return cronsManifest{}, fmt.Errorf("parse %s: %w", localPath, err)
+		}
+		if len(local.Crons.Hosts) > 0 {
+			doc.Crons.Hosts = local.Crons.Hosts
+		}
+		for id, job := range local.Crons.Jobs {
+			if doc.Crons.Jobs == nil {
+				doc.Crons.Jobs = map[string]cronManifestJob{}
+			}
+			doc.Crons.Jobs[id] = job
+		}
 	}
 	return doc.Crons, nil
 }
@@ -773,7 +790,7 @@ func (p *probeData) crontab() ([]cronJob, cronAccess) {
 		}
 		sum := sha256.Sum256([]byte(schedule + " " + command))
 		job := p.newJob("crontab", "crontab-"+hex.EncodeToString(sum[:4]))
-		job.Name = truncate(command, 60)
+		job.Name = cronCommandName(command)
 		job.Schedule, job.Command = schedule, command
 		if tz != "" {
 			job.TZ = tz
@@ -795,6 +812,29 @@ func (p *probeData) crontab() ([]cronJob, cronAccess) {
 		jobs = append(jobs, job)
 	}
 	return jobs, cronAccess{}
+}
+
+// cronCommandName names a crontab job after the program the line ends up
+// running: the last command, without redirects, with the program's base name.
+func cronCommandName(command string) string {
+	segment := command
+	for _, sep := range []string{";", "&&", "||"} {
+		if i := strings.LastIndex(segment, sep); i >= 0 {
+			segment = segment[i+len(sep):]
+		}
+	}
+	var words []string
+	for _, word := range strings.Fields(segment) {
+		if strings.ContainsAny(word, "<>") {
+			break
+		}
+		words = append(words, strings.Trim(word, `"'`))
+	}
+	if len(words) == 0 {
+		return truncate(command, 60)
+	}
+	words[0] = filepath.Base(words[0])
+	return truncate(strings.Join(words, " "), 60)
 }
 
 func truncate(s string, n int) string {
