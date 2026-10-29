@@ -78,12 +78,17 @@ func parseViewFlags(args []string) (configServeOptions, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Addr, "addr", "127.0.0.1:8765", "Loopback listen address")
 	fs.BoolVar(&opts.NoOpen, "no-open", false, "Do not open the browser")
-	fs.BoolVar(&opts.SecureCookie, "secure-cookie", false, "Mark the session cookie Secure for HTTPS loopback access")
+	fs.BoolVar(&opts.SecureCookie, "secure-cookie", false, "Serve an HTTPS proxy such as tailscale serve: Secure cookies and https origins for non-loopback hosts")
 	fs.StringVar(&opts.SSHHost, "ssh-host", "", "Print an ssh -L tunnel command for this host (user@host)")
-	fs.StringVar(&opts.TokenFile, "token-file", "", "Stable session token file (created on first use); keeps the URL fixed across restarts")
+	fs.StringVar(&opts.TokenFile, "token-file", "", "Session token file, created on first use (default view.token in $XDG_STATE_HOME/tackroom or ~/.local/state/tackroom)")
 	if err := fs.Parse(args); err != nil {
 		return configServeOptions{}, err
 	}
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "addr" {
+			opts.AddrSet = true
+		}
+	})
 	if fs.NArg() != 0 {
 		return configServeOptions{}, errors.New("view does not accept positional arguments")
 	}

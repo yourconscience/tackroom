@@ -52,7 +52,9 @@ effective view is read-only, and saving YAML never runs `sync`. The web UI
 binds to loopback, requires a session cookie and CSRF header, and keeps sync
 behind an explicit preview/apply confirmation.
 
-For temporary HTTPS access from a tailnet, the operator owns the route:
+For temporary HTTPS access from a tailnet, the operator owns the route.
+`--secure-cookie` covers requests through the proxy; the local
+`http://127.0.0.1` URL keeps working:
 
 ```bash
 tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765

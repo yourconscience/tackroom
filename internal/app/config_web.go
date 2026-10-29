@@ -13,8 +13,11 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"gopkg.in/yaml.v3"
@@ -44,15 +47,32 @@ func runConfigServe(opts configServeOptions) error {
 	if err := validateLoopbackAddr(opts.Addr); err != nil {
 		return err
 	}
+	if opts.TokenFile == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return err
+		}
+		opts.TokenFile = filepath.Join(tackroomStateDir(home), "view.token")
+	}
+	token, err := resolveServerToken(opts.TokenFile)
+	if err != nil {
+		return err
+	}
+	remote := os.Getenv("SSH_CONNECTION") != ""
+	sshHost := resolveSSHHost(opts.SSHHost, os.Getenv)
+	addrFile := strings.TrimSuffix(opts.TokenFile, filepath.Ext(opts.TokenFile)) + ".addr"
+	if running := runningViewURL(opts, addrFile, token); running != "" {
+		fmt.Fprintln(os.Stdout, "\ntackroom view is already running; opening it instead of starting another.")
+		announceView(os.Stdout, running, opts, remote, sshHost)
+		return nil
+	}
 	listener, err := net.Listen("tcp", opts.Addr)
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", opts.Addr, err)
 	}
 	defer listener.Close()
-	token, err := resolveServerToken(opts.TokenFile)
-	if err != nil {
-		return err
-	}
+	// Recorded so a later `tackroom view` without --addr finds this one.
+	_ = os.WriteFile(addrFile, []byte(listener.Addr().String()+"\n"), 0o600)
 	csrf, err := randomToken(24)
 	if err != nil {
 		return err
@@ -63,11 +83,87 @@ func runConfigServe(opts configServeOptions) error {
 	}
 	server := &configWebServer{doc: doc, secureCookie: opts.SecureCookie, origin: origin, token: token, csrf: csrf}
 	startURL := origin + "/?token=" + url.QueryEscape(token)
-	remote := os.Getenv("SSH_CONNECTION") != ""
-	sshHost := resolveSSHHost(opts.SSHHost, os.Getenv)
 	announceView(os.Stdout, startURL, opts, remote, sshHost)
+	go restartOnUpgrade()
 	httpServer := &http.Server{Handler: server.handler(), ReadHeaderTimeout: 5 * time.Second}
 	return httpServer.Serve(listener)
+}
+
+// runningViewURL returns the startup URL of a tackroom view that already
+// serves this token at --addr or, when --addr was not given, at the address
+// the last view recorded. It returns "" when no such view answers.
+func runningViewURL(opts configServeOptions, addrFile, token string) string {
+	addrs := []string{opts.Addr}
+	if !opts.AddrSet {
+		if data, err := os.ReadFile(addrFile); err == nil {
+			if recorded := strings.TrimSpace(string(data)); recorded != opts.Addr && validateLoopbackAddr(recorded) == nil {
+				addrs = append([]string{recorded}, addrs...)
+			}
+		}
+	}
+	client := &http.Client{
+		Timeout:       time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+	}
+	for _, addr := range addrs {
+		startURL := "http://" + addr + "/?token=" + url.QueryEscape(token)
+		resp, err := client.Get(startURL)
+		if err != nil {
+			continue
+		}
+		resp.Body.Close()
+		// Only a view holding this token answers its startup URL with the
+		// redirect that sets the session cookie.
+		if resp.StatusCode == http.StatusSeeOther {
+			return startURL
+		}
+	}
+	return ""
+}
+
+// viewUpgradePoll is how often a running view checks whether the tackroom
+// binary it was started from has been replaced.
+const viewUpgradePoll = 15 * time.Second
+
+// restartOnUpgrade re-executes the view when the tackroom binary it was started
+// from is replaced on disk (install script, brew upgrade, go install), so a
+// long-running view serves the installed version. The token file keeps the URL
+// and open sessions valid across the restart.
+func restartOnUpgrade() {
+	path, err := exec.LookPath(os.Args[0])
+	if err != nil {
+		return
+	}
+	if path, err = filepath.Abs(path); err != nil {
+		return
+	}
+	started, err := os.Stat(path)
+	if err != nil {
+		return
+	}
+	var changed os.FileInfo
+	for range time.Tick(viewUpgradePoll) {
+		current, err := os.Stat(path)
+		if err != nil || sameBinary(current, started) {
+			changed = nil
+			continue
+		}
+		// Wait one more poll with the new file unchanged, so a copy in progress finishes.
+		if changed == nil || !sameBinary(current, changed) {
+			changed = current
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "tackroom binary at %s changed; restarting view\n", path)
+		// --no-open keeps the restart from opening another browser tab.
+		args := append(append([]string{}, os.Args...), "--no-open")
+		err = syscall.Exec(path, args, os.Environ())
+		fmt.Fprintf(os.Stderr, "view restart failed, still serving the old version: %v\n", err)
+		return
+	}
+}
+
+func sameBinary(a, b os.FileInfo) bool {
+	return os.SameFile(a, b) && a.Size() == b.Size() && a.ModTime().Equal(b.ModTime())
 }
 
 func portString(addr net.Addr) string {
@@ -121,6 +217,9 @@ func resolveServerToken(tokenFile string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if err := os.MkdirAll(filepath.Dir(tokenFile), 0o700); err != nil {
+		return "", fmt.Errorf("create token file directory: %w", err)
+	}
 	if err := os.WriteFile(tokenFile, []byte(tok+"\n"), 0o600); err != nil {
 		return "", fmt.Errorf("write token file %s: %w", tokenFile, err)
 	}
@@ -171,7 +270,7 @@ func (s *configWebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, http.StatusUnauthorized, "invalid_config", "invalid startup token")
 			return
 		}
-		s.setSessionCookies(w)
+		s.setSessionCookies(w, r)
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
@@ -181,7 +280,7 @@ func (s *configWebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	// A restarted server keeps the session token (--token-file) but mints a new
 	// CSRF secret; reissue it so a reloaded page can still save.
-	s.setSessionCookies(w)
+	s.setSessionCookies(w, r)
 	data, err := configWebAssets.ReadFile("web/index.html")
 	if err != nil {
 		http.Error(w, "asset unavailable", http.StatusInternalServerError)
@@ -215,8 +314,27 @@ func (s *configWebServer) authenticated(r *http.Request) bool {
 	return err == nil && cookie.Value == s.token
 }
 
-func (s *configWebServer) setSessionCookies(w http.ResponseWriter) {
-	secure := s.secureCookie
+// secureRequest reports whether a request came through the HTTPS proxy that
+// --secure-cookie is for. Direct loopback requests keep plain-http cookies and
+// origins, so one view serves both the tailnet route and the local browser.
+func (s *configWebServer) secureRequest(r *http.Request) bool {
+	if !s.secureCookie {
+		return false
+	}
+	host := r.Host
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if host == "localhost" {
+		return false
+	}
+	ip := net.ParseIP(host)
+	return ip == nil || !ip.IsLoopback()
+}
+
+func (s *configWebServer) setSessionCookies(w http.ResponseWriter, r *http.Request) {
+	secure := s.secureRequest(r)
 	http.SetCookie(w, &http.Cookie{Name: "tackroom_session", Value: s.token, Path: "/", HttpOnly: true, SameSite: http.SameSiteStrictMode, Secure: secure})
 	http.SetCookie(w, &http.Cookie{Name: "tackroom_csrf", Value: s.csrf, Path: "/", HttpOnly: false, SameSite: http.SameSiteStrictMode, Secure: secure})
 }
@@ -253,7 +371,7 @@ func (s *configWebServer) requestOriginAllowed(r *http.Request) bool {
 		return false
 	}
 	scheme := "http"
-	if s.secureCookie {
+	if s.secureRequest(r) {
 		scheme = "https"
 	}
 	return origin.Scheme == scheme && origin.Host == r.Host
