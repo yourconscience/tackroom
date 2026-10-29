@@ -33,7 +33,7 @@ Hosts come from `--hosts`, else `crons.hosts` in `tackroom.yaml`, else `local`. 
 
 | Source | Read from | Included |
 | --- | --- | --- |
-| `launchd` | `~/Library/LaunchAgents/*.plist` via `plutil -convert json`, state via `launchctl print gui/$UID/<label>` | `StartCalendarInterval` or `StartInterval` jobs. `RunAtLoad`-only and `KeepAlive` daemons are services, not schedules, and are left out. |
+| `launchd` | `~/Library/LaunchAgents/*.plist` via `plutil -convert json`, state via `launchctl print gui/$UID/<label>` | `StartCalendarInterval` or `StartInterval` jobs. `KeepAlive`, `RunAtLoad` and other on-demand agents are services, not schedules; they appear only when their last exit is non-zero, with `state: service`. |
 | `crontab` | `crontab -l` | Every schedule line; `@reboot` is a boot hook and is left out. |
 | `systemd` | `systemctl --user list-timers --all --output=json`, `systemctl --user show` on each timer and its unit | User timers. |
 | `hermes` | `~/.hermes/cron/jobs.json`, `executions.db`, `ticker_heartbeat` | Every job. An enabled job whose scheduler heartbeat is older than 10 minutes is reported `dead`. |
@@ -44,6 +44,7 @@ Documented gaps, reported as `not_scanned` rather than silently absent:
 
 - Claude cloud routines: no on-disk state; listable only from inside a Claude session.
 - OpenBot routines: the database does not open from an SSH session.
+- Login items an app registers through `SMAppService` (`launchctl print` shows them as submitted by `smd`): there is no plist in `~/Library/LaunchAgents` to read.
 
 ### launchd checks
 
@@ -54,6 +55,12 @@ Documented gaps, reported as `not_scanned` rather than silently absent:
 - an absolute path in `ProgramArguments`, `Program` or `WorkingDirectory` that does not exist.
 
 The same missing-path check runs on crontab and systemd commands, skipping `>`/`>>` targets a job creates itself.
+
+For a service, a `KeepAlive` agent with 10 or more runs and a non-zero last exit is flagged as a crash loop. The threshold is a heuristic.
+
+### Missed runs
+
+A scheduled job whose recorded last run is older than the two most recent times its cron expression should have fired is flagged as "enabled, but has not run". The check runs only where the scheduler records its own last run (Hermes, Claude desktop). A last run inferred from a log mtime is skipped, because a job that runs but writes nothing would look stale.
 
 ### Record
 
