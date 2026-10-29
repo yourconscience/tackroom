@@ -34,9 +34,9 @@ Hosts come from `--hosts`, else `crons.hosts` in `tackroom.yaml`, else `local`. 
 | Source | Read from | Included |
 | --- | --- | --- |
 | `launchd` | `~/Library/LaunchAgents/*.plist` via `plutil -convert json`, state via `launchctl print gui/$UID/<label>` | `StartCalendarInterval` or `StartInterval` jobs. `RunAtLoad`-only and `KeepAlive` daemons are services, not schedules, and are left out. |
-| `crontab` | `crontab -l` | Every non-comment, non-variable line. |
+| `crontab` | `crontab -l` | Every schedule line; `@reboot` is a boot hook and is left out. |
 | `systemd` | `systemctl --user list-timers --all --output=json`, `systemctl --user show` on each timer and its unit | User timers. |
-| `hermes` | `~/.hermes/cron/jobs.json`, `executions.db`, `ticker_heartbeat` | Every job. An enabled job whose scheduler heartbeat is stale is reported `dead`. |
+| `hermes` | `~/.hermes/cron/jobs.json`, `executions.db`, `ticker_heartbeat` | Every job. An enabled job whose scheduler heartbeat is older than 10 minutes is reported `dead`. |
 | `codex` | `~/.codex/sqlite/codex-dev.db`, tables `automations` and `automation_runs` | Every automation. |
 | `claude-desktop` | `scheduled-tasks.json` under the Claude desktop app's `claude-code-sessions` directory, prompts in `~/.claude/scheduled-tasks/<id>/SKILL.md`, runs from session files that carry `scheduledTaskId` | Every task. |
 
@@ -51,7 +51,9 @@ Documented gaps, reported as `not_scanned` rather than silently absent:
 
 - a `StartCalendarInterval` entry with no recognized key (`Minute`, `Hour`, `Day`, `Weekday`, `Month`): fires every minute;
 - any key that matches a known launchd key only case-insensitively;
-- a `ProgramArguments[0]` or `Program` path that does not exist.
+- an absolute path in `ProgramArguments`, `Program` or `WorkingDirectory` that does not exist.
+
+The same missing-path check runs on crontab and systemd commands, skipping `>`/`>>` targets a job creates itself.
 
 ### Record
 
@@ -61,10 +63,10 @@ Every job becomes one JSON record:
 | --- | --- | --- |
 | `host` | Host alias as scanned | declared (by the scan target) |
 | `source` | `launchd`, `crontab`, `systemd`, `hermes`, `codex`, `claude-desktop` | declared |
-| `id` | Scheduler-native id: launchd label, timer unit, harness job id, crontab line number | declared |
+| `id` | Scheduler-native id: launchd label, timer unit, harness job id; for crontab, `crontab-` plus a short hash of the line, so it survives reordering | declared |
 | `name` | Human name where the scheduler has one, else `id` | declared |
 | `schedule` | Cron expression, interval, `OnCalendar`, or RRULE as the scheduler stores it | declared |
-| `tz` | Host time zone from `/etc/localtime`, unless the scheduler stores its own | inferred |
+| `tz` | Host time zone from `/etc/localtime`; `CRON_TZ` for crontab; the UTC offset of Hermes `next_run_at` | inferred |
 | `command` | Program and arguments, script, or prompt reference | declared |
 | `log` | `StandardOutPath`, a `>>` redirect in a crontab line, the journal, or a harness output directory | declared or inferred |
 | `runs` | Run count (launchd `runs` since load; harness run tables) | declared |
@@ -72,12 +74,12 @@ Every job becomes one JSON record:
 | `last_status` | Harness status string (`ok`, `error`, `blocked_config`, ...) | declared |
 | `last_run` | Last start time; from log mtime where the scheduler keeps none | declared or inferred |
 | `state` | `scheduled`, `disabled`, `paused`, `not_loaded`, `dead`, `missing` | inferred |
-| `created_by` | `human`, `agent`, or a harness name | from the manifest |
+| `created_by` | `human`, `agent`, or a harness name; `system` for timers shipped under `/usr` or `/lib` | from the manifest, or inferred |
 | `connectors` | Services the job reads or writes | from the manifest; a harness delivery target is inferred |
 | `effect` | Expected observable outcome | from the manifest |
 | `problems` | Findings such as miscased plist keys or a missing program | inferred |
 
-`provenance` on each record lists which fields were inferred, so a view can show them differently. The inference rules stay small and explicit; they never guess connectors from free-form command text.
+`inferred` on each record lists which fields tackroom derived rather than read or had declared, so a view can show them differently. The inference rules stay small and explicit; they never guess connectors from free-form command text.
 
 ### Access states
 
