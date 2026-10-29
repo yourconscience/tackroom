@@ -36,6 +36,7 @@ tackroom skill promote <name-or-path> [--dry-run]
 tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]
 tackroom mcp <list|add|import|remove> [options]
 tackroom restore [<backup> | latest] [--dry-run]
+tackroom crons scan [--hosts local,HOST...] [--table]   # read-only scheduled-job inventory
 ```
 
 `sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` stays compact; `--verbose` adds the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.

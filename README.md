@@ -134,9 +134,12 @@ tackroom publish  [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]  #
 tackroom mcp      list|add|import|remove
 tackroom hook     list [query] | remove [--dry-run] <query>
 tackroom restore  [<backup> | latest] [--dry-run]   # put backed-up native files back
+tackroom crons    scan [--hosts local,HOST...] [--table]  # read-only inventory of scheduled jobs
 ```
 
 `status`, `sync` and `doctor` take `--json` for scripts and agents; exit code 1 means something is out of sync or failed. `tackroom mcp remove <name>` followed by `sync` removes the server from every agent tackroom wrote it to, and from agents whose entry still matches its definition (the native config is backed up first). Other hand-configured servers stay. If a native file differs from the shared copy (say a hand-written `~/.claude/CLAUDE.md`), `sync` leaves that agent alone, syncs the others, and says how to resolve it; `sync --replace-conflicts` moves such files to `~/.local/state/tackroom/backups/<time>/` and links the shared copy. `setup` does this for you after asking (`--yes` accepts). `tackroom restore` lists those backups and puts one back; whatever it replaces is saved as a new backup, so `tackroom restore latest` undoes it.
+
+`tackroom crons scan` lists every scheduled job on this machine and on SSH hosts (`--hosts local,laptop,vps`, or `crons.hosts` in `tackroom.yaml`): launchd agents with a calendar or interval schedule, crontab, systemd user timers, and the Hermes, Codex and Claude desktop schedulers. It prints JSON (`--table` for people) with each job's schedule, command, runs, last exit or status and problems such as miscased launchd keys, plus an access entry per host and source that tells `empty` apart from `unreadable` and `not_scanned`. The scan only reads; databases are copied back over SSH and opened locally. `tackroom cron` is unrelated: it installs tackroom's own self-update entry. Design: [docs/crons.md](docs/crons.md).
 
 Hooks are declared in `tackroom.yaml` (there is no `hook add` yet) and rendered with each agent's event names:
 
