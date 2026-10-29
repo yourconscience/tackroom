@@ -1,6 +1,6 @@
-# Scheduled job inventory (`tackroom crons`)
+# Scheduled job inventory (`tackroom cron collect`)
 
-Status: design. `tackroom crons scan` is the first piece; the manifest and Healthchecks sync follow.
+Status: `tackroom cron collect` and the Crons tab in `tackroom view` are the first piece; the manifest and Healthchecks sync follow.
 
 ## Problem
 
@@ -21,13 +21,13 @@ So the design has two layers: tackroom collects (the provider-agnostic part noth
 
 ## Naming
 
-`tackroom cron` already exists: it installs tackroom's own self-update crontab entry. The inventory lives under `tackroom crons` so neither command changes meaning. `cron` manages one job tackroom owns; `crons` observes every job on every host.
+`tackroom cron` already exists: with flags only (`--interval`, `--deps`, `--remove`) it installs tackroom's own self-update crontab entry, and it keeps doing that. The inventory is its `collect` subcommand, so all scheduled-job commands live under one word: plain `cron` manages the one job tackroom owns, `cron collect` observes every job on every host, and `cron sync` (section 3) comes later.
 
-## 1. scan
+## 1. collect
 
-`tackroom crons scan [--hosts local,HOST...] [--table]` is read-only. For each host it runs one POSIX `sh` probe (locally, or through `ssh -o BatchMode=yes HOST sh -s`), the probe prints raw scheduler state, and tackroom parses it locally. Nothing is copied to, installed on, or written on the scanned host. SQLite files are streamed back and opened from a local temporary copy, because opening a WAL database with `mode=ro` in place can still create a `-shm` file.
+`tackroom cron collect [--hosts local,HOST...] [--table]` is read-only. For each host it runs one POSIX `sh` probe (locally, or through `ssh -o BatchMode=yes HOST sh -s`), the probe prints raw scheduler state, and tackroom parses it locally. Nothing is copied to, installed on, or written on the scanned host. SQLite files are streamed back and opened from a local temporary copy, because opening a WAL database with `mode=ro` in place can still create a `-shm` file.
 
-Hosts come from `--hosts`, else `crons.hosts` in `tackroom.yaml`, else `local`. SSH aliases resolve through the user's own `~/.ssh/config`.
+Hosts come from `--hosts`, else `crons.hosts` in `tackroom.local.yaml`, else `crons.hosts` in `tackroom.yaml`, else `local`. Hosts differ per machine, so the local overlay is the usual place for them. SSH aliases resolve through the user's own `~/.ssh/config`.
 
 ### Sources
 
@@ -101,6 +101,10 @@ A scan reports one access entry per host and source, independent of the job list
 
 An empty job list means nothing on its own; only `empty` means "looked and there are none".
 
+## View
+
+`tackroom view` has a Crons tab with the same inventory. It runs the collector on first open, caches the result for a minute, and collects again on request. The tab lists the jobs that need attention first, then one table per host with an access chip per source, so an unreachable host or an unreadable source shows as such instead of as an empty list. A job needs attention when it has problems or is `dead` or `missing`; a disabled or paused job's old error does not count until the job is turned on again. Selecting a row shows its command, log, time zone, problems and manifest fields. The tab only reads; it has no actions that change a job.
+
 ## 2. The `crons:` manifest
 
 Authorship and connectors cannot be derived reliably from a command line, so they are declared once in `tackroom.yaml`. The scan merges declared fields into matching records and reports declared jobs it did not find as `state: missing`.
@@ -125,7 +129,7 @@ Jobs that tackroom itself installs later can carry `created_by` from the start; 
 
 ## 3. sync to self-hosted Healthchecks
 
-`tackroom crons sync` (later) pushes the scan into a Healthchecks instance the user runs (BSD-3, SQLite).
+`tackroom cron sync` (later) pushes the collected inventory into a Healthchecks instance the user runs (BSD-3, SQLite).
 
 - **Checks.** One check per record via `POST /api/v3/checks/` with `unique: ["name"]`, so repeated syncs update instead of duplicating. `name` is `host/source/id`. `tags` carry `host:<h>`, `source:<s>` and one tag per connector. `schedule` and `tz` come from the scan when the schedule is a cron expression; interval jobs use `timeout`. `desc` carries `effect`.
 - **Own launchd and crontab jobs.** Wrapped in [`runitor`](https://github.com/bdd/runitor), which pings start, exit code and output. Jobs that read private notes or other sensitive data use `-no-output-in-ping` so their output never reaches the monitor. Wrapping edits plists and crontab lines, so it is a separate, reviewed step per job.
@@ -136,7 +140,7 @@ Exit codes and log mtimes catch jobs that stopped running, not jobs that run and
 
 ## Non-goals
 
-- tackroom does not become a scheduler. `tackroom cron` keeps its one entry.
-- Scheduled jobs are not a sixth sync surface. `crons` reads harness state and writes only to the user's Healthchecks instance; it never writes harness configuration.
-- Scan never fixes, unloads or edits a job. It reports.
+- tackroom does not become a scheduler. Plain `tackroom cron` keeps its one entry.
+- Scheduled jobs are not a sixth sync surface. `cron collect` and `cron sync` read harness state and write only to the user's Healthchecks instance; it never writes harness configuration.
+- Neither `cron collect` nor the view fixes, unloads or edits a job. They report.
 - No hosted monitoring service, and no job output leaving the user's own infrastructure.
