@@ -76,6 +76,7 @@ type cronsManifest struct {
 
 type cronManifestJob struct {
 	Host       string   `yaml:"host"`
+	Source     string   `yaml:"source"`
 	CreatedBy  string   `yaml:"created_by"`
 	Connectors []string `yaml:"connectors"`
 	Effect     string   `yaml:"effect"`
@@ -193,17 +194,18 @@ func scanCrons(hosts []string, manifest cronsManifest) cronsScanResult {
 	wg.Wait()
 
 	out := cronsScanResult{ScannedAt: time.Now().Format(time.RFC3339), Jobs: []cronJob{}}
-	reached := map[string]bool{}
 	for _, r := range results {
 		out.Jobs = append(out.Jobs, r.jobs...)
 		out.Access = append(out.Access, r.access...)
-		reached[r.host] = r.reached
 	}
-	out.Jobs = mergeCronsManifest(out.Jobs, manifest, reached)
+	out.Jobs = mergeCronsManifest(out.Jobs, manifest, out.Access)
 	return out
 }
 
-func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, reached map[string]bool) []cronJob {
+// mergeCronsManifest adds declared fields to matching records. An entry
+// matches by id, narrowed by host and source when set. A declared job that is
+// not found is reported missing only when every place it could live was read.
+func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAccess) []cronJob {
 	ids := make([]string, 0, len(manifest.Jobs))
 	for id := range manifest.Jobs {
 		ids = append(ids, id)
@@ -214,7 +216,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, reached map[stri
 		matched := false
 		for i := range jobs {
 			job := &jobs[i]
-			if job.ID != id || (entry.Host != "" && entry.Host != job.Host) {
+			if job.ID != id || (entry.Host != "" && entry.Host != job.Host) || (entry.Source != "" && entry.Source != job.Source) {
 				continue
 			}
 			matched = true
@@ -228,16 +230,39 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, reached map[stri
 			}
 			job.Effect = entry.Effect
 		}
-		if matched || (entry.Host != "" && !reached[entry.Host]) {
+		if matched || !manifestEntryRead(entry, access) {
 			continue
 		}
 		jobs = append(jobs, cronJob{
-			Host: entry.Host, ID: id, State: "missing", CreatedBy: entry.CreatedBy,
+			Host: entry.Host, Source: entry.Source, ID: id, State: "missing", CreatedBy: entry.CreatedBy,
 			Connectors: entry.Connectors, Effect: entry.Effect,
 			Problems: []string{"declared in crons.jobs but not found on any scanned host"},
 		})
 	}
 	return jobs
+}
+
+// manifestEntryRead reports whether every host and source a declared job
+// could live on was read. With no source set, documented gaps (not_scanned)
+// do not count against it, but an unreadable source does.
+func manifestEntryRead(entry cronManifestJob, access []cronAccess) bool {
+	seen := false
+	for _, a := range access {
+		if entry.Host != "" && a.Host != entry.Host {
+			continue
+		}
+		if entry.Source != "" && a.Source != entry.Source {
+			continue
+		}
+		seen = true
+		if entry.Source != "" && a.State != "found" && a.State != "empty" {
+			return false
+		}
+		if a.State == "unreadable" || (a.State == "not_scanned" && strings.HasPrefix(a.Detail, "probe failed")) {
+			return false
+		}
+	}
+	return seen
 }
 
 func removeString(list []string, value string) []string {
@@ -256,10 +281,9 @@ type probeSection struct {
 }
 
 type hostScan struct {
-	host    string
-	reached bool
-	jobs    []cronJob
-	access  []cronAccess
+	host   string
+	jobs   []cronJob
+	access []cronAccess
 }
 
 func scanCronHost(host string) hostScan {
@@ -271,7 +295,6 @@ func scanCronHost(host string) hostScan {
 		}
 		return scan
 	}
-	scan.reached = true
 	p := newProbeData(host, sections)
 	for _, source := range cronSources {
 		jobs, access := p.collect(source)
