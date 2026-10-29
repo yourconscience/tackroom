@@ -14,16 +14,20 @@ type configCommandOptions struct {
 }
 
 type configServeOptions struct {
-	ConfigPath   string
-	Addr         string
+	ConfigPath string
+	Addr       string
+	// AddrSet records an explicit --addr. Without it, view first looks for a
+	// running view at the address the last one recorded.
+	AddrSet      bool
 	NoOpen       bool
 	SecureCookie bool
 	// SSHHost, when set, prints a ready-to-copy `ssh -L` tunnel command for
 	// reaching the loopback-bound UI from this host instead of auto-opening a
 	// browser on a remote box.
 	SSHHost string
-	// TokenFile, when set, holds a stable session token (created on first use)
-	// so a restarted persistent `view` service keeps the same access URL.
+	// TokenFile holds a stable session token (created on first use) so a
+	// restarted `view` keeps the same access URL. Empty means view.token in
+	// the tackroom state directory.
 	TokenFile string
 }
 

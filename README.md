@@ -209,8 +209,15 @@ CSRF- and origin-checked on mutations, guards saves by revision, and keeps sync
 as a separate preview/confirm step. It prints the tokenized URL on its own line
 and opens your default browser locally; `--no-open` skips that, and
 `--ssh-host user@host` (or an SSH session, via `SSH_CONNECTION`) prints an
-`ssh -L` tunnel command for reaching the loopback UI from another machine. For
-deliberate HTTPS tailnet access, expose the loopback listener yourself:
+`ssh -L` tunnel command for reaching the loopback UI from another machine.
+
+The URL survives restarts: the token lives in `view.token` under
+`$XDG_STATE_HOME/tackroom` (`~/.local/state/tackroom`), or in `--token-file`.
+Running `tackroom view` while one is already up opens that one instead of
+starting a second, and a long-running view restarts itself when the `tackroom`
+binary is upgraded. For deliberate HTTPS tailnet access, expose the loopback
+listener yourself; `--secure-cookie` applies to requests through the proxy, so
+the same view still works at its local `http://127.0.0.1` URL:
 
 ```bash
 tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765
