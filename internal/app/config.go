@@ -39,7 +39,7 @@ func loadContext(opts runOptions) (string, string, config, []agentConfig, error)
 		return "", "", config{}, nil, err
 	}
 
-	return repoRoot, home, cfg, selected, nil
+	return repoRoot, home, cfg, selected, checkSkillRoots(repoRoot, selected)
 }
 func loadConfig(repoRoot string, home string, overridePath string) (config, error) {
 	configPath := overridePath
