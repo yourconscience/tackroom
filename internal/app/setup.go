@@ -391,7 +391,7 @@ const (
 )
 
 func runCron(opts cronOptions) error {
-	_, _, _, _, err := loadContext(opts.runOptions)
+	_, home, _, _, err := loadContext(opts.runOptions)
 	if err != nil {
 		return err
 	}
@@ -404,12 +404,43 @@ func runCron(opts cronOptions) error {
 		}
 	}
 
+	// The self-update and dependency jobs are built-in owned jobs: installed
+	// on the selected scheduler like `cron apply` installs declared ones.
 	cronCmd, interval := cronCommandForOptions(binaryPath, opts)
-
-	if opts.Remove {
-		return removeCronEntry(cronCmd)
+	id, mode := "tackroom-pull", "pull"
+	if opts.Deps {
+		id, mode = "tackroom-deps", "sync deps"
 	}
-	return installCronEntry(cronCmd, interval)
+	manifest, err := loadCronsManifest(opts.ConfigPath)
+	if err != nil {
+		return err
+	}
+	backend, err := selectCronBackend(manifest.Scheduler)
+	if err != nil {
+		return err
+	}
+	var desired []ownedCronJob
+	if !opts.Remove {
+		desired = append(desired, ownedCronJob{ID: id, Schedule: intervalToSchedule(interval), Command: []string{"/bin/sh", "-c", cronCmd}})
+	}
+	unlock, err := lockCronApply(home)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	installed, err := readOwnedCronUnits(home)
+	if err != nil {
+		return err
+	}
+	plan, err := planOwnedCrons(desired, backend, installed, home, func(owned string) bool { return owned == id })
+	if err != nil {
+		return err
+	}
+	legacy, err := legacyCronLines(mode)
+	if err != nil {
+		return err
+	}
+	return runCronPlan(plan, backend, home, legacy, false)
 }
 
 func cronCommandForOptions(binaryPath string, opts cronOptions) (string, string) {
@@ -429,93 +460,6 @@ func cronCommandForOptions(binaryPath string, opts cronOptions) (string, string)
 		command += fmt.Sprintf(" --config %q", opts.ConfigPath)
 	}
 	return command, interval
-}
-
-// legacyCronCommands returns earlier spellings of cronCmd that installed
-// crontab lines may still carry: `deps update` became `sync deps` in v1.0.
-func legacyCronCommands(cronCmd string) []string {
-	if strings.Contains(cronCmd, " sync deps") {
-		return []string{strings.Replace(cronCmd, " sync deps", " deps update", 1)}
-	}
-	return nil
-}
-
-func lineMatchesAny(line string, commands []string) bool {
-	for _, command := range commands {
-		if strings.Contains(line, command) {
-			return true
-		}
-	}
-	return false
-}
-
-func installCronEntry(cronCmd string, interval string) error {
-	schedule := intervalToSchedule(interval)
-	entry := fmt.Sprintf("%s %s", schedule, cronCmd)
-
-	existing, _ := exec.Command("crontab", "-l").Output()
-	lines := strings.Split(string(existing), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, cronCmd) {
-			fmt.Println("cron entry already exists:")
-			fmt.Printf("  %s\n", line)
-			return nil
-		}
-	}
-
-	legacy := legacyCronCommands(cronCmd)
-	var kept []string
-	for _, line := range lines {
-		if lineMatchesAny(line, legacy) {
-			fmt.Printf("replaced legacy cron entry: %s\n", line)
-			continue
-		}
-		kept = append(kept, line)
-	}
-	newCrontab := strings.Join(kept, "\n")
-	if !strings.HasSuffix(newCrontab, "\n") && newCrontab != "" {
-		newCrontab += "\n"
-	}
-	newCrontab += entry + "\n"
-
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(newCrontab)
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("crontab install: %w", err)
-	}
-
-	fmt.Printf("installed cron entry:\n  %s\n", entry)
-	return nil
-}
-
-func removeCronEntry(cronCmd string) error {
-	existing, err := exec.Command("crontab", "-l").Output()
-	if err != nil {
-		return fmt.Errorf("crontab read: %w", err)
-	}
-
-	commands := append([]string{cronCmd}, legacyCronCommands(cronCmd)...)
-	var kept []string
-	removed := 0
-	for _, line := range strings.Split(string(existing), "\n") {
-		if lineMatchesAny(line, commands) {
-			fmt.Printf("removed: %s\n", line)
-			removed++
-			continue
-		}
-		kept = append(kept, line)
-	}
-
-	if removed == 0 {
-		fmt.Println("no tackroom cron entry found")
-		return nil
-	}
-
-	cmd := exec.Command("crontab", "-")
-	cmd.Stdin = strings.NewReader(strings.Join(kept, "\n"))
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
 }
 
 func intervalToSchedule(interval string) string {
