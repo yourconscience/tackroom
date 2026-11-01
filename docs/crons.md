@@ -39,6 +39,7 @@ Hosts come from `--hosts`, else `crons.hosts` in `tackroom.local.yaml`, else `cr
 | `hermes` | `~/.hermes/cron/jobs.json`, `executions.db`, `ticker_heartbeat` | Every job. An enabled job whose scheduler heartbeat is older than 10 minutes is reported `dead`. |
 | `codex` | `~/.codex/sqlite/codex-dev.db`, tables `automations` and `automation_runs` | Every automation. |
 | `claude-desktop` | `scheduled-tasks.json` under the Claude desktop app's `claude-code-sessions` directory, prompts in `~/.claude/scheduled-tasks/<id>/SKILL.md`, runs from session files that carry `scheduledTaskId` | Every task. |
+| `herdr-automations` | `automations.yaml` in `$HERDR_PLUGIN_CONFIG_DIR`, else `~/.config/herdr/plugins/config/dnzzl.automations/`; `history.jsonl` in `$HERDR_PLUGIN_STATE_DIR`, else `~/.local/state/herdr/plugins/dnzzl.automations/`; `daemon.pid` in the same state folder | Every automation. `id` is its `name`; `command` is `agent` and `model` plus the first prompt line; `disabled: true` or a top-level `paused: true` gives `disabled`/`paused`. `last_status` and `last_run` come from the last terminal history event (`done`, `failed`, `missed`, `skipped`, `cancelled`, `invalid`); `failed`, `missed` and `invalid` are problems. When the pid in `daemon.pid` is not a live `herdr-automations` process, every enabled automation is `dead`. |
 
 Scope is the user tackroom runs as (or the SSH user): their LaunchAgents, crontab and user timers. System daemons in `/Library/LaunchDaemons`, other users' crontabs and system timers are out of scope; collecting them needs root, which a read-only probe does not ask for.
 
@@ -144,7 +145,7 @@ Exit codes and log mtimes catch jobs that stopped running, not jobs that run and
 
 ## 4. Owned jobs: `cron apply`
 
-A job declared with a `schedule` and a `command` is owned: tackroom writes it as a native unit of the host's own scheduler and removes it when the declaration goes. tackroom runs no daemon of its own; launchd, systemd or cron fires the job.
+A job declared with a `schedule` and a `command` is owned: tackroom writes it as a native unit of the host's own scheduler and removes it when the declaration goes. tackroom runs no daemon of its own; launchd, systemd or cron fires the job. Agent prompts on a schedule are not owned jobs; they belong in herdr-automations (section 5).
 
 ```yaml
 crons:
@@ -157,17 +158,36 @@ crons:
       created_by: human
 ```
 
-`crons.self` in each machine's `tackroom.local.yaml` names that machine (`self: m1`), so one shared manifest says which machine runs what. `tackroom cron apply [--dry-run]` installs the owned jobs for this machine, prints the diff first, and unloads and deletes owned units that are no longer declared. Owned units carry a fixed prefix (`dev.tackroom.<id>` for launchd, `tackroom-<id>` for systemd, a `# tackroom:<id>` marker for crontab), and `apply` touches nothing without it.
+### Identity and scope
+
+- `crons.self` in each machine's `tackroom.local.yaml` names that machine (`self: m1`), so one shared manifest says which machine runs what. `crons.scheduler` may also be set in the local overlay; the overlay wins.
+- A job is in scope on this machine when its `host` is unset or equals `crons.self`. If any job has a `host` and `crons.self` is unset, `apply` stops before changing anything.
+- Job ids match `^[a-z0-9][a-z0-9-]{0,62}$`. Any other id is refused, because the id becomes part of file names and unit labels.
+- The manifest loader keeps `scheduler`, `self`, `schedule` and `command`; today's decode types drop them, so they are extended, and the local overlay merges `self` and `scheduler`.
+
+### What `apply` does
+
+`tackroom cron apply [--dry-run]` reconciles this machine's owned units with the manifest:
+
+1. Load the config. A missing, unreadable or invalid config stops `apply` with an error; it is never read as an empty manifest, so it never prunes because of a load failure.
+2. Take a lock (`~/.local/state/tackroom/cron/apply.lock`); a second `apply` waits for it, then plans from the manifest as it is then.
+3. Read every owned unit on this machine from all three backends, recognized by its prefix: `dev.tackroom.<id>` for launchd, `tackroom-<id>.timer`/`.service` for systemd, a `# tackroom:<id>` marker for crontab. Nothing without the prefix is read as owned or touched.
+4. Plan, per id: install (declared, absent), replace (declared, content differs, or present on a backend other than the selected one), remove (present, not declared). Print the plan as a diff. `--dry-run` stops here.
+5. Execute. `~` and `$HOME` in `command` and in paths are expanded at render time, so units hold absolute paths. The log folder is created before any unit is loaded.
+   - launchd: write the plist to a temporary file and rename it into place; `launchctl bootout` the old label when it is loaded, then `launchctl bootstrap gui/$UID`.
+   - systemd: write both units, `systemctl --user daemon-reload`, then `enable --now` the timer; a replaced timer is restarted. A removed one is `disable --now`d before its files go.
+   - crontab: rewrite the marked line in one `crontab -` call.
+6. Report each step. If any step fails, `apply` exits non-zero and says what is installed now.
 
 ### Backends
 
 | `scheduler` | Unit | Missed while asleep or off |
 | --- | --- | --- |
-| `launchd` (default on macOS) | `~/Library/LaunchAgents/dev.tackroom.<id>.plist` with `StartCalendarInterval`, loaded with `launchctl bootstrap gui/$UID` | Runs once on wake. launchd.plist(5): unlike cron, launchd starts a calendar job the next time the computer wakes, coalescing missed intervals into one run. |
-| `systemd` (default on Linux) | `tackroom-<id>.timer` with `OnCalendar=` and `Persistent=true`, plus a `Type=oneshot` service | Runs once at boot or resume (`Persistent=true`). |
+| `launchd` (default on macOS) | `~/Library/LaunchAgents/dev.tackroom.<id>.plist` with `StartCalendarInterval` | Runs once on wake. launchd.plist(5): unlike cron, launchd starts a calendar job the next time the computer wakes, coalescing missed intervals into one run. |
+| `systemd` (default on Linux) | `tackroom-<id>.timer` with `OnCalendar=` and `Persistent=true`, plus a `Type=oneshot` service | Runs once when the user manager starts again (`Persistent=true`). Without lingering the user manager stops at logout and starts at login, so a server needs `loginctl enable-linger $USER`; `apply` checks `Linger` and warns, and does not enable it. |
 | `crontab` | One line with the marker | Skipped. Only when set explicitly. |
 
-`auto` picks launchd on macOS and systemd on Linux when `systemctl --user` answers, else crontab.
+`auto` picks launchd on macOS and systemd on Linux. It never falls back to crontab: when `systemctl --user` does not answer, `apply` stops and asks for an explicit `scheduler`.
 
 The schedule is always a 5-field cron expression and is translated, never passed through:
 
@@ -175,17 +195,29 @@ The schedule is always a 5-field cron expression and is translated, never passed
 - An expression that restricts both day of month and day of week is refused: cron runs it when either matches, and the other backends cannot say that.
 - systemd: `0 7 * * 2,5` becomes `OnCalendar=Tue,Fri *-*-* 07:00:00`.
 
-Output goes to `~/.local/state/tackroom/cron/<id>.log` (launchd `StandardOutPath`/`StandardErrorPath`, a redirect for crontab); systemd keeps it in the journal. Each owned job enters the collected inventory with `created_by` set, like any other record.
+Output goes to `~/.local/state/tackroom/cron/<id>.log` (launchd `StandardOutPath`/`StandardErrorPath`, a redirect for crontab); systemd keeps it in the journal.
+
+### Collect sees owned jobs as owned
+
+`cron collect` maps an owned unit back to its manifest id by the prefix (`dev.tackroom.knowledge-sync` and `tackroom-knowledge-sync.timer` are both `knowledge-sync`) and treats the `local` host as `crons.self`, so the declaration's fields merge into the record and a declared job is not reported `missing` because its native id has a prefix. Owned records get `created_by: tackroom` unless the manifest says otherwise.
 
 tackroom writes every plist key itself, so the case-sensitive key trap in section 1 cannot happen in an owned job. One trap stays outside its reach: launchd kills a job whose binary was overwritten in place (`last exit reason = OS_REASON_CODESIGNING`). `cron collect` flags it; install binaries by writing a new file and renaming it over the old one.
 
-### tackroom's own entry
+### tackroom's own entries
 
-Plain `tackroom cron` (self-update) becomes the built-in owned job `tackroom-pull` on the same backend. Its flags keep working, and the first `apply` removes the old crontab line, legacy spellings included.
+The two jobs plain `tackroom cron` installs today become built-in owned jobs on the selected backend: `tackroom-pull` (every 30 minutes by default) and, with `--deps`, `tackroom-deps` (weekly). `tackroom cron [--interval] [--deps] [--remove]` edits those built-in entries and runs `apply` for them; it no longer writes crontab directly, so the self-update cannot end up installed twice. The first `apply` removes the old crontab lines, legacy spellings included.
 
-### Considered: herdr-automations
+## 5. herdr-automations
 
-[herdr-automations](https://github.com/DnzzL/herdr-automations) (MIT) schedules agent prompts: a prompt, a cron line and a fresh git worktree per run, in Herdr panes, with its own daemon installed as a launchd or systemd service that polls the wall clock every 30 seconds, so runs missed during sleep fire on wake. It fits recurring agent chores, not plain commands, needs Herdr (or the Herdr app's `hc`) running, and is young (v0.11.1 to v0.11.3 all shipped on 2026-10-30). It is not a backend here. If agent jobs move to it, `cron collect` gains a `herdr-automations` source that reads its `automations.yaml` and `history.jsonl`.
+[herdr-automations](https://github.com/DnzzL/herdr-automations) (MIT) schedules agent prompts: a prompt, a cron line and a fresh git worktree per run, in Herdr or in the Herdr app (`backend: hc`). Its own daemon runs as a launchd or systemd service and reads the wall clock every 30 seconds, so a run due while the machine slept fires on wake within `catch_up_minutes`. It is the place for scheduled agent work; owned jobs (section 4) are for plain commands. The two do not overlap: tackroom does not write `automations.yaml`.
+
+tackroom supports it in three places:
+
+- **collect**: the `herdr-automations` source (section 1) on every scanned host where the config folder exists.
+- **view**: its records sit in the Crons tab like any other source, and a host card shows whether its scheduler is running.
+- **doctor**: on a machine with an `automations.yaml`, `tackroom doctor` reports a scheduler that is not installed as a service, and agent names in the file that this machine has no binary for.
+
+Version note: v0.11.1 to v0.11.3 all shipped on 2026-10-30, and `backend: hc` arrived in that series.
 
 ## Non-goals
 
