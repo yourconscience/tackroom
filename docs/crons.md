@@ -174,7 +174,7 @@ crons:
 3. Read every owned unit on this machine from all three backends, recognized by its prefix: `dev.tackroom.<id>` for launchd, `tackroom-<id>.timer`/`.service` for systemd, a `# tackroom:<id>` marker for crontab. Nothing without the prefix is read as owned or touched.
 4. Plan, per id: install (declared, absent), replace (declared, content differs, or present on a backend other than the selected one), remove (present, not declared). Print the plan as a diff. `--dry-run` stops here.
 5. Execute. `~` and `$HOME` in `command` and in paths are expanded at render time, so units hold absolute paths. The log folder is created before any unit is loaded.
-   - launchd: write the plist to a temporary file and rename it into place; `launchctl bootout` the old label when it is loaded, then `launchctl bootstrap gui/$UID`.
+   - launchd: write the plist to a temporary file and rename it into place; `launchctl bootout gui/$UID/<label>` when it is loaded, then `launchctl bootstrap gui/$UID <plist path>`.
    - systemd: write both units, `systemctl --user daemon-reload`, then `enable --now` the timer; a replaced timer is restarted. A removed one is `disable --now`d before its files go.
    - crontab: rewrite the marked line in one `crontab -` call.
 6. Report each step. If any step fails, `apply` exits non-zero and says what is installed now.
@@ -205,7 +205,7 @@ tackroom writes every plist key itself, so the case-sensitive key trap in sectio
 
 ### tackroom's own entries
 
-The two jobs plain `tackroom cron` installs today become built-in owned jobs on the selected backend: `tackroom-pull` (every 30 minutes by default) and, with `--deps`, `tackroom-deps` (weekly). `tackroom cron [--interval] [--deps] [--remove]` edits those built-in entries and runs `apply` for them; it no longer writes crontab directly, so the self-update cannot end up installed twice. The first `apply` removes the old crontab lines, legacy spellings included.
+The two jobs plain `tackroom cron` installs today become built-in owned jobs on the selected backend: `tackroom-pull` (every 30 minutes by default) and, with `--deps`, `tackroom-deps` (weekly). `tackroom cron [--interval] [--deps] [--remove]` edits those built-in entries and runs `apply` for them; it no longer writes crontab directly, so the self-update cannot end up installed twice. The first `apply` lists the old crontab lines in its plan and removes them. A line counts as old when its command, after an optional `. "$HOME/.profile" 2>/dev/null;` prefix, is any executable whose base name is `tackroom` (quoted or not), followed by `pull`, `sync deps` or the legacy `deps update`, and an optional `--config <path>`. The match is on that whole shape, not a substring of today's resolved command, so a line with another binary path or `--config` value is found too, and a different command that merely contains it is not.
 
 ## 5. herdr-automations
 
