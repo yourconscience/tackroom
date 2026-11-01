@@ -687,7 +687,7 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 			job.Inferred = append(job.Inferred, "last_run")
 		}
 
-		running := ""
+		running, exitReason := "", ""
 		if lc, ok := p.one("launchctl", s.Key); !ok || lc.RC != 0 {
 			job.State = "not_loaded"
 		} else {
@@ -710,6 +710,8 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 					if n, err := strconv.Atoi(code); err == nil {
 						job.LastExit = &n
 					}
+				case "last exit reason": // the kernel killed it, e.g. OS_REASON_CODESIGNING
+					exitReason = v
 				}
 			}
 		}
@@ -719,17 +721,21 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 		if !scheduled {
 			// Services (KeepAlive, RunAtLoad, WatchPaths) are not schedules;
 			// they are reported only when their last exit was non-zero.
-			if job.LastExit == nil || *job.LastExit == 0 || job.State == "disabled" {
+			if (job.LastExit == nil || *job.LastExit == 0) && exitReason == "" || job.State == "disabled" {
 				continue
 			}
 			job.Schedule = launchdTrigger(plist)
 			job.State, job.LastStatus = "service", running
 			job.Inferred = append(job.Inferred, "state")
-			if plist["KeepAlive"] != nil && plist["KeepAlive"] != false && job.Runs != nil && *job.Runs >= 10 {
+			if exitReason != "" {
+				job.Problems = append(job.Problems, "last run killed by the system: "+exitReason)
+			} else if plist["KeepAlive"] != nil && plist["KeepAlive"] != false && job.Runs != nil && *job.Runs >= 10 {
 				job.Problems = append(job.Problems, fmt.Sprintf("crash loop: KeepAlive restarted it %d times, last exit %d", *job.Runs, *job.LastExit))
 			} else {
 				job.Problems = append(job.Problems, fmt.Sprintf("last exit %d", *job.LastExit))
 			}
+		} else if exitReason != "" && job.State != "disabled" {
+			job.Problems = append(job.Problems, "last run killed by the system: "+exitReason)
 		}
 		jobs = append(jobs, job)
 	}
