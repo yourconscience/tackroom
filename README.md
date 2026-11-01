@@ -206,10 +206,14 @@ tackroom config validate
 tackroom config print
 ```
 
-The `view` web server is loopback-only, session-cookie authenticated (a
-one-time startup token swapped for an `HttpOnly`, `SameSite=Strict` cookie),
-CSRF- and origin-checked on mutations, guards saves by revision, and keeps sync
-as a separate preview/confirm step. It prints the tokenized URL on its own line
+The `view` web server is loopback-only, CSRF- and origin-checked on mutations,
+guards saves by revision, and keeps sync as a separate preview/confirm step.
+Requests made straight to `http://127.0.0.1:PORT` or `localhost` from the same
+machine need no token, so a bookmark keeps working. Requests through a proxy
+(a non-loopback `Host`, or forwarding headers) need the session: a one-time
+startup token swapped for an `HttpOnly`, `SameSite=Strict` cookie. On a
+machine shared with other users, anyone who can reach its loopback can use the
+view. It prints the tokenized URL on its own line
 and opens your default browser locally; `--no-open` skips that, and
 `--ssh-host user@host` (or an SSH session, via `SSH_CONNECTION`) prints an
 `ssh -L` tunnel command for reaching the loopback UI from another machine.

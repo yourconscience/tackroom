@@ -319,27 +319,45 @@ func (s *configWebServer) handleAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *configWebServer) authenticated(r *http.Request) bool {
+	if directLoopback(r) {
+		return true
+	}
 	cookie, err := r.Cookie("tackroom_session")
 	return err == nil && cookie.Value == s.token
+}
+
+// directLoopback reports whether a request came straight from this machine to
+// a loopback name, not through a proxy such as tailscale serve. These requests
+// need no session token, so a bookmarked http://127.0.0.1:PORT keeps working.
+// Proxied requests and DNS-rebinding pages carry a non-loopback Host and still
+// need the token; mutations still need the origin and CSRF checks.
+func directLoopback(r *http.Request) bool {
+	for _, header := range []string{"Forwarded", "X-Forwarded-For", "X-Forwarded-Host", "Tailscale-User-Login"} {
+		if r.Header.Get(header) != "" {
+			return false
+		}
+	}
+	return loopbackHost(r.Host) && loopbackHost(r.RemoteAddr)
+}
+
+func loopbackHost(hostport string) bool {
+	host := hostport
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // secureRequest reports whether a request came through the HTTPS proxy that
 // --secure-cookie is for. Direct loopback requests keep plain-http cookies and
 // origins, so one view serves both the tailnet route and the local browser.
 func (s *configWebServer) secureRequest(r *http.Request) bool {
-	if !s.secureCookie {
-		return false
-	}
-	host := r.Host
-	if h, _, err := net.SplitHostPort(host); err == nil {
-		host = h
-	}
-	host = strings.Trim(host, "[]")
-	if host == "localhost" {
-		return false
-	}
-	ip := net.ParseIP(host)
-	return ip == nil || !ip.IsLoopback()
+	return s.secureCookie && !loopbackHost(r.Host)
 }
 
 func (s *configWebServer) setSessionCookies(w http.ResponseWriter, r *http.Request) {
