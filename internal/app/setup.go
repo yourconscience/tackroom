@@ -405,7 +405,21 @@ func runCron(opts cronOptions) error {
 	}
 
 	// The self-update and dependency jobs are built-in owned jobs: installed
-	// on the selected scheduler like `cron apply` installs declared ones.
+	// on the selected scheduler like `cron apply` installs declared ones. The
+	// scheduler does not see this shell's config choice, so the job always
+	// names the config by absolute path.
+	unlock, err := lockCronApply(home)
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	configPath, err := resolveConfigPath(opts.ConfigPath, home)
+	if err != nil {
+		return err
+	}
+	if opts.ConfigPath, err = filepath.Abs(configPath); err != nil {
+		return err
+	}
 	cronCmd, interval := cronCommandForOptions(binaryPath, opts)
 	id, mode := "tackroom-pull", "pull"
 	if opts.Deps {
@@ -423,11 +437,6 @@ func runCron(opts cronOptions) error {
 	if !opts.Remove {
 		desired = append(desired, ownedCronJob{ID: id, Schedule: intervalToSchedule(interval), Command: []string{"/bin/sh", "-c", cronCmd}})
 	}
-	unlock, err := lockCronApply(home)
-	if err != nil {
-		return err
-	}
-	defer unlock()
 	installed, err := readOwnedCronUnits(home)
 	if err != nil {
 		return err

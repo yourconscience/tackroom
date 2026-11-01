@@ -75,6 +75,15 @@ func runCronApply(args []string) error {
 	if err != nil {
 		return err
 	}
+	// Lock before reading the manifest, so a run waiting for the lock plans
+	// from the config as it is then. A dry run changes nothing and takes none.
+	if !*dryRun {
+		unlock, err := lockCronApply(home)
+		if err != nil {
+			return err
+		}
+		defer unlock()
+	}
 	// A missing config is an error here, never an empty manifest: an empty
 	// manifest would prune every owned unit.
 	path, err := resolveConfigPath(*configPath, home)
@@ -96,11 +105,6 @@ func runCronApply(args []string) error {
 	if err != nil {
 		return err
 	}
-	unlock, err := lockCronApply(home)
-	if err != nil {
-		return err
-	}
-	defer unlock()
 	installed, err := readOwnedCronUnits(home)
 	if err != nil {
 		return err
@@ -163,7 +167,9 @@ func resolveCronCommand(command []string, home string) ([]string, error) {
 		if err != nil {
 			return nil, fmt.Errorf("command %q not found on PATH", out[0])
 		}
-		out[0] = path
+		if out[0], err = filepath.Abs(path); err != nil {
+			return nil, err
+		}
 	}
 	return out, nil
 }
@@ -286,14 +292,18 @@ func planOwnedCrons(desired []ownedCronJob, backend string, installed []ownedCro
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", job.ID, err)
 		}
-		op := "install"
+		op, matches := "install", 0
 		for _, unit := range installed {
 			if unit.ID == job.ID && unit.Backend == backend {
+				matches++
 				op = "replace"
-				if unit.Content == content {
+				if unit.Content == content && matches == 1 {
 					op = "keep"
 				}
 			}
+		}
+		if matches > 1 {
+			op = "replace" // duplicate crontab lines collapse into one
 		}
 		plan = append(plan, cronPlanStep{Op: op, Backend: backend, Job: job, Content: content})
 	}
@@ -320,12 +330,15 @@ func renderOwnedCron(job ownedCronJob, backend, home string) (string, error) {
 		if _, ok := parseCronSpec(job.Schedule); !ok {
 			return "", fmt.Errorf("schedule %q is not a 5-field cron expression", job.Schedule)
 		}
+		// cron turns an unescaped % into a newline.
+		quote := func(arg string) string {
+			return strings.ReplaceAll("'"+strings.ReplaceAll(arg, "'", `'\''`)+"'", "%", `\%`)
+		}
 		quoted := make([]string, len(job.Command))
 		for i, arg := range job.Command {
-			// cron turns an unescaped % into a newline.
-			quoted[i] = strings.ReplaceAll("'"+strings.ReplaceAll(arg, "'", `'\''`)+"'", "%", `\%`)
+			quoted[i] = quote(arg)
 		}
-		return fmt.Sprintf("%s %s >> '%s' 2>&1 %s%s", job.Schedule, strings.Join(quoted, " "), cronLogPath(home, job.ID), ownedCrontabMarker, job.ID), nil
+		return fmt.Sprintf("%s %s >> %s 2>&1 %s%s", job.Schedule, strings.Join(quoted, " "), quote(cronLogPath(home, job.ID)), ownedCrontabMarker, job.ID), nil
 	}
 	return "", fmt.Errorf("unknown backend %q", backend)
 }
@@ -508,58 +521,46 @@ func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dry
 		return err
 	}
 
-	// Install first, then remove, so a job moving between backends is never
-	// absent if a step fails.
-	var crontabAdd []string
+	// Install first, then remove. A unit is removed only when its job's new
+	// unit installed, so a job moving between backends is never left without one.
+	var errs []string
+	failed := map[string]bool{}
+	fail := func(id string, err error) {
+		errs = append(errs, fmt.Sprintf("%s: %v", id, err))
+		failed[id] = true
+	}
+	var crontabAdd, crontabIDs []string
 	crontabDrop := map[string]bool{}
 	for _, line := range legacy {
 		crontabDrop[line] = true
 	}
-	systemdChanged := false
-	var errs []string
+	var systemdSteps []cronPlanStep
 	for _, step := range plan {
-		if step.Op == "keep" || step.Op == "remove" {
+		if step.Op != "install" && step.Op != "replace" {
 			continue
 		}
-		var err error
 		switch step.Backend {
 		case cronBackendLaunchd:
-			err = installLaunchdUnit(step, home)
+			if err := installLaunchdUnit(step, home); err != nil {
+				fail(step.Job.ID, err)
+			}
 		case cronBackendSystemd:
-			err = writeSystemdUnits(step, home)
-			systemdChanged = true
+			if err := writeSystemdUnits(step, home); err != nil {
+				fail(step.Job.ID, err)
+			} else {
+				systemdSteps = append(systemdSteps, step)
+			}
 		case cronBackendCrontab:
 			crontabAdd = append(crontabAdd, step.Content)
+			crontabIDs = append(crontabIDs, step.Job.ID)
 			crontabDrop[ownedCrontabMarker+step.Job.ID] = true
 		}
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("%s %s: %v", step.Op, step.Job.ID, err))
-		}
 	}
-	for _, step := range plan {
-		if step.Op != "remove" {
-			continue
-		}
-		var err error
-		switch step.Backend {
-		case cronBackendLaunchd:
-			err = removeLaunchdUnit(step.Job.ID, home)
-		case cronBackendSystemd:
-			err = removeSystemdUnits(step.Job.ID, home)
-			systemdChanged = true
-		case cronBackendCrontab:
-			crontabDrop[ownedCrontabMarker+step.Job.ID] = true
-		}
-		if err != nil {
-			errs = append(errs, fmt.Sprintf("remove %s: %v", step.Job.ID, err))
-		}
-	}
-	if systemdChanged {
-		if err := systemctlUser("daemon-reload"); err != nil {
-			errs = append(errs, err.Error())
-		}
-		for _, step := range plan {
-			if step.Backend != cronBackendSystemd || (step.Op != "install" && step.Op != "replace") {
+	if len(systemdSteps) > 0 {
+		reload := systemctlUser("daemon-reload")
+		for _, step := range systemdSteps {
+			if reload != nil {
+				fail(step.Job.ID, reload)
 				continue
 			}
 			timer := ownedSystemdPrefix + step.Job.ID + ".timer"
@@ -568,12 +569,50 @@ func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dry
 				err = systemctlUser("restart", timer)
 			}
 			if err != nil {
-				errs = append(errs, err.Error())
+				fail(step.Job.ID, err)
 			}
 		}
 	}
-	if len(crontabAdd) > 0 || len(crontabDrop) > 0 {
+	if len(crontabAdd) > 0 || len(legacy) > 0 {
 		if err := rewriteCrontab(crontabAdd, crontabDrop); err != nil {
+			errs = append(errs, err.Error())
+			for _, id := range crontabIDs {
+				failed[id] = true
+			}
+		}
+	}
+
+	removeDrop := map[string]bool{}
+	systemdRemoved := false
+	for _, step := range plan {
+		if step.Op != "remove" {
+			continue
+		}
+		if failed[step.Job.ID] {
+			errs = append(errs, fmt.Sprintf("%s: kept the %s unit because its replacement did not install", step.Job.ID, step.Backend))
+			continue
+		}
+		switch step.Backend {
+		case cronBackendLaunchd:
+			if err := removeLaunchdUnit(step.Job.ID, home); err != nil {
+				errs = append(errs, fmt.Sprintf("remove %s: %v", step.Job.ID, err))
+			}
+		case cronBackendSystemd:
+			if err := removeSystemdUnits(step.Job.ID, home); err != nil {
+				errs = append(errs, fmt.Sprintf("remove %s: %v", step.Job.ID, err))
+			}
+			systemdRemoved = true
+		case cronBackendCrontab:
+			removeDrop[ownedCrontabMarker+step.Job.ID] = true
+		}
+	}
+	if len(removeDrop) > 0 {
+		if err := rewriteCrontab(nil, removeDrop); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if systemdRemoved {
+		if err := systemctlUser("daemon-reload"); err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
@@ -604,7 +643,7 @@ func launchdLoaded(label string) bool {
 func launchctl(args ...string) error {
 	out, err := exec.Command("launchctl", args...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("launchctl %s: %s", strings.Join(args, " "), strings.TrimSpace(string(out)))
+		return fmt.Errorf("launchctl %s: %s", strings.Join(args, " "), commandFailure(out, err))
 	}
 	return nil
 }
@@ -636,9 +675,17 @@ func removeLaunchdUnit(id, home string) error {
 func systemctlUser(args ...string) error {
 	out, err := exec.Command("systemctl", append([]string{"--user"}, args...)...).CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("systemctl --user %s: %s", strings.Join(args, " "), strings.TrimSpace(string(out)))
+		return fmt.Errorf("systemctl --user %s: %s", strings.Join(args, " "), commandFailure(out, err))
 	}
 	return nil
+}
+
+// commandFailure is a failed command's output, or its error when it printed nothing.
+func commandFailure(out []byte, err error) string {
+	if msg := strings.TrimSpace(string(out)); msg != "" {
+		return msg
+	}
+	return err.Error()
 }
 
 func writeSystemdUnits(step cronPlanStep, home string) error {

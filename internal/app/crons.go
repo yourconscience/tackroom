@@ -166,7 +166,9 @@ func loadCronsManifest(override string) (cronsManifest, error) {
 	// Hosts differ per machine, so tackroom.local.yaml may set its own
 	// crons.hosts; its jobs entries override the shared ones by id.
 	localPath := filepath.Join(filepath.Dir(path), "tackroom.local.yaml")
-	if data, err := os.ReadFile(localPath); err == nil {
+	if data, err := os.ReadFile(localPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return cronsManifest{}, err
+	} else if err == nil {
 		var local struct {
 			Crons cronsManifest `yaml:"crons"`
 		}
