@@ -1262,7 +1262,12 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 	}
 	last := map[string]event{}
 	runs := map[string]map[string]bool{}
-	if h, ok := p.one("ha-history", ""); ok && h.RC == 0 {
+	var details []string
+	h, haveHistory := p.one("ha-history", "")
+	if haveHistory && h.RC != 0 {
+		details = append(details, "history.jsonl unreadable: "+firstLine(h.Body))
+	}
+	if haveHistory && h.RC == 0 {
 		for _, line := range strings.Split(h.Body, "\n") {
 			var e event
 			if json.Unmarshal([]byte(line), &e) != nil {
@@ -1284,11 +1289,12 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 
 	alive := false
 	if d, ok := p.one("ha-daemon", ""); ok && d.RC == 0 {
-		alive = filepath.Base(strings.TrimSpace(d.Body)) == "herdr-automations"
+		alive = filepath.Base(first(strings.Fields(d.Body))) == "herdr-automations"
 	}
-	detail := "scheduler not running"
 	if alive {
-		detail = "scheduler running"
+		details = append([]string{"scheduler running"}, details...)
+	} else {
+		details = append([]string{"scheduler not running"}, details...)
 	}
 
 	var jobs []cronJob
@@ -1311,8 +1317,11 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 		if prompt := firstLine(strings.TrimSpace(a.Prompt)); prompt != "" {
 			job.Command += ": " + truncate(prompt, 60)
 		}
-		n := len(runs[a.Name])
-		job.Runs = &n
+		// Unreadable history leaves runs unknown rather than zero.
+		if !haveHistory || h.RC == 0 {
+			n := len(runs[a.Name])
+			job.Runs = &n
+		}
 		if e, ok := last[a.Name]; ok {
 			job.LastRun, job.LastStatus = e.At, e.Status
 			switch e.Status {
@@ -1337,7 +1346,7 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 		missedRuns(&job, time.Unix(p.now, 0))
 		jobs = append(jobs, job)
 	}
-	return jobs, cronAccess{Detail: detail}
+	return jobs, cronAccess{Detail: strings.Join(details, "; ")}
 }
 
 func frontmatterValue(body, key string) string {

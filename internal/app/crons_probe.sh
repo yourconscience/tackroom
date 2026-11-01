@@ -74,9 +74,10 @@ ha_conf="${HERDR_PLUGIN_CONFIG_DIR:-$HOME/.config/herdr/plugins/config/dnzzl.aut
 ha_state="${HERDR_PLUGIN_STATE_DIR:-$HOME/.local/state/herdr/plugins/dnzzl.automations}"
 if [ -e "$ha_conf/automations.yaml" ]; then
 	run ha-config "" cat "$ha_conf/automations.yaml"
-	[ -e "$ha_state/history.jsonl" ] && run ha-history "" tail -n 5000 "$ha_state/history.jsonl"
+	[ -e "$ha_state/history.jsonl" ] && run ha-history "" cat "$ha_state/history.jsonl"
 	pid=$(cat "$ha_state/daemon.pid" 2>/dev/null)
-	[ -n "$pid" ] && run ha-daemon "" ps -o comm= -p "$pid"
+	# args, not comm: Linux truncates comm to 15 characters.
+	[ -n "$pid" ] && run ha-daemon "" ps -o args= -p "$pid"
 fi
 
 if [ "$os" = Darwin ]; then
