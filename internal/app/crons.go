@@ -82,7 +82,7 @@ type cronManifestJob struct {
 	Effect     string   `yaml:"effect"`
 }
 
-var cronSources = []string{"launchd", "crontab", "systemd", "hermes", "codex", "claude-desktop", "claude-cloud", "openbot"}
+var cronSources = []string{"launchd", "crontab", "systemd", "hermes", "codex", "claude-desktop", "herdr-automations", "claude-cloud", "openbot"}
 
 func runCronCollect(args []string) error {
 	fs := flag.NewFlagSet("cron collect", flag.ContinueOnError)
@@ -454,6 +454,8 @@ func (p *probeData) collect(source string) ([]cronJob, cronAccess) {
 			return nil, cronAccess{State: "not_scanned", Detail: "desktop app state is read on macOS only"}
 		}
 		return p.claudeDesktop()
+	case "herdr-automations":
+		return p.herdrAutomations()
 	case "claude-cloud":
 		return nil, cronAccess{State: "not_scanned", Detail: "cloud routines have no on-disk state; list them from a Claude session"}
 	case "openbot":
@@ -1222,6 +1224,120 @@ func (p *probeData) claudeDesktop() ([]cronJob, cronAccess) {
 		}
 	}
 	return jobs, access
+}
+
+// herdr-automations
+
+// herdrAutomations reads the plugin's automations.yaml and history.jsonl. An
+// automation's last result is its last terminal history event; the scheduler
+// is alive when the pid in daemon.pid is a running herdr-automations.
+func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
+	s, ok := p.one("ha-config", "")
+	if !ok {
+		return nil, cronAccess{Detail: "no automations.yaml"}
+	}
+	var doc struct {
+		Paused      bool `yaml:"paused"`
+		Automations []struct {
+			Name     string `yaml:"name"`
+			Cron     string `yaml:"cron"`
+			Agent    string `yaml:"agent"`
+			Template string `yaml:"template"`
+			Workflow string `yaml:"workflow"`
+			Model    string `yaml:"model"`
+			Prompt   string `yaml:"prompt"`
+			Disabled bool   `yaml:"disabled"`
+		} `yaml:"automations"`
+	}
+	if s.RC != 0 || yaml.Unmarshal([]byte(s.Body), &doc) != nil {
+		return nil, cronAccess{State: "unreadable", Detail: "automations.yaml: " + firstLine(s.Body)}
+	}
+
+	type event struct {
+		RunID      string `json:"run_id"`
+		Automation string `json:"automation"`
+		Status     string `json:"status"`
+		At         string `json:"at"`
+		Error      string `json:"error"`
+	}
+	last := map[string]event{}
+	runs := map[string]map[string]bool{}
+	if h, ok := p.one("ha-history", ""); ok && h.RC == 0 {
+		for _, line := range strings.Split(h.Body, "\n") {
+			var e event
+			if json.Unmarshal([]byte(line), &e) != nil {
+				continue
+			}
+			switch e.Status {
+			case "done", "failed", "cancelled":
+				if runs[e.Automation] == nil {
+					runs[e.Automation] = map[string]bool{}
+				}
+				runs[e.Automation][e.RunID] = true
+			case "missed", "skipped", "invalid":
+			default:
+				continue
+			}
+			last[e.Automation] = e
+		}
+	}
+
+	alive := false
+	if d, ok := p.one("ha-daemon", ""); ok && d.RC == 0 {
+		alive = filepath.Base(strings.TrimSpace(d.Body)) == "herdr-automations"
+	}
+	detail := "scheduler not running"
+	if alive {
+		detail = "scheduler running"
+	}
+
+	var jobs []cronJob
+	for _, a := range doc.Automations {
+		job := p.newJob("herdr-automations", a.Name)
+		job.Schedule = a.Cron
+		agent := a.Agent
+		switch {
+		case a.Workflow != "":
+			agent = "workflow " + a.Workflow
+		case a.Template != "":
+			agent = "template " + a.Template
+		case agent == "":
+			agent = "claude"
+		}
+		if a.Model != "" {
+			agent += " " + a.Model
+		}
+		job.Command = agent
+		if prompt := firstLine(strings.TrimSpace(a.Prompt)); prompt != "" {
+			job.Command += ": " + truncate(prompt, 60)
+		}
+		n := len(runs[a.Name])
+		job.Runs = &n
+		if e, ok := last[a.Name]; ok {
+			job.LastRun, job.LastStatus = e.At, e.Status
+			switch e.Status {
+			case "failed", "missed", "invalid":
+				msg := "last run " + e.Status
+				if e.Error != "" {
+					msg += ": " + truncate(e.Error, 160)
+				}
+				job.Problems = append(job.Problems, msg)
+			}
+		}
+		switch {
+		case a.Disabled:
+			job.State = "disabled"
+		case doc.Paused:
+			job.State = "paused"
+		case !alive:
+			job.State = "dead"
+			job.Problems = append(job.Problems, "enabled, but the herdr-automations scheduler is not running on this host")
+		}
+		job.Inferred = append(job.Inferred, "state")
+		missedRuns(&job, time.Unix(p.now, 0))
+		jobs = append(jobs, job)
+	}
+	return jobs, cronAccess{Detail: detail}
 }
 
 func frontmatterValue(body, key string) string {

@@ -2,13 +2,17 @@ package app
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type herdrPluginCommand struct {
@@ -183,4 +187,59 @@ func missingHerdrCommandPath(pluginRoot string, command []string) string {
 // there, and such a command must not be reported as healthy.
 func hasHerdrPathSeparator(token string) bool {
 	return strings.ContainsAny(token, `/\`)
+}
+
+// checkHerdrAutomations covers herdr-automations on a machine that has its
+// automations.yaml: the scheduler should run as a login service, and every
+// enabled automation's agent should be on PATH. See docs/crons.md section 5.
+func checkHerdrAutomations(home string) checkResult {
+	const name = "herdr automations"
+	dir := os.Getenv("HERDR_PLUGIN_CONFIG_DIR")
+	if dir == "" {
+		dir = filepath.Join(home, ".config", "herdr", "plugins", "config", "dnzzl.automations")
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "automations.yaml"))
+	if errors.Is(err, fs.ErrNotExist) {
+		return checkResult{name, checkStatusPass, "no automations.yaml, skipped"}
+	}
+	if err != nil {
+		return checkResult{name, checkStatusWarn, err.Error()}
+	}
+	var doc struct {
+		Automations []struct {
+			Agent    string `yaml:"agent"`
+			Template string `yaml:"template"`
+			Workflow string `yaml:"workflow"`
+			Disabled bool   `yaml:"disabled"`
+		} `yaml:"automations"`
+	}
+	if err := yaml.Unmarshal(data, &doc); err != nil {
+		return checkResult{name, checkStatusWarn, "automations.yaml: " + err.Error()}
+	}
+
+	var issues []string
+	bin, err := exec.LookPath("herdr-automations")
+	if err != nil {
+		issues = append(issues, "herdr-automations is not on PATH")
+	} else if out, err := exec.Command(bin, "service", "status").Output(); err != nil || !strings.Contains(string(out), "service installed: true") {
+		issues = append(issues, "scheduler is not installed as a login service; run: herdr-automations service install")
+	}
+	missing := map[string]bool{}
+	for _, a := range doc.Automations {
+		if a.Disabled || a.Template != "" || a.Workflow != "" {
+			continue
+		}
+		agent := a.Agent
+		if agent == "" {
+			agent = "claude"
+		}
+		if _, err := exec.LookPath(agent); err != nil && !missing[agent] {
+			missing[agent] = true
+			issues = append(issues, "agent not on PATH: "+agent)
+		}
+	}
+	if len(issues) > 0 {
+		return checkResult{name, checkStatusWarn, strings.Join(issues, "; ")}
+	}
+	return checkResult{name, checkStatusPass, fmt.Sprintf("%d automations, scheduler installed", len(doc.Automations))}
 }

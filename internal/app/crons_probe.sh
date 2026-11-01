@@ -70,6 +70,15 @@ if [ -e "$c/codex-dev.db" ]; then
 	done
 fi
 
+ha_conf="${HERDR_PLUGIN_CONFIG_DIR:-$HOME/.config/herdr/plugins/config/dnzzl.automations}"
+ha_state="${HERDR_PLUGIN_STATE_DIR:-$HOME/.local/state/herdr/plugins/dnzzl.automations}"
+if [ -e "$ha_conf/automations.yaml" ]; then
+	run ha-config "" cat "$ha_conf/automations.yaml"
+	[ -e "$ha_state/history.jsonl" ] && run ha-history "" tail -n 5000 "$ha_state/history.jsonl"
+	pid=$(cat "$ha_state/daemon.pid" 2>/dev/null)
+	[ -n "$pid" ] && run ha-daemon "" ps -o comm= -p "$pid"
+fi
+
 if [ "$os" = Darwin ]; then
 	s="$HOME/Library/Application Support/Claude/claude-code-sessions"
 	for f in "$s"/*/*/scheduled-tasks.json; do
