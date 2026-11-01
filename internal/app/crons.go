@@ -1275,6 +1275,10 @@ func (p *probeData) claudeDesktop() ([]cronJob, cronAccess) {
 
 // herdr-automations
 
+// herdrAutomationsProcess matches a ps args line whose executable is
+// herdr-automations, also under a path with spaces.
+var herdrAutomationsProcess = regexp.MustCompile(`^(?:.*/)?herdr-automations(?:\s|$)`)
+
 // herdrAutomations reads the plugin's automations.yaml and history.jsonl. An
 // automation's last result is its last terminal history event; the scheduler
 // is alive when the pid in daemon.pid is a running herdr-automations.
@@ -1306,18 +1310,22 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 		Status     string `json:"status"`
 		At         string `json:"at"`
 		Error      string `json:"error"`
+		Seen       bool   `json:"seen"` // an inbox marker copying an older event
 	}
 	last := map[string]event{}
 	runs := map[string]map[string]bool{}
 	var details []string
 	h, haveHistory := p.one("ha-history", "")
+	if haveHistory && h.RC != 0 && strings.Contains(h.Body, "No such file") {
+		haveHistory = false
+	}
 	if haveHistory && h.RC != 0 {
 		details = append(details, "history.jsonl unreadable: "+firstLine(h.Body))
 	}
 	if haveHistory && h.RC == 0 {
 		for _, line := range strings.Split(h.Body, "\n") {
 			var e event
-			if json.Unmarshal([]byte(line), &e) != nil {
+			if json.Unmarshal([]byte(line), &e) != nil || e.Seen {
 				continue
 			}
 			switch e.Status {
@@ -1334,13 +1342,19 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 		}
 	}
 
-	alive := false
-	if d, ok := p.one("ha-daemon", ""); ok && d.RC == 0 {
-		alive = filepath.Base(first(strings.Fields(d.Body))) == "herdr-automations"
+	alive, known := false, true
+	if pid, ok := p.one("ha-pid", ""); ok && pid.RC != 0 && !strings.Contains(pid.Body, "No such file") {
+		known = false // daemon.pid exists but cannot be read
 	}
-	if alive {
+	if d, ok := p.one("ha-daemon", ""); ok && d.RC == 0 {
+		alive = herdrAutomationsProcess.MatchString(strings.TrimSpace(d.Body))
+	}
+	switch {
+	case !known:
+		details = append([]string{"scheduler state unreadable"}, details...)
+	case alive:
 		details = append([]string{"scheduler running"}, details...)
-	} else {
+	default:
 		details = append([]string{"scheduler not running"}, details...)
 	}
 
@@ -1385,7 +1399,7 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 			job.State = "disabled"
 		case doc.Paused:
 			job.State = "paused"
-		case !alive:
+		case known && !alive:
 			job.State = "dead"
 			job.Problems = append(job.Problems, "enabled, but the herdr-automations scheduler is not running on this host")
 		}
