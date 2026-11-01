@@ -135,6 +135,7 @@ tackroom mcp      list|add|import|remove
 tackroom hook     list [query] | remove [--dry-run] <query>
 tackroom restore  [<backup> | latest] [--dry-run]   # put backed-up native files back
 tackroom cron     collect [--hosts local,HOST...] [--table]  # read-only inventory of scheduled jobs
+tackroom cron     apply [--dry-run]                         # install or remove the crons.jobs entries with schedule and command
 ```
 
 `status`, `sync` and `doctor` take `--json` for scripts and agents; exit code 1 means something is out of sync or failed. `tackroom mcp remove <name>` followed by `sync` removes the server from every agent tackroom wrote it to, and from agents whose entry still matches its definition (the native config is backed up first). Other hand-configured servers stay. If a native file differs from the shared copy (say a hand-written `~/.claude/CLAUDE.md`), `sync` leaves that agent alone, syncs the others, and says how to resolve it; `sync --replace-conflicts` moves such files to `~/.local/state/tackroom/backups/<time>/` and links the shared copy. `setup` does this for you after asking (`--yes` accepts). `tackroom restore` lists those backups and puts one back; whatever it replaces is saved as a new backup, so `tackroom restore latest` undoes it.

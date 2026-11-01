@@ -531,8 +531,12 @@ func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dry
 	}
 	var crontabAdd, crontabIDs []string
 	crontabDrop := map[string]bool{}
-	for _, line := range legacy {
-		crontabDrop[line] = true
+	// Old self-update lines go in the same crontab write as their crontab
+	// replacement; on another backend they go only after every install worked.
+	if backend == cronBackendCrontab {
+		for _, line := range legacy {
+			crontabDrop[line] = true
+		}
 	}
 	var systemdSteps []cronPlanStep
 	for _, step := range plan {
@@ -573,7 +577,7 @@ func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dry
 			}
 		}
 	}
-	if len(crontabAdd) > 0 || len(legacy) > 0 {
+	if len(crontabAdd) > 0 || (backend == cronBackendCrontab && len(legacy) > 0) {
 		if err := rewriteCrontab(crontabAdd, crontabDrop); err != nil {
 			errs = append(errs, err.Error())
 			for _, id := range crontabIDs {
@@ -604,6 +608,15 @@ func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dry
 			systemdRemoved = true
 		case cronBackendCrontab:
 			removeDrop[ownedCrontabMarker+step.Job.ID] = true
+		}
+	}
+	if backend != cronBackendCrontab && len(legacy) > 0 {
+		if len(failed) > 0 {
+			errs = append(errs, "kept the old crontab self-update line because its replacement did not install")
+		} else {
+			for _, line := range legacy {
+				removeDrop[line] = true
+			}
 		}
 	}
 	if len(removeDrop) > 0 {
