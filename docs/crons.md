@@ -222,6 +222,6 @@ Version note: v0.11.1 to v0.11.3 all shipped on 2026-10-30, and `backend: hc` ar
 ## Non-goals
 
 - tackroom runs no scheduler daemon. Owned jobs are native units that the host's scheduler fires (section 4).
-- Scheduled jobs are not a sixth sync surface. `cron collect` and `cron sync` read harness state and write only to the user's Healthchecks instance; it never writes harness configuration.
+- Scheduled jobs are not a sixth sync surface. `cron collect` and `cron sync` read harness state and write only to the user's Healthchecks instance, and `cron apply` writes only units with its own prefix; none of them writes harness configuration, `automations.yaml` included.
 - Neither `cron collect` nor the view fixes, unloads or edits a job. They report.
 - No hosted monitoring service, and no job output leaving the user's own infrastructure.
