@@ -1,6 +1,6 @@
 # Scheduled job inventory (`tackroom cron collect`)
 
-Status: `tackroom cron collect` and the Crons tab in `tackroom view` are the first piece; the manifest and Healthchecks sync follow.
+Status: `tackroom cron collect` and the Crons tab in `tackroom view` are the first piece; the manifest and Healthchecks sync follow. `cron apply` (section 4) is proposed.
 
 ## Problem
 
@@ -21,7 +21,7 @@ So the design has two layers: tackroom collects (the provider-agnostic part noth
 
 ## Naming
 
-`tackroom cron` already exists: with flags only (`--interval`, `--deps`, `--remove`) it installs tackroom's own self-update crontab entry, and it keeps doing that. The inventory is its `collect` subcommand, so all scheduled-job commands live under one word: plain `cron` manages the one job tackroom owns, `cron collect` observes every job on every host, and `cron sync` (section 3) comes later.
+`tackroom cron` already exists: with flags only (`--interval`, `--deps`, `--remove`) it installs tackroom's own self-update crontab entry, and it keeps doing that. The inventory is its `collect` subcommand, so all scheduled-job commands live under one word: plain `cron` manages tackroom's own self-update entry, `cron collect` observes every job on every host, `cron apply` (section 4) installs declared jobs, and `cron sync` (section 3) comes later.
 
 ## 1. collect
 
@@ -142,9 +142,54 @@ Jobs that tackroom itself installs later can carry `created_by` from the start; 
 
 Exit codes and log mtimes catch jobs that stopped running, not jobs that run and do nothing. Jobs with an external effect should check that effect, for example with Healthchecks `success_kw` on the ping body.
 
+## 4. Owned jobs: `cron apply`
+
+A job declared with a `schedule` and a `command` is owned: tackroom writes it as a native unit of the host's own scheduler and removes it when the declaration goes. tackroom runs no daemon of its own; launchd, systemd or cron fires the job.
+
+```yaml
+crons:
+  scheduler: auto          # auto | launchd | systemd | crontab
+  jobs:
+    knowledge-sync:
+      host: m1             # matched against crons.self; omitted means every machine
+      schedule: "*/30 * * * *"
+      command: [~/.local/bin/knowledge-sync]
+      created_by: human
+```
+
+`crons.self` in each machine's `tackroom.local.yaml` names that machine (`self: m1`), so one shared manifest says which machine runs what. `tackroom cron apply [--dry-run]` installs the owned jobs for this machine, prints the diff first, and unloads and deletes owned units that are no longer declared. Owned units carry a fixed prefix (`dev.tackroom.<id>` for launchd, `tackroom-<id>` for systemd, a `# tackroom:<id>` marker for crontab), and `apply` touches nothing without it.
+
+### Backends
+
+| `scheduler` | Unit | Missed while asleep or off |
+| --- | --- | --- |
+| `launchd` (default on macOS) | `~/Library/LaunchAgents/dev.tackroom.<id>.plist` with `StartCalendarInterval`, loaded with `launchctl bootstrap gui/$UID` | Runs once on wake. launchd.plist(5): unlike cron, launchd starts a calendar job the next time the computer wakes, coalescing missed intervals into one run. |
+| `systemd` (default on Linux) | `tackroom-<id>.timer` with `OnCalendar=` and `Persistent=true`, plus a `Type=oneshot` service | Runs once at boot or resume (`Persistent=true`). |
+| `crontab` | One line with the marker | Skipped. Only when set explicitly. |
+
+`auto` picks launchd on macOS and systemd on Linux when `systemctl --user` answers, else crontab.
+
+The schedule is always a 5-field cron expression and is translated, never passed through:
+
+- launchd: each restricted field becomes a key (`Minute`, `Hour`, `Day`, `Month`, `Weekday`) and lists expand into an array of dictionaries. An expression that would expand past 64 dictionaries is refused. `StartInterval` is never used, because it drops firings during sleep.
+- An expression that restricts both day of month and day of week is refused: cron runs it when either matches, and the other backends cannot say that.
+- systemd: `0 7 * * 2,5` becomes `OnCalendar=Tue,Fri *-*-* 07:00:00`.
+
+Output goes to `~/.local/state/tackroom/cron/<id>.log` (launchd `StandardOutPath`/`StandardErrorPath`, a redirect for crontab); systemd keeps it in the journal. Each owned job enters the collected inventory with `created_by` set, like any other record.
+
+tackroom writes every plist key itself, so the case-sensitive key trap in section 1 cannot happen in an owned job. One trap stays outside its reach: launchd kills a job whose binary was overwritten in place (`last exit reason = OS_REASON_CODESIGNING`). `cron collect` flags it; install binaries by writing a new file and renaming it over the old one.
+
+### tackroom's own entry
+
+Plain `tackroom cron` (self-update) becomes the built-in owned job `tackroom-pull` on the same backend. Its flags keep working, and the first `apply` removes the old crontab line, legacy spellings included.
+
+### Considered: herdr-automations
+
+[herdr-automations](https://github.com/DnzzL/herdr-automations) (MIT) schedules agent prompts: a prompt, a cron line and a fresh git worktree per run, in Herdr panes, with its own daemon installed as a launchd or systemd service that polls the wall clock every 30 seconds, so runs missed during sleep fire on wake. It fits recurring agent chores, not plain commands, needs Herdr (or the Herdr app's `hc`) running, and is young (v0.11.1 to v0.11.3 all shipped on 2026-10-30). It is not a backend here. If agent jobs move to it, `cron collect` gains a `herdr-automations` source that reads its `automations.yaml` and `history.jsonl`.
+
 ## Non-goals
 
-- tackroom does not become a scheduler. Plain `tackroom cron` keeps its one entry.
+- tackroom runs no scheduler daemon. Owned jobs are native units that the host's scheduler fires (section 4).
 - Scheduled jobs are not a sixth sync surface. `cron collect` and `cron sync` read harness state and write only to the user's Healthchecks instance; it never writes harness configuration.
 - Neither `cron collect` nor the view fixes, unloads or edits a job. They report.
 - No hosted monitoring service, and no job output leaving the user's own infrastructure.
