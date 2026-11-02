@@ -70,6 +70,19 @@ if [ -e "$c/codex-dev.db" ]; then
 	done
 fi
 
+ha_conf="${HERDR_PLUGIN_CONFIG_DIR:-$HOME/.config/herdr/plugins/config/dnzzl.automations}"
+ha_state="${HERDR_PLUGIN_STATE_DIR:-$HOME/.local/state/herdr/plugins/dnzzl.automations}"
+if [ -e "$ha_conf/automations.yaml" ]; then
+	run ha-config "" cat "$ha_conf/automations.yaml"
+	# Read even when the file test fails: a missing file means no runs yet,
+	# a permission error means the runs are unknown.
+	run ha-history "" cat "$ha_state/history.jsonl"
+	run ha-pid "" cat "$ha_state/daemon.pid"
+	pid=$(cat "$ha_state/daemon.pid" 2>/dev/null)
+	# args, not comm: Linux truncates comm to 15 characters.
+	[ -n "$pid" ] && run ha-daemon "" ps -o args= -p "$pid"
+fi
+
 if [ "$os" = Darwin ]; then
 	s="$HOME/Library/Application Support/Claude/claude-code-sessions"
 	for f in "$s"/*/*/scheduled-tasks.json; do
