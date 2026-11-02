@@ -37,7 +37,8 @@ func patchCodexMCPServer(target mcpTarget, server mcpServerConfig, home string) 
 			return err
 		}
 	}
-	updated := upsertTOMLSectionIncludingDescendants(content, header, keepNativeCodexKeys(content, server.Name, section))
+	section = keepNativeCodexKeys(content, server, section)
+	updated := upsertTOMLSectionIncludingDescendants(removeCodexDescendants(content, server.Name), header, section)
 	if updated == content {
 		return nil
 	}
@@ -56,7 +57,8 @@ var codexManagedKeys = map[string]struct{}{
 }
 
 // keepNativeCodexKeys carries over Codex keys tackroom does not manage (env_vars, startup_timeout_sec, tools.*) so a rewrite cannot drop them.
-func keepNativeCodexKeys(content string, name string, section string) string {
+func keepNativeCodexKeys(content string, server mcpServerConfig, section string) string {
+	name := server.Name
 	entry, ok, err := decodeCodexMCPEntry("", []byte(content), name)
 	if !ok || (err != nil && !errors.Is(err, errCodexEntryRepairable)) {
 		return section
@@ -66,8 +68,8 @@ func keepNativeCodexKeys(content string, name string, section string) string {
 		if _, managed := codexManagedKeys[key]; managed {
 			continue
 		}
-		// The upsert leaves [[...]] descendants in place, so re-emitting them would duplicate them.
-		if _, tables := value.([]map[string]interface{}); tables {
+		// Codex refuses env_vars and cwd on a remote entry.
+		if server.URL != "" && (key == "env_vars" || key == "cwd") {
 			continue
 		}
 		extras[key] = value
@@ -98,5 +100,21 @@ func keepNativeCodexKeys(content string, name string, section string) string {
 		out.WriteString(line + "\n")
 	}
 	out.WriteString("\n")
+	return out.String()
+}
+
+// removeCodexDescendants cuts every [mcp_servers.<name>.*] and [[mcp_servers.<name>.*]] table, wherever it sits, because keepNativeCodexKeys re-emits them.
+func removeCodexDescendants(content string, name string) string {
+	prefixes := []string{"[mcp_servers." + name + ".", "[[mcp_servers." + name + "."}
+	var out strings.Builder
+	skipping := false
+	for _, line := range strings.SplitAfter(content, "\n") {
+		if strings.HasPrefix(line, "[") {
+			skipping = strings.HasPrefix(line, prefixes[0]) || strings.HasPrefix(line, prefixes[1])
+		}
+		if !skipping {
+			out.WriteString(line)
+		}
+	}
 	return out.String()
 }
