@@ -258,6 +258,9 @@ func inspectAgent(agent agentConfig, expected map[string]string, repoRoot string
 		// mirror is created, so every expected skill is already managed.
 		report.Managed = append(report.Managed, sortedKeys(expected)...)
 	} else {
+		if err := checkSkillRoot(agent, agentsSkillRoot); err != nil {
+			return report, err
+		}
 		expectedNames := sortedKeys(expected)
 		rootInfo, err := os.Stat(agent.SkillRoot)
 		rootMissing := false
