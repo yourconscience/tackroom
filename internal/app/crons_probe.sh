@@ -72,7 +72,9 @@ fi
 
 ha_conf="${HERDR_PLUGIN_CONFIG_DIR:-$HOME/.config/herdr/plugins/config/dnzzl.automations}"
 ha_state="${HERDR_PLUGIN_STATE_DIR:-$HOME/.local/state/herdr/plugins/dnzzl.automations}"
-if [ -e "$ha_conf/automations.yaml" ]; then
+# Test the folder, not the file: a folder the probe cannot search makes the
+# file test fail, and that is an unreadable source, not an empty one.
+if [ -e "$ha_conf" ]; then
 	run ha-config "" cat "$ha_conf/automations.yaml"
 	# Read even when the file test fails: a missing file means no runs yet,
 	# a permission error means the runs are unknown.

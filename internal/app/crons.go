@@ -1290,7 +1290,7 @@ var herdrAutomationsProcess = regexp.MustCompile(`^(?:.*/)?herdr-automations(?:\
 // is alive when the pid in daemon.pid is a running herdr-automations.
 func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 	s, ok := p.one("ha-config", "")
-	if !ok {
+	if !ok || (s.RC != 0 && strings.Contains(s.Body, "No such file")) {
 		return nil, cronAccess{Detail: "no automations.yaml"}
 	}
 	var doc struct {
@@ -1328,10 +1328,18 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 	if haveHistory && h.RC != 0 {
 		details = append(details, "history.jsonl unreadable: "+firstLine(h.Body))
 	}
+	malformed := 0
 	if haveHistory && h.RC == 0 {
 		for _, line := range strings.Split(h.Body, "\n") {
 			var e event
-			if json.Unmarshal([]byte(line), &e) != nil || e.Seen {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			if json.Unmarshal([]byte(line), &e) != nil {
+				malformed++
+				continue
+			}
+			if e.Seen {
 				continue
 			}
 			switch e.Status {
@@ -1348,6 +1356,9 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 		}
 	}
 
+	if malformed > 0 {
+		details = append(details, fmt.Sprintf("%d malformed history line(s) skipped; run counts may be incomplete", malformed))
+	}
 	alive, known := false, true
 	if pid, ok := p.one("ha-pid", ""); ok && pid.RC != 0 && !strings.Contains(pid.Body, "No such file") {
 		known = false // daemon.pid exists but cannot be read
