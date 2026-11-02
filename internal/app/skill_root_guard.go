@@ -2,16 +2,18 @@ package app
 
 import (
 	"fmt"
-	"path/filepath"
+	"os"
 )
 
-// checkSkillRoots refuses a skill_root that resolves to the canonical skills directory, where sync would replace each skill with a link to itself.
-func checkSkillRoots(repoRoot string, selected []agentConfig) error {
-	canonical := filepath.Join(repoRoot, "skills")
-	for _, agent := range selected {
-		if sameResolvedPath(agent.SkillRoot, canonical) {
-			return fmt.Errorf("config agent %s: skill_root %s is the canonical skills directory, so sync would replace its skills with links to themselves; point skill_root elsewhere", agent.Name, agent.SkillRoot)
-		}
+// checkSkillRoot refuses a mirrored skill_root that is the canonical skills directory, where sync would replace each skill with a link to itself.
+func checkSkillRoot(agent agentConfig, canonical string) error {
+	root, err := os.Stat(agent.SkillRoot)
+	if err != nil {
+		return nil
 	}
-	return nil
+	skills, err := os.Stat(canonical)
+	if err != nil || !os.SameFile(root, skills) {
+		return nil
+	}
+	return fmt.Errorf("skill_root %s is the canonical skills directory, so sync would replace its skills with links to themselves; point skill_root elsewhere", agent.SkillRoot)
 }
