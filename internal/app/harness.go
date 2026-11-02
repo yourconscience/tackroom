@@ -144,6 +144,10 @@ func initHarnesses() {
 				inspect:   inspectClaudeHook,
 				patch:     patchClaudeHook,
 			},
+			// Claude Code reads AGENTS.md only as project instructions, and only
+			// where no CLAUDE.md exists in the working directory or above it, so
+			// ~/.claude/AGENTS.md would not load outside $HOME or in a repo with
+			// its own CLAUDE.md. The user-level file stays ~/.claude/CLAUDE.md.
 			RootInstructions: &rootInstructionsCapability{
 				Path:     func(home string) string { return filepath.Join(home, ".claude", "CLAUDE.md") },
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },

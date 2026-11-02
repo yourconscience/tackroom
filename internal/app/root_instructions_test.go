@@ -159,3 +159,17 @@ func TestApplyAgentRootInstructionSyncClaudeAndCodex(t *testing.T) {
 		}
 	}
 }
+
+// Claude Code 2.1.277+ reads a project's AGENTS.md only when no CLAUDE.md or
+// .claude/CLAUDE.md sits in the working directory or above it.
+func TestRepoHasNoClaudeMDShadowingAgentsMD(t *testing.T) {
+	repoRoot := filepath.Join("..", "..")
+	if _, err := os.Stat(filepath.Join(repoRoot, "AGENTS.md")); err != nil {
+		t.Fatalf("repo AGENTS.md: %v", err)
+	}
+	for _, name := range []string{"CLAUDE.md", filepath.Join(".claude", "CLAUDE.md")} {
+		if _, err := os.Lstat(filepath.Join(repoRoot, name)); err == nil {
+			t.Fatalf("%s would stop Claude Code from reading AGENTS.md", name)
+		}
+	}
+}
