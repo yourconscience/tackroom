@@ -57,3 +57,4 @@ Keep `README.md`, `skills/tackroom/SKILL.md`, CLI help, the public template, and
 - Use short, single-line commit messages without bot attribution trailers.
 - Do not commit secrets, local overlays, external caches, generated memory, or native harness state.
 - Pull requests must pass the full repository suite before merge.
+- Follow `CONTRIBUTING.md` and the pull request template when opening a pull request.
