@@ -33,7 +33,6 @@ const (
 
 var (
 	ownedCronIDPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{0,62}$`)
-	cronBackends       = []string{cronBackendLaunchd, cronBackendSystemd, cronBackendCrontab}
 	// builtinCronIDs are the jobs plain `tackroom cron` owns; apply never
 	// prunes them and the manifest cannot declare them.
 	builtinCronIDs = map[string]bool{"tackroom-pull": true, "tackroom-deps": true}
@@ -208,7 +207,7 @@ func lockCronApply(home string) (func(), error) {
 		f.Close()
 		return nil, fmt.Errorf("lock %s: %w", f.Name(), err)
 	}
-	return func() { syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
+	return func() { _ = syscall.Flock(int(f.Fd()), syscall.LOCK_UN); f.Close() }, nil
 }
 
 func cronLogPath(home, id string) string {
