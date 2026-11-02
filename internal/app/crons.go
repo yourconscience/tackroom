@@ -70,8 +70,10 @@ type cronsScanResult struct {
 }
 
 type cronsManifest struct {
-	Hosts []string                   `yaml:"hosts"`
-	Jobs  map[string]cronManifestJob `yaml:"jobs"`
+	Hosts     []string                   `yaml:"hosts"`
+	Self      string                     `yaml:"self"`
+	Scheduler string                     `yaml:"scheduler"`
+	Jobs      map[string]cronManifestJob `yaml:"jobs"`
 }
 
 type cronManifestJob struct {
@@ -80,6 +82,9 @@ type cronManifestJob struct {
 	CreatedBy  string   `yaml:"created_by"`
 	Connectors []string `yaml:"connectors"`
 	Effect     string   `yaml:"effect"`
+	// Schedule and Command make the job owned: `cron apply` installs it.
+	Schedule string   `yaml:"schedule"`
+	Command  []string `yaml:"command"`
 }
 
 var cronSources = []string{"launchd", "crontab", "systemd", "hermes", "codex", "claude-desktop", "herdr-automations", "claude-cloud", "openbot"}
@@ -161,7 +166,9 @@ func loadCronsManifest(override string) (cronsManifest, error) {
 	// Hosts differ per machine, so tackroom.local.yaml may set its own
 	// crons.hosts; its jobs entries override the shared ones by id.
 	localPath := filepath.Join(filepath.Dir(path), "tackroom.local.yaml")
-	if data, err := os.ReadFile(localPath); err == nil {
+	if data, err := os.ReadFile(localPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return cronsManifest{}, err
+	} else if err == nil {
 		var local struct {
 			Crons cronsManifest `yaml:"crons"`
 		}
@@ -170,6 +177,12 @@ func loadCronsManifest(override string) (cronsManifest, error) {
 		}
 		if len(local.Crons.Hosts) > 0 {
 			doc.Crons.Hosts = local.Crons.Hosts
+		}
+		if local.Crons.Self != "" {
+			doc.Crons.Self = local.Crons.Self
+		}
+		if local.Crons.Scheduler != "" {
+			doc.Crons.Scheduler = local.Crons.Scheduler
 		}
 		for id, job := range local.Crons.Jobs {
 			if doc.Crons.Jobs == nil {
@@ -206,6 +219,18 @@ func scanCrons(hosts []string, manifest cronsManifest) cronsScanResult {
 // matches by id, narrowed by host and source when set. A declared job that is
 // not found is reported missing only when every place it could live was read.
 func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAccess) []cronJob {
+	for i := range jobs {
+		if id, ok := ownedCronID(jobs[i]); ok {
+			jobs[i].ID, jobs[i].Name = id, id
+			if jobs[i].CreatedBy == "" {
+				jobs[i].CreatedBy = "tackroom"
+			}
+		}
+	}
+	// The scanned host "local" is this machine, which the manifest calls crons.self.
+	sameHost := func(declared, scanned string) bool {
+		return declared == scanned || (scanned == "local" && declared != "" && declared == manifest.Self)
+	}
 	ids := make([]string, 0, len(manifest.Jobs))
 	for id := range manifest.Jobs {
 		ids = append(ids, id)
@@ -216,7 +241,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 		matched := false
 		for i := range jobs {
 			job := &jobs[i]
-			if job.ID != id || (entry.Host != "" && entry.Host != job.Host) || (entry.Source != "" && entry.Source != job.Source) {
+			if job.ID != id || (entry.Host != "" && !sameHost(entry.Host, job.Host)) || (entry.Source != "" && entry.Source != job.Source) {
 				continue
 			}
 			matched = true
@@ -230,7 +255,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 			}
 			job.Effect = entry.Effect
 		}
-		if matched || !manifestEntryRead(entry, access) {
+		if matched || !manifestEntryRead(entry, access, sameHost) {
 			continue
 		}
 		jobs = append(jobs, cronJob{
@@ -245,10 +270,10 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 // manifestEntryRead reports whether every host and source a declared job
 // could live on was read. With no source set, documented gaps (not_scanned)
 // do not count against it, but an unreadable source does.
-func manifestEntryRead(entry cronManifestJob, access []cronAccess) bool {
+func manifestEntryRead(entry cronManifestJob, access []cronAccess, sameHost func(declared, scanned string) bool) bool {
 	seen := false
 	for _, a := range access {
-		if entry.Host != "" && a.Host != entry.Host {
+		if entry.Host != "" && !sameHost(entry.Host, a.Host) {
 			continue
 		}
 		if entry.Source != "" && a.Source != entry.Source {
@@ -263,6 +288,28 @@ func manifestEntryRead(entry cronManifestJob, access []cronAccess) bool {
 		}
 	}
 	return seen
+}
+
+// ownedCronID maps a unit `cron apply` installed back to its manifest id.
+func ownedCronID(job cronJob) (string, bool) {
+	var id string
+	switch job.Source {
+	case "launchd":
+		id = strings.TrimPrefix(job.ID, ownedLaunchdPrefix)
+		if id == job.ID {
+			return "", false
+		}
+	case "systemd":
+		id = strings.TrimSuffix(strings.TrimPrefix(job.ID, ownedSystemdPrefix), ".timer")
+		if id == job.ID {
+			return "", false
+		}
+	case "crontab":
+		return crontabOwnedID(job.Command)
+	default:
+		return "", false
+	}
+	return id, ownedCronIDPattern.MatchString(id)
 }
 
 func removeString(list []string, value string) []string {
@@ -1243,7 +1290,7 @@ var herdrAutomationsProcess = regexp.MustCompile(`^(?:.*/)?herdr-automations(?:\
 // is alive when the pid in daemon.pid is a running herdr-automations.
 func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 	s, ok := p.one("ha-config", "")
-	if !ok {
+	if !ok || (s.RC != 0 && strings.Contains(s.Body, "No such file")) {
 		return nil, cronAccess{Detail: "no automations.yaml"}
 	}
 	var doc struct {
@@ -1281,10 +1328,18 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 	if haveHistory && h.RC != 0 {
 		details = append(details, "history.jsonl unreadable: "+firstLine(h.Body))
 	}
+	malformed := 0
 	if haveHistory && h.RC == 0 {
 		for _, line := range strings.Split(h.Body, "\n") {
 			var e event
-			if json.Unmarshal([]byte(line), &e) != nil || e.Seen {
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			if json.Unmarshal([]byte(line), &e) != nil {
+				malformed++
+				continue
+			}
+			if e.Seen {
 				continue
 			}
 			switch e.Status {
@@ -1301,6 +1356,9 @@ func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
 		}
 	}
 
+	if malformed > 0 {
+		details = append(details, fmt.Sprintf("%d malformed history line(s) skipped; run counts may be incomplete", malformed))
+	}
 	alive, known := false, true
 	if pid, ok := p.one("ha-pid", ""); ok && pid.RC != 0 && !strings.Contains(pid.Body, "No such file") {
 		known = false // daemon.pid exists but cannot be read

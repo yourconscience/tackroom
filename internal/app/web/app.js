@@ -527,7 +527,7 @@ function renderUnmanaged(root) {
 }
 
 // ---------- crons ----------
-const CRON_OK_STATUS = new Set(['ok', 'success', 'succeeded', 'completed', 'done']);
+const CRON_OK_STATUS = new Set(['ok', 'success', 'succeeded', 'completed', 'done', 'cancelled', 'skipped']);
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STRIP_HOURS = 24;
 
@@ -767,14 +767,15 @@ function hostCard(host, data) {
   const jobs = data.jobs.filter((job) => job.host === host);
   const counts = Object.fromEntries(HEALTH_ORDER.map((kind) => [kind, 0]));
   jobs.forEach((job) => { counts[jobHealth(job)] += 1; });
-  const sources = access.filter((entry) => entry.state === 'found' || entry.state === 'unreadable');
+  // An empty herdr-automations source still says whether its scheduler runs.
+  const sources = access.filter((entry) => entry.state === 'found' || entry.state === 'unreadable' || (entry.source === 'herdr-automations' && entry.state === 'empty' && entry.detail && entry.detail.startsWith('scheduler')));
   return h('section', {class: 'hero-card'},
     h('div', {class: 'hero-head'}, icon('i-laptop'), h('h2', {text: hostName(host)}), unreachable ? h('span', {class: 'pill bad', title: access[0].detail, text: 'unreachable'}) : null),
     h('div', {class: 'host-body'},
       ring(HEALTH_ORDER.map((kind) => ({kind, value: counts[kind], label: HEALTH[kind][1].toLowerCase()})), jobs.length, 'jobs'),
       h('ul', {class: 'health-list'}, HEALTH_ORDER.filter((kind) => counts[kind]).map((kind) => h('li', {class: kind}, icon(HEALTH[kind][0]), h('span', {text: HEALTH[kind][1]}), h('b', {text: String(counts[kind])}))))),
     h('div', {class: 'source-row'}, sources.map((entry) => h('span', {class: entry.state === 'unreadable' ? 'src bad' : 'src', title: `${entry.source}: ${entry.state === 'found' ? plural(entry.jobs, 'job') + (entry.detail ? `, ${entry.detail}` : '') : entry.detail || entry.state}`},
-      icon(SOURCE_ICONS[entry.source] || 'i-crons'), entry.source, h('b', {text: entry.state === 'found' ? String(entry.jobs) : '!'})))));
+      icon(SOURCE_ICONS[entry.source] || 'i-crons'), entry.source, h('b', {text: entry.state === 'unreadable' ? '!' : String(entry.jobs)})))));
 }
 function upNextCard(jobs) {
   const now = Date.now();

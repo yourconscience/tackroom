@@ -1,6 +1,6 @@
 # Scheduled job inventory (`tackroom cron collect`)
 
-Status: `tackroom cron collect` and the Crons tab in `tackroom view` are the first piece; the manifest and Healthchecks sync follow. `cron apply` (section 4) is proposed.
+Status: `tackroom cron collect`, the Crons tab in `tackroom view`, `cron apply` (section 4) and the herdr-automations source (section 5) are built; Healthchecks sync follows.
 
 ## Problem
 
@@ -161,7 +161,7 @@ crons:
 ### Identity and scope
 
 - `crons.self` in each machine's `tackroom.local.yaml` names that machine (`self: m1`), so one shared manifest says which machine runs what. `crons.scheduler` may also be set in the local overlay; the overlay wins.
-- A job is in scope on this machine when its `host` is unset or equals `crons.self`. If any job has a `host` and `crons.self` is unset, `apply` stops before changing anything.
+- A job is in scope on this machine when its `host` is unset or equals `crons.self`. If any owned job has a `host` and `crons.self` is unset, `apply` stops before changing anything. Inventory-only entries (no `schedule` or `command`) may name any host.
 - Job ids match `^[a-z0-9][a-z0-9-]{0,62}$`. Any other id is refused, because the id becomes part of file names and unit labels.
 - The manifest loader keeps `scheduler`, `self`, `schedule` and `command`; today's decode types drop them, so they are extended, and the local overlay merges `self` and `scheduler`.
 
@@ -205,7 +205,7 @@ tackroom writes every plist key itself, so the case-sensitive key trap in sectio
 
 ### tackroom's own entries
 
-The two jobs plain `tackroom cron` installs today become built-in owned jobs on the selected backend: `tackroom-pull` (every 30 minutes by default) and, with `--deps`, `tackroom-deps` (weekly). `tackroom cron [--interval] [--deps] [--remove]` edits those built-in entries and runs `apply` for them; it no longer writes crontab directly, so the self-update cannot end up installed twice. The first `apply` lists the old crontab lines in its plan and removes them. A line counts as old when its command, after an optional `. "$HOME/.profile" 2>/dev/null;` prefix, is any executable whose base name is `tackroom` (quoted or not), followed by `pull`, `sync deps` or the legacy `deps update`, and an optional `--config <path>`. The match is on that whole shape, not a substring of today's resolved command, so a line with another binary path or `--config` value is found too, and a different command that merely contains it is not.
+The two jobs plain `tackroom cron` installs today become built-in owned jobs on the selected backend: `tackroom-pull` (every 30 minutes by default) and, with `--deps`, `tackroom-deps` (weekly). `tackroom cron [--interval] [--deps] [--remove]` installs, replaces or removes that one built-in job through the same planner as `apply`, on the selected backend and off every other; it no longer writes crontab directly, so the self-update cannot end up installed twice. `apply` never prunes the built-in ids, and the manifest cannot declare them. The first plain `tackroom cron` lists the old crontab lines in its plan and removes them as it installs the built-in job; `apply` leaves them, so the self-update is never removed without a replacement. A line counts as old when its command, after an optional `. "$HOME/.profile" 2>/dev/null;` prefix, is any executable whose base name is `tackroom` (quoted or not), followed by `pull`, `sync deps` or the legacy `deps update`, and an optional `--config <path>`. The match is on that whole shape, not a substring of today's resolved command, so a line with another binary path or `--config` value is found too, and a different command that merely contains it is not.
 
 ## 5. herdr-automations
 
