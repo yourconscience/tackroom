@@ -771,45 +771,6 @@ func inspectCodexMCPServer(target mcpTarget, server mcpServerConfig, home string
 	return stateSynced, nil
 }
 
-func patchCodexMCPServer(target mcpTarget, server mcpServerConfig, home string) error {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	content := ""
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("read %s: %w", configPath, err)
-		}
-	} else {
-		content = string(data)
-		entry, _, err := decodeCodexMCPEntry(configPath, data, server.Name)
-		if err != nil && !errors.Is(err, errCodexEntryRepairable) {
-			return err
-		}
-		server.Env = mergeManagedEnv(tomlEntryEnv(entry), server.Env)
-		if server.URL != "" {
-			server = keepNativeRemoteSecrets(server, entry, target.remote.codexHeaders)
-		}
-	}
-	header := fmt.Sprintf("[mcp_servers.%s]", server.Name)
-	section := renderCodexMCPSection(server)
-	if server.URL != "" {
-		if section, err = renderRemoteTOMLSection(server, target.remote.codexHeaders); err != nil {
-			return err
-		}
-	}
-	updated := upsertTOMLSectionIncludingDescendants(content, header, section)
-	if updated == content {
-		return nil
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(configPath), err)
-	}
-	if err := os.WriteFile(configPath, []byte(updated), 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return nil
-}
-
 func readCodexMCPServer(target mcpTarget, name string, home string) (mcpServerConfig, error) {
 	configPath := target.configPath(home)
 	data, err := os.ReadFile(configPath)
