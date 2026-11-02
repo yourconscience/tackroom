@@ -70,8 +70,10 @@ type cronsScanResult struct {
 }
 
 type cronsManifest struct {
-	Hosts []string                   `yaml:"hosts"`
-	Jobs  map[string]cronManifestJob `yaml:"jobs"`
+	Hosts     []string                   `yaml:"hosts"`
+	Self      string                     `yaml:"self"`
+	Scheduler string                     `yaml:"scheduler"`
+	Jobs      map[string]cronManifestJob `yaml:"jobs"`
 }
 
 type cronManifestJob struct {
@@ -80,9 +82,12 @@ type cronManifestJob struct {
 	CreatedBy  string   `yaml:"created_by"`
 	Connectors []string `yaml:"connectors"`
 	Effect     string   `yaml:"effect"`
+	// Schedule and Command make the job owned: `cron apply` installs it.
+	Schedule string   `yaml:"schedule"`
+	Command  []string `yaml:"command"`
 }
 
-var cronSources = []string{"launchd", "crontab", "systemd", "hermes", "codex", "claude-desktop", "claude-cloud", "openbot"}
+var cronSources = []string{"launchd", "crontab", "systemd", "hermes", "codex", "claude-desktop", "herdr-automations", "claude-cloud", "openbot"}
 
 func runCronCollect(args []string) error {
 	fs := flag.NewFlagSet("cron collect", flag.ContinueOnError)
@@ -161,7 +166,9 @@ func loadCronsManifest(override string) (cronsManifest, error) {
 	// Hosts differ per machine, so tackroom.local.yaml may set its own
 	// crons.hosts; its jobs entries override the shared ones by id.
 	localPath := filepath.Join(filepath.Dir(path), "tackroom.local.yaml")
-	if data, err := os.ReadFile(localPath); err == nil {
+	if data, err := os.ReadFile(localPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return cronsManifest{}, err
+	} else if err == nil {
 		var local struct {
 			Crons cronsManifest `yaml:"crons"`
 		}
@@ -170,6 +177,12 @@ func loadCronsManifest(override string) (cronsManifest, error) {
 		}
 		if len(local.Crons.Hosts) > 0 {
 			doc.Crons.Hosts = local.Crons.Hosts
+		}
+		if local.Crons.Self != "" {
+			doc.Crons.Self = local.Crons.Self
+		}
+		if local.Crons.Scheduler != "" {
+			doc.Crons.Scheduler = local.Crons.Scheduler
 		}
 		for id, job := range local.Crons.Jobs {
 			if doc.Crons.Jobs == nil {
@@ -206,6 +219,18 @@ func scanCrons(hosts []string, manifest cronsManifest) cronsScanResult {
 // matches by id, narrowed by host and source when set. A declared job that is
 // not found is reported missing only when every place it could live was read.
 func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAccess) []cronJob {
+	for i := range jobs {
+		if id, ok := ownedCronID(jobs[i]); ok {
+			jobs[i].ID, jobs[i].Name = id, id
+			if jobs[i].CreatedBy == "" {
+				jobs[i].CreatedBy = "tackroom"
+			}
+		}
+	}
+	// The scanned host "local" is this machine, which the manifest calls crons.self.
+	sameHost := func(declared, scanned string) bool {
+		return declared == scanned || (scanned == "local" && declared != "" && declared == manifest.Self)
+	}
 	ids := make([]string, 0, len(manifest.Jobs))
 	for id := range manifest.Jobs {
 		ids = append(ids, id)
@@ -216,7 +241,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 		matched := false
 		for i := range jobs {
 			job := &jobs[i]
-			if job.ID != id || (entry.Host != "" && entry.Host != job.Host) || (entry.Source != "" && entry.Source != job.Source) {
+			if job.ID != id || (entry.Host != "" && !sameHost(entry.Host, job.Host)) || (entry.Source != "" && entry.Source != job.Source) {
 				continue
 			}
 			matched = true
@@ -230,7 +255,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 			}
 			job.Effect = entry.Effect
 		}
-		if matched || !manifestEntryRead(entry, access) {
+		if matched || !manifestEntryRead(entry, access, sameHost) {
 			continue
 		}
 		jobs = append(jobs, cronJob{
@@ -245,10 +270,10 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 // manifestEntryRead reports whether every host and source a declared job
 // could live on was read. With no source set, documented gaps (not_scanned)
 // do not count against it, but an unreadable source does.
-func manifestEntryRead(entry cronManifestJob, access []cronAccess) bool {
+func manifestEntryRead(entry cronManifestJob, access []cronAccess, sameHost func(declared, scanned string) bool) bool {
 	seen := false
 	for _, a := range access {
-		if entry.Host != "" && a.Host != entry.Host {
+		if entry.Host != "" && !sameHost(entry.Host, a.Host) {
 			continue
 		}
 		if entry.Source != "" && a.Source != entry.Source {
@@ -263,6 +288,28 @@ func manifestEntryRead(entry cronManifestJob, access []cronAccess) bool {
 		}
 	}
 	return seen
+}
+
+// ownedCronID maps a unit `cron apply` installed back to its manifest id.
+func ownedCronID(job cronJob) (string, bool) {
+	var id string
+	switch job.Source {
+	case "launchd":
+		id = strings.TrimPrefix(job.ID, ownedLaunchdPrefix)
+		if id == job.ID {
+			return "", false
+		}
+	case "systemd":
+		id = strings.TrimSuffix(strings.TrimPrefix(job.ID, ownedSystemdPrefix), ".timer")
+		if id == job.ID {
+			return "", false
+		}
+	case "crontab":
+		return crontabOwnedID(job.Command)
+	default:
+		return "", false
+	}
+	return id, ownedCronIDPattern.MatchString(id)
 }
 
 func removeString(list []string, value string) []string {
@@ -454,6 +501,8 @@ func (p *probeData) collect(source string) ([]cronJob, cronAccess) {
 			return nil, cronAccess{State: "not_scanned", Detail: "desktop app state is read on macOS only"}
 		}
 		return p.claudeDesktop()
+	case "herdr-automations":
+		return p.herdrAutomations()
 	case "claude-cloud":
 		return nil, cronAccess{State: "not_scanned", Detail: "cloud routines have no on-disk state; list them from a Claude session"}
 	case "openbot":
@@ -685,7 +734,7 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 			job.Inferred = append(job.Inferred, "last_run")
 		}
 
-		running := ""
+		running, exitReason := "", ""
 		if lc, ok := p.one("launchctl", s.Key); !ok || lc.RC != 0 {
 			job.State = "not_loaded"
 		} else {
@@ -708,6 +757,8 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 					if n, err := strconv.Atoi(code); err == nil {
 						job.LastExit = &n
 					}
+				case "last exit reason": // the kernel killed it, e.g. OS_REASON_CODESIGNING
+					exitReason = v
 				}
 			}
 		}
@@ -717,17 +768,21 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 		if !scheduled {
 			// Services (KeepAlive, RunAtLoad, WatchPaths) are not schedules;
 			// they are reported only when their last exit was non-zero.
-			if job.LastExit == nil || *job.LastExit == 0 || job.State == "disabled" {
+			if (job.LastExit == nil || *job.LastExit == 0) && exitReason == "" || job.State == "disabled" {
 				continue
 			}
 			job.Schedule = launchdTrigger(plist)
 			job.State, job.LastStatus = "service", running
 			job.Inferred = append(job.Inferred, "state")
-			if plist["KeepAlive"] != nil && plist["KeepAlive"] != false && job.Runs != nil && *job.Runs >= 10 {
+			if exitReason != "" {
+				job.Problems = append(job.Problems, "last run killed by the system: "+exitReason)
+			} else if plist["KeepAlive"] != nil && plist["KeepAlive"] != false && job.Runs != nil && *job.Runs >= 10 {
 				job.Problems = append(job.Problems, fmt.Sprintf("crash loop: KeepAlive restarted it %d times, last exit %d", *job.Runs, *job.LastExit))
 			} else {
 				job.Problems = append(job.Problems, fmt.Sprintf("last exit %d", *job.LastExit))
 			}
+		} else if exitReason != "" && job.State != "disabled" {
+			job.Problems = append(job.Problems, "last run killed by the system: "+exitReason)
 		}
 		jobs = append(jobs, job)
 	}
@@ -1222,6 +1277,154 @@ func (p *probeData) claudeDesktop() ([]cronJob, cronAccess) {
 		}
 	}
 	return jobs, access
+}
+
+// herdr-automations
+
+// herdrAutomationsProcess matches a ps args line whose executable is
+// herdr-automations, also under a path with spaces.
+var herdrAutomationsProcess = regexp.MustCompile(`^(?:.*/)?herdr-automations(?:\s|$)`)
+
+// herdrAutomations reads the plugin's automations.yaml and history.jsonl. An
+// automation's last result is its last terminal history event; the scheduler
+// is alive when the pid in daemon.pid is a running herdr-automations.
+func (p *probeData) herdrAutomations() ([]cronJob, cronAccess) {
+	s, ok := p.one("ha-config", "")
+	if !ok || (s.RC != 0 && strings.Contains(s.Body, "No such file")) {
+		return nil, cronAccess{Detail: "no automations.yaml"}
+	}
+	var doc struct {
+		Paused      bool `yaml:"paused"`
+		Automations []struct {
+			Name     string `yaml:"name"`
+			Cron     string `yaml:"cron"`
+			Agent    string `yaml:"agent"`
+			Template string `yaml:"template"`
+			Workflow string `yaml:"workflow"`
+			Model    string `yaml:"model"`
+			Prompt   string `yaml:"prompt"`
+			Disabled bool   `yaml:"disabled"`
+		} `yaml:"automations"`
+	}
+	if s.RC != 0 || yaml.Unmarshal([]byte(s.Body), &doc) != nil {
+		return nil, cronAccess{State: "unreadable", Detail: "automations.yaml: " + firstLine(s.Body)}
+	}
+
+	type event struct {
+		RunID      string `json:"run_id"`
+		Automation string `json:"automation"`
+		Status     string `json:"status"`
+		At         string `json:"at"`
+		Error      string `json:"error"`
+		Seen       bool   `json:"seen"` // an inbox marker copying an older event
+	}
+	last := map[string]event{}
+	runs := map[string]map[string]bool{}
+	var details []string
+	h, haveHistory := p.one("ha-history", "")
+	if haveHistory && h.RC != 0 && strings.Contains(h.Body, "No such file") {
+		haveHistory = false
+	}
+	if haveHistory && h.RC != 0 {
+		details = append(details, "history.jsonl unreadable: "+firstLine(h.Body))
+	}
+	malformed := 0
+	if haveHistory && h.RC == 0 {
+		for _, line := range strings.Split(h.Body, "\n") {
+			var e event
+			if strings.TrimSpace(line) == "" {
+				continue
+			}
+			if json.Unmarshal([]byte(line), &e) != nil {
+				malformed++
+				continue
+			}
+			if e.Seen {
+				continue
+			}
+			switch e.Status {
+			case "done", "failed", "cancelled":
+				if runs[e.Automation] == nil {
+					runs[e.Automation] = map[string]bool{}
+				}
+				runs[e.Automation][e.RunID] = true
+			case "missed", "skipped", "invalid":
+			default:
+				continue
+			}
+			last[e.Automation] = e
+		}
+	}
+
+	if malformed > 0 {
+		details = append(details, fmt.Sprintf("%d malformed history line(s) skipped; run counts may be incomplete", malformed))
+	}
+	alive, known := false, true
+	if pid, ok := p.one("ha-pid", ""); ok && pid.RC != 0 && !strings.Contains(pid.Body, "No such file") {
+		known = false // daemon.pid exists but cannot be read
+	}
+	if d, ok := p.one("ha-daemon", ""); ok && d.RC == 0 {
+		alive = herdrAutomationsProcess.MatchString(strings.TrimSpace(d.Body))
+	}
+	switch {
+	case !known:
+		details = append([]string{"scheduler state unreadable"}, details...)
+	case alive:
+		details = append([]string{"scheduler running"}, details...)
+	default:
+		details = append([]string{"scheduler not running"}, details...)
+	}
+
+	var jobs []cronJob
+	for _, a := range doc.Automations {
+		job := p.newJob("herdr-automations", a.Name)
+		job.Schedule = a.Cron
+		agent := a.Agent
+		switch {
+		case a.Workflow != "":
+			agent = "workflow " + a.Workflow
+		case a.Template != "":
+			agent = "template " + a.Template
+		case agent == "":
+			agent = "claude"
+		}
+		if a.Model != "" {
+			agent += " " + a.Model
+		}
+		job.Command = agent
+		if prompt := firstLine(strings.TrimSpace(a.Prompt)); prompt != "" {
+			job.Command += ": " + truncate(prompt, 60)
+		}
+		// Unreadable history leaves runs unknown rather than zero.
+		if !haveHistory || h.RC == 0 {
+			n := len(runs[a.Name])
+			job.Runs = &n
+		}
+		if e, ok := last[a.Name]; ok {
+			job.LastRun, job.LastStatus = e.At, e.Status
+			switch e.Status {
+			case "failed", "missed", "invalid":
+				msg := "last run " + e.Status
+				if e.Error != "" {
+					msg += ": " + truncate(e.Error, 160)
+				}
+				job.Problems = append(job.Problems, msg)
+			}
+		}
+		switch {
+		case a.Disabled:
+			job.State = "disabled"
+		case doc.Paused:
+			job.State = "paused"
+		case known && !alive:
+			job.State = "dead"
+			job.Problems = append(job.Problems, "enabled, but the herdr-automations scheduler is not running on this host")
+		}
+		job.Inferred = append(job.Inferred, "state")
+		missedRuns(&job, time.Unix(p.now, 0))
+		jobs = append(jobs, job)
+	}
+	return jobs, cronAccess{Detail: strings.Join(details, "; ")}
 }
 
 func frontmatterValue(body, key string) string {
