@@ -33,23 +33,31 @@ import (
 var cronsProbeScript string
 
 type cronJob struct {
-	Host       string   `json:"host"`
-	Source     string   `json:"source"`
-	ID         string   `json:"id"`
-	Name       string   `json:"name,omitempty"`
-	Schedule   string   `json:"schedule,omitempty"`
-	TZ         string   `json:"tz,omitempty"`
-	Command    string   `json:"command,omitempty"`
-	Log        string   `json:"log,omitempty"`
-	Runs       *int     `json:"runs,omitempty"`
-	LastExit   *int     `json:"last_exit,omitempty"`
-	LastStatus string   `json:"last_status,omitempty"`
-	LastRun    string   `json:"last_run,omitempty"`
-	State      string   `json:"state"`
-	CreatedBy  string   `json:"created_by,omitempty"`
-	Connectors []string `json:"connectors,omitempty"`
-	Effect     string   `json:"effect,omitempty"`
-	Problems   []string `json:"problems,omitempty"`
+	Host     string `json:"host"`
+	Source   string `json:"source"`
+	ID       string `json:"id"`
+	Name     string `json:"name,omitempty"`
+	Schedule string `json:"schedule,omitempty"`
+	TZ       string `json:"tz,omitempty"`
+	Command  string `json:"command,omitempty"`
+	Log      string `json:"log,omitempty"`
+	// Unit and Plist address a launchd job for the view's actions: its label
+	// and plist path. Owned marks a unit `cron apply` installed from crons.jobs.
+	Unit  string `json:"unit,omitempty"`
+	Plist string `json:"plist,omitempty"`
+	Owned bool   `json:"owned,omitempty"`
+	// DeclaredSchedule is the crons.jobs schedule of an owned job, as written;
+	// Schedule is what the scheduler holds after translation.
+	DeclaredSchedule string   `json:"declared_schedule,omitempty"`
+	Runs             *int     `json:"runs,omitempty"`
+	LastExit         *int     `json:"last_exit,omitempty"`
+	LastStatus       string   `json:"last_status,omitempty"`
+	LastRun          string   `json:"last_run,omitempty"`
+	State            string   `json:"state"`
+	CreatedBy        string   `json:"created_by,omitempty"`
+	Connectors       []string `json:"connectors,omitempty"`
+	Effect           string   `json:"effect,omitempty"`
+	Problems         []string `json:"problems,omitempty"`
 	// Inferred names the fields derived by tackroom rather than read from the
 	// scheduler or declared in the manifest.
 	Inferred []string `json:"inferred,omitempty"`
@@ -221,7 +229,7 @@ func scanCrons(hosts []string, manifest cronsManifest) cronsScanResult {
 func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAccess) []cronJob {
 	for i := range jobs {
 		if id, ok := ownedCronID(jobs[i]); ok {
-			jobs[i].ID, jobs[i].Name = id, id
+			jobs[i].ID, jobs[i].Name, jobs[i].Owned = id, id, true
 			if jobs[i].CreatedBy == "" {
 				jobs[i].CreatedBy = "tackroom"
 			}
@@ -254,6 +262,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 				job.Inferred = removeString(job.Inferred, "connectors")
 			}
 			job.Effect = entry.Effect
+			job.DeclaredSchedule = entry.Schedule
 		}
 		if matched || !manifestEntryRead(entry, access, sameHost) {
 			continue
@@ -664,6 +673,7 @@ func (p *probeData) launchd() ([]cronJob, cronAccess) {
 			label = strings.TrimSuffix(filepath.Base(s.Key), ".plist")
 		}
 		job := p.newJob("launchd", label)
+		job.Unit, job.Plist = label, s.Key
 		job.Problems = keyProblems(plist, launchdKnownKeys, "")
 
 		var schedules []string
