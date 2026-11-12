@@ -61,14 +61,3 @@ func TestCoexistenceWarnsOnCCSwitchSkillLinksInAgentRoots(t *testing.T) {
 	}
 }
 
-func TestCoexistenceNotesManagersWithoutOverlap(t *testing.T) {
-	repoRoot, home, cfg := coexistenceFixture(t)
-	writeSyncTestFile(t, filepath.Join(home, ".cc-switch", "settings.json"), []byte(`{"skillStorageLocation":"cc_switch"}`))
-	if err := os.MkdirAll(filepath.Join(home, ".harnesskit", "kits"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	got := checkAgentManagerCoexistence(repoRoot, home, cfg)
-	if got.status != checkStatusPass || !strings.Contains(got.detail, "cc-switch") || !strings.Contains(got.detail, "HarnessKit") {
-		t.Fatalf("got %+v", got)
-	}
-}

@@ -43,35 +43,6 @@ func TestParseViewFlagsRejectsPositional(t *testing.T) {
 	}
 }
 
-func TestRunViewLegacyHarnessKitFlagsGiveRenameGuidance(t *testing.T) {
-	for _, flag := range []string{"--port", "--host", "--no-token", "--name"} {
-		t.Run(flag, func(t *testing.T) {
-			// Legacy HarnessKit args must not launch anything; they point at HarnessKit itself.
-			for _, args := range [][]string{{flag, "7070"}, {flag + "=x"}} {
-				err := runView(args)
-				if err == nil {
-					t.Fatalf("runView(%v) = nil, want rename guidance error", args)
-				}
-				if !strings.Contains(err.Error(), "hk serve") || !strings.Contains(err.Error(), flag) {
-					t.Fatalf("runView(%v) error = %q, want guidance naming %s and inspect", args, err, flag)
-				}
-			}
-		})
-	}
-}
-
-func TestFirstLegacyInspectFlag(t *testing.T) {
-	if got := firstLegacyInspectFlag([]string{"--no-open", "--addr", "127.0.0.1:8765"}); got != "" {
-		t.Fatalf("firstLegacyInspectFlag on config-UI flags = %q, want empty", got)
-	}
-	if got := firstLegacyInspectFlag([]string{"--no-open", "--port", "7070"}); got != "--port" {
-		t.Fatalf("firstLegacyInspectFlag = %q, want --port", got)
-	}
-	if got := firstLegacyInspectFlag([]string{"--host=0.0.0.0"}); got != "--host" {
-		t.Fatalf("firstLegacyInspectFlag equals form = %q, want --host", got)
-	}
-}
-
 func TestPortFromURL(t *testing.T) {
 	if got := portFromURL("http://127.0.0.1:8765/?token=x"); got != "8765" {
 		t.Fatalf("portFromURL = %q, want 8765", got)

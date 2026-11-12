@@ -50,8 +50,8 @@ unmanaged items in agent folders, and a YAML editor. It edits shared YAML or the
 machine-local overlay; effective configuration is read-only. Each toggle
 applies immediately, and `view` never runs `sync` implicitly. It binds only to
 loopback and uses a session cookie plus CSRF and origin protection. `config`
-validates or prints the result. HarnessKit (`hk serve`) and AgentsView
-(`agentsview serve`) are optional companion tools that you run on their own.
+validates or prints the result. AgentsView (`agentsview serve`) is an optional
+companion tool that you run on its own.
 
 Run `tackroom help --all` for maintenance commands.
 
@@ -199,7 +199,7 @@ tackroom doctor --e2e
 
 ## view
 
-Opens the canonical config UI in your browser: the review-first authoring surface, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no HarnessKit, Node, or separate daemon). Views: Overview (agent cards with sync state, counts and estimated skill-listing tokens), Skills and Roles (matrices of what is on disk per agent), MCP & hooks (toggle an entry or the agents it targets), Unmanaged (foreign skills, conflicts, stale links with the next command), Crons (scheduled jobs and failing services on the hosts in `crons.hosts`, the same data as `tackroom cron collect`, with Run now, Pause and Resume for launchd jobs and a schedule field for owned ones), and Config (edit, check and save the YAML). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step in which every destructive item must be ticked. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
+Opens the canonical config UI in your browser: the review-first authoring surface, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no Node or separate daemon). Views: Overview (agent cards with sync state, counts and estimated skill-listing tokens), Skills and Roles (matrices of what is on disk per agent), MCP & hooks (toggle an entry or the agents it targets), Unmanaged (foreign skills, conflicts, stale links with the next command), Crons (scheduled jobs and failing services on the hosts in `crons.hosts`, the same data as `tackroom cron collect`, with Run now, Pause and Resume for launchd jobs and a schedule field for owned ones), and Config (edit, check and save the YAML). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step in which every destructive item must be ticked. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
 
 It prints the tokenized URL on its own line and, when running locally, opens it in your default browser. `--no-open` suppresses the browser launch. `--addr` sets the loopback bind (default `127.0.0.1:8765`). `--secure-cookie` serves an HTTPS proxy such as `tailscale serve`: requests through it get `Secure` cookies and https origin checks, while direct loopback requests keep working over http. The token is kept in `view.token` under `$XDG_STATE_HOME/tackroom` (`~/.local/state/tackroom`) or `--token-file`, so the URL survives restarts; `tackroom view` opens an already running view instead of starting another (it finds one at the last recorded address unless `--addr` is given), and a long-running view restarts itself when the `tackroom` binary is upgraded. On a remote host, pass `--ssh-host user@host` (or run inside an SSH session, where it derives the host from `SSH_CONNECTION`) to print a ready `ssh -L` tunnel command instead of auto-opening.
 
@@ -209,7 +209,6 @@ tackroom view --no-open --addr 127.0.0.1:8765        # print the URL, do not ope
 tackroom view --ssh-host me@box                      # remote: print an ssh -L tunnel command
 ```
 
-Legacy HarnessKit flags on `view` (`--port`, `--host`, `--no-token`) are rejected with a one-line pointer to running HarnessKit itself (`hk serve`); they do not launch it.
 
 ## Capability matrix
 

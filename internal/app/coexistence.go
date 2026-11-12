@@ -43,10 +43,6 @@ func checkAgentManagerCoexistence(repoRoot string, home string, cfg config) chec
 		}
 	}
 
-	if hasDir(filepath.Join(home, ".harnesskit")) {
-		notes = append(notes, "HarnessKit found: reading is fine, its deploy and enable actions bypass tackroom")
-	}
-
 	switch {
 	case len(warnings) > 0:
 		return checkResult{"other agent managers", checkStatusWarn, strings.Join(append(warnings, notes...), "; ")}

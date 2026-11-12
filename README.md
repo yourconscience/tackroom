@@ -180,12 +180,7 @@ tackroom does one job. These tools pair well with it; install and run them on th
 
 | Tool | Purpose | Run |
 |---|---|---|
-| [HarnessKit](https://github.com/RealZST/HarnessKit) | Inspect and audit skills, MCP servers, hooks, and native harness configuration | `hk serve` |
 | [AgentsView](https://github.com/kenn-io/agentsview) | Search and replay sessions; inspect tool telemetry, token usage, and estimated cost | `agentsview serve` |
-
-Treat HarnessKit as read-mostly: its enable, disable and deploy actions bypass tackroom, so reconcile any changes with `tackroom sync`.
-
-On macOS, the experimental [Tackroom app](macos/) puts all three in one window, with sync state in the menu bar, AgentsView skill usage next to each skill, and a list of what tackroom does not manage. Build it with `macos/bundle.sh`.
 
 `tackroom skill list` remains the built-in provenance view for each harness skill root. It reports managed links, foreign symlinks, unmanaged directories, drift, broken links, and estimated context cost.
 
