@@ -81,6 +81,8 @@ Gemini CLI MCP servers and hooks go to `~/.gemini/settings.json` (hook events re
 
 Root instructions follow the same idea: `~/.agents/AGENTS.md` links into each harness's own instructions file (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.hermes/SOUL.md`, ...). List extra files such as `SOUL.md` or a user profile under `instructions:`, and every harness with a managed root doc gets them after `AGENTS.md`: Claude Code through `@` imports, the rest as a generated copy that `sync` keeps current. Details in [docs/setup.md](docs/setup.md#root-instructions).
 
+Claude Code's root instructions go to `~/.claude/CLAUDE.md`, not `~/.claude/AGENTS.md`: Claude Code 2.1.277 and later read `AGENTS.md` only as project instructions, and only in a project with no `CLAUDE.md` ([details](docs/setup.md#root-instructions)). A repository therefore needs no `CLAUDE.md` that just imports its `AGENTS.md`.
+
 In `tackroom.yaml` and `--agents`, Claude Code is `claude`. The former name `claude-code` is still accepted; a tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config.
 
 OpenClaw MCP servers go to `mcp.servers` in `~/.openclaw/openclaw.json`; a running Gateway picks them up after `openclaw mcp reload`. DeepSeek Harness MCP servers go to `tackroom-mcp-*` rows in the home-level `~/.dsh/cordis.patch.yml`, which every dsh profile applies, and its root instructions link to `~/.dsh/AGENTS.md`. Neither has a role or hook format tackroom can render: OpenClaw agents are separate gateway personas, and dsh roles and hooks are Cordis plugins. A "yes" above only appears after end-to-end verification.
