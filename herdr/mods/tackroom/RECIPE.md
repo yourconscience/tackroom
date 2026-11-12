@@ -19,7 +19,7 @@ A side panel that shows every scheduled job tackroom collects, on every host in 
 
 ## Built from
 
-- One mod, `tackroom`, `place: "none"`, put in a layout as a block: `{ "type": "block", "content": { "mod": "tackroom", "props": { "tackroom": "~/.local/bin/tackroom", "config": "~/.agents/crons.yaml", "refresh": 300 } } }`. All props are optional: `tackroom` defaults to `tackroom` on the PATH, `config` to tackroom's default config.
+- One mod, `tackroom`, `place: "none"`, put in a layout as a block (the `tackroom` layout in `herdr/layouts` already has it, with a Crons button): `{ "type": "block", "content": { "mod": "tackroom", "props": { "tackroom": "~/.local/bin/tackroom", "config": "~/.agents/crons.yaml", "refresh": 300 } } }`. All props are optional: `tackroom` defaults to `tackroom` on the PATH, `config` to tackroom's default config.
 - Data: `exec(tackroom, ["cron", "collect", "--config", config])`, JSON with `jobs` and `access`, 5-minute timeout.
 - Actions: `exec(tackroom, ["cron", verb, "--config", config, "--host", host, "--source", source, id])` with `verb` run, pause or resume. Flags come before the id.
 - Web: `exec("/bin/sh", ...)` reads `view.addr` and `view.token` from `${XDG_STATE_HOME:-~/.local/state}/tackroom` and runs `open`.
@@ -31,7 +31,7 @@ A side panel that shows every scheduled job tackroom collects, on every host in 
 - Needs a tackroom with the `cron run|pause|resume` verbs (the Crons actions change) for the buttons; collect works with any tackroom that has `cron collect`.
 - `exec` does not expand `~`; the mod expands a leading `~/` itself from `$HOME`.
 - A collect probes every host over SSH; on a loaded machine the local probe can hit tackroom's 2-minute timeout and the host shows unreachable until the next collect.
-- An owned job shows its declared schedule (`declared_schedule`), not the entries launchd expanded it into.
+- An owned job shows its declared schedule (`declared_schedule`), not the entries launchd expanded it into. Collected from a host that does not declare it, the expansion still reads as one schedule: sixteen `0 8 N * *` entries for odd days are "Every 2 days 08:00", `0 * * * *; 30 * * * *` is "Every 30 min".
 - Schedule changes are not in the panel yet; use the web view or `tackroom cron schedule`.
 
 ## Done when

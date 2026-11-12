@@ -136,11 +136,13 @@ tackroom hook     list [query] | remove [--dry-run] <query>
 tackroom restore  [<backup> | latest] [--dry-run]   # put backed-up native files back
 tackroom cron     collect [--hosts local,HOST...] [--table]  # read-only inventory of scheduled jobs
 tackroom cron     apply [--dry-run]                         # install or remove the crons.jobs entries with schedule and command
+tackroom cron     run|pause|resume [--host HOST] ID         # act on a launchd job, here or over SSH
+tackroom cron     schedule ID "MIN HOUR DOM MON DOW"        # new schedule for a job tackroom owns on this machine
 ```
 
 `status`, `sync` and `doctor` take `--json` for scripts and agents; exit code 1 means something is out of sync or failed. `tackroom mcp remove <name>` followed by `sync` removes the server from every agent tackroom wrote it to, and from agents whose entry still matches its definition (the native config is backed up first). Other hand-configured servers stay. If a native file differs from the shared copy (say a hand-written `~/.claude/CLAUDE.md`), `sync` leaves that agent alone, syncs the others, and says how to resolve it; `sync --replace-conflicts` moves such files to `~/.local/state/tackroom/backups/<time>/` and links the shared copy. `setup` does this for you after asking (`--yes` accepts). `tackroom restore` lists those backups and puts one back; whatever it replaces is saved as a new backup, so `tackroom restore latest` undoes it.
 
-`tackroom cron collect` lists every scheduled job on this machine and on SSH hosts (`--hosts local,laptop,vps`, or `crons.hosts` in `tackroom.yaml`; `tackroom.local.yaml` can set its own, since hosts differ per machine): launchd agents with a calendar or interval schedule, crontab, systemd user timers, and the Hermes, Codex, Claude desktop and herdr-automations schedulers. Failing `KeepAlive` and `RunAtLoad` agents are listed too, with crash loops flagged. It prints JSON (`--table` for people) with each job's schedule, command, runs, last exit or status and problems such as miscased launchd keys or an enabled job that stopped firing, plus an access entry per host and source that tells `empty` apart from `unreadable` and `not_scanned`. It only reads; databases are copied back over SSH and opened locally. The Crons tab in `tackroom view` shows the same inventory, with jobs that need attention first. `tackroom cron apply` installs the `crons.jobs` entries that have a `schedule` and a `command` as native units (launchd on macOS, systemd user timers on Linux, crontab only when `crons.scheduler: crontab`) and removes the ones no longer declared; `--dry-run` prints the plan. Plain `tackroom cron` installs tackroom's own self-update job the same way and removes its old crontab line. Design: [docs/crons.md](docs/crons.md).
+`tackroom cron collect` lists every scheduled job on this machine and on SSH hosts (`--hosts local,laptop,vps`, or `crons.hosts` in `tackroom.yaml`; `tackroom.local.yaml` can set its own, since hosts differ per machine): launchd agents with a calendar or interval schedule, crontab, systemd user timers, and the Hermes, Codex, Claude desktop and herdr-automations schedulers. Failing `KeepAlive` and `RunAtLoad` agents are listed too, with crash loops flagged. It prints JSON (`--table` for people) with each job's schedule, command, runs, last exit or status and problems such as miscased launchd keys or an enabled job that stopped firing, plus an access entry per host and source that tells `empty` apart from `unreadable` and `not_scanned`. It only reads; databases are copied back over SSH and opened locally. The Crons tab in `tackroom view` shows the same inventory, with jobs that need attention first, and runs, pauses or resumes a launchd job on any scanned host; `tackroom cron run|pause|resume` do the same from a shell. Pause keeps a job off across logins until Resume. `tackroom cron apply` installs the `crons.jobs` entries that have a `schedule` and a `command` as native units (launchd on macOS, systemd user timers on Linux, crontab only when `crons.scheduler: crontab`) and removes the ones no longer declared; `--dry-run` prints the plan. Such an owned job takes a new schedule from the Crons tab or `tackroom cron schedule`, which edits its `crons.jobs` entry and applies it. Plain `tackroom cron` installs tackroom's own self-update job the same way and removes its old crontab line. Design: [docs/crons.md](docs/crons.md).
 
 Hooks are declared in `tackroom.yaml` (there is no `hook add` yet) and rendered with each agent's event names:
 
@@ -157,6 +159,20 @@ hooks:
 MCP servers are stdio (`mcp add NAME --command ...`) or remote (`mcp add NAME --url https://... --header 'Authorization: Bearer ${TOKEN}'`). Remote servers go to Claude Code, Codex, Pi, Grok Build, Cursor and Gemini CLI in each one's format (Codex reads `Bearer ${TOKEN}` through `bearer_token_env_var`, Cursor as `${env:TOKEN}`); other agents get stdio servers only for now. As with env, a `${VAR}` header never replaces a real value already in an agent's config.
 
 `sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` stays compact; `--verbose` adds the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.
+
+## Herdr
+
+[`herdr/`](herdr/) brings the Crons tab into the [Herdr](https://herdr.dev) app as a native side panel: the same jobs per host, health counts and Run now / Pause / Resume, drawn from the same `tackroom cron collect` and acting through the same `tackroom cron` verbs. The folder is laid out like `~/.config/herdr-app`:
+
+- `mods/tackroom`, the panel. Add it to your own layout as a block in the `panel-body` stack ([recipe](herdr/mods/tackroom/RECIPE.md)).
+- `layouts/tackroom.json` with `mods/tackroom-toggle`, Herdr's main layout plus the panel and a Crons button beside Files and Changes ([recipe](herdr/RECIPE.md)).
+
+```bash
+cp -R herdr/mods/tackroom herdr/mods/tackroom-toggle ~/.config/herdr-app/mods/
+cp herdr/layouts/tackroom.* ~/.config/herdr-app/layouts/   # then ctrl-shift-l to switch to it
+```
+
+The panel runs `tackroom` from your PATH with the default config; set the block's `tackroom` and `config` props otherwise. Design: [docs/herdr.md](docs/herdr.md).
 
 ## Companion tools
 
@@ -250,6 +266,8 @@ The script refuses to run unless the tree is clean, `HEAD` matches `origin/main`
 - [docs/roles.md](docs/roles.md) — role format, model tiers, per-harness overrides
 - [docs/memory.md](docs/memory.md) — memory tiers, rem workflow, vault layout
 - [docs/comparison.md](docs/comparison.md) — how tackroom differs from rulesync, ruler, openskills
+- [docs/crons.md](docs/crons.md) — cron inventory, owned jobs, the Crons tab and its actions
+- [docs/herdr.md](docs/herdr.md) — the Herdr panel and layout, and what is planned for them
 - [Troubleshooting](docs/troubleshooting.md)
 - [memory/README.md](memory/README.md) — memory layer layout, hooks, and tools
 

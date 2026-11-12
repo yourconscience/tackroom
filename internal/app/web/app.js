@@ -662,8 +662,10 @@ function duration(seconds) {
   if (seconds % 60 === 0) return seconds === 60 ? 'minute' : `${seconds / 60} min`;
   return `${seconds} s`;
 }
+// An owned job shows the expression it declares; launchd may have expanded it
+// into one entry per day ("0 8 */2 * *" into 16), which reads the same here.
 function describeSchedule(job) {
-  const schedule = job.schedule || '';
+  const schedule = job.declared_schedule || job.schedule || '';
   if (job.state === 'service') return 'Always on';
   const every = /^every (\d+)s$/.exec(schedule);
   if (every) return `Every ${duration(Number(every[1]))}`;
@@ -673,9 +675,28 @@ function describeSchedule(job) {
   const [m, hr, dom, mon, dow] = lines[0];
   const step = /^\*\/(\d+)$/.exec(m);
   if (lines.length === 1 && step && hr === '*' && dom === '*' && mon === '*' && dow === '*') return `Every ${step[1]} min`;
-  const sameTime = lines.every((fields) => fields[0] === m && fields[1] === hr && fields[2] === '*' && fields[3] === '*');
+  if (lines.every((fields) => /^\d+$/.test(fields[0]) && fields.slice(1).every((field) => field === '*'))) {
+    const minutes = lines.map((fields) => Number(fields[0])).sort((a, b) => a - b);
+    const gap = 60 / minutes.length;
+    if (minutes.length > 1 && minutes.every((minute, i) => minute === minutes[0] + i * gap)) return `Every ${gap} min`;
+    return `Hourly at ${minutes.map((minute) => `:${String(minute).padStart(2, '0')}`).join(', ')}`;
+  }
+  const sameTime = lines.every((fields) => fields[0] === m && fields[1] === hr && fields[3] === '*');
   if (!sameTime || !/^\d+$/.test(m) || !/^\d+$/.test(hr)) return schedule;
   const time = `${hr.padStart(2, '0')}:${m.padStart(2, '0')}`;
+  if (lines.every((fields) => fields[2] !== '*' && fields[4] === '*')) {
+    const dates = new Set();
+    for (const fields of lines) {
+      const set = cronField(fields[2], 1, 31);
+      if (!set) return schedule;
+      set.forEach((date) => dates.add(date));
+    }
+    const order = [...dates].sort((a, b) => a - b);
+    const gap = order.length > 1 ? order[1] - order[0] : 0;
+    if (order[0] === 1 && gap > 1 && order.every((date, i) => date === 1 + i * gap) && order[order.length - 1] + gap > 31) return `Every ${gap} days ${time}${zone}`;
+    return `${order.length === 1 ? 'Day' : 'Days'} ${order.join(', ')} of the month, ${time}${zone}`;
+  }
+  if (!lines.every((fields) => fields[2] === '*')) return schedule;
   const days = new Set();
   for (const fields of lines) {
     const set = cronField(fields[4], 0, 7);

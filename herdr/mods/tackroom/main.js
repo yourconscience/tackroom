@@ -34,29 +34,31 @@ function shortName(j) {
 
 const hostName = (h) => (h === "local" ? "This Mac" : h);
 
+// The web's duration.
 function duration(s) {
-  if (s % 86400 === 0) return `${s / 86400} d`;
-  if (s % 3600 === 0) return `${s / 3600} h`;
-  if (s % 60 === 0) return `${s / 60} min`;
+  if (s % 3600 === 0) return s === 3600 ? "hour" : `${s / 3600} h`;
+  if (s % 60 === 0) return s === 60 ? "minute" : `${s / 60} min`;
   return `${s} s`;
 }
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-// Day-of-week field as day numbers (0 Sunday), or null for a shape it doesn't read.
-function weekdays(field) {
-  if (field === "*") return [0, 1, 2, 3, 4, 5, 6];
-  const out = [];
-  for (const part of field.split(",")) {
-    const m = /^(\d+)(?:-(\d+))?$/.exec(part);
-    if (!m) return null;
-    for (let d = Number(m[1]); d <= Number(m[2] ?? m[1]); d++) out.push(d % 7);
+// The web's cronField: a cron field as a set of numbers, or null for a shape it doesn't read.
+function cronField(text, min, max) {
+  const values = new Set();
+  for (const part of text.split(",")) {
+    const [range, stepText] = part.split("/");
+    const step = Number(stepText || 1);
+    let [lo, hi] = range === "*" ? [min, max] : range.split("-").map(Number);
+    if (hi === undefined) hi = stepText ? max : lo;
+    if (![lo, hi, step].every(Number.isFinite) || step < 1 || lo < min || hi > max) return null;
+    for (let value = lo; value <= hi; value += step) values.add(max === 7 && value === 7 ? 0 : value);
   }
-  return out;
+  return values;
 }
 
 // The web's describeSchedule. An owned job shows its declared expression,
-// which launchd may have expanded into many entries.
+// which launchd may have expanded into many entries ("0 8 */2 * *" into 16).
 function describe(j) {
   if (j.state === "service") return "Always on";
   const s = j.declared_schedule || j.schedule || "";
@@ -67,14 +69,33 @@ function describe(j) {
   const [m, hr] = lines[0];
   const step = /^\*\/(\d+)$/.exec(m);
   if (lines.length === 1 && step && lines[0].slice(1).every((f) => f === "*")) return `Every ${step[1]} min`;
-  if (!/^\d+$/.test(m) || !/^\d+$/.test(hr) || !lines.every((f) => f[0] === m && f[1] === hr && f[2] === "*" && f[3] === "*")) return s;
+  if (lines.every((f) => /^\d+$/.test(f[0]) && f.slice(1).every((x) => x === "*"))) {
+    const minutes = lines.map((f) => Number(f[0])).sort((a, b) => a - b);
+    const gap = 60 / minutes.length;
+    if (minutes.length > 1 && minutes.every((v, i) => v === minutes[0] + i * gap)) return `Every ${gap} min`;
+    return `Hourly at ${minutes.map((v) => `:${String(v).padStart(2, "0")}`).join(", ")}`;
+  }
+  if (!/^\d+$/.test(m) || !/^\d+$/.test(hr) || !lines.every((f) => f[0] === m && f[1] === hr && f[3] === "*")) return s;
+  const time = `${hr.padStart(2, "0")}:${m.padStart(2, "0")}`;
+  if (lines.every((f) => f[2] !== "*" && f[4] === "*")) {
+    const dates = new Set();
+    for (const f of lines) {
+      const set = cronField(f[2], 1, 31);
+      if (!set) return s;
+      set.forEach((d) => dates.add(d));
+    }
+    const order = [...dates].sort((a, b) => a - b);
+    const gap = order.length > 1 ? order[1] - order[0] : 0;
+    if (order[0] === 1 && gap > 1 && order.every((d, i) => d === 1 + i * gap) && order[order.length - 1] + gap > 31) return `Every ${gap} days ${time}`;
+    return `${order.length === 1 ? "Day" : "Days"} ${order.join(", ")} of the month, ${time}`;
+  }
+  if (!lines.every((f) => f[2] === "*")) return s;
   const days = new Set();
   for (const f of lines) {
-    const set = weekdays(f[4]);
+    const set = cronField(f[4], 0, 7);
     if (!set) return s;
     set.forEach((d) => days.add(d));
   }
-  const time = `${hr.padStart(2, "0")}:${m.padStart(2, "0")}`;
   if (days.size === 7) return `Daily ${time}`;
   if (days.size === 5 && [1, 2, 3, 4, 5].every((d) => days.has(d))) return `Weekdays ${time}`;
   return `${[...days].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => DAY_NAMES[d]).join(", ")} ${time}`;

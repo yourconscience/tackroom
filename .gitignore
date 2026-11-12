@@ -16,3 +16,7 @@ npm/bin/*
 memory/local/
 memory/apply-local.sh
 npm/node_modules/
+
+# Editor type hints herdr-app check writes into a mod folder
+herdr/mods/*/gpui-kit.d.ts
+herdr/mods/*/jsconfig.json
