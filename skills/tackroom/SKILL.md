@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, OpenClaw, DeepSeek Harness (dsh), Hermes, Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, DeepSeek Harness (dsh), Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
 ---
 
 # tackroom
@@ -32,7 +32,6 @@ tackroom skill sources [--json]
 tackroom skill sources search <query> [--json]
 tackroom skill sources add <owner/repo[/path] | git URL> [--skills a,b | --all] [--latest] [--name N] [--no-sync]
 tackroom skill update [name ...]
-tackroom skill promote <name-or-path> [--dry-run]
 tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]
 tackroom mcp <list|add|import|remove> [options]
 tackroom restore [<backup> | latest] [--dry-run]
@@ -91,17 +90,7 @@ Memory tiers:
 - `basic` (default): Python-3-only bounded Markdown digests under `$KNOWLEDGE_DIR/sessions/` plus recent context at session start.
 - `memsearch`: the indexed SessionStart, Stop, and SessionEnd pipeline; requires `memsearch` on `PATH`.
 
-For Hermes, the `memsearch` tier also keeps the built-in memory files and the
-knowledge vault in sync: `sync-vault-to-memory.sh` runs at session start,
-`session-end.sh` captures the session digest at finalize, and
-`sync-memory-to-vault.sh` exports durable memory at finalize. The generic
-`session-start.sh` is not registered for Hermes because its Claude-style
-context response is not consumed by Hermes; Hermes injects the synchronized
-built-in memory natively instead.
-
-Verify the complete setup with `tackroom doctor --e2e`, then run
-`hermes hooks doctor`. Hermes hook approval is host-local and may require one
-interactive approval after setup.
+Verify the complete setup with `tackroom doctor --e2e`.
 
 ## status
 
@@ -118,7 +107,7 @@ Missing, drifted, conflicting, stale managed, and unrelated external entries are
 
 Reconciles only configured managed entries. Unrelated native content remains untouched.
 
-For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Hermes uses `skills.external_dirs: ["~/.agents/skills"]`; Qwen Code uses `skills.directories: ["~/.agents/skills"]`. Both consume the canonical tree without creating a duplicate mirror. OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, OpenClaw and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
+For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Qwen Code uses `skills.directories: ["~/.agents/skills"]` and consumes the canonical tree without creating a duplicate mirror. OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
 
 Agent roles are canonical Markdown files under `~/.agents/agents/` and render to:
 
@@ -138,7 +127,7 @@ Pi always has managed skills. With `pi-subagents` installed, tackroom renders ca
 
 For MCP servers, sync patches only named canonical entries and preserves unrelated native servers. A server sync wrote earlier and that is no longer wanted for an agent (removed from `tackroom.yaml`, disabled, or dropped from its `agents`) shows as `mcp stale` in `status` and is removed by the next `sync`, after the native config file is copied to `~/.local/state/tackroom/backups/<time>/`. Sync never claims an entry the agent already had; `mcp remove` also claims native entries that still match the definition it removes. Import redacts literal environment values to `${KEY}` references and names the redacted keys; the source agent keeps its values. Other target agents get the literal `${KEY}`, which they may not expand: put the real value in their native config (sync never replaces a value with a reference) or import with `--agents <source>`. List output never prints values.
 
-For hooks, sync registers only declared entries on harnesses with verified hook support. Host-local review and approval state remains outside tackroom; Hermes keys first-use consent by the exact event and command and reports script mtime drift through `hermes hooks doctor`.
+For hooks, sync registers only declared entries on harnesses with verified hook support. Host-local review and approval state remains outside tackroom.
 
 Claude Code plugins (mods, workflows, monitors, output styles, LSP, `bin/`) stay in Claude's native layout under the config root, listed in `<config-root>/.claude-plugin/marketplace.json`. `sync` registers that directory as a marketplace in `~/.claude/settings.json` (`extraKnownMarketplaces`) and enables each relative-path entry (`enabledPlugins`). Claude Code reads it in place: edit, then `/reload-plugins`. User disables (kept across a marketplace rename) and `defaultEnabled: false` are respected; stale enable keys are pruned and removing the marketplace file removes the registration. A name already registered with another source, or a malformed file, is a conflict and nothing is written. `doctor` runs `claude plugin validate` on it when Claude Code is detected.
 
@@ -181,7 +170,7 @@ publish_targets:
 tackroom mcp list
 tackroom mcp add local --command uvx --arg pkg@1.2.3 --env KEY=value
 tackroom mcp add docs --url https://mcp.example.com/mcp --header 'Authorization: Bearer ${DOCS_TOKEN}'  # remote: Claude Code, Codex, Pi, Grok, Cursor, Gemini CLI
-tackroom mcp import claude local --agents=codex,hermes,droid,pi,omp
+tackroom mcp import claude local --agents=codex,droid,pi,omp
 tackroom sync
 tackroom mcp remove local
 tackroom sync                     # removes it from agents where tackroom wrote it or it still matches
@@ -217,7 +206,6 @@ tackroom view --ssh-host me@box                      # remote: print an ssh -L t
 | Claude Code | yes | yes | yes | yes |
 | Codex | yes | yes | yes | yes |
 | Factory Droid | yes | yes | yes | yes |
-| Hermes | yes, config-driven | no | yes | yes |
 | OpenCode | yes | yes | yes | no |
 | Pi | yes | yes, via `pi-subagents` | yes, native since Pi 1.0 | no |
 | OMP | yes | yes | yes | no |
@@ -226,7 +214,6 @@ tackroom view --ssh-host me@box                      # remote: print an ssh -L t
 | GitHub Copilot CLI | yes | yes | yes, `~/.copilot/mcp-config.json` | yes, `~/.copilot/hooks/tackroom.json` |
 | Grok Build | yes | yes | yes, `~/.grok/config.toml` | yes, `~/.grok/hooks/tackroom.json` |
 | Gemini CLI | yes | yes | yes, `~/.gemini/settings.json` | yes, `~/.gemini/settings.json` |
-| OpenClaw | yes | no | yes, `~/.openclaw/openclaw.json` `mcp.servers` | no |
 | DeepSeek Harness | yes | no | yes, `tackroom-mcp-*` rows in `~/.dsh/cordis.patch.yml` | no |
 
 Do not add a surface without a verified native adapter and focused tests.
