@@ -277,45 +277,6 @@ func TestShippedStarterFilesAreManagedPathsOnly(t *testing.T) {
 	}
 }
 
-func TestRunSyncReconcilesManagedStarterFiles(t *testing.T) {
-	home := t.TempDir()
-	repoRoot := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("TACKROOM_HOME", repoRoot)
-
-	writeSyncTestFile(t, filepath.Join(repoRoot, "tackroom.yaml"), []byte(`version: 1
-agents:
-  - name: hermes
-    enabled: true
-    skill_root: ~/.hermes/skills
-`))
-	writeSyncTestFile(t, filepath.Join(home, ".hermes", "config.yaml"), []byte("{}\n"))
-	// Hand-edited managed file: sync must leave it alone.
-	writeSyncTestFile(t, filepath.Join(repoRoot, "memory", "hooks", "common.sh"), []byte("#!/bin/sh\n# my own tweak\n"))
-
-	if err := runSync(runOptions{Agents: agentHermes}); err != nil {
-		t.Fatal(err)
-	}
-
-	if got := readStarter(t, repoRoot, "memory/hooks/common.sh"); got != "#!/bin/sh\n# my own tweak\n" {
-		t.Fatalf("user-edited managed file was overwritten by sync: %q", got)
-	}
-	manifest, exists, err := loadStarterManifest(repoRoot)
-	if err != nil || !exists {
-		t.Fatalf("sync did not write a manifest: exists=%v err=%v", exists, err)
-	}
-	shipped, err := shippedStarterFiles()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if manifest.Files["memory/lib/basic_memory.py"] != fileHash(shipped["memory/lib/basic_memory.py"]) {
-		t.Fatalf("manifest did not record the shipped hash for a scaffolded file: %#v", manifest.Files)
-	}
-	if _, ok := manifest.Files["memory/hooks/common.sh"]; ok {
-		t.Fatal("manifest claimed a file tackroom never wrote")
-	}
-}
-
 func TestReconcileStarterSetIgnoresUnsafeManifestEntries(t *testing.T) {
 	root := t.TempDir()
 	shipped, legacy := testStarterSet()

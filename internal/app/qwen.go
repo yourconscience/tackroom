@@ -48,7 +48,7 @@ func patchQwenConfig(home string, repoRoot string, _ config) (bool, error) {
 			return false, nil
 		}
 	}
-	skills["directories"] = append(directories, hermesExternalDirValue(home, target))
+	skills["directories"] = append(directories, configSkillsDirValue(home, target))
 
 	out, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {

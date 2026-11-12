@@ -54,15 +54,6 @@ if [ "$os" = Linux ] && command -v systemctl >/dev/null 2>&1; then
 	done
 fi
 
-h="$HOME/.hermes/cron"
-if [ -e "$h/jobs.json" ]; then
-	run hermes-jobs "" cat "$h/jobs.json"
-	for f in executions.db executions.db-wal; do
-		[ -e "$h/$f" ] && run hermes-db "$f" b64 "$h/$f"
-	done
-	[ -e "$h/ticker_heartbeat" ] && run hermes-heartbeat "" cat "$h/ticker_heartbeat"
-fi
-
 c="$HOME/.codex/sqlite"
 if [ -e "$c/codex-dev.db" ]; then
 	for f in codex-dev.db codex-dev.db-wal; do

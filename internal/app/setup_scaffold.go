@@ -157,7 +157,6 @@ func defaultAgentConfigs() []agentConfig {
 		{Name: agentClaudeCode, Enabled: true, SkillRoot: "~/.claude/skills", AgentRoot: "~/.claude/agents", Detect: "claude"},
 		{Name: agentCodex, Enabled: true, SkillRoot: "~/.codex/skills", AgentRoot: "~/.codex/agents", Detect: "codex"},
 		{Name: agentDroid, Enabled: true, SkillRoot: "~/.factory/skills", AgentRoot: "~/.factory/droids", Detect: "droid"},
-		{Name: agentHermes, Enabled: true, SkillRoot: "~/.hermes/skills", Detect: "hermes"},
 		{Name: agentOMP, Enabled: true, SkillRoot: "~/.omp/agent/skills", AgentRoot: "~/.omp/agent/agents", Detect: "omp"},
 		{Name: agentOpenCode, Enabled: true, SkillRoot: "~/.config/opencode/skills", AgentRoot: "~/.config/opencode/agents", Detect: "opencode"},
 		{Name: agentPi, Enabled: true, SkillRoot: "~/.pi/agent/skills", AgentRoot: "~/.pi/agent/agents", Detect: "pi"},
@@ -166,7 +165,6 @@ func defaultAgentConfigs() []agentConfig {
 		{Name: agentGemini, Enabled: true, SkillRoot: "~/.gemini/skills", AgentRoot: "~/.gemini/agents", Detect: "gemini"},
 		{Name: agentCopilot, Enabled: true, SkillRoot: "~/.copilot/skills", AgentRoot: "~/.copilot/agents", Detect: "copilot"},
 		{Name: agentGrok, Enabled: true, SkillRoot: "~/.grok/skills", AgentRoot: "~/.grok/agents", Detect: "grok"},
-		{Name: agentOpenClaw, Enabled: true, SkillRoot: "~/.openclaw/skills", Detect: "openclaw"},
 		{Name: agentDSH, Enabled: true, SkillRoot: "~/.dsh/skills", Detect: "dsh"},
 	}
 }
@@ -244,7 +242,6 @@ func applyMemoryTier(cfg *config, tier string, root string, home string) error {
 	startTargets := memoryHookAgents(*cfg, "SessionStart")
 	stopTargets := memoryHookAgents(*cfg, "Stop")
 	endTargets := memoryHookAgents(*cfg, "SessionEnd")
-	hermesTargets := enabledAgentNames(*cfg, agentHermes)
 	switch tier {
 	case memoryTierOff:
 		removeManagedMemoryHooks(cfg)
@@ -266,23 +263,14 @@ func applyMemoryTier(cfg *config, tier string, root string, home string) error {
 			return fmt.Errorf("configure memsearch: %w", err)
 		}
 		removeManagedMemoryHooks(cfg)
-		// session-start.sh delegates to the Claude memsearch plugin, whose
-		// hookSpecificOutput response is not consumed by Hermes. Hermes imports
-		// the shared vault into its built-in memory instead.
-		if targets := withoutAgent(startTargets, agentHermes); len(targets) > 0 {
-			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-session-start", Enabled: true, Event: "SessionStart", Command: managedMemoryHookCommand(root, home, "session-start.sh"), Timeout: 15, Agents: targets})
+		if len(startTargets) > 0 {
+			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-session-start", Enabled: true, Event: "SessionStart", Command: managedMemoryHookCommand(root, home, "session-start.sh"), Timeout: 15, Agents: startTargets})
 		}
 		if len(stopTargets) > 0 {
 			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-stop", Enabled: true, Event: "Stop", Command: managedMemoryHookCommand(root, home, "stop.sh"), Timeout: 15, Agents: stopTargets})
 		}
 		if len(endTargets) > 0 {
 			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-session-end", Enabled: true, Event: "SessionEnd", Command: managedMemoryHookCommand(root, home, "session-end.sh"), Timeout: 30, Agents: endTargets})
-		}
-		if len(hermesTargets) > 0 {
-			cfg.Hooks = append(cfg.Hooks,
-				hookConfig{Name: "memory-hermes-vault-to-memory", Enabled: true, Event: "SessionStart", Command: managedMemoryHookCommand(root, home, "sync-vault-to-memory.sh"), Timeout: 30, Agents: hermesTargets},
-				hookConfig{Name: "memory-hermes-memory-to-vault", Enabled: true, Event: "SessionEnd", Command: managedMemoryHookCommand(root, home, "sync-memory-to-vault.sh"), Timeout: 30, Agents: hermesTargets},
-			)
 		}
 		return nil
 	default:
@@ -307,36 +295,10 @@ func memoryHookAgents(cfg config, event string) []string {
 		if _, ok := hookTargetForHarness(agent.Name); !ok {
 			continue
 		}
-		if normalizeAgentName(agent.Name) == agentHermes {
-			if _, ok := hermesHookEvent(event); !ok {
-				continue
-			}
-		}
 		agents = append(agents, agent.Name)
 	}
 	sort.Strings(agents)
 	return agents
-}
-
-func enabledAgentNames(cfg config, name string) []string {
-	var names []string
-	for _, agent := range cfg.Agents {
-		if agent.Enabled && normalizeAgentName(agent.Name) == name {
-			names = append(names, agent.Name)
-		}
-	}
-	sort.Strings(names)
-	return names
-}
-
-func withoutAgent(agents []string, excluded string) []string {
-	filtered := make([]string, 0, len(agents))
-	for _, agent := range agents {
-		if normalizeAgentName(agent) != excluded {
-			filtered = append(filtered, agent)
-		}
-	}
-	return filtered
 }
 
 func normalizeMemoryTier(tier string) string {
@@ -587,9 +549,6 @@ func nativeMCPServerNames(agentName string, home string) ([]string, error) {
 	if agentName == agentCodex {
 		return codexMCPServerNames(string(data)), nil
 	}
-	if agentName == agentHermes {
-		return yamlMCPServerNames(path, data, target.rootKey)
-	}
 	if agentName == agentDSH {
 		return dshMCPServerNames(path)
 	}
@@ -613,20 +572,6 @@ func nativeMCPServerNames(agentName string, home string) ([]string, error) {
 	sort.Strings(names)
 	return names, nil
 }
-func yamlMCPServerNames(path string, data []byte, rootKey string) ([]string, error) {
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	entry, _ := asMap(raw[rootKey])
-	var names []string
-	for name := range entry {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names, nil
-}
-
 func claudeProjectMCPMap(raw map[string]interface{}) (map[string]interface{}, bool) {
 	projects, ok := asMap(raw["projects"])
 	if !ok || len(projects) != 1 {

@@ -8,8 +8,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 func runSetup(opts runOptions) error {
@@ -212,7 +210,7 @@ func patchAmpConfig(home string, repoRoot string) (bool, error) {
 	if ampSkillsPathConfigured(current, home, target) {
 		return false, nil
 	}
-	raw["amp.skills.path"] = appendAmpSkillsPath(current, hermesExternalDirValue(home, target))
+	raw["amp.skills.path"] = appendAmpSkillsPath(current, configSkillsDirValue(home, target))
 
 	out, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
@@ -284,78 +282,7 @@ func appendAmpSkillsPath(raw string, target string) string {
 	return strings.TrimRight(raw, ":") + ":" + target
 }
 
-func patchHermesConfig(home string, repoRoot string, _ config) (bool, error) {
-	configPath := filepath.Join(home, ".hermes", "config.yaml")
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return false, fmt.Errorf("read %s: %w", configPath, err)
-		}
-		data = []byte("{}\n")
-	}
-
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return false, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-
-	skillsRaw, ok := raw["skills"]
-	if !ok {
-		skillsRaw = map[string]interface{}{}
-		raw["skills"] = skillsRaw
-	}
-	skills, ok := skillsRaw.(map[string]interface{})
-	if !ok {
-		return false, fmt.Errorf("skills key in %s is not a map", configPath)
-	}
-
-	targets := []string{filepath.Join(repoRoot, "skills")}
-
-	targetSet := make(map[string]bool, len(targets))
-	for _, target := range targets {
-		targetSet[target] = true
-	}
-	existing := make(map[string]bool)
-	dirsRaw, ok := skills["external_dirs"]
-	var dirs []interface{}
-	changed := !ok
-	if ok {
-		if existingDirs, ok := dirsRaw.([]interface{}); ok {
-			for _, d := range existingDirs {
-				if s, isStr := d.(string); isStr {
-					expanded := expandPath(strings.TrimSpace(s), home)
-					existing[expanded] = true
-				}
-				dirs = append(dirs, d)
-			}
-		}
-	}
-	for _, target := range targets {
-		if existing[target] {
-			continue
-		}
-		dirs = append(dirs, hermesExternalDirValue(home, target))
-		changed = true
-	}
-	if !changed {
-		return false, nil
-	}
-	skills["external_dirs"] = dirs
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return false, fmt.Errorf("marshal: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		return false, fmt.Errorf("create %s: %w", filepath.Dir(configPath), err)
-	}
-	if err := os.WriteFile(configPath, out, 0o644); err != nil {
-		return false, fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return true, nil
-}
-
-func hermesExternalDirValue(home string, target string) string {
+func configSkillsDirValue(home string, target string) string {
 	if target == filepath.Join(home, ".agents", "skills") {
 		return tackroomSkillsPathValue
 	}

@@ -3,47 +3,8 @@ package app
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
-
-func TestCollectAndRemoveNativeHooksAcrossSupportedFormats(t *testing.T) {
-	home := t.TempDir()
-	writeSyncTestFile(t, claudeHooksConfigPath(home), []byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.orca/agent-hooks/claude-hook.sh"},{"type":"command","command":"echo keep"}]}]}}`))
-	writeSyncTestFile(t, codexHooksConfigPath(home), []byte(`{"hooks":{"SessionStart":[{"hooks":[{"type":"command","command":"~/.orca/agent-hooks/codex-hook.sh"}]}]}}`))
-	writeSyncTestFile(t, droidHooksConfigPath(home), []byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.orca/agent-hooks/droid-hook.sh"}]}]}}`))
-	writeSyncTestFile(t, filepath.Join(home, ".hermes", "config.yaml"), []byte("hooks:\n  on_session_end:\n    - command: ~/.orca/agent-hooks/hermes-hook.sh\n"))
-	writeSyncTestFile(t, qwenSettingsPath(home), []byte(`{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"~/.orca/agent-hooks/qwen-hook.sh"}]}]}}`))
-
-	selected := []agentConfig{{Name: agentClaudeCode}, {Name: agentCodex}, {Name: agentDroid}, {Name: agentHermes}, {Name: agentQwenCode}}
-	entries, unsupported, err := collectNativeHooks(home, config{}, selected)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(unsupported) != 0 || len(filterNativeHooks(entries, "orca")) != 5 {
-		t.Fatalf("entries=%#v unsupported=%#v", entries, unsupported)
-	}
-	changed, err := removeNativeHookEntries(filterNativeHooks(entries, "orca"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if changed != 5 {
-		t.Fatalf("changed configs = %d, want 5", changed)
-	}
-	for _, path := range []string{claudeHooksConfigPath(home), codexHooksConfigPath(home), droidHooksConfigPath(home), filepath.Join(home, ".hermes", "config.yaml"), qwenSettingsPath(home)} {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if strings.Contains(strings.ToLower(string(data)), "orca") {
-			t.Fatalf("orca hook remains in %s:\n%s", path, data)
-		}
-	}
-	data, err := os.ReadFile(claudeHooksConfigPath(home))
-	if err != nil || !strings.Contains(string(data), "echo keep") {
-		t.Fatalf("unrelated hook was not preserved: err=%v data=%s", err, data)
-	}
-}
 
 func TestMissingHookTarget(t *testing.T) {
 	home := t.TempDir()

@@ -175,8 +175,6 @@ func nativeHookConfigPaths(agent string, home string) ([]string, bool, bool) {
 		return []string{codexHooksConfigPath(home)}, false, true
 	case agentDroid:
 		return []string{droidHooksConfigPath(home), droidLegacyHooksConfigPath(home)}, false, true
-	case agentHermes:
-		return []string{filepath.Join(home, ".hermes", "config.yaml")}, true, true
 	case agentQwenCode:
 		return []string{qwenSettingsPath(home)}, false, true
 	case agentGemini:
@@ -262,8 +260,6 @@ func nativeHookIsManaged(entry nativeHookEntry, cfg config) bool {
 		event := hook.Event
 		var ok bool
 		switch entry.Agent {
-		case agentHermes:
-			event, ok = hermesHookEvent(event)
 		case agentCursor:
 			event, ok = cursorHookEvent(event)
 		case agentGemini:
@@ -339,7 +335,7 @@ func removeNativeHookEntries(entries []nativeHookEntry) (int, error) {
 			// One generated module per hook: removing the hook removes the file.
 			err = os.Remove(path)
 			didChange = err == nil
-		case agentHermes, agentCursor, agentCopilot:
+		case agentCursor, agentCopilot:
 			didChange, err = removeSimpleNativeHookEntries(path, pathEntries)
 		default:
 			didChange, err = removeGroupedNativeHookEntries(path, pathEntries)
@@ -473,7 +469,7 @@ func removeSimpleNativeHookEntries(path string, entries []nativeHookEntry) (bool
 	return true, nil
 }
 
-// parseSimpleHookFile reads a flat hook file: Hermes YAML, or the JSON hook
+// parseSimpleHookFile reads a flat hook file: the JSON hook
 // files of Cursor and Copilot CLI.
 func parseSimpleHookFile(path string, data []byte) (map[string]interface{}, error) {
 	var raw map[string]interface{}

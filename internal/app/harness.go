@@ -18,7 +18,7 @@ const (
 	// skillsSymlink means tackroom creates symlinks in the agent's skill root.
 	skillsSymlink skillsKind = iota
 	// skillsConfigDriven means the agent reads skills from a config-driven
-	// shared path (e.g. Amp's amp.skills.path or Hermes' skills.external_dirs).
+	// shared path (e.g. Amp's amp.skills.path).
 	// Inspect and setup are handled by custom functions on the harness.
 	skillsConfigDriven
 )
@@ -204,45 +204,6 @@ func initHarnesses() {
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 			},
 			TrailerExample: "Co-authored-by: factory-droid[bot] <factory-droid[bot]@users.noreply.github.com>",
-		},
-
-		"hermes": {
-			Skills: skillsConfigDriven,
-			InspectSkills: func(agent agentConfig, expected map[string]string, agentsSkillRoot string, cfg config, home string) (agentReport, error) {
-				return inspectHermesAgent(agent, expected, agentsSkillRoot, cfg, home)
-			},
-			Setup: func(home string, repoRoot string, cfg config) (bool, error) {
-				return patchHermesConfig(home, repoRoot, cfg)
-			},
-			MCP: mcpTargetPtr(mcpTarget{
-				agentName:  "hermes",
-				configPath: func(home string) string { return filepath.Join(home, ".hermes", "config.yaml") },
-				inspect:    inspectYAMLMCPServer,
-				patch:      patchYAMLMCPServer,
-				remove:     removeYAMLMCPServer,
-				read:       readYAMLMCPServer,
-				rootKey:    "mcp_servers",
-			}),
-			Hooks: &hookTarget{
-				agentName: "hermes",
-				inspect:   inspectHermesHook,
-				patch:     patchHermesHook,
-			},
-			// Hermes has no global AGENTS.md; SOUL.md in HERMES_HOME is its
-			// one always-loaded file. Hermes seeds a default there.
-			RootInstructions: &rootInstructionsCapability{
-				Path:          func(home string) string { return filepath.Join(home, ".hermes", "SOUL.md") },
-				Expected:      func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
-				NoSetupImport: true,
-			},
-			IntegrationNote: "config-driven via ~/.hermes/config.yaml -> skills.external_dirs",
-			doctorChecks: []doctorCheck{
-				{Name: "hermes direct mirrors", Run: checkHermesDirectMirrors},
-				{Name: "hermes hooks", Run: func(_, home string, cfg config) checkResult {
-					return checkHermesHooks(home, cfg)
-				}},
-			},
-			TrailerExample: "Co-Authored-By: hermes[bot] <hermes[bot]@users.noreply.github.com>",
 		},
 
 		agentOpenCode: {
@@ -433,22 +394,6 @@ func initHarnesses() {
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 			},
 			IntegrationNote: "skills read natively from ~/.agents/skills; Grok also reads Claude Code's skills, roles, hooks and MCP and dedups them by name",
-		},
-
-		agentOpenClaw: {
-			Skills:           skillsSymlink,
-			SkillsNativeRoot: openClawReadsAgentsSkills,
-			MCP: mcpTargetPtr(mcpTarget{
-				agentName:  agentOpenClaw,
-				configPath: openClawConfigPath,
-				inspect:    inspectJSONMCPServer,
-				patch:      patchJSONMCPServer,
-				remove:     removeJSONMCPServer,
-				read:       readJSONMCPServer,
-				parentKey:  "mcp",
-				rootKey:    "servers",
-			}),
-			IntegrationNote: "skills read natively from ~/.agents/skills; MCP goes to openclaw.json mcp.servers (run `openclaw mcp reload` for a running Gateway)",
 		},
 
 		agentDSH: {

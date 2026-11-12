@@ -108,45 +108,6 @@ func TestMCPCLIAddListRemove(t *testing.T) {
 	}
 }
 
-func TestMCPCLIImport(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	configPath := filepath.Join(t.TempDir(), "tackroom.yaml")
-	writeTestTackroomConfig(t, configPath)
-
-	claudePath := filepath.Join(home, ".claude.json")
-	if err := os.MkdirAll(filepath.Dir(claudePath), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(claudePath, []byte(fmt.Sprintf(`{"mcpServers":{"imported":{"type":"stdio","command":%q,"args":["server.js"],"env":{"TOKEN":"secret"}}}}`, mcpTestNodeCommand)), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := runMCP([]string{"import", "claude", "imported", "--agents", "codex,hermes", "--config", configPath}); err != nil {
-		t.Fatal(err)
-	}
-	cfg, _, err := loadEditableMCPConfig(configPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(cfg.MCPServers) != 1 {
-		t.Fatalf("MCP server count = %d, want 1", len(cfg.MCPServers))
-	}
-	server := cfg.MCPServers[0]
-	if server.Name != "imported" || server.Command != mcpTestNodeCommand || !stringSlicesEqual(server.Args, []string{"server.js"}) {
-		t.Fatalf("unexpected imported server: %#v", server)
-	}
-	if !stringSlicesEqual(server.Agents, []string{"codex", "hermes"}) {
-		t.Fatalf("agents = %#v", server.Agents)
-	}
-	if server.Env["TOKEN"] != mcpTestTokenPlaceholder {
-		t.Fatalf("env not redacted: %#v", server.Env)
-	}
-	if strings.Contains(server.Env["TOKEN"], "secret") {
-		t.Fatalf("env leaked raw secret: %#v", server.Env)
-	}
-}
-
 func TestMCPCLIImportCodexMultiline(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

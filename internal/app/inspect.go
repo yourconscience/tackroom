@@ -9,8 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -609,7 +607,7 @@ func inspectAmpAgent(agent agentConfig, expected map[string]string, agentsSkillR
 	if ok, err := ampHasSkillsPath(home, agentsSkillRoot); err != nil {
 		return agentReport{}, err
 	} else if !ok {
-		message := "config amp.skills.path -> " + hermesExternalDirValue(home, agentsSkillRoot)
+		message := "config amp.skills.path -> " + configSkillsDirValue(home, agentsSkillRoot)
 		report.Missing = append(report.Missing, message)
 		report.Adds = append(report.Adds, message)
 	}
@@ -647,127 +645,6 @@ func ampHasSkillsPath(home string, target string) (bool, error) {
 	}
 	path, _ := raw["amp.skills.path"].(string)
 	return ampSkillsPathConfigured(path, home, target), nil
-}
-
-func inspectHermesAgent(agent agentConfig, expected map[string]string, agentsSkillRoot string, cfg config, home string) (agentReport, error) {
-	report := agentReport{
-		Name:           agent.Name,
-		SkillRoot:      agent.SkillRoot,
-		AgentRoot:      agent.AgentRoot,
-		ExpectedSkills: expected,
-		Detected:       isDetected(agent),
-	}
-	if !report.Detected {
-		return report, nil
-	}
-
-	entries, err := os.ReadDir(agent.SkillRoot)
-	if err == nil {
-		for _, entry := range entries {
-			name := entry.Name()
-			if strings.HasPrefix(name, ".") {
-				continue
-			}
-			report.External = append(report.External, name)
-		}
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		return agentReport{}, fmt.Errorf("read %s: %w", agent.SkillRoot, err)
-	}
-
-	expectedDirs, err := hermesExternalSkillDirs(agentsSkillRoot, cfg, home)
-	if err != nil {
-		return agentReport{}, err
-	}
-	ok, stale, err := hermesExternalSkillsDirsState(expectedDirs, cfg, home)
-	if err != nil {
-		return agentReport{}, err
-	}
-	if !ok {
-		report.Missing = append(report.Missing, "config skills.external_dirs")
-		report.Adds = append(report.Adds, "config skills.external_dirs")
-	}
-	for _, dir := range stale {
-		report.StaleManaged = append(report.StaleManaged, "config dir "+dir)
-		report.Removes = append(report.Removes, "config dir "+dir)
-	}
-	report.Managed = append(report.Managed, sortedKeys(report.ExpectedSkills)...)
-	if err := augmentMCPReport(&report, agent, cfg, home); err != nil {
-		return agentReport{}, err
-	}
-	if err := augmentHookReport(&report, agent, cfg, home); err != nil {
-		return agentReport{}, err
-	}
-	if h := harnessFor(agent.Name); h != nil && h.RootInstructions != nil {
-		if err := inspectRootInstructions(&report, h.RootInstructions, filepath.Dir(agentsSkillRoot), home, cfg.Instructions); err != nil {
-			return agentReport{}, err
-		}
-	}
-
-	sortReportLists(&report)
-	report.Synced = isReportSynced(report)
-	return report, nil
-}
-
-func hermesExternalSkillDirs(agentsSkillRoot string, _ config, _ string) ([]string, error) {
-	return []string{agentsSkillRoot}, nil
-}
-
-func hermesExternalSkillsDirsState(expected []string, _ config, _ string) (bool, []string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return false, nil, fmt.Errorf("resolve home: %w", err)
-	}
-	configPath := filepath.Join(home, ".hermes", "config.yaml")
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return false, nil, fmt.Errorf("read %s: %w", configPath, err)
-	}
-
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return false, nil, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-
-	skillsRaw, ok := raw["skills"]
-	if !ok {
-		return false, nil, nil
-	}
-	skills, ok := skillsRaw.(map[string]interface{})
-	if !ok {
-		return false, nil, nil
-	}
-	dirsRaw, ok := skills["external_dirs"]
-	if !ok {
-		return false, nil, nil
-	}
-	dirs, ok := dirsRaw.([]interface{})
-	if !ok {
-		return false, nil, nil
-	}
-
-	expectedSet := make(map[string]bool, len(expected))
-	for _, dir := range expected {
-		expectedSet[dir] = true
-	}
-
-	found := make(map[string]bool, len(expected))
-	for _, d := range dirs {
-		s, ok := d.(string)
-		if !ok {
-			continue
-		}
-		expanded := expandPath(strings.TrimSpace(s), home)
-		if expectedSet[expanded] {
-			found[expanded] = true
-		}
-	}
-
-	for _, dir := range expected {
-		if !found[dir] {
-			return false, nil, nil
-		}
-	}
-	return true, nil, nil
 }
 
 func linkMatches(linkPath string, rawTarget string, expectedTarget string) bool {

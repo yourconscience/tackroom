@@ -36,7 +36,6 @@ type mcpTarget struct {
 	remove     func(mcpTarget, string, string) error
 	rootKey    string
 	// parentKey, when set, names the top-level object that holds rootKey
-	// (OpenClaw keeps servers under "mcp" -> "servers").
 	parentKey string
 	defaults  map[string]interface{}
 	remote    *remoteMCP
@@ -349,67 +348,6 @@ func claudeMCPJSONEntry(name string, cwd string) (map[string]interface{}, bool, 
 		}
 		dir = parent
 	}
-}
-
-func inspectYAMLMCPServer(target mcpTarget, server mcpServerConfig, home string) (string, error) {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return stateMissing, nil
-		}
-		return stateMissing, fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return stateMissing, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	return inspectMapMCPServer(raw, target, server), nil
-}
-
-func patchYAMLMCPServer(target mcpTarget, server mcpServerConfig, home string) error {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var doc yaml.Node
-	if err == nil {
-		if err := yaml.Unmarshal(data, &doc); err != nil {
-			return fmt.Errorf("parse %s: %w", configPath, err)
-		}
-	}
-	if err := upsertYAMLMCPNode(&doc, target.rootKey, server, target.defaults); err != nil {
-		return fmt.Errorf("update %s: %w", configPath, err)
-	}
-	out, err := marshalYAMLNode(&doc)
-	if err != nil {
-		return fmt.Errorf("marshal %s: %w", configPath, err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(configPath), err)
-	}
-	if err := os.WriteFile(configPath, out, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return nil
-}
-
-func readYAMLMCPServer(target mcpTarget, name string, home string) (mcpServerConfig, error) {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return mcpServerConfig{}, fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return mcpServerConfig{}, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	entry, ok := mapMCPEntry(raw, target.rootKey, name)
-	if !ok {
-		return mcpServerConfig{}, fmt.Errorf("MCP server %q not found in %s", name, target.agentName)
-	}
-	return mcpServerFromMap(name, entry)
 }
 
 func inspectMapMCPServer(raw map[string]interface{}, target mcpTarget, server mcpServerConfig) string {

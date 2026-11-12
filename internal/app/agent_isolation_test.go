@@ -3,7 +3,6 @@ package app
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -29,42 +28,6 @@ agents:
 	writeSyncTestFile(t, filepath.Join(repoRoot, "skills", "sample", "SKILL.md"), []byte("---\nname: sample\ndescription: Sample skill.\n---\n"))
 	writeSyncTestFile(t, filepath.Join(home, ".hermes", "config.yaml"), []byte(brokenHermesConfig))
 	return home, repoRoot
-}
-
-func TestRunSyncContinuesPastBrokenAgentConfig(t *testing.T) {
-	home, _ := setupBrokenHermesFixture(t)
-
-	stdout, _, err := captureCLIOutput(t, func() error { return runSync(runOptions{}) })
-	if err == nil || !strings.Contains(err.Error(), "hermes") {
-		t.Fatalf("sync should fail and name hermes, got err=%v", err)
-	}
-	if _, statErr := os.Lstat(filepath.Join(home, ".claude", "skills", "sample")); statErr != nil {
-		t.Fatalf("claude was not synced past the broken Hermes config: %v\n%s", statErr, stdout)
-	}
-	if !strings.Contains(stdout, "config.yaml") {
-		t.Fatalf("sync output should show the Hermes parse error:\n%s", stdout)
-	}
-	if got := readFileString(t, filepath.Join(home, ".hermes", "config.yaml")); got != brokenHermesConfig {
-		t.Fatalf("sync rewrote the broken Hermes config:\n%s", got)
-	}
-}
-
-func TestRunStatusReportsBrokenAgentAndOthers(t *testing.T) {
-	setupBrokenHermesFixture(t)
-	if _, _, err := captureCLIOutput(t, func() error { return runSync(runOptions{}) }); err == nil {
-		t.Fatal("sync with a broken Hermes config should return an error")
-	}
-
-	stdout, _, err := captureCLIOutput(t, func() error { return runStatus(runOptions{}) })
-	if err == nil || !strings.Contains(err.Error(), "hermes") {
-		t.Fatalf("status should fail and name hermes, got err=%v", err)
-	}
-	if !strings.Contains(stdout, "claude") || !strings.Contains(stdout, "config.yaml") {
-		t.Fatalf("status should report claude and the Hermes parse error:\n%s", stdout)
-	}
-	if strings.Contains(stdout, "Everything is synced.") {
-		t.Fatalf("status claimed everything is synced with a broken agent:\n%s", stdout)
-	}
 }
 
 func readFileString(t *testing.T, path string) string {

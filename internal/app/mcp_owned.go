@@ -224,32 +224,6 @@ func removeCodexMCPServer(target mcpTarget, name string, home string) error {
 	return nil
 }
 
-func removeYAMLMCPServer(target mcpTarget, name string, home string) error {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	if len(doc.Content) == 0 || !deleteMappingKey(dshMappingValue(doc.Content[0], target.rootKey), name) {
-		return nil
-	}
-	out, err := marshalYAMLNode(&doc)
-	if err != nil {
-		return fmt.Errorf("marshal %s: %w", configPath, err)
-	}
-	if err := os.WriteFile(configPath, out, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return nil
-}
-
 func removeDSHMCPServer(_ mcpTarget, name string, home string) error {
 	path := dshPatchPath(home)
 	doc, err := loadDSHPatch(path)

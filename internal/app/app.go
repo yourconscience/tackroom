@@ -390,7 +390,7 @@ func runDoctorCommand(args []string) error {
 
 func runSkillCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("skill requires subcommand: new, list, info, sources, update, promote")
+		return errors.New("skill requires subcommand: new, list, info, sources, update")
 	}
 	if isHelpArg(args[0]) {
 		printGroupUsage("skill")
@@ -407,8 +407,6 @@ func runSkillCommand(args []string) error {
 		return runSkillList(args[1:])
 	case "info":
 		return runSkillInfo(args[1:])
-	case "promote":
-		return runPromote(args[1:])
 	default:
 		return fmt.Errorf("unknown skill subcommand %q", args[0])
 	}
@@ -538,7 +536,7 @@ func printUsage() {
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
 	fmt.Println()
 	fmt.Println("Command groups:")
-	fmt.Println("  skill    Inspect, create, update, and promote skills")
+	fmt.Println("  skill    Inspect, create, and update skills")
 	fmt.Println("  publish  Push canonical skills to a remote skill registry")
 	fmt.Println("  mcp      Manage MCP servers")
 	fmt.Println("  hook     Review and remove native hook registrations")
@@ -561,7 +559,6 @@ var canonicalForms = []string{
 	"  tackroom skill sources search <query>     # find sources on skills.sh",
 	"  tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync]",
 	"  tackroom skill update [name ...]",
-	"  tackroom skill promote <name-or-path> [--dry-run]",
 	"  tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]",
 	"  tackroom mcp <list|add|import|remove> [options]   # add: --command ... or --url ... [--header 'Name: value']",
 	"  tackroom restore [<backup> | latest] [--dry-run]",

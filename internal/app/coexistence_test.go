@@ -60,4 +60,3 @@ func TestCoexistenceWarnsOnCCSwitchSkillLinksInAgentRoots(t *testing.T) {
 		t.Fatalf("got %+v", got)
 	}
 }
-
