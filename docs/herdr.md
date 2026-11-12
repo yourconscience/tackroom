@@ -22,7 +22,7 @@ tackroom cron run|pause|resume   <-  Herdr mod      (exec)
 ## Phases
 
 1. **Crons panel** (this change): `herdr/mods/tackroom`, a side panel with host health, needs attention, per-host job lists, Run now / Pause / Resume, and a button that opens the web view. `herdr/` is laid out like `~/.config/herdr-app` and also holds `layouts/tackroom.json`, Herdr's main layout with the panel and a Crons button (`mods/tackroom-toggle`). Installed by copying: the mod into a layout of your own (its `RECIPE.md`), or the whole folder for the layout (`herdr/RECIPE.md`).
-2. **One implementation of the derived fields.** Health, short name and schedule words are computed in `app.js` and copied into the mod today. Move them into the collect JSON (`health`, `short_name`, `schedule_text`) so both renderers only draw. Then add schedule editing to the panel and a `tackroom herdr install` that copies the mod and adds the block to the shown layout.
+2. **Schedule editing and install.** Health, short name and schedule words already come from the collect JSON (`health`, `short_name`, `schedule_text`, worked out once in `crons_words.go`), so both renderers only draw. Next: schedule editing in the panel, and a `tackroom herdr install` that copies the folder and adds the block to the shown layout.
 3. **The other tabs.** Overview status, skills and MCP wiring from the same JSON the view's `/api/inventory` and `/api/status` serve, behind CLI verbs, as more panels in the same mod.
 
 ## Not planned

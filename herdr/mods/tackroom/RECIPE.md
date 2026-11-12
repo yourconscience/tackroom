@@ -24,11 +24,11 @@ A side panel that shows every scheduled job tackroom collects, on every host in 
 - Actions: `exec(tackroom, ["cron", verb, "--config", config, "--host", host, "--source", source, id])` with `verb` run, pause or resume. Flags come before the id.
 - Web: `exec("/bin/sh", ...)` reads `view.addr` and `view.token` from `${XDG_STATE_HOME:-~/.local/state}/tackroom` and runs `open`.
 - `herdr` functions: `exec`, `props`, `theme`, `notify`. Icon: `crons.svg`, tinted.
-- Health, short names and schedule words follow `internal/app/web/app.js` in tackroom (`jobHealth`, `shortName`, `describeSchedule`).
+- Health, short names and schedule words come from the JSON (`health`, `short_name`, `schedule_text`); tackroom works them out once for this panel and the web view.
 
 ## Watch out
 
-- Needs a tackroom with the `cron run|pause|resume` verbs (the Crons actions change) for the buttons; collect works with any tackroom that has `cron collect`.
+- Needs a tackroom whose `cron collect` carries `health`, `short_name` and `schedule_text`, and has the `cron run|pause|resume` verbs for the buttons.
 - `exec` does not expand `~`; the mod expands a leading `~/` itself from `$HOME`.
 - A collect probes every host over SSH; on a loaded machine the local probe can hit tackroom's 2-minute timeout and the host shows unreachable until the next collect.
 - An owned job shows its declared schedule (`declared_schedule`), not the entries launchd expanded it into. Collected from a host that does not declare it, the expansion still reads as one schedule: sixteen `0 8 N * *` entries for odd days are "Every 2 days 08:00", `0 * * * *; 30 * * * *` is "Every 30 min".
