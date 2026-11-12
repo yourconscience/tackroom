@@ -14,7 +14,7 @@ A side panel that shows every scheduled job tackroom collects, on every host in 
 
 - Collects on open, then every `refresh` seconds (default 300, at least 60). Collect collects at once; the button is dimmed while a collect runs.
 - Clicking a row opens or closes its details.
-- A launchd job that is running or scheduled offers Run now and Pause; a paused, disabled or unloaded one offers Resume. Other sources have no buttons. While an action runs its button reads "…" and every action button is dimmed. A notification says whether it worked; then the panel collects again.
+- A launchd job offers Run now and Pause, or Resume when it is disabled or unloaded, as in the web view. Other sources have no buttons. While an action runs its button reads "…" and every action button is dimmed. A notification says whether it worked; then the panel collects again.
 - Web opens the running `tackroom view` on its Crons tab in the default browser, signed in with the token it saved.
 
 ## Built from
@@ -30,6 +30,7 @@ A side panel that shows every scheduled job tackroom collects, on every host in 
 
 - Needs a tackroom whose `cron collect` carries `health`, `short_name` and `schedule_text`, and has the `cron run|pause|resume` verbs for the buttons.
 - `exec` does not expand `~`; the mod expands a leading `~/` itself from `$HOME`.
+- Web reads `view.addr` and `view.token` from tackroom's default state folder, so it does not find a view started with another `--token-file`.
 - A collect probes every host over SSH; on a loaded machine the local probe can hit tackroom's 2-minute timeout and the host shows unreachable until the next collect.
 - An owned job shows its declared schedule (`declared_schedule`), not the entries launchd expanded it into. Collected from a host that does not declare it, the expansion still reads as one schedule: sixteen `0 8 N * *` entries for odd days are "Every 2 days 08:00", `0 * * * *; 30 * * * *` is "Every 30 min".
 - Schedule changes are not in the panel yet; use the web view or `tackroom cron schedule`.

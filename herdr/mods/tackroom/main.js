@@ -7,7 +7,8 @@ import { exec, props, theme, notify } from "herdr";
 // words tackroom works out once for both, and acts through the same
 // `tackroom cron run|pause|resume` verbs.
 
-const PAUSED = ["disabled", "paused", "not_loaded"];
+// A launchd job that is off offers Resume, as in the web view.
+const OFF = ["disabled", "not_loaded"];
 const HEALTH = { fail: "Failing", warn: "Last run failed", idle: "No result", ok: "Healthy", paused: "Paused" };
 const ORDER = ["fail", "warn", "idle", "ok", "paused"];
 const DONE = { run: "Started", pause: "Paused", resume: "Resumed" };
@@ -63,8 +64,11 @@ export default class Crons extends View {
   }
 
   load(cx) {
-    if (this.loading) return;
+    // A collect asked for while one runs (say, right after an action) runs
+    // next, so the panel never keeps data from before the action.
+    if (this.loading) { this.again = true; return; }
     this.loading = true;
+    this.again = false;
     cx.notify();
     cx.spawn(async (cx) => {
       try {
@@ -77,6 +81,7 @@ export default class Crons extends View {
       }
       this.loading = false;
       cx.notify();
+      if (this.again) this.load(cx);
     });
   }
 
@@ -84,10 +89,15 @@ export default class Crons extends View {
     this.busy = key(job);
     cx.notify();
     cx.spawn(async (cx) => {
-      const r = await this.tackroom(["cron", verb, "--host", job.host, "--source", job.source, job.id], 120000);
-      this.busy = "";
-      if (r.code === 0) notify({ title: `${DONE[verb]} ${job.short_name}`, level: "success", timeout: 3000 });
-      else notify({ title: `Could not ${verb} ${job.short_name}`, body: lastLine(r), level: "error" });
+      try {
+        const r = await this.tackroom(["cron", verb, "--host", job.host, "--source", job.source, job.id], 120000);
+        if (r.code === 0) notify({ title: `${DONE[verb]} ${job.short_name}`, level: "success", timeout: 3000 });
+        else notify({ title: `Could not ${verb} ${job.short_name}`, body: lastLine(r), level: "error" });
+      } catch (e) {
+        notify({ title: `Could not ${verb} ${job.short_name}`, body: String(e?.message ?? e), level: "error" });
+      } finally {
+        this.busy = "";
+      }
       this.load(cx);
     });
   }
@@ -180,7 +190,7 @@ export default class Crons extends View {
       ["Schedule", j.declared_schedule || j.schedule], ["Last run", j.last_run], ["Result", result]].filter(([, v]) => v);
     const busy = this.busy === key(j) || this.busy !== "" || this.loading;
     const acts = j.source === "launchd" && j.unit
-      ? (PAUSED.includes(j.state) ? [["resume", "Resume"]] : [["run", "Run now"], ["pause", "Pause"]])
+      ? (OFF.includes(j.state) ? [["resume", "Resume"]] : [["run", "Run now"], ["pause", "Pause"]])
       : [];
     const lines = [
       ...(j.problems ?? []).map((p) => div().text_color(t.ansi1).child(p)),
