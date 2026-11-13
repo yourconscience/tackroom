@@ -476,7 +476,7 @@ func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agent
 	}
 	for _, name := range sortedKeysNative(held) {
 		h := held[name]
-		out.Held = append(out.Held, heldItemJSON{Item: h.Item, Kind: h.Kind, Reason: h.Reason, Until: h.Until, Command: h.Command})
+		out.Held = append(out.Held, heldItemJSON(h))
 	}
 	if len(notes.unchecked) > 0 {
 		out.FreshnessUnchecked = notes.unchecked
