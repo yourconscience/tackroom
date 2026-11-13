@@ -1,28 +1,34 @@
-# Setup walkthrough
+# Setup
 
-## What `tackroom setup` does
+`tackroom setup` creates your config repo, imports what your harnesses already have, runs the first sync and installs the periodic sync job. This page also covers multi-machine use, the web view, per-harness settings and root instructions.
 
-1. Creates `~/.agents` if it does not exist and copies in the starter content: the `tackroom` skill, six roles, memory hooks (skipped with `--memory off`), a minimal `tackroom.yaml` and a `.gitignore`. It ships no instructions file and no third-party skills.
-2. Detects which harnesses are installed and records their native paths.
-3. Scans each harness for skills, roles, and MCP servers you already have and shows a review screen: one row per item, share/keep/skip per row, items identical across harnesses shared automatically. Copy-only, originals untouched. Non-interactive runs fall back to sequential prompts; `--yes` imports everything without prompting, `--dry-run` prints the candidates and exits without changes, `--json` emits the detection result for scripting and exits.
-4. Imports the instructions you already have (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and so on) into `~/.agents/AGENTS.md`: one file is copied as is, several different ones are kept in full under a heading each for you to merge. Without any, no `AGENTS.md` is created and every agent keeps its own file.
-5. Before its first sync touches a harness that already has content, shows exactly what would be removed or overwritten there and asks per harness. Declining keeps that harness's files. Native files that differ from the shared copy (your old instructions, a skill imported from another agent) are listed and, once you agree, moved to `~/.local/state/tackroom/backups/<time>/` and linked.
-6. Offers to `git init` the new repository, and runs the first sync.
-7. Installs the periodic sync job (`tackroom pull` every 15 minutes). Pass `--no-cron` to skip it; `tackroom cron` installs or removes it later, and `status` and `doctor` warn while it is missing or off.
-
-`--yes` answers every prompt with its default and never reads stdin, so an agent or script can run setup unattended: it imports everything, initializes git, backs up and links differing files, and keeps existing content wherever the safe answer is no.
-
-The review screen in step 3 looks like this — `space` cycles share/keep/skip per row, `enter` applies:
-
+```bash
+tackroom setup                        # detect harnesses, review imports, first sync
+tackroom setup --dry-run              # print import candidates, change nothing
+tackroom setup --yes --no-cron        # unattended: default answer to every prompt, no periodic job
 ```
-tackroom setup — review 3 item(s)  (2 identical, shared automatically)
 
-  skill   pr-review  claude✓      codex✓ droid·   [share]
-  skill   my-notes   claude✓      codex· droid✓   [share] (differ) from claude
-  role    reviewer   claude✓      codex✓ droid✓   [skip]
+Other flags: `--memory off|basic|memsearch` (default `basic`, see [memory.md](memory.md)), `--agents a,b` to limit the run to named harnesses, `--json` for the detection result, `--config PATH`.
 
-↑↓ move  space cycle action  ←→ pick source  a share-all  s skip-all  enter apply  q abort
-```
+Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agents:` lists: Claude Code `claude`, Codex `codex`, Factory Droid `droid`, OMP `omp`, OpenCode `opencode`, Pi `pi`, Qwen Code `qwen-code`, Cursor `cursor`, Gemini CLI `gemini`, GitHub Copilot CLI `copilot`, Grok Build `grok`, DeepSeek Harness `dsh`, Antigravity CLI `agy`, Kimi Code `kimi`, Amp `amp`. The former key `claude-code` still works.
+
+## What setup does
+
+1. Creates the config root and copies in the starter content once: the `tackroom` skill, six roles, `tackroom.yaml`, `tackroom.lock`, `.gitignore`, `plugin.json`, `.agnix.toml` and the memory code layer under `memory/`. No instructions file and no third-party skills ship. `--memory off` leaves out the Go sources under `memory/tools/` and registers no memory hooks.
+2. Detects harnesses by their executable on `PATH` and records them in `tackroom.yaml`. Amp is not auto-detected; add it with `--agents amp`.
+3. Scans each harness for skills, roles and MCP servers you already have and shows a review screen. Import is copy-only; originals stay where they are.
+4. Imports existing root instructions into `AGENTS.md`: one file is copied as is, several different ones are kept in full under a heading each for you to merge. With none, no `AGENTS.md` is created and every harness keeps its own file.
+5. Before the first sync touches a harness that already has content, shows what would be removed or overwritten and asks per harness `[y/N]`. Declining, or `--yes`, keeps that harness's files.
+6. Offers `git init` for a new config root, then runs the first sync. Native files that differ from the shared copy are moved to a backup and linked, after you agree.
+7. Installs the periodic sync job unless you pass `--no-cron` (see [Periodic sync](#periodic-sync)).
+
+The config root is `--config`'s folder, else `$TACKROOM_HOME`, else `~/.agents`. The checkout of tackroom itself is never your config.
+
+`--yes` answers every prompt with its default and never reads stdin, so a script can run setup: it imports everything, initializes git, backs up and links differing files, and keeps existing content wherever the safe answer is no.
+
+## The review screen
+
+Each row is one skill, role or MCP server found in a harness. Items identical across harnesses are shared automatically. For the rest, `space` cycles share, keep or skip; `←` and `→` pick which harness's copy becomes canonical when copies differ; `a` shares all, `s` skips all, `enter` applies and `q` aborts. Non-interactive runs fall back to sequential prompts.
 
 ## Multi-machine
 
@@ -33,29 +39,25 @@ git push -u origin main
 # on the next machine: clone it to ~/.agents, install tackroom, run tackroom setup
 ```
 
-Subsequent syncs: `tackroom sync --pull` pulls the repo first, then reconciles. Machines without a Go toolchain skip the memory-tools build step; everything else syncs normally.
+`tackroom sync --pull` pulls the repo first, then reconciles. Machines without a Go toolchain skip building the memory tools; everything else syncs normally.
 
-## Authoring the canonical YAML
-
-After setup, use the authoring surface rather than editing native harness
-files:
+## The web view
 
 ```bash
+tackroom view                         # opens the loopback web UI
 tackroom view --no-open --addr 127.0.0.1:8765
 tackroom config validate
 tackroom config print
 ```
 
-`view` opens a dashboard: per-agent sync state, skill and role matrices, MCP
-and hook targeting per agent, unmanaged items in agent folders, and a YAML
-editor. The shared file and `tackroom.local.yaml` remain separate layers. The
-effective view is read-only, and saving YAML never runs `sync`. The web UI
-binds to loopback, requires a session cookie and CSRF header, and keeps sync
-behind an explicit preview/apply confirmation.
+The view has seven tabs: Overview, Skills, Roles, MCP & hooks, Unmanaged, Crons and Config. The Config tab edits `tackroom.yaml` and `tackroom.local.yaml` as separate layers; the merged result is read-only. Saving never runs `sync`; Sync opens a per-harness plan and each destructive item has to be ticked before it applies.
 
-For temporary HTTPS access from a tailnet, the operator owns the route.
-`--secure-cookie` covers requests through the proxy; the local
-`http://127.0.0.1` URL keeps working:
+The server listens on loopback only and checks origin and CSRF on every change. Requests straight to `http://127.0.0.1:PORT` need no token. Requests through a proxy need the session: a one-time startup token swapped for an `HttpOnly`, `SameSite=Strict` cookie. On a machine shared with other users, anyone who can reach its loopback can use the view.
+
+- The token lives in `view.token` under `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`), or at `--token-file`, so the URL survives restarts.
+- A second `tackroom view` opens the running one instead of starting another.
+- `--ssh-host user@host`, or running inside an SSH session, prints an `ssh -L` tunnel command.
+- For HTTPS over a tailnet you expose the loopback port yourself; `--secure-cookie` applies to requests through the proxy:
 
 ```bash
 tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765
@@ -64,7 +66,7 @@ tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
 
 ## Per-harness settings
 
-Per-harness settings are declared under `settings:` on each agent, a map of dotted key to value written into that harness's own settings file. Supported: `claude` (`~/.claude/settings.json`), `pi` (`~/.pi/agent/settings.json`), `omp` (`~/.omp/agent/config.yml`). Other harnesses report `settings unsupported` and ignore the block.
+`settings:` on an agent is a map of dotted key to value, written into that harness's own settings file. Supported: `claude` (`~/.claude/settings.json`), `pi` (`~/.pi/agent/settings.json`), `omp` (`~/.omp/agent/config.yml`). Other harnesses report `settings unsupported` and ignore the block.
 
 ```yaml
 agents:
@@ -76,53 +78,54 @@ agents:
       api_token: ${API_TOKEN}   # must be a single ${VAR} reference
 ```
 
-Only declared keys are written; every other key in the file is preserved. A key whose last segment is a secret word (token, secret, password, apikey, authorization, credential, in any casing) must be a single `${VAR}` reference; `${VAR}` expands at sync time, an unset variable fails that harness and writes nothing, and expanded values never appear in output. Keys tackroom manages elsewhere (Pi `packages`; Claude `hooks`, `enabledPlugins`, `extraKnownMarketplaces`, `mcpServers`) are refused. The file is backed up before the first modifying write, and `tackroom restore` lists and restores it. Removing a key from `settings:` leaves the native value in place.
-
-## Managed starter files
-
-`setup` copies the starter content into the config root once. The memory code layer under `memory/hooks/` and `memory/lib/` stays managed afterwards: on every `sync`, tackroom
-
-- scaffolds files that are missing,
-- refreshes files it wrote that you have not modified, so an upgraded CLI does not leave an old hook layer behind,
-- removes files a release stopped shipping,
-- and reports, without touching, anything you edited yourself.
-
-Ownership is tracked in `.tackroom-starter.json` at the config root (commit it alongside `tackroom.yaml`). Only content tackroom wrote is ever refreshed or removed, so a customized layer is safe.
-
-Everything else in the starter set — `tackroom.yaml`, `agents/*.md`, `skills/`, `.gitignore` — is your content: tackroom only creates those when they are missing. `AGENTS.md` is yours too; setup only creates it from instructions you already had.
-
-## Memory tier
-
-Choose during setup or reconfigure later:
-
-```bash
-tackroom setup --memory basic      # default
-tackroom setup --memory off
-tackroom setup --memory memsearch
-```
-
-| Tier | Behavior | Dependency |
-|---|---|---|
-| `off` | no managed memory hooks | none |
-| `basic` | appends a bounded digest of each session to `$KNOWLEDGE_DIR/sessions/YYYY-MM-DD.md` and injects recent digests as context at session start | Python 3 |
-| `memsearch` | full-text indexed search over the knowledge vault | `memsearch` on PATH (`uv tool install memsearch`) |
-
-## Periodic sync
-
-`setup` installs an owned job, `tackroom-pull`, that runs `tackroom pull` every 15 minutes: `git pull --ff-only`, then `sync`. A pull failure prints one warning and the sync still runs. Pass `--no-cron` to skip installing it, and `tackroom cron` installs, changes or removes it later (`tackroom cron --interval 15m`, `--deps`, `--remove`). Re-run `tackroom cron` after a PATH change, since the job runs the tackroom binary with the PATH of the shell that installed it. While the job is missing, paused, broken, or its last run failed, `status` prints a warning line and `doctor` has a "periodic sync" check. Without it, edited root instruction files reach the harnesses that read `AGENTS.md` natively only on a manual `tackroom sync`.
+- Only declared keys are written; every other key in the file is kept. Removing a key from `settings:` leaves the native value in place.
+- A key whose last segment ends in `token`, `secret`, `password`, `passwd`, `apikey`, `authorization` or `credential(s)` (any casing) must be a single `${VAR}` reference.
+- `${VAR}` expands at sync time. An unset variable fails that harness and writes nothing; expanded values never appear in output.
+- Keys tackroom manages through another surface are refused: Pi `packages`; Claude Code `hooks`, `enabledPlugins`, `extraKnownMarketplaces`, `mcpServers`.
+- The file is backed up before the first modifying write; `tackroom restore` lists and restores it.
 
 ## Root instructions
 
-`~/.agents/AGENTS.md` is your single root instruction file. During sync, tackroom links it into each harness's native memory path: `~/.config/amp/AGENTS.md` for Amp, `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex, `~/.factory/AGENTS.md` for Droid, `~/.pi/agent/AGENTS.md` for Pi, `~/.omp/agent/AGENTS.md` for OMP, `~/.qwen/QWEN.md` for Qwen Code, `~/.copilot/copilot-instructions.md` for GitHub Copilot CLI, `~/.grok/AGENTS.md` for Grok Build, `~/.gemini/GEMINI.md` for Gemini CLI and Antigravity CLI, and `~/.dsh/AGENTS.md` for DeepSeek Harness. Cursor has no global instructions file, and Kimi Code reads `~/.agents/AGENTS.md` natively, so no root file is written for it; `$COPILOT_HOME`, `$GROK_HOME` and `$DSH_HOME` replace `~/.copilot`, `~/.grok` and `~/.dsh` when set. So an edit in one place reaches every agent. Without `~/.agents/AGENTS.md`, tackroom leaves every agent's instructions file alone. `tackroom status` reports drift; a real file with different content is never replaced without your confirmation, and then only after a backup (`setup`, or `sync --replace-conflicts`). An identical copy is simply relinked.
+`~/.agents/AGENTS.md` is your one root instruction file. Sync links it into each harness's own path:
+
+- Amp `~/.config/amp/AGENTS.md`, Claude Code `~/.claude/CLAUDE.md`, Codex `~/.codex/AGENTS.md`, Factory Droid `~/.factory/AGENTS.md`
+- Pi `~/.pi/agent/AGENTS.md`, OMP `~/.omp/agent/AGENTS.md`, Qwen Code `~/.qwen/QWEN.md`
+- GitHub Copilot CLI `~/.copilot/copilot-instructions.md`, Grok Build `~/.grok/AGENTS.md`, DeepSeek Harness `~/.dsh/AGENTS.md` (`$COPILOT_HOME`, `$GROK_HOME` and `$DSH_HOME` replace the folders when set)
+- Gemini CLI and Antigravity CLI share `~/.gemini/GEMINI.md`
+- Cursor and OpenCode get no root file from tackroom. Kimi Code reads `~/.agents/AGENTS.md` itself, so none is written for it either
+
+Without `AGENTS.md`, tackroom leaves every harness's instructions file alone. `tackroom status` reports drift. A real file with different content is never replaced without your confirmation, and then only after a backup (`setup`, or `sync --replace-conflicts`). An identical copy is relinked.
 
 ### Extra instruction files
 
-Keep voice, profile, or other always-on notes in their own files and list them under `instructions:` in `tackroom.yaml`:
+List voice, profile or other always-on notes under `instructions:`:
 
 ```yaml
 instructions:
-  - SOUL.md                                # relative to the config root
-  - ~/Workspace/knowledge/profile/USER.md  # or anywhere else
+  - SOUL.md                  # relative to the config root
+  - ~/notes/profile.md       # or anywhere else
 ```
 
-Each agent's root doc then carries `AGENTS.md` followed by those files, in order. Claude Code expands `@path` imports, so `~/.claude/CLAUDE.md` becomes a short generated file of import lines and edits show up live. Every other agent reads one plain file, so it gets a generated copy of all the sources: run `tackroom sync` after editing `AGENTS.md` or a listed file, and `tackroom status` reports the copy as drifted until you do. Generated files start with a `Generated by tackroom` comment that names their sources; edit the sources, not the copy. A listed file missing on a machine is skipped and named in status, so a machine without it still syncs the rest. Delete the list, or set `instructions: []` in `tackroom.local.yaml` for one machine, to go back to plain links.
+Each harness's root doc then carries `AGENTS.md` followed by those files, in order. Claude Code expands `@path` imports, so its `CLAUDE.md` becomes a short generated file of import lines and edits show up live. Every other harness reads one plain file, so it gets a generated copy: run `tackroom sync` after editing, and `status` reports the copy as drifted until you do.
+
+Generated files start with a `Generated by tackroom` comment that names their sources; edit the sources, not the copy. A listed file missing on one machine is skipped and named in `status`. Set `instructions: []` in `tackroom.local.yaml` to go back to plain links on that machine.
+
+## Managed starter files
+
+`setup` copies the starter content once. The memory code layer under `memory/hooks/` and `memory/lib/` stays managed: on every `sync`, tackroom scaffolds missing files, refreshes files it wrote that you have not modified, removes files a release stopped shipping, and reports without touching anything you edited.
+
+Ownership is recorded in `.tackroom-starter.json` at the config root; commit it with `tackroom.yaml`. Everything else in the starter set (`tackroom.yaml`, `agents/*.md`, `skills/`, `.gitignore`, `AGENTS.md`) is yours: tackroom only creates it when missing.
+
+## Periodic sync
+
+```bash
+tackroom cron                         # install or replace the job (every 15 minutes)
+tackroom cron --interval 1h           # 5m, 15m, 30m, 1h, 6h, 12h, daily, weekly
+tackroom cron --remove
+```
+
+`setup` installs `tackroom-pull`, which runs `tackroom pull` (`git pull --ff-only`, then `sync`). A failed pull prints one warning and the sync still runs. Re-run `tackroom cron` after a `PATH` change, since the job runs with the `PATH` of the shell that installed it.
+
+While the job is missing, paused, broken or its last run failed, `status` prints a warning and `doctor` has a `periodic sync` check. `setup --no-cron` records `periodic_sync: false` in `tackroom.local.yaml`, which silences that warning; installing the job again clears it.
+
+Without the job, edited root instruction files reach Codex, Pi and OMP only on a manual `tackroom sync`. [crons.md](crons.md#built-in-jobs) describes the job.

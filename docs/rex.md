@@ -1,16 +1,26 @@
-# tackroom in Rex
+# Rex
 
-Rex is a terminal multiplexer (sessions, windows, blocks, clients) with a CLI, Lua scripting and a server API. tackroom integrates with it optionally, in the same shape as the Herdr mod.
+Rex is a terminal multiplexer with sessions, windows, blocks, a CLI and a Lua `do` command. tackroom's only Rex integration today is a `doctor` check; Rex stays optional.
 
-## Shipped
+```bash
+tackroom doctor            # includes a "rex" check
+```
 
-- `tackroom doctor` checks Rex: installed, version, runnable (`checkRex`). An absent Rex reports `skipped` (a pass), never a failure, because Rex is optional.
+## What works
 
-## Planned
+- The `rex` check runs `rex version`. With Rex absent it reports `skipped`, which counts as a pass. With Rex installed but not runnable it warns. Otherwise it prints the version line.
+- tackroom never reads or writes Rex's configuration.
 
-- `tackroom rex`, the same workspace as `tackroom tern`: a session with a shell, `tackroom status` and `tackroom cron collect --table`, built with `rex new` and `rex split`.
-- Run now / Pause / Resume as Lua custom actions (`rex.action` in `init.lua`) that call `tackroom cron run|pause|resume`.
+## Show jobs in a Rex block
 
-## Constraint
+There is no Rex panel. A Rex block is a terminal, so run the inventory in one:
 
-Rex blocks are terminals and Rex 0.1.0 has no plugin surface for other block types, so there is no native Crons panel to build yet. Integration goes through the `rex` CLI (`--json` for machine-readable output), Lua in `init.lua` and `tackroom` CLI verbs, and never edits Rex config behind the person's back.
+```bash
+tackroom status
+tackroom cron collect --table
+```
+
+## Not built
+
+- `tackroom rex`, a counterpart to `tackroom tern` ([tern.md](tern.md)) that would open a ready-made workspace.
+- Run now, Pause and Resume as Rex actions. The verbs they would call exist already: `tackroom cron run|pause|resume` ([crons.md](crons.md)).
