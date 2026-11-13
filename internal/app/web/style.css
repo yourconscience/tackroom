@@ -1,5 +1,5 @@
-/* Data terminal. A 56px icon rail on a #171719 ground; cards a step darker than the ground, lifted by one soft shadow instead of a border.
-   Every figure in IBM Plex Mono so counts and times stack; the text is Public Sans at 13px. Every selection is the same 1px #4a8ad6 line, as wide or as tall as what it marks.
+/* Data terminal in the Graphite theme. A 56px icon rail on the ground; cards on a surface a step off the ground, lifted by one soft shadow instead of a border.
+   Every figure in IBM Plex Mono so counts and times stack; the text is Public Sans at 13px. Every selection is the same 1px ink line, as wide or as tall as what it marks.
    Pictures before words: rings for shares of a whole, dots for each agent cell, one outline icon per kind of thing, and the explanation behind an info mark. */
 @font-face { font-family: "Public Sans"; src: url("./fonts/public-sans-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "Public Sans"; src: url("./fonts/public-sans-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
@@ -8,18 +8,20 @@
 @font-face { font-family: "IBM Plex Mono"; src: url("./fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2"); font-weight: 400; font-display: swap; }
 @font-face { font-family: "IBM Plex Mono"; src: url("./fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 :root {
-  color-scheme: dark;
-  --ground: #171719; --surface: #131217; --raised: #212023;
-  --border: #26252a; --rule: #1f1e23; --control: #3a3a3e;
-  --text: #ffffff; --muted: #b4b4b8; --faint: #919399;
-  --primary: #ffffff; --primary-ink: #0b0b0c; --focus: #4a8ad6; --line: #4a8ad6;
-  --data: #e9e9ec; --switch-on: #f2f2f3; --idle: #6e7076;
-  --positive: #44a282; --negative: #e5566f; --warning: #d9a441;
-  --pill-positive-bg: #1b2828; --pill-positive-ink: #5fc39c;
-  --pill-negative-bg: #2c1a20; --pill-negative-ink: #f07a8e;
-  --pill-warning-bg: #2a2416; --pill-warning-ink: #d9a441;
-  --pill-neutral-bg: #212023; --pill-neutral-ink: #bdbdc0;
-  --code-bg: #0d0d10; --code-text: #e6e6e8;
+  /* Graphite, the site's theme (docs/site/tokens.css). Dark below, light under prefers-color-scheme: light.
+     Ink is the accent; hue appears only for states. */
+  color-scheme: dark light;
+  --ground: #141416; --surface: #1c1c1f; --raised: #26262a;
+  --border: #303035; --rule: #303035; --control: #707077;
+  --text: #f2f2f3; --muted: #b3b3b8; --faint: #9a9aa0;
+  --primary: #f2f2f3; --primary-ink: #111113; --focus: #f2f2f3; --line: #f2f2f3;
+  --data: #e8e8ea; --switch-on: #f2f2f3; --idle: #707077;
+  --positive: #55c38f; --negative: #ff7086; --warning: #f0a54a;
+  --pill-positive-bg: #15271f; --pill-positive-ink: #55c38f;
+  --pill-negative-bg: #2e171c; --pill-negative-ink: #ff7086;
+  --pill-warning-bg: #2c2113; --pill-warning-ink: #f0a54a;
+  --pill-neutral-bg: #26262a; --pill-neutral-ink: #b3b3b8;
+  --code-bg: #101012; --code-text: #e8e8ea; --code-add: #55c38f; --code-del: #ff7086;
   --float-shadow: 0 12px 28px rgba(0, 0, 0, .45);
   --card-shadow: 0 12px 28px rgba(0, 0, 0, .2);
   --radius-card: 6px; --radius-control: 999px; --radius-chip: 4px;
@@ -28,6 +30,23 @@
   --font: "Public Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --fs-title: 26px; --fs-section: 16px; --fs-kpi: 22px; --fs-body: 13px; --fs-small: 12px;
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --ground: #fafafa; --surface: #ffffff; --raised: #f0f0f1;
+    --border: #e3e3e6; --rule: #e3e3e6; --control: #86868c;
+    --text: #111113; --muted: #4d4d53; --faint: #68686e;
+    --primary: #111113; --primary-ink: #ffffff; --focus: #111113; --line: #111113;
+    --data: #111113; --switch-on: #111113; --idle: #86868c;
+    --positive: #17784c; --negative: #c21f3a; --warning: #9c5200;
+    --pill-positive-bg: #e6f3ec; --pill-positive-ink: #17784c;
+    --pill-negative-bg: #fce8eb; --pill-negative-ink: #c21f3a;
+    --pill-warning-bg: #fcf0e1; --pill-warning-ink: #9c5200;
+    --pill-neutral-bg: #f0f0f1; --pill-neutral-ink: #4d4d53;
+    --code-bg: #f2f2f3; --code-text: #111113; --code-add: #17784c; --code-del: #b51c36;
+    --float-shadow: 0 12px 28px rgba(17, 17, 19, .16);
+    --card-shadow: 0 8px 24px rgba(17, 17, 19, .07);
+  }
 }
 
 /* ---------- base ---------- */
@@ -361,8 +380,8 @@ button.cell:disabled { cursor: default; }
 .editor { width: 100%; min-height: 420px; padding: 14px 16px; border: 1px solid var(--control); border-radius: var(--radius-card); background: var(--code-bg); color: var(--code-text); font: 13px/1.6 var(--font-mono); tab-size: 2; resize: vertical; }
 .editor-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .diff { margin: 0; max-height: 360px; overflow: auto; padding: 12px 14px; border-radius: var(--radius-card); background: var(--code-bg); color: var(--code-text); font: 12.5px/1.55 var(--font-mono); white-space: pre; }
-.diff .add { color: #7fd29a; }
-.diff .del { color: #f08a8a; }
+.diff .add { color: var(--code-add); }
+.diff .del { color: var(--code-del); }
 .diff .hunk { color: var(--faint); }
 
 /* ---------- sync panel (floats, so it may cast a shadow) ---------- */

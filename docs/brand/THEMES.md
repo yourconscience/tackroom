@@ -1,6 +1,6 @@
 # Theme candidates
 
-Graphite is the applied theme: `docs/site/tokens.css` and `tokens-graphite.css` hold it. The other three candidates below were explored and not taken. The dashboard and terminal panels are not rethemed yet.
+Graphite is the applied theme: `docs/site/tokens.css` and `tokens-graphite.css` hold it. The other three candidates below were explored and not taken. `tackroom view` now uses Graphite too, in light and dark. The Herdr and Tern panels use only their host's theme slots and tones, so they follow the user's Herdr or Tern theme.
 
 ## Diagnosis
 
@@ -47,7 +47,7 @@ The web view (`tackroom view`) becomes the primary surface; `tackroom tui` and t
 | Surface | Files | What it can style itself |
 |---|---|---|
 | Site, docs | `docs/site/tokens.css`, `style.css`, `tools/sitedocs/docs.css` | Everything. Token swap, then the hero and rail changes above. Instrument also needs IBM Plex Sans woff2 (OFL) in `docs/site/fonts/`. |
-| `tackroom view` | `internal/app/web/style.css`, `index.html`, `app.js` | Everything; today it has its own token set. Logo symbol in `index.html` is the old lavender one. |
+| `tackroom view` | `internal/app/web/style.css`, `index.html`, `app.js` | Everything. Its own variables now hold the Graphite values, light and dark, and the logo symbol in `index.html` is the Graphite mark. |
 | Herdr | `herdr/mods/tackroom/main.js`, `herdr/layouts/tackroom.json` | Layout, sizes, glyphs, labels and which `theme()` slot each element uses. Herdr cannot embed a web page, so the panel stays native; to carry the theme it would pass token values as colours instead of slots, which fights the user's Herdr theme. Sentence-case its uppercase section titles. It already opens the full view with `exec`. |
 | Tern | `tern/plugins/tackroom-crons/` | The native block takes span tones only. Tern's browser block beside a pane, with `tern web serve`, can host the compact web view itself, so in Tern the theme applies in full. |
 | Claude Code pane | `claude/hooks/register.tsx` | Ink colour names (success, warning, error, inactive), bold and dim. No palette. |
