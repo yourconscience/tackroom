@@ -295,7 +295,7 @@ func harnessState(r agentReport) string {
 	case !r.Detected:
 		return ui.Dim.Render("not detected")
 	case !r.Synced:
-		return ui.Mark("fail") + " " + ui.Yellow.Render("drifted")
+		return ui.Mark("warn") + " " + ui.Yellow.Render("drifted")
 	default:
 		return ui.Mark("ok") + " " + ui.Green.Render("synced")
 	}
@@ -662,7 +662,7 @@ func writeHarnessStatus(b *strings.Builder, report agentReport, repoRoot string,
 	if report.Synced {
 		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("ok"), ui.Green.Render("synced"))
 	} else {
-		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("fail"), ui.Yellow.Render("drifted"))
+		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("warn"), ui.Yellow.Render("drifted"))
 	}
 
 	if verbose {
