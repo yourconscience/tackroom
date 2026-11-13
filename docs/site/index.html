@@ -41,6 +41,7 @@
   <symbol id="i-pin" viewBox="0 0 256 256"><path d="M235.32,81.37,174.63,20.69a16,16,0,0,0-22.63,0L98.37,74.49c-10.66-3.34-35-7.37-60.4,13.14a16,16,0,0,0-1.29,23.78L85,159.71,42.34,202.34a8,8,0,0,0,11.32,11.32L96.29,171l48.29,48.29A16,16,0,0,0,155.9,224c.38,0,.75,0,1.13,0a15.93,15.93,0,0,0,11.64-6.33c19.64-26.1,17.75-47.32,13.19-60L235.33,104A16,16,0,0,0,235.32,81.37ZM224,92.69h0l-57.27,57.46a8,8,0,0,0-1.49,9.22c9.46,18.93-1.8,38.59-9.34,48.62L48,100.08c12.08-9.74,23.64-12.31,32.48-12.31A40.13,40.13,0,0,1,96.81,91a8,8,0,0,0,9.25-1.51L163.32,32,224,92.68Z"/></symbol>
   <symbol id="i-timer" viewBox="0 0 256 256"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,216ZM173.66,90.34a8,8,0,0,1,0,11.32l-40,40a8,8,0,0,1-11.32-11.32l40-40A8,8,0,0,1,173.66,90.34ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></symbol>
   <symbol id="i-audit" viewBox="0 0 256 256"><path d="M220,160a12,12,0,1,1-12-12A12,12,0,0,1,220,160Zm-4.55,39.29A48.08,48.08,0,0,1,168,240H144a48.05,48.05,0,0,1-48-48V151.49A64,64,0,0,1,40,88V40a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56V88a48,48,0,0,0,48.64,48c26.11-.34,47.36-22.25,47.36-48.83V48H136a8,8,0,0,1,0-16h24a8,8,0,0,1,8,8V87.17c0,32.84-24.53,60.29-56,64.31V192a32,32,0,0,0,32,32h24a32.06,32.06,0,0,0,31.22-25,40,40,0,1,1,16.23.27ZM232,160a24,24,0,1,0-24,24A24,24,0,0,0,232,160Z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H40a8,8,0,0,1,0-16H216A8,8,0,0,1,224,128ZM40,72H216a8,8,0,0,0,0-16H40a8,8,0,0,0,0,16ZM216,184H40a8,8,0,0,0,0,16H216a8,8,0,0,0,0-16Z"/></symbol>
 </svg>
 <a class="skip" href="#main">Skip to content</a>
 
@@ -68,20 +69,36 @@
         </div>
         <a class="second" href="#start">Other ways to install</a>
       </div>
-      <figure class="term">
-        <figcaption>$ tackroom status (excerpt, demo home)</figcaption>
-<pre>repo   <span class="o">✓</span> ~/.agents
-sources
-  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>  https://github.com/acme/agent-skills
-
-claude   <span class="o">✓ synced</span>
-  managed     3 skills · 6 agents · 1 mcp
-<span class="d">...</span>
-Everything is synced.
-
-held or blocked (skipped by sync)
-  <span class="r"><b>blocked</b></span> skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."
-  <span class="y"><b>held</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); hold ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
+      <figure class="vw-frame">
+        <figcaption>tackroom view, Overview at tablet width (demo home, excerpt)</figcaption>
+        <div class="vw" role="img" aria-label="The Overview tab of tackroom view: all synced. Outside sources: agent-skills pinned at b09718b; lint-skills held until Saturday, with the command that takes it now; shell-kit blocked by one critical audit finding, with the command that accepts it. Agents claude, codex and pi synced.">
+          <div class="vw-bar"><img src="logo.svg" width="24" height="24" alt=""><b>tackroom</b><svg class="ico vw-menu" aria-hidden="true"><use href="#i-menu"/></svg></div>
+          <div class="vw-body">
+            <div class="vw-top"><b class="vw-h">Overview</b><span class="vw-chip"><svg class="ico ok" aria-hidden="true"><use href="#i-ok"/></svg>All synced</span><span class="vw-btn">Sync</span></div>
+            <div class="vw-title"><svg class="ico" aria-hidden="true"><use href="#i-pin"/></svg>Outside sources<span class="vw-count">3</span></div>
+            <ul class="vw-list">
+              <li>
+                <div class="vw-head"><svg class="ico pin" aria-hidden="true"><use href="#i-pin"/></svg><b>agent-skills</b><span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>b09718b</code></span></span><span class="tag t-ok"><span class="g">✓</span><span class="w">audit pass</span></span></div>
+                <span class="vw-meta">github.com/acme/agent-skills</span>
+              </li>
+              <li>
+                <div class="vw-head"><svg class="ico warn" aria-hidden="true"><use href="#i-timer"/></svg><b>lint-skills</b><span class="tag t-warn"><span class="g">!</span><span class="w">held until <code>Sat 23:38</code></span></span><span class="tag t-ok"><span class="g">✓</span><span class="w">audit pass</span></span></div>
+                <span class="vw-meta">github.com/example/lint-skills · new 6100a81</span>
+                <code class="vw-cmd">tackroom sync --allow-fresh=skill:lint-skills</code>
+              </li>
+              <li>
+                <div class="vw-head"><svg class="ico bad" aria-hidden="true"><use href="#i-audit"/></svg><b>shell-kit</b><span class="tag t-bad"><span class="g">✗</span><span class="w">blocked</span></span><span class="tag t-bad"><span class="g">✗</span><span class="w">audit <code>1 critical</code></span></span></div>
+                <span class="vw-meta">github.com/example/shell-kit</span>
+                <code class="vw-cmd">tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."</code>
+              </li>
+            </ul>
+            <ul class="vw-list vw-agents">
+              <li><img src="marks/claude.svg" width="28" height="28" alt=""><span><b>claude</b><span class="vw-ok"><svg class="ico ok" aria-hidden="true"><use href="#i-ok"/></svg>synced</span></span><span class="vw-switch"></span></li>
+              <li><img src="marks/codex.svg" width="28" height="28" alt=""><span><b>codex</b><span class="vw-ok"><svg class="ico ok" aria-hidden="true"><use href="#i-ok"/></svg>synced</span></span><span class="vw-switch"></span></li>
+              <li><img src="marks/pi.svg" width="28" height="28" alt=""><span><b>pi</b><span class="vw-ok"><svg class="ico ok" aria-hidden="true"><use href="#i-ok"/></svg>synced</span></span><span class="vw-switch"></span></li>
+            </ul>
+          </div>
+        </div>
       </figure>
     </div>
   </section>
@@ -274,6 +291,21 @@ skipped 1 blocked and 1 held item(s); see tackroom status</pre>
             <h3>Check</h3>
             <p><code>tackroom view</code> opens the dashboard you work in: every agent's sync state, each outside source as pinned, held or blocked, and your scheduled jobs, on a desktop or a phone. From a shell, <code>tackroom status</code> shows what is synced, held or blocked, <code>tackroom doctor</code> checks skills, roles, pins, audits and hooks, and <code>tackroom tui</code> shows the same state in a full-screen terminal view.</p>
           </div>
+          <figure class="term">
+            <figcaption>$ tackroom status (excerpt, demo home)</figcaption>
+<pre>repo   <span class="o">✓</span> ~/.agents
+sources
+  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>  https://github.com/acme/agent-skills
+
+claude   <span class="o">✓ synced</span>
+  managed     3 skills · 6 agents · 1 mcp
+<span class="d">...</span>
+Everything is synced.
+
+held or blocked (skipped by sync)
+  <span class="r"><b>blocked</b></span> skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."
+  <span class="y"><b>held</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); hold ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
+          </figure>
         </li>
       </ol>
       <!-- SLOT (not in this release): dashboard screenshot of `tackroom view` (Overview) from the demo home, 2880x1800 (16:10).
