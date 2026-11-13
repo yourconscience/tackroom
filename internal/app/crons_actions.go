@@ -8,12 +8,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 // The Crons tab's actions (docs/crons.md, "View actions"): run, pause and
@@ -165,113 +162,11 @@ func runLaunchdAction(job cronJob, action string) (string, error) {
 	return strings.TrimSpace(string(out)), nil
 }
 
-// setOwnedCronSchedule rewrites crons.jobs.<id>.schedule in the file that
-// declares the job (a tackroom.local.yaml entry replaces the shared one by id,
-// so it wins even without a schedule of its own), then runs `cron apply`,
-// which replaces the unit. The edit holds the cron apply lock, so two edits
-// never interleave, and keeps the file's permissions.
+// setOwnedCronSchedule changes the schedule of an owned job on this machine:
+// an edit of crons.jobs.<id>.schedule in the file that declares the job (a
+// tackroom.local.yaml entry replaces the shared one by id, so it wins), then
+// `cron apply`, which replaces the unit. See crons_jobs.go.
 func setOwnedCronSchedule(sharedPath, id, schedule string) (string, error) {
-	schedule = strings.TrimSpace(schedule)
-	if _, err := parseOwnedSchedule(schedule); err != nil {
-		return "", err
-	}
-	if _, err := cronToCalendarIntervals(schedule); err != nil {
-		return "", err
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	shared, err := resolveConfigPath(sharedPath, home)
-	if err != nil {
-		return "", err
-	}
-	path, err := writeOwnedCronSchedule(shared, id, schedule, home)
-	if err != nil {
-		return "", err
-	}
-	exe, err := os.Executable()
-	if err != nil {
-		return "", err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, exe, "cron", "apply", "--config", shared).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("saved the schedule in %s, but cron apply failed: %s", displayPath(path, home), commandFailure(out, err))
-	}
-	return strings.TrimSpace(string(out)), nil
-}
-
-// writeOwnedCronSchedule edits the declaring file under the cron apply lock
-// (released before `cron apply` takes it) and returns that file's path.
-func writeOwnedCronSchedule(shared, id, schedule, home string) (string, error) {
-	unlock, err := lockCronApply(home)
-	if err != nil {
-		return "", err
-	}
-	defer unlock()
-	path := filepath.Join(filepath.Dir(shared), "tackroom.local.yaml")
-	root, job, err := cronJobNode(path, id)
-	if err != nil {
-		return "", err
-	}
-	if job == nil {
-		path = shared
-		if root, job, err = cronJobNode(path, id); err != nil {
-			return "", err
-		}
-	}
-	if job == nil {
-		return "", fmt.Errorf("crons.jobs.%s is not declared in %s or %s", id, filepath.Base(shared), "tackroom.local.yaml")
-	}
-	node := dshMappingValue(job, "schedule")
-	if node == nil {
-		node = &yaml.Node{Kind: yaml.ScalarNode}
-		job.Content = append(job.Content, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: "schedule"}, node)
-	} else if node.Kind != yaml.ScalarNode {
-		return "", fmt.Errorf("crons.jobs.%s.schedule in %s is not a string", id, path)
-	}
-	node.Value, node.Tag, node.Style = schedule, "!!str", yaml.DoubleQuotedStyle
-	data, err := marshalConfigYAML(root)
-	if err != nil {
-		return "", err
-	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return "", err
-	}
-	if err := atomicConfigWrite(path, data, info.Mode().Perm()); err != nil {
-		return "", err
-	}
-	return path, nil
-}
-
-// cronJobNode parses path and returns its document and the mapping at
-// crons.jobs.<id>, or a nil job when the file or the entry is absent.
-func cronJobNode(path, id string) (*yaml.Node, *yaml.Node, error) {
-	data, err := os.ReadFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil, nil
-	}
-	if err != nil {
-		return nil, nil, err
-	}
-	var root yaml.Node
-	if err := yaml.Unmarshal(data, &root); err != nil {
-		return nil, nil, fmt.Errorf("parse %s: %w", path, err)
-	}
-	if len(root.Content) == 0 {
-		return &root, nil, nil
-	}
-	node := root.Content[0]
-	for _, key := range []string{"crons", "jobs", id} {
-		if node = dshMappingValue(node, key); node == nil {
-			return &root, nil, nil
-		}
-	}
-	if node.Kind != yaml.MappingNode {
-		return &root, nil, fmt.Errorf("crons.jobs.%s in %s is not a mapping", id, path)
-	}
-	return &root, node, nil
+	res, err := changeCronJob(sharedPath, cronJobChange{Action: "edit", ID: id, Schedule: &schedule, LocalOnly: true})
+	return strings.Join(res.Plan, "\n"), err
 }
