@@ -13,6 +13,30 @@ tackroom skill info <name>   # one skill across harnesses
 
 Harnesses that read `~/.agents/skills/` natively (OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, Kimi Code, DeepSeek Harness) get a mirror in their own skill root only when the config root is not `~/.agents`. Qwen Code and Amp read the canonical folder through their own settings (`skills.directories`, `amp.skills.path`), so no mirror is created.
 
+## Where a skill came from
+
+```bash
+tackroom skill list [--agents a,b]   # every entry in each harness skill root, with provenance
+tackroom skill info <name>           # one skill: its canonical folder and how each harness sees it
+```
+
+Both only read. `skill list` prints, for each detected harness, every entry in its skill root with one of these labels, then the context cost of the skill listing: name and description bytes and an estimated token count. A harness that is not on `PATH` prints `not detected`.
+
+| Label | Meaning |
+|---|---|
+| `managed (local)` | A link to a skill in your config root. |
+| `managed (external: acme/agent-skills@774ddc2)` | A link to an external source's skill, pinned at that commit. `(unpinned)` replaces the commit while the lock has no pin. |
+| `missing (not linked)` | Expected but absent. `sync` creates the link. |
+| `drifted symlink -> TARGET` | The link points somewhere other than the canonical folder. |
+| `stale managed (...)` | A link into the store for a skill that is no longer canonical. `sync` removes it. |
+| `conflict (real dir, differs from canonical)` | A real folder with the same name and different content. That harness is left alone until `sync --replace-conflicts`. |
+| `unmanaged dir` | A real folder tackroom did not put there. |
+| `foreign symlink -> TARGET` | A link tackroom did not create. |
+| `external cache link -> TARGET` | A link into the external source cache that this harness is not expected to have. |
+| `broken symlink -> TARGET` | A link whose target no longer exists. |
+
+Amp and Qwen Code read the canonical folder through their own settings, so they print `managed (N): names` and an `integration:` line instead of one row per skill.
+
 ## Add an external source
 
 Pulling skills from other people's repos is installing prompt code from strangers, so it is a separate step and never part of setup.
@@ -76,10 +100,25 @@ Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing 
 
 ## Plugins
 
-An external source with an [agent-plugins-spec](https://agent-plugins.org) `plugin.json` is audited as `plugin:<name>`, and its name and version are recorded in the lock. Set `mcp: true` on the source (and optionally `mcp_agents: [...]`) to register the MCP servers from the plugin's `mcp.json`.
+An external source with an [agent-plugins-spec](https://agent-plugins.org) `plugin.json` is audited as `plugin:<name>`, and its name and version are recorded in the lock. Claude Code plugins in your config root, the spec sources and the Claude Code and Pi panels are covered in [plugins.md](plugins.md).
 
-Claude Code plugins stay in Claude Code's native layout. Put each plugin under the config root and list it in `.claude-plugin/marketplace.json`. `sync` registers the config root as a directory marketplace in `~/.claude/settings.json` and enables each relative-path plugin.
+## Publish skills
 
-Claude Code reads the plugin in place, so there is no install step; run `/reload-plugins` after an edit. A plugin you turn off in `/plugin` stays off. Entries with `defaultEnabled: false`, entries that point at the config root itself and remote sources are left for you.
+```bash
+tackroom publish --dry-run                   # the plan: create, update or skip per skill
+tackroom publish [--target NAME] [--skills a,b] [--yes] [--json]
+```
 
-Codex has no native plugin projection in tackroom yet: Codex loads plugins only from its own cache, filled by `codex plugin add`.
+`publish` is the outward counterpart of external sources: it uploads skills from your config root to a remote skill registry, the OpenAI skills API. Declare an opt-in target with an explicit allowlist, because only the skills you name are ever uploaded:
+
+```yaml
+publish_targets:
+  - name: openai
+    kind: openai-skills           # the only kind today
+    enabled: true                 # a target does nothing until this is set
+    skills: [review-checklist]
+    api_key_env: OPENAI_API_KEY   # the env var that holds the key; this is the default
+    version_strategy: new-version # or set-default, which also makes the new version the default
+```
+
+A skill whose bundle is unchanged since the last run is skipped; a changed one gets a new version. `tackroom.lock` records the returned id and version under `published_skills`. A real upload prints a warning that the registry is US-only with no Zero Data Retention, even with `--yes`; without `--yes` it then shows the plan and asks `Proceed? [y/N]`. Do not publish skills that carry secrets or private notes.

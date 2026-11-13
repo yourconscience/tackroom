@@ -1,6 +1,6 @@
 # Setup
 
-`tackroom setup` creates your config repo, imports what your harnesses already have, runs the first sync and installs the periodic sync job. This page also covers multi-machine use, the web view, per-harness settings and root instructions.
+`tackroom setup` creates your config repo, imports what your harnesses already have, runs the first sync and installs the periodic sync job. This page also covers multi-machine use, the web view in brief, per-harness settings and root instructions.
 
 ```bash
 tackroom setup                        # detect harnesses, review imports, first sync
@@ -10,7 +10,7 @@ tackroom setup --yes --no-cron        # unattended: default answer to every prom
 
 Other flags: `--memory off|basic|memsearch` (default `basic`, see [memory.md](memory.md)), `--agents a,b` to limit the run to named harnesses, `--json` for the detection result, `--config PATH`.
 
-Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agents:` lists: Claude Code `claude`, Codex `codex`, Factory Droid `droid`, OMP `omp`, OpenCode `opencode`, Pi `pi`, Qwen Code `qwen-code`, Cursor `cursor`, Gemini CLI `gemini`, GitHub Copilot CLI `copilot`, Grok Build `grok`, DeepSeek Harness `dsh`, Antigravity CLI `agy`, Kimi Code `kimi`, Amp `amp`. The former key `claude-code` still works.
+Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agents:` lists: Claude Code `claude`, Codex `codex`, Factory Droid `droid`, OMP `omp`, OpenCode `opencode`, Pi `pi`, Qwen Code `qwen-code`, Cursor `cursor`, Gemini CLI `gemini`, GitHub Copilot CLI `copilot`, Grok Build `grok`, DeepSeek Harness `dsh`, Antigravity CLI `agy`, Kimi Code `kimi`, Amp `amp`. The former key `claude-code` still works. What each harness gets, and the executable that detects it, is in [harnesses.md](harnesses.md).
 
 ## What setup does
 
@@ -45,24 +45,9 @@ git push -u origin main
 
 ```bash
 tackroom view                         # opens the loopback web UI
-tackroom view --no-open --addr 127.0.0.1:8765
-tackroom config validate
-tackroom config print
 ```
 
-The view has seven tabs: Overview, Skills, Roles, MCP & hooks, Unmanaged, Crons and Config. The Config tab edits `tackroom.yaml` and `tackroom.local.yaml` as separate layers; the merged result is read-only. Saving never runs `sync`; Sync opens a per-harness plan and each destructive item has to be ticked before it applies.
-
-The server listens on loopback only and checks origin and CSRF on every change. Requests straight to `http://127.0.0.1:PORT` need no token. Requests through a proxy need the session: a one-time startup token swapped for an `HttpOnly`, `SameSite=Strict` cookie. On a machine shared with other users, anyone who can reach its loopback can use the view.
-
-- The token lives in `view.token` under `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`), or at `--token-file`, so the URL survives restarts.
-- A second `tackroom view` opens the running one instead of starting another.
-- `--ssh-host user@host`, or running inside an SSH session, prints an `ssh -L` tunnel command.
-- For HTTPS over a tailnet you expose the loopback port yourself; `--secure-cookie` applies to requests through the proxy:
-
-```bash
-tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765
-tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
-```
+The view is a local dashboard over your config with a per-harness sync plan. It listens on loopback only, and saving never runs `sync`. Tabs, the token file, remote access and what it can change are in [view.md](view.md).
 
 ## Per-harness settings
 

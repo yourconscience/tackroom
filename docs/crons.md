@@ -81,7 +81,7 @@ claude plugin install tackroom --marketplace yourconscience/tackroom
 pi install git:github.com/yourconscience/tackroom@v2.0.0
 ```
 
-The Claude Code plugin takes two options in `/config`: `tackroom`, the program to run, and `config`, the full path of a config file other than the default. On a Pi agent with a `packages` list in `tackroom.yaml`, add the `git:` entry there instead, because sync writes that list as a whole.
+The Claude Code plugin takes two options in `/config`: `tackroom`, the program to run, and `config`, the full path of a config file other than the default. On a Pi agent with a `packages` list in `tackroom.yaml`, add the `git:` entry there instead, because sync writes that list as a whole. The same install steps are in [plugins.md](plugins.md#tackroom-in-claude-code-and-pi).
 
 ## The `crons:` manifest
 
