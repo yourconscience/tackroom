@@ -319,6 +319,10 @@ The script refuses to run unless the tree is clean, `HEAD` matches `origin/main`
 
 Project-level generators (rulesync, ruler) win on tool breadth; tackroom is user-level. One private repo, fifteen targets deep, pinned externals, review-first memory. Full table in [docs/comparison.md](docs/comparison.md).
 
+## Contributing
+
+Bug fixes are welcome directly. For anything bigger, open an issue first. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## License
 
 [MIT](./LICENSE)
