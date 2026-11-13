@@ -39,12 +39,14 @@ var starterManagedPrefixes = []string{"memory/hooks/", "memory/lib/"}
 // The manifest takes over for every release after v0.9.0, so this table is a
 // one-time bridge and does not need to grow with each release.
 var legacyStarterHashes = map[string][]string{
-	// Refreshed when they still match the v0.8.0 content.
+	// Refreshed when they still match the v0.8.0 content. The sync entries are
+	// no longer shipped, so a matching file is removed instead.
 	"memory/hooks/common.sh":               {"f13b590485d585d2d3d73a87feffc885737bf33202daf558c37d22c4c3127ca3"},
 	"memory/hooks/session-end.sh":          {"6d1cb6e961d3b2a4179d7efbae41de0882a9eec6a8f322acb9f76f39917fafc8"},
 	"memory/hooks/stop.sh":                 {"6d98219c8a2e6d019e2001917a30664f04cdedb0c3eda91e7e0e2db696814f3c"},
 	"memory/hooks/sync-memory-to-vault.sh": {"7d6689ad7a1cf6188d19e8cd71879f0e2a752cbe033827d6daf6928327b99d26"},
 	"memory/hooks/sync-vault-to-memory.sh": {"3b9df7dd08e9a9d45977a7d0b2e44b01e7a680162127e23ad5eea0f1399e9c81"},
+	"memory/hooks/sync.sh":                 {"d9ea8186f073426738903af3f0b60942d39006789d145e2f14da29c651cdbee6"},
 	"memory/lib/basic_memory.py":           {"effd29bac6e8d75bc70b150e84833e3157eda6928a6f974a62ca54e3142a0900"},
 	"memory/lib/sync.py":                   {"5bb300805c1cfc7f673150e4c8bfbcdaf65db882720033f46c34df2ec78523ea"},
 	// Removed when they still match the content a past release shipped.

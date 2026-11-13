@@ -196,22 +196,13 @@ func migrateLegacyMemoryHookPaths(home string, roots ...string) (int, error) {
 		filepath.Join(homeAgents, "bin", "memsearch", "hook.sh") + " stop":          filepath.Join(homeAgents, "memory", "hooks", "stop.sh"),
 		filepath.Join(homeAgents, "bin", "memsearch", "hook.sh") + " session-end":   filepath.Join(homeAgents, "memory", "hooks", "session-end.sh"),
 		"~/.agents/bin/memsearch/finalize.sh":                                       "~/.agents/memory/hooks/session-end.sh",
-		"~/.agents/bin/memsearch/hermes-finalize.sh":                                "~/.agents/memory/hooks/session-end.sh",
-		"~/.agents/bin/memsearch/sync.sh":                                           "~/.agents/memory/hooks/sync.sh",
-		"~/.agents/bin/memsearch/sync-memory-to-vault.sh":                           "~/.agents/memory/hooks/sync-memory-to-vault.sh",
-		"~/.agents/bin/memsearch/sync-vault-to-memory.sh":                           "~/.agents/memory/hooks/sync-vault-to-memory.sh",
 		filepath.Join(homeAgents, "bin", "memsearch", "finalize.sh"):                filepath.Join(homeAgents, "memory", "hooks", "session-end.sh"),
-		filepath.Join(homeAgents, "bin", "memsearch", "hermes-finalize.sh"):         filepath.Join(homeAgents, "memory", "hooks", "session-end.sh"),
-		filepath.Join(homeAgents, "bin", "memsearch", "sync.sh"):                    filepath.Join(homeAgents, "memory", "hooks", "sync.sh"),
-		filepath.Join(homeAgents, "bin", "memsearch", "sync-memory-to-vault.sh"):    filepath.Join(homeAgents, "memory", "hooks", "sync-memory-to-vault.sh"),
-		filepath.Join(homeAgents, "bin", "memsearch", "sync-vault-to-memory.sh"):    filepath.Join(homeAgents, "memory", "hooks", "sync-vault-to-memory.sh"),
 	}
 
 	paths := []string{
 		filepath.Join(home, ".claude", "settings.json"),
 		filepath.Join(home, ".factory", "hooks.json"),
 		filepath.Join(home, ".factory", "settings.json"),
-		filepath.Join(home, ".hermes", "config.yaml"),
 	}
 	for _, root := range roots {
 		if root == "" {

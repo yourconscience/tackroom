@@ -1,8 +1,8 @@
 # memory
 
-Agent-agnostic session memory and private Hermes-vault synchronization for
-tackroom. Session capture writes bounded, redacted digests; it never promotes
-facts into durable profile or agent instructions automatically.
+Agent-agnostic session memory for tackroom. Session capture writes bounded,
+redacted digests; it never promotes facts into durable profile or agent
+instructions automatically.
 
 ## Setup and shipped tools
 
@@ -27,12 +27,11 @@ packages in its root module, while setup materializes each embedded
 
 ## One capture and consolidation pipeline
 
-All locally captured Amp, Droid/Factory, Hermes, Codex, OMP-compatible, and
-Claude fallback payloads are normalized by `lib/basic_memory.py` and written as
-the same digest format under `$KNOWLEDGE_DIR/sessions`. Provider-specific code
-only classifies payloads or loads a provider-owned session file. The shared
-shell helper performs the one bounded, non-overlapping refresh after a new
-digest or a successful Hermes bridge sync.
+All locally captured Amp, Droid/Factory, Codex, OMP-compatible, and Claude
+fallback payloads are normalized by `lib/basic_memory.py` and written as the
+same digest format under `$KNOWLEDGE_DIR/sessions`. Provider-specific code only
+classifies payloads. The shared shell helper performs the one bounded,
+non-overlapping refresh after a new digest.
 
 `rem dream` is the only supported consolidation workflow:
 
@@ -53,19 +52,14 @@ The CLI only manages hooks exposed by the harness registry:
 
 - Claude Code, Codex, and Droid/Factory: verified start/stop/end events as
   available for the selected tier.
-- Hermes: verified native session events, including the existing Hermes vault
-  bridge wrappers.
 - Amp, OMP, and Pi: no managed hook installation. The dispatcher retains cheap
   compatibility for legacy Amp/OMP payloads, but users should not treat that as
   a managed native integration.
-
-`hooks/sync.sh` remains solely for legacy path migration.
 
 ## Layout
 
 - `hooks/` — managed lifecycle wrappers and the shared refresh helper
 - `lib/basic_memory.py` — payload normalization, digest capture, and start context
-- `lib/sync.py` — Hermes memory ↔ vault bridge (no index implementation)
 - `lib/safety.py` — locking, redaction, and safe filesystem helpers
 - `tools/rem/`, `tools/knowledge-sync/` — shipped Go package sources
 - `tools/memsearch/` — optional memsearch parity guidance
