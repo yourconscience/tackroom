@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func runSetup(opts runOptions) error {
@@ -156,16 +157,22 @@ func runSetup(opts runOptions) error {
 	if err := runSync(syncOpts); err != nil {
 		return err
 	}
-	if !opts.NoCron {
-		// Setup is the one place besides `tackroom cron` that installs the
-		// job. A scheduler that cannot take it must not fail the setup. An
-		// installed job is left alone, so a chosen --interval survives.
-		if job, _ := readPeriodicSync(); job != nil {
-			return nil
+	if opts.NoCron {
+		// --no-cron is an explicit opt-out, recorded so doctor does not warn
+		// about a job the user chose not to install.
+		if err := setLocalPeriodicSync(configPath, home, false); err != nil {
+			fmt.Fprintf(streams.out, "warning: could not record periodic_sync: false: %v\n", err)
 		}
-		if err := installPeriodicSync(cronOptions{runOptions: syncOpts}); err != nil {
-			fmt.Fprintf(streams.out, "warning: periodic sync not installed: %v\nfix and retry: tackroom cron\n", err)
-		}
+		return nil
+	}
+	// Setup is the one place besides `tackroom cron` that installs the job.
+	// A scheduler that cannot take it must not fail the setup. An installed
+	// job is left alone, so a chosen --interval survives.
+	if job, _ := readPeriodicSync(); job != nil {
+		return nil
+	}
+	if err := installPeriodicSync(cronOptions{runOptions: syncOpts}); err != nil {
+		fmt.Fprintf(streams.out, "warning: periodic sync not installed: %v\nfix and retry: tackroom cron\n", err)
 	}
 	return nil
 }
@@ -308,23 +315,38 @@ func configSkillsDirValue(home string, target string) string {
 }
 
 func runPull(opts runOptions) error {
-	repoRoot, _, _, _, err := loadContext(opts)
+	repoRoot, home, _, _, err := loadContext(opts)
 	if err != nil {
 		return err
 	}
 
-	// A git step that cannot fast-forward (no remote, offline, diverged, dirty
-	// tree, not a repository) must not stop the sync: the local copy still
-	// has to reach the harnesses. The exit code reflects the sync only.
-	out, err := exec.Command("git", "-C", repoRoot, "pull", "--ff-only").CombinedOutput()
-	if err != nil {
-		msg := firstLine(strings.TrimSpace(string(out)))
-		if msg == "" {
-			msg = err.Error()
+	// The git step is skipped quietly when it cannot do anything: no git
+	// repository, no remote, or no upstream. A pull that cannot fast-forward
+	// (offline, diverged, dirty tree) must still not stop the sync: the local
+	// copy has to reach the harnesses, and the exit code reflects the sync
+	// only. Either way the outcome is recorded so status and doctor can
+	// surface a machine that has stopped receiving updates.
+	if shouldPull(repoRoot) {
+		now := time.Now().UTC().Format(time.RFC3339)
+		out, err := exec.Command("git", "-C", repoRoot, "pull", "--ff-only").CombinedOutput()
+
+		prev, _ := readPullState(home)
+		state := pullState{LastAttempt: now, LastSuccess: prev.LastSuccess}
+		if err != nil {
+			state.Failed = true
+			state.Error = gitErrorLine(string(out))
+			if state.Error == "" {
+				state.Error = err.Error()
+			}
+			fmt.Fprintf(os.Stderr, "warning: git pull --ff-only failed, syncing the local copy: %s\n", state.Error)
+		} else {
+			state.Failed = false
+			state.Error = ""
+			state.LastSuccess = now
+			os.Stdout.Write(out)
 		}
-		fmt.Fprintf(os.Stderr, "warning: git pull --ff-only failed, syncing the local copy: %s\n", msg)
-	} else {
-		os.Stdout.Write(out)
+		// A failed state write must not fail the pull.
+		_ = writePullState(home, state)
 	}
 
 	return runSync(opts)
@@ -401,7 +423,18 @@ func runCron(opts cronOptions) error {
 	if err != nil {
 		return err
 	}
-	return runCronPlan(plan, backend, home, legacy, false)
+	if err := runCronPlan(plan, backend, home, legacy, false); err != nil {
+		return err
+	}
+	if !opts.Remove && !opts.Deps {
+		// Installing the pull job opts back into periodic sync: drop an
+		// earlier `periodic_sync: false` in the local overlay so the default
+		// (true) applies again.
+		if err := setLocalPeriodicSync(configPath, home, true); err != nil {
+			return fmt.Errorf("re-enable periodic sync in %s: %w", filepath.Join(filepath.Dir(configPath), "tackroom.local.yaml"), err)
+		}
+	}
+	return nil
 }
 
 // cronJobForOptions is the built-in job. It runs the tackroom binary directly

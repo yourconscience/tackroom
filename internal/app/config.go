@@ -62,6 +62,9 @@ func mergeConfig(base *config, overlay config) {
 	if overlay.ContextNoteTokens != nil {
 		base.ContextNoteTokens = overlay.ContextNoteTokens
 	}
+	if overlay.PeriodicSync != nil {
+		base.PeriodicSync = overlay.PeriodicSync
+	}
 	if overlay.Instructions != nil {
 		base.Instructions = append([]string(nil), overlay.Instructions...)
 	}
