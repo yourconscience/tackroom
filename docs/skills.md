@@ -94,7 +94,7 @@ tackroom doctor audit accept skill:<name> <rule> --reason "..."
 tackroom doctor audit revoke skill:<name> <rule>
 ```
 
-New or changed external content with an unaccepted CRITICAL finding is skipped by sync, and the previous pin stays. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
+New or changed external content with an unaccepted CRITICAL finding is skipped by sync, and the previous pin stays. CRITICAL means a prompt-injection phrase, a secret sent out or a credential file read, invisible tag characters, or a download piped into a shell (rule `remote-exec`). A match inside a Markdown code fence or a script comment counts one level lower, so a documented example is HIGH and does not block. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
 
 Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing. A git commit date is a weaker time source than a registry publish time.
 
