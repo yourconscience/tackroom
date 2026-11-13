@@ -436,7 +436,7 @@ func initHarnesses() {
 				Expected:      func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 				NoSetupImport: true,
 			},
-			IntegrationNote: "skills go to ~/.gemini/antigravity-cli/skills (CLI only, not Gemini CLI's ~/.gemini/skills); MCP to ~/.gemini/config/mcp_config.json and hooks to ~/.gemini/config/hooks.json (Gemini CLI reads neither); no roles (tools default unverified); root file ~/.gemini/GEMINI.md is shared with Gemini CLI",
+			IntegrationNote: "skills go to ~/.gemini/antigravity-cli/skills (CLI only, not Gemini CLI's ~/.gemini/skills); MCP to ~/.gemini/config/mcp_config.json and hooks to ~/.gemini/config/hooks.json (Gemini CLI reads neither); roles are not rendered yet (agy supports custom agents in ~/.gemini/config/agents, but its tool-name mapping is unverified and `tools` defaults to empty); root file ~/.gemini/GEMINI.md is shared with Gemini CLI",
 			doctorChecks: []doctorCheck{
 				{Name: "agy duplicate skills", Run: checkAgyDuplicateSkills},
 			},
