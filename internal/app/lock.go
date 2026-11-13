@@ -17,6 +17,11 @@ type lockFile struct {
 	Version         int                  `yaml:"version"`
 	ExternalSkills  []externalLockEntry  `yaml:"external_skills"`
 	PublishedSkills []publishedLockEntry `yaml:"published_skills,omitempty"`
+	// Accepted records audit findings the user accepted per item. Holds records
+	// the freshness decision for each new external reference. Older tackroom
+	// versions ignore both keys on read and drop them when they rewrite the lock.
+	Accepted []acceptedFinding `yaml:"accepted,omitempty"`
+	Holds    []holdEntry       `yaml:"holds,omitempty"`
 }
 
 // publishedLockEntry pins one skill pushed to a remote skill registry. It is the
@@ -188,8 +193,12 @@ func rebuildLockEntries(sources []externalSkillSource, home string, lock lockFil
 	}
 	// Keep the lock file order-stable so reordering config sources does not
 	// rewrite it.
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+	sortLockEntries(entries)
 	return entries
+}
+
+func sortLockEntries(entries []externalLockEntry) {
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
 }
 
 func lockEntriesEqual(a, b []externalLockEntry) bool {

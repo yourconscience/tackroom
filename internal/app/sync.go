@@ -15,6 +15,12 @@ func runStatus(opts runOptions) error {
 	if err != nil {
 		return err
 	}
+	statusLock, err := readLockFile(repoRoot)
+	if err != nil {
+		return err
+	}
+	held := gateExternalSources(cfg.ExternalSkills, home, &statusLock, gateOptions{now: timeNow()})
+	cfg.ExternalSkills = filterHeldSources(cfg.ExternalSkills, held)
 	injectPluginMCPServers(&cfg, home)
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
@@ -42,6 +48,12 @@ func runStatus(opts runOptions) error {
 		return nil
 	}
 	printStatusReport(setupStreams(opts).out, repoRoot, repoReport, reports, home, cfg, opts.Verbose)
+	if lines := heldLines(held); len(lines) > 0 {
+		fmt.Fprintln(setupStreams(opts).out, "\nheld or blocked (skipped by sync)")
+		for _, line := range lines {
+			fmt.Fprintf(setupStreams(opts).out, "  %s\n", line)
+		}
+	}
 	if err := agentFailures(reports); err != nil {
 		return err
 	}
@@ -76,9 +88,11 @@ func runSync(opts runOptions) error {
 		return err
 	}
 
-	if err := syncExternalRepos(cfg.ExternalSkills, home, repoRoot); err != nil {
+	held, err := syncExternalReposGated(cfg.ExternalSkills, home, repoRoot, ptrGate(gateOptionsFor(opts)))
+	if err != nil {
 		return err
 	}
+	cfg.ExternalSkills = filterHeldSources(cfg.ExternalSkills, held)
 	// Re-inject after clone so first sync picks up newly fetched plugins.
 	injectPluginMCPServers(&cfg, home)
 	if err := renderCommittedArtifacts(repoRoot); err != nil {
@@ -171,6 +185,7 @@ func runSync(opts runOptions) error {
 	repoReport.Linked = linkingRepo && repoReport.State == stateSynced
 
 	printReport(streams.out, true, repoReport, reports, home, cfg)
+	printHeldSummary(streams.out, held)
 	if opts.JSONOutput {
 		view := buildStatusJSON(repoRoot, repoReport, reports)
 		for _, c := range conflicts {
@@ -362,3 +377,5 @@ func applyConfigDrivenSkillDrift(report agentReport, h *harness, cfg config, rep
 
 	return nil
 }
+
+func ptrGate(g gateOptions) *gateOptions { return &g }

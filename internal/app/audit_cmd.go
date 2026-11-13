@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -70,19 +71,47 @@ var auditScriptExtensions = map[string]bool{
 	".rb": true, ".pl": true,
 }
 
+func parseAuditFlags(args []string) (runOptions, error) {
+	fs := flag.NewFlagSet("doctor audit", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	var opts runOptions
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
+	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
+	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
+	fs.BoolVar(&opts.JSONOutput, "json", false, "Print findings as JSON")
+	if err := fs.Parse(args); err != nil {
+		return runOptions{}, err
+	}
+	if fs.NArg() != 0 {
+		return runOptions{}, fmt.Errorf("doctor audit does not accept positional arguments")
+	}
+	return opts, nil
+}
+
 func runAudit(opts runOptions) error {
 	repoRoot, home, cfg, _, err := loadContext(opts)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("tackroom audit")
-	fmt.Printf("repo: %s\n\n", repoRoot)
+	crit := 0
+	if !opts.JSONOutput {
+		fmt.Println("tackroom audit")
+		fmt.Printf("repo: %s\n\n", repoRoot)
+		findings := auditRepo(repoRoot, home, cfg)
+		crit, _, _ = printAuditFindings(os.Stdout, findings)
+		fmt.Println()
+	}
 
-	findings := auditRepo(repoRoot, home, cfg)
-	crit, _, _ := printAuditFindings(os.Stdout, findings)
+	lock, _ := readLockFile(repoRoot)
+	items := collectAuditItems(repoRoot, home, cfg)
+	markAccepted(items, lock)
+	blocked := printRuleFindings(os.Stdout, items, lock, opts.JSONOutput)
 	if crit > 0 {
 		return fmt.Errorf("%d critical finding(s)", crit)
+	}
+	if blocked > 0 {
+		return fmt.Errorf("%d unaccepted CRITICAL finding(s) on external items", blocked)
 	}
 	return nil
 }
