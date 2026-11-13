@@ -39,6 +39,12 @@ func loadStatusGates(opts runOptions, createPluginData bool) (statusGates, error
 	if err != nil {
 		return statusGates{}, err
 	}
+	return applyStatusGates(repoRoot, home, cfg, selected, createPluginData)
+}
+
+// applyStatusGates is loadStatusGates for a config already loaded, such as the
+// view's snapshot, so the view shows what status shows.
+func applyStatusGates(repoRoot, home string, cfg config, selected []agentConfig, createPluginData bool) (statusGates, error) {
 	statusLock, err := readLockFile(repoRoot)
 	if err != nil {
 		return statusGates{}, err

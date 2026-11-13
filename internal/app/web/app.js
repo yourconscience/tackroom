@@ -330,8 +330,47 @@ function renderOverview(root) {
   const crons = store.crons ? h('section', {class: 'block'},
     h('div', {class: 'block-title'}, icon('i-crons'), h('h2', {}, h('a', {href: '#crons', text: 'Crons'})), cronTrouble ? h('span', {class: 'count-chip bad', title: 'Jobs that need attention', text: String(cronTrouble)}) : null),
     h('div', {class: 'hero-grid'}, [...new Set(cronJobs.map((job) => job.host))].map((host) => hostCard(host, store.crons)), upNextCard(cronJobs))) : null;
-  const agents = inv.agents.length ? h('div', {class: 'cards'}, inv.agents.map(agentCard)) : noAgents();
-  mount(root, tiles, attention, agents, crons);
+  // With no agents, saying so comes first: nothing else on the page can change until there are some.
+  const agents = inv.agents.length ? h('div', {class: 'cards'}, inv.agents.map(agentCard)) : null;
+  mount(root, tiles, attention, agents ? null : noAgents(), lockBlock(inv.lock), agents, crons);
+}
+
+// Outside sources: each pin, and what sync holds or blocks with the command that releases it.
+// The same rows as the lock tab of `tackroom tui` and the held lines of `tackroom status`, drawn
+// with the site's lock stamps: pinned solid, held dashed, blocked a 2px fill, audit pass outlined.
+const LOCK_STATES = {pinned: ['t-pin', '✓', 'i-pin'], held: ['t-warn', '!', 'i-timer'], blocked: ['t-bad', '✗', 'i-audit']};
+function lockTag(cls, glyph, word, code) {
+  return h('span', {class: `lock-tag ${cls}`}, h('span', {class: 'g', 'aria-hidden': 'true', text: glyph}), h('span', {class: 'w'}, word, code ? h('code', {text: code}) : null));
+}
+function lockBlock(rows) {
+  const blocked = rows.filter((row) => row.state === 'blocked').length;
+  const help = 'Skills and packages from outside your config root. Sync pins each source to a commit in tackroom.lock, audits it, and holds anything published in the last 72 hours. Nothing held or blocked reaches your agents until it is released or accepted.';
+  return h('section', {class: 'block'},
+    h('div', {class: 'block-title'}, icon('i-pin'), h('h2', {text: 'Outside sources'}),
+      h('span', {class: blocked ? 'count-chip bad' : 'count-chip', text: String(rows.length)}),
+      h('span', {class: 'help', tabindex: '0', role: 'note', 'aria-label': help, dataset: {tip: help}}, icon('i-info'))),
+    rows.length
+      ? h('ul', {class: 'lock-list'}, rows.map(lockItem))
+      : h('p', {class: 'muted'}, 'None yet. ', h('code', {text: 'tackroom skill sources add owner/repo'}), ' adds one; sync pins it, audits it and holds anything published in the last 72 hours.'));
+}
+function lockItem(row) {
+  const [cls, glyph, iconId] = LOCK_STATES[row.state] || ['t-warn', '!', 'i-warn'];
+  const until = Date.parse(row.until);
+  const audit = !row.audited ? null
+    : row.critical ? lockTag('t-bad', '✗', 'audit', `${row.critical} critical`)
+    : row.findings ? lockTag('t-warn', '!', 'audit', plural(row.findings, 'finding')) : lockTag('t-ok', '✓', 'audit pass');
+  const why = {
+    held: until ? 'Sync skips it until then and your agents keep what they have. To take it now:' : `Held: ${row.reason}. To take it anyway:`,
+    blocked: `Sync skips it: ${row.reason}. Read the finding with tackroom doctor audit; to sync it anyway, accept it:`,
+  }[row.state] || `${sentence(row.reason || row.state)}. Fix it with:`;
+  return h('li', {},
+    h('div', {class: 'lock-head'}, icon(iconId, `lock-icon ${cls}`), h('span', {class: 'lock-name', text: row.name}),
+      row.state === 'pinned' ? lockTag(cls, glyph, 'pinned', row.commit)
+        : row.state === 'held' && until ? lockTag(cls, glyph, 'held until', weekdayClock(until)) : lockTag(cls, glyph, row.state),
+      audit),
+    row.source ? h('div', {class: 'lock-meta'}, h('span', {text: row.source.replace(/^https:\/\//, '')}),
+      row.commit && !row.pinned ? h('span', {class: 'fig', title: 'The commit sync would take; not pinned', text: `new ${row.commit}`}) : null) : null,
+    row.state === 'pinned' ? null : [h('p', {class: 'note', text: why}), row.command ? command(row.command) : null]);
 }
 
 // An empty agents list is a config state, not a load in progress: say so and name the command that fills it.
@@ -1132,6 +1171,9 @@ function renderPlan() {
     }
     body.push(h('div', {class: 'plan-agent'}, h('h3', {}, agentMark(report.Name), report.Name), h('ul', {}, items.map(([verb, text]) => h('li', {}, h('span', {class: `verb ${verb}`, text: verb}), h('span', {text}))))));
   }
+  const waiting = (store.inv?.lock || []).filter((row) => row.state === 'held' || row.state === 'blocked');
+  if (waiting.length) body.push(h('div', {class: 'plan-agent'}, h('h3', {}, icon('i-pin'), 'Outside sources'),
+    h('ul', {}, waiting.map((row) => h('li', {}, h('span', {class: `verb ${row.state}`, text: row.state}), h('span', {text: `${row.name}, skipped. See Overview.`}))))));
   const destructive = plan.destructive || [];
   if (destructive.length) {
     body.unshift(h('div', {class: 'destructive'},

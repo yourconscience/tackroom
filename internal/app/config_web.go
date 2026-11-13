@@ -629,16 +629,13 @@ func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) 
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}
-	repo, err := inspectRepoLink(snapshot.repoRoot, snapshot.home)
+	// Inspect through the status gates, so the plan leaves out what sync will
+	// skip; sync itself gets the config as written and gates it again.
+	g, err := applyStatusGates(snapshot.repoRoot, snapshot.home, cfg, selected, true)
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}
-	expected, err := expectedSkills(snapshot.repoRoot, snapshot.home, cfg)
-	if err != nil {
-		return syncPlan{}, config{}, "", err
-	}
-	injectPluginMCPServers(&cfg, snapshot.home)
-	reports, err := inspectAgents(selected, expected, snapshot.repoRoot, snapshot.home, cfg)
+	repo, reports, err := inspectStatus(g)
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}

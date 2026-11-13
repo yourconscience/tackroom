@@ -10,14 +10,14 @@
 @font-face { font-family: "IBM Plex Mono"; src: url("./fonts/ibm-plex-mono-latin-500-normal.woff2") format("woff2"); font-weight: 500; font-display: swap; }
 :root {
   /* Graphite, the site's theme (docs/site/tokens.css). Dark below, light under prefers-color-scheme: light.
-     Ink is the accent; hue appears only for states. */
+     Ink is the accent; hue appears only for states, and blue only for a pinned source. */
   color-scheme: dark light;
   --ground: #141416; --surface: #1c1c1f; --raised: #26262a;
   --border: #303035; --rule: #303035; --control: #707077;
   --text: #f2f2f3; --muted: #b3b3b8; --faint: #9a9aa0;
   --primary: #f2f2f3; --primary-ink: #111113; --focus: #f2f2f3; --line: #f2f2f3;
   --data: #e8e8ea; --switch-on: #f2f2f3; --idle: #707077;
-  --positive: #55c38f; --negative: #ff7086; --warning: #f0a54a;
+  --positive: #55c38f; --negative: #ff7086; --warning: #f0a54a; --pin: #6aaef0;
   --pill-positive-bg: #15271f; --pill-positive-ink: #55c38f;
   --pill-negative-bg: #2e171c; --pill-negative-ink: #ff7086;
   --pill-warning-bg: #2c2113; --pill-warning-ink: #f0a54a;
@@ -39,7 +39,7 @@
     --text: #111113; --muted: #4d4d53; --faint: #68686e;
     --primary: #111113; --primary-ink: #ffffff; --focus: #111113; --line: #111113;
     --data: #111113; --switch-on: #111113; --idle: #86868c;
-    --positive: #17784c; --negative: #c21f3a; --warning: #9c5200;
+    --positive: #17784c; --negative: #c21f3a; --warning: #9c5200; --pin: #0b5cad;
     --pill-positive-bg: #e6f3ec; --pill-positive-ink: #17784c;
     --pill-negative-bg: #fce8eb; --pill-negative-ink: #c21f3a;
     --pill-warning-bg: #fcf0e1; --pill-warning-ink: #9c5200;
@@ -191,6 +191,29 @@ a.kpi:hover { background: var(--raised); }
 .issues li { display: flex; align-items: center; gap: 10px; padding: 10px var(--card-pad); }
 .issues li + li { border-top: 1px solid var(--rule); }
 .issues svg { color: var(--warning); }
+.lock-list { margin: 0; padding: 4px 0; list-style: none; border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--card-shadow); }
+.lock-list > li { display: grid; gap: 8px; min-width: 0; padding: 12px var(--card-pad); }
+.lock-list > li + li { border-top: 1px solid var(--rule); }
+.lock-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; min-width: 0; }
+.lock-name { font-weight: 600; overflow-wrap: anywhere; }
+.lock-icon { width: 18px; height: 18px; color: var(--faint); }
+.lock-icon.t-pin { color: var(--pin); }
+.lock-icon.t-warn { color: var(--warning); }
+.lock-icon.t-bad { color: var(--negative); }
+.lock-meta { display: flex; flex-wrap: wrap; gap: 2px 16px; padding-left: 28px; color: var(--faint); font-size: var(--fs-small); overflow-wrap: anywhere; }
+.lock-list .note, .lock-list .command { margin-left: 28px; }
+/* The site's lock stamps (docs/site/style.css .tag): glyph, word and shape carry the state; colour follows. */
+.lock-tag { display: inline-flex; align-items: stretch; max-width: 100%; border: 1px solid; border-radius: var(--radius-chip); font-size: var(--fs-small); line-height: 1; overflow: hidden; }
+.lock-tag .g { display: grid; place-items: center; min-width: 22px; padding: 0 4px; font: 500 var(--fs-small)/1 var(--font-mono); }
+.lock-tag .w { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 4px 8px 4px 6px; min-width: 0; font-weight: 600; }
+.lock-tag code { font: 400 var(--fs-small)/1.2 var(--font-mono); }
+.t-ok { color: var(--positive); border-color: var(--positive); }
+.t-ok .g { background: var(--pill-positive-bg); }
+.t-warn { color: var(--warning); border-color: var(--warning); border-style: dashed; }
+.t-warn .g { background: var(--pill-warning-bg); }
+.t-bad { color: var(--surface); background: var(--negative); border-color: var(--negative); border-width: 2px; }
+.t-pin { color: var(--surface); background: var(--pin); border-color: var(--pin); }
+.t-pin code { padding: 2px 5px; border-radius: 2px; background: var(--surface); color: var(--text); }
 .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
 .card { display: grid; gap: 18px; align-content: start; padding: var(--card-pad); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--card-shadow); min-width: 0; }
 .card.off { background: transparent; box-shadow: none; }
@@ -418,6 +441,8 @@ button.cell:disabled { cursor: default; }
 .verb.update { color: var(--text); }
 .verb.remove, .verb.conflict { color: var(--negative); }
 .verb.note { color: var(--faint); }
+.verb.held { color: var(--warning); }
+.verb.blocked { color: var(--negative); }
 .destructive { display: grid; gap: 8px; padding: 12px 14px; border-radius: var(--radius-card); background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
 .destructive label { display: flex; align-items: flex-start; gap: 10px; font-size: var(--fs-body); cursor: pointer; }
 .destructive input { margin-top: 3px; accent-color: var(--negative); }
@@ -461,6 +486,8 @@ button.cell:disabled { cursor: default; }
   :root { --card-pad: 16px; --gap: 16px; --fs-title: 22px; --fs-body: 15px; --fs-small: 13px; --fs-tiny: 12px; --fs-code: 14px; --control-height: 44px; }
   .search, .editor { font-size: 16px; }
   .field input { min-height: 44px; }
+  .lock-meta { padding-left: 0; }
+  .lock-list .note, .lock-list .command { margin-left: 0; }
   /* Plex Mono advances 0.6em, so "Mon 09:00" at 15px is 81px wide. */
   .upnext-list li { grid-template-columns: 96px auto minmax(0, 1fr) auto; }
   .segmented, .segmented button, .chip-button { min-height: 44px; }
