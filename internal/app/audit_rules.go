@@ -331,6 +331,13 @@ func externalSourceItem(src externalSkillSource, home string) auditItem {
 				}
 			}
 		}
+		// Codex loads more of a plugin than the stdio servers tackroom writes:
+		// every MCP transport, its own manifest overlay and hooks.
+		for _, rel := range []string{"mcp.json", "plugin.json", ".codex-plugin/plugin.json", "hooks/hooks.json"} {
+			if data, err := os.ReadFile(filepath.Join(cachePath, filepath.FromSlash(rel))); err == nil && len(data) <= skillAuditMaxFileSize && utf8.Valid(data) {
+				item.Findings = append(item.Findings, scanText(rel, string(data))...)
+			}
+		}
 	}
 	return item
 }

@@ -608,7 +608,7 @@ func validateAgentSettings(agent agentConfig) error {
 	}
 	for _, reserved := range settingsManagedKeys[normalizeAgentName(agent.Name)] {
 		for key := range agent.Settings {
-			if key == reserved || strings.HasPrefix(key, reserved+".") {
+			if key == reserved || strings.HasPrefix(key, reserved+".") || strings.HasPrefix(reserved, key+".") {
 				return fmt.Errorf("config agent %s settings key %q is managed by tackroom via another surface (%s)", agent.Name, key, reserved)
 			}
 		}

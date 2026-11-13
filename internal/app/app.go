@@ -28,6 +28,10 @@ type config struct {
 	// them and writes nothing new. Set by gatePackages; never from YAML.
 	heldMCP  map[string]bool
 	heldHome string
+	// codexPluginMCP names plugin MCP servers Codex loads from its native
+	// plugin, so desiredMCPServersForAgent writes no [mcp_servers] row for them.
+	// Set by injectPluginMCPServersMode; never from YAML.
+	codexPluginMCP map[string]bool
 	// ContextNoteTokens is the estimated skill-listing token threshold above
 	// which `tackroom doctor` prints a soft context advisory note. Absent
 	// (nil) uses contextNoteTokensDefault; 0 (or negative) disables the note.

@@ -8,8 +8,10 @@ import (
 	"reflect"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
+	"github.com/BurntSushi/toml"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,6 +21,7 @@ type settingsFormat int
 const (
 	settingsJSON settingsFormat = iota
 	settingsYAML
+	settingsTOML
 )
 
 // settingsTarget is a harness settings file tackroom patches key by key.
@@ -38,12 +41,19 @@ func ompConfigPath(home string) string {
 	return filepath.Join(home, ".omp", "agent", "config.yml")
 }
 
+// codexConfigPath is the Codex config file (TOML), shared by its MCP servers
+// and its settings.
+func codexConfigPath(home string) string {
+	return filepath.Join(home, ".codex", "config.toml")
+}
+
 // settingsManagedKeys lists the dotted keys each harness already manages
 // through another surface; a `settings:` block must not touch them. A declared
 // key matches when it equals a managed key or sits under one (hooks.X).
 var settingsManagedKeys = map[string][]string{
 	agentPi:         {"packages"},
 	agentClaudeCode: {"hooks", "enabledPlugins", "extraKnownMarketplaces", "mcpServers"},
+	agentCodex:      {"mcp_servers", "plugins", "marketplaces", "features.hooks", "codex_hooks"},
 }
 
 // secretKeySegment matches a key segment that must hold an environment
@@ -203,6 +213,10 @@ func readSettingsRaw(path string, format settingsFormat) (map[string]any, os.Fil
 		if err := yaml.Unmarshal(data, &raw); err != nil {
 			return nil, mode, true, fmt.Errorf("parse %s: %w", path, err)
 		}
+	case settingsTOML:
+		if _, err := toml.Decode(string(data), &raw); err != nil {
+			return nil, mode, true, fmt.Errorf("parse %s: %w", path, err)
+		}
 	default:
 		return nil, mode, true, fmt.Errorf("unsupported settings format for %s", path)
 	}
@@ -282,6 +296,8 @@ func applySettingsSync(path string, format settingsFormat, values map[string]any
 		return writeJSONConfig(path, raw)
 	case settingsYAML:
 		return applyYAMLSettingsSync(path, values)
+	case settingsTOML:
+		return applyTOMLSettingsSync(path, values)
 	default:
 		return fmt.Errorf("unsupported settings format for %s", path)
 	}
@@ -410,6 +426,277 @@ func marshalSettingsYAML(doc *yaml.Node, indent int) ([]byte, error) {
 		return nil, err
 	}
 	return []byte(b.String()), nil
+}
+
+// tomlBareKey matches a TOML bare key segment. Any other segment needs
+// quoting, which a dotted settings key cannot express.
+var tomlBareKey = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+
+// applyTOMLSettingsSync edits a TOML file as text so comments, key order and
+// unrelated tables survive. Each declared key replaces its line or is added to
+// its table. The result is decoded again and must equal the pre-edit file with
+// only the declared keys changed; a file this editor cannot patch safely is
+// refused with an error and left untouched.
+func applyTOMLSettingsSync(path string, values map[string]any) error {
+	if real, err := filepath.EvalSymlinks(path); err == nil {
+		path = real
+	}
+	mode := os.FileMode(0o600)
+	data, err := os.ReadFile(path)
+	switch {
+	case err == nil:
+		if info, statErr := os.Stat(path); statErr == nil {
+			mode = info.Mode().Perm()
+		}
+	case os.IsNotExist(err):
+		// a missing file is created with only the declared keys
+	default:
+		return fmt.Errorf("read %s: %w", path, err)
+	}
+	content := string(data)
+	before, expected := map[string]any{}, map[string]any{}
+	if _, err := toml.Decode(content, &before); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	if _, err := toml.Decode(content, &expected); err != nil {
+		return fmt.Errorf("parse %s: %w", path, err)
+	}
+	keys := sortedSettingKeys(values)
+	for _, key := range keys {
+		for _, part := range strings.Split(key, ".") {
+			if !tomlBareKey.MatchString(part) {
+				return fmt.Errorf("%s: key segment %q needs TOML quoting, which settings keys cannot express", key, part)
+			}
+		}
+		if err := setSettingPath(expected, key, values[key]); err != nil {
+			return fmt.Errorf("%s: %w", key, err)
+		}
+	}
+	for _, key := range keys {
+		rendered, err := renderTOMLValue(values[key])
+		if err != nil {
+			return fmt.Errorf("%s: %w", key, err)
+		}
+		if content, err = setTOMLSetting(content, before, strings.Split(key, "."), rendered); err != nil {
+			return fmt.Errorf("%s: %w", key, err)
+		}
+	}
+	after := map[string]any{}
+	if _, err := toml.Decode(content, &after); err != nil {
+		return fmt.Errorf("refusing to edit %s: the result does not parse (%v); an inline table, dotted key or unusual table header needs a manual edit", path, err)
+	}
+	if !reflect.DeepEqual(normalizeSettingValue(after), normalizeSettingValue(expected)) {
+		return fmt.Errorf("refusing to edit %s: the result differs from the declared settings; edit the file by hand", path)
+	}
+	if err := atomicConfigWrite(path, []byte(content), mode); err != nil {
+		return fmt.Errorf("write %s: %w", path, err)
+	}
+	return nil
+}
+
+// setTOMLSetting sets one dotted key in TOML text. A top-level key lives in the
+// block before the first table header; a.b.c lives in the [a.b] table. The
+// key's line is replaced, or the key is added to its table (created when
+// absent). before is the pre-edit decode, used to spot keys that exist in a
+// form that has no line to patch.
+func setTOMLSetting(content string, before map[string]any, parts []string, rendered string) (string, error) {
+	key := strings.Join(parts, ".")
+	leaf := parts[len(parts)-1]
+	from, to, header := 0, len(content), ""
+	if i := indexNextTOMLHeader(content); i != -1 {
+		to = i
+	}
+	if len(parts) > 1 {
+		prefix := strings.Join(parts[:len(parts)-1], ".")
+		header = "[" + prefix + "]"
+		start := indexTOMLSectionHeader(content, header)
+		if start == -1 {
+			_, defined := lookupSettingPath(before, prefix)
+			if defined && indexTOMLHeaderCandidate(content, "["+prefix+".") == -1 && indexTOMLHeaderCandidate(content, "[["+prefix+".") == -1 {
+				return "", fmt.Errorf("%s is already defined as an inline table or dotted key, which this editor cannot patch", prefix)
+			}
+			// New tables go at the end of the file, as Codex adds its own, so no
+			// comment is separated from the table it introduces.
+			section := header + "\n" + leaf + " = " + rendered + "\n"
+			switch {
+			case strings.TrimSpace(content) == "":
+				return section, nil
+			case strings.HasSuffix(content, "\n\n"):
+				return content + section, nil
+			case strings.HasSuffix(content, "\n"):
+				return content + "\n" + section, nil
+			default:
+				return content + "\n\n" + section, nil
+			}
+		}
+		from, to = start+len(header), endTOMLSection(content, start, header)
+	}
+
+	lineStart, lineEnd, valueAt, err := findTOMLKeyLine(content, from, to, leaf)
+	if err != nil {
+		return "", err
+	}
+	if lineStart != -1 {
+		after := content[valueAt:lineEnd]
+		stripped := stripTOMLInlineComments(after)
+		value := strings.TrimSpace(stripped)
+		if strings.HasPrefix(value, "{") || strings.HasPrefix(value, `"""`) || strings.HasPrefix(value, `'''`) || !tomlValueComplete(value) {
+			return "", fmt.Errorf("the existing value is an inline table or spans several lines, which this editor cannot patch")
+		}
+		lead := after[:len(after)-len(strings.TrimLeft(after, " \t"))]
+		tail := after[len(strings.TrimRight(stripped, " \t")):]
+		return content[:valueAt] + lead + rendered + tail + content[lineEnd:], nil
+	}
+	if _, exists := lookupSettingPath(before, key); exists {
+		return "", fmt.Errorf("the key already exists as a table, dotted key or array of tables, which this editor cannot patch")
+	}
+
+	line := leaf + " = " + rendered + "\n"
+	at := lastTOMLAssignmentEnd(content, from, to)
+	switch {
+	case at != -1:
+	case header != "":
+		// an empty table: the key goes right under its header
+		at = len(content)
+		if nl := strings.IndexByte(content[from:], '\n'); nl != -1 {
+			at = from + nl + 1
+		}
+	default:
+		// no top-level keys yet: go above the first table and the comments that introduce it
+		at = to
+		if to < len(content) {
+			for at > 0 {
+				prev := strings.LastIndexByte(content[:at-1], '\n') + 1
+				if !strings.HasPrefix(strings.TrimSpace(content[prev:at]), "#") {
+					break
+				}
+				at = prev
+			}
+			line += "\n"
+		}
+	}
+	if at > 0 && content[at-1] != '\n' {
+		line = "\n" + line
+	}
+	return content[:at] + line + content[at:], nil
+}
+
+// findTOMLKeyLine finds the line in content[from:to] that assigns the bare key.
+// It returns the line's bounds without its line break and the offset just past
+// the "="; lineStart is -1 when no line assigns the key. A dotted-key form such
+// as a.b = 1 is an error.
+func findTOMLKeyLine(content string, from int, to int, key string) (int, int, int, error) {
+	assign := regexp.MustCompile(`^[ \t]*` + regexp.QuoteMeta(key) + `[ \t]*([=.])`)
+	for pos := from; pos < to; {
+		next := to
+		if nl := strings.IndexByte(content[pos:to], '\n'); nl != -1 {
+			next = pos + nl + 1
+		}
+		line := strings.TrimRight(content[pos:next], "\r\n")
+		if m := assign.FindStringSubmatchIndex(line); m != nil {
+			if line[m[2]] == '.' {
+				return -1, -1, -1, fmt.Errorf("the key is set with a dotted key, which this editor cannot patch")
+			}
+			return pos, pos + len(line), pos + m[1], nil
+		}
+		pos = next
+	}
+	return -1, -1, -1, nil
+}
+
+// lastTOMLAssignmentEnd returns the offset just past the last line in
+// content[from:to] that is neither blank nor a comment, or -1.
+func lastTOMLAssignmentEnd(content string, from int, to int) int {
+	last := -1
+	for pos := from; pos < to; {
+		next := to
+		if nl := strings.IndexByte(content[pos:to], '\n'); nl != -1 {
+			next = pos + nl + 1
+		}
+		if text := strings.TrimSpace(content[pos:next]); text != "" && !strings.HasPrefix(text, "#") {
+			last = next
+		}
+		pos = next
+	}
+	return last
+}
+
+// renderTOMLValue renders a declared settings value as a TOML value.
+func renderTOMLValue(value any) (string, error) {
+	switch v := value.(type) {
+	case string:
+		return renderTOMLString(v), nil
+	case bool:
+		return strconv.FormatBool(v), nil
+	case int:
+		return strconv.Itoa(v), nil
+	case uint64:
+		return strconv.FormatUint(v, 10), nil
+	case float64:
+		text := strconv.FormatFloat(v, 'g', -1, 64)
+		if !strings.ContainsAny(text, ".eE") {
+			text += ".0"
+		}
+		return text, nil
+	case []any:
+		items := make([]string, 0, len(v))
+		for _, item := range v {
+			rendered, err := renderTOMLValue(item)
+			if err != nil {
+				return "", err
+			}
+			items = append(items, rendered)
+		}
+		return "[" + strings.Join(items, ", ") + "]", nil
+	case map[string]any:
+		if len(v) == 0 {
+			return "{}", nil
+		}
+		fields := make([]string, 0, len(v))
+		for _, name := range sortedSettingKeys(v) {
+			rendered, err := renderTOMLValue(v[name])
+			if err != nil {
+				return "", err
+			}
+			if !tomlBareKey.MatchString(name) {
+				name = renderTOMLString(name)
+			}
+			fields = append(fields, name+" = "+rendered)
+		}
+		return "{ " + strings.Join(fields, ", ") + " }", nil
+	default:
+		return "", fmt.Errorf("unsupported value type %T", value)
+	}
+}
+
+// renderTOMLString renders text as a TOML basic string.
+func renderTOMLString(text string) string {
+	var b strings.Builder
+	b.WriteByte('"')
+	for _, r := range text {
+		switch {
+		case r == '"':
+			b.WriteString(`\"`)
+		case r == '\\':
+			b.WriteString(`\\`)
+		case r == '\n':
+			b.WriteString(`\n`)
+		case r == '\r':
+			b.WriteString(`\r`)
+		case r == '\t':
+			b.WriteString(`\t`)
+		case r == '\b':
+			b.WriteString(`\b`)
+		case r == '\f':
+			b.WriteString(`\f`)
+		case r < 0x20 || r == 0x7f:
+			fmt.Fprintf(&b, `\u%04X`, r)
+		default:
+			b.WriteRune(r)
+		}
+	}
+	b.WriteByte('"')
+	return b.String()
 }
 
 func sortedSettingKeys(values map[string]any) []string {

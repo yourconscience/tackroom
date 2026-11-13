@@ -708,7 +708,7 @@ func confirmDestructiveSyncActions(reports []agentReport, streams setupIO) {
 			fmt.Fprintf(streams.out, "  remove %d Pi package declaration(s): %s\n", len(r.RemovesPackage), strings.Join(r.RemovesPackage, ", "))
 		}
 		if len(r.RemovesPlugin) > 0 {
-			fmt.Fprintf(streams.out, "  remove %d Claude plugin setting(s): %s\n", len(r.RemovesPlugin), strings.Join(r.RemovesPlugin, ", "))
+			fmt.Fprintf(streams.out, "  remove %d plugin setting(s): %s\n", len(r.RemovesPlugin), strings.Join(r.RemovesPlugin, ", "))
 		}
 		if len(r.RemovesMCP) > 0 {
 			fmt.Fprintf(streams.out, "  remove %d MCP server(s) tackroom no longer manages: %s\n", len(r.RemovesMCP), strings.Join(r.RemovesMCP, ", "))

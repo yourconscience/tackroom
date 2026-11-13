@@ -107,4 +107,4 @@ Where each harness keeps its servers is in [harnesses.md](harnesses.md#where-eac
 
 A server command with an exact npm or PyPI version, such as `npx -y @acme/docs-mcp@1.2.0`, is held until the version is 72 hours old. While it is held, `sync` keeps the entry a harness already has and writes nothing new ([skills.md](skills.md#the-72-hour-hold)).
 
-MCP servers can also come from an agent-plugins-spec source with `mcp: true`; those are stdio only and are described in [plugins.md](plugins.md#agent-plugins-sources).
+MCP servers can also come from an agent-plugins-spec source with `mcp: true`; tackroom writes the stdio ones, and Codex installs the source as a native plugin instead ([plugins.md](plugins.md#agent-plugins-sources)).
