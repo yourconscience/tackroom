@@ -1344,6 +1344,20 @@ func frontmatterValue(body, key string) string {
 	return ""
 }
 
+// cronResultAndLastRun are the "result" and "last run" cells of a job: its last
+// exit or status, and its last run in local time.
+func cronResultAndLastRun(j cronJob) (result, lastRun string) {
+	result = j.LastStatus
+	if j.LastExit != nil {
+		result = "exit " + strconv.Itoa(*j.LastExit)
+	}
+	lastRun = j.LastRun
+	if t, err := time.Parse(time.RFC3339, lastRun); err == nil {
+		lastRun = t.Local().Format("2006-01-02 15:04")
+	}
+	return result, lastRun
+}
+
 func printCronsTable(result cronsScanResult) {
 	out := ui.Writer(os.Stdout)
 	newTable := func(headers ...string) *table.Table {
@@ -1362,17 +1376,10 @@ func printCronsTable(result cronsScanResult) {
 
 	jobs := newTable("host", "source", "id", "schedule", "state", "last run", "result", "runs", "problems")
 	for _, j := range result.Jobs {
-		res := j.LastStatus
-		if j.LastExit != nil {
-			res = "exit " + strconv.Itoa(*j.LastExit)
-		}
+		res, lastRun := cronResultAndLastRun(j)
 		runs := ""
 		if j.Runs != nil {
 			runs = strconv.Itoa(*j.Runs)
-		}
-		lastRun := j.LastRun
-		if t, err := time.Parse(time.RFC3339, lastRun); err == nil {
-			lastRun = t.Local().Format("2006-01-02 15:04")
 		}
 		jobs.Row(j.Host, j.Source, truncate(j.ID, 40), truncate(j.Schedule, 28), j.State, lastRun, res, runs, strconv.Itoa(len(j.Problems)))
 	}

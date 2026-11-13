@@ -18,44 +18,77 @@ func runStatus(opts runOptions) error {
 	return mapStatusExit(err)
 }
 
-func statusReport(opts runOptions) error {
+// statusGates is what status settles before it looks at any harness: the lock
+// and the external sources and packages sync would hold or block.
+type statusGates struct {
+	repoRoot string
+	home     string
+	cfg      config // held sources dropped, held MCP servers marked
+	selected []agentConfig
+	sources  []externalSkillSource // as configured, held ones included
+	lock     lockFile
+	held     map[string]heldItem // held sources by name; held packages as "package-hold:"+item
+}
+
+// loadStatusGates reads the config and the lock and applies the freshness and
+// audit gates with no registry lookup and no lock write. createPluginData
+// keeps the plugin data directories status has always created; a read-only
+// caller passes false.
+func loadStatusGates(opts runOptions, createPluginData bool) (statusGates, error) {
 	repoRoot, home, cfg, selected, err := loadContext(opts)
 	if err != nil {
-		return err
+		return statusGates{}, err
 	}
 	statusLock, err := readLockFile(repoRoot)
 	if err != nil {
-		return err
+		return statusGates{}, err
 	}
 	sources := cfg.ExternalSkills
 	held := gateExternalSources(sources, home, &statusLock, gateOptions{now: timeNow()})
 	cfg.ExternalSkills = filterHeldSources(sources, held)
-	injectPluginMCPServers(&cfg, home)
+	injectPluginMCPServersMode(&cfg, home, createPluginData)
 	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gateOptions{now: timeNow()}, false)
 	if err != nil {
-		return err
+		return statusGates{}, err
 	}
 	for k, v := range pkgHeld {
 		held["package-hold:"+k] = v
 	}
+	return statusGates{repoRoot: repoRoot, home: home, cfg: cfg, selected: selected, sources: sources, lock: statusLock, held: held}, nil
+}
 
-	repoReport, err := inspectRepoLink(repoRoot, home)
+// inspectStatus compares the repo link and every selected harness with what
+// sync would write.
+func inspectStatus(g statusGates) (repoLinkReport, []agentReport, error) {
+	repoReport, err := inspectRepoLink(g.repoRoot, g.home)
 	if err != nil {
-		return err
+		return repoLinkReport{}, nil, err
 	}
+	inspectCfg, err := configForInspection(g.cfg, g.sources, g.held, g.repoRoot, g.home)
+	if err != nil {
+		return repoLinkReport{}, nil, err
+	}
+	expected, err := expectedSkills(g.repoRoot, g.home, inspectCfg)
+	if err != nil {
+		return repoLinkReport{}, nil, err
+	}
+	reports, err := inspectAgents(g.selected, expected, g.repoRoot, g.home, inspectCfg)
+	if err != nil {
+		return repoLinkReport{}, nil, err
+	}
+	return repoReport, reports, nil
+}
 
-	inspectCfg, err := configForInspection(cfg, sources, held, repoRoot, home)
+func statusReport(opts runOptions) error {
+	g, err := loadStatusGates(opts, true)
 	if err != nil {
 		return err
 	}
-	expected, err := expectedSkills(repoRoot, home, inspectCfg)
+	repoReport, reports, err := inspectStatus(g)
 	if err != nil {
 		return err
 	}
-	reports, err := inspectAgents(selected, expected, repoRoot, home, inspectCfg)
-	if err != nil {
-		return err
-	}
+	repoRoot, home, cfg, held := g.repoRoot, g.home, g.cfg, g.held
 
 	if opts.JSONOutput {
 		view := buildStatusJSON(repoRoot, repoReport, reports)
