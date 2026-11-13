@@ -69,14 +69,6 @@ func isLocalSourceURL(url string) bool {
 		strings.HasPrefix(u, "~") || strings.HasPrefix(u, "file://")
 }
 
-func sourceItemID(src externalSkillSource, home string) string {
-	kind := "skill"
-	if hasPluginManifest(filepath.Join(externalCacheDir(home), sourceName(src))) {
-		kind = "plugin"
-	}
-	return kind + ":" + sourceName(src)
-}
-
 // gateExternalSources decides, for every external source whose pin is new or
 // would change, whether sync may use it. A source already pinned in the lock is
 // never gated here. The candidate content is the source's cache checkout.

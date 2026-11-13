@@ -534,20 +534,15 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 	checked := 0
 	currentNames := make(map[string]bool)
 	lockedNames := make(map[string]bool)
-	var materializedCacheRoots []string
 	for _, entry := range lock.ExternalSkills {
 		for _, name := range entry.Materialized.Values() {
 			lockedNames[name] = true
-		}
-		if entry.Materialized != "" {
-			materializedCacheRoots = append(materializedCacheRoots, filepath.Join(externalCacheDir(home), entry.Name))
 		}
 	}
 	for _, src := range cfg.ExternalSkills {
 		if !src.Materialize {
 			continue
 		}
-		materializedCacheRoots = append(materializedCacheRoots, filepath.Join(externalCacheDir(home), sourceName(src)))
 		pin := lockEntryFor(lock, src)
 		if pin == nil {
 			issues = append(issues, fmt.Sprintf("%s has no matching lock pin", sourceName(src)))
@@ -622,16 +617,4 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 		return checkResult{"materialized external skills", checkStatusPass, "none configured"}
 	}
 	return checkResult{"materialized external skills", checkStatusPass, fmt.Sprintf("%d canonical copies match lock", checked)}
-}
-
-func pathIsWithin(path string, root string) bool {
-	if path == root || strings.HasPrefix(path, root+string(os.PathSeparator)) {
-		return true
-	}
-	resolvedPath, pathErr := filepath.EvalSymlinks(path)
-	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
-	if pathErr != nil || rootErr != nil {
-		return false
-	}
-	return resolvedPath == resolvedRoot || strings.HasPrefix(resolvedPath, resolvedRoot+string(os.PathSeparator))
 }

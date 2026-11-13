@@ -629,34 +629,6 @@ func removeGroupedHookCommands(raw map[string]interface{}, commands []string) bo
 	return changed
 }
 
-func removeSimpleHookCommands(raw map[string]interface{}, rootKey string, commands []string) bool {
-	root, ok := raw[rootKey].(map[string]interface{})
-	if !ok {
-		return false
-	}
-	changed := false
-	for event, itemsRaw := range root {
-		items, ok := itemsRaw.([]interface{})
-		if !ok {
-			continue
-		}
-		filtered, removed := removeHookCommands(items, commands)
-		if !removed {
-			continue
-		}
-		changed = true
-		if len(filtered) == 0 {
-			delete(root, event)
-			continue
-		}
-		root[event] = filtered
-	}
-	if len(root) == 0 {
-		delete(raw, rootKey)
-	}
-	return changed
-}
-
 func hookCommandMatchesAny(actual interface{}, commands []string) bool {
 	for _, command := range commands {
 		if hookCommandMatches(actual, command) {

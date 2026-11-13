@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/BurntSushi/toml"
-	"gopkg.in/yaml.v3"
 )
 
 // mcpOwnership is the machine-local record of the MCP servers sync wrote into
@@ -236,19 +235,4 @@ func removeDSHMCPServer(_ mcpTarget, name string, home string) error {
 	}
 	list.Content = append(list.Content[:index], list.Content[index+1:]...)
 	return writeDSHPatch(path, doc)
-}
-
-// deleteMappingKey removes key from a YAML mapping node and reports whether
-// it was there.
-func deleteMappingKey(mapping *yaml.Node, key string) bool {
-	if mapping == nil || mapping.Kind != yaml.MappingNode {
-		return false
-	}
-	for i := 0; i+1 < len(mapping.Content); i += 2 {
-		if mapping.Content[i].Value == key {
-			mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
-			return true
-		}
-	}
-	return false
 }

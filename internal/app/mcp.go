@@ -1321,49 +1321,6 @@ func stringSlicesEqual(a []string, b []string) bool {
 	return true
 }
 
-func upsertYAMLMCPNode(doc *yaml.Node, rootKey string, server mcpServerConfig, defaults map[string]interface{}) error {
-	root := doc
-	if root.Kind == 0 {
-		root.Kind = yaml.DocumentNode
-	}
-	if root.Kind != yaml.DocumentNode {
-		return fmt.Errorf("unexpected YAML root kind %d", root.Kind)
-	}
-	if len(root.Content) == 0 {
-		root.Content = []*yaml.Node{{Kind: yaml.MappingNode, Tag: yamlMapTag}}
-	}
-	mapping := root.Content[0]
-	if mapping.Kind != yaml.MappingNode {
-		return fmt.Errorf("top-level YAML node is not a mapping")
-	}
-
-	serversNode := ensureMappingValue(mapping, rootKey)
-	entryNode := ensureMappingValue(serversNode, server.Name)
-	setMappingString(entryNode, "command", server.Command)
-	setMappingStringSlice(entryNode, "args", server.Args)
-	if len(server.Env) > 0 {
-		envNode := ensureMappingValue(entryNode, "env")
-		setMappingStringMap(envNode, mergeManagedEnv(yamlStringMap(envNode), server.Env))
-	}
-	for key, value := range defaults {
-		setMappingScalar(entryNode, key, value)
-	}
-	return nil
-}
-
-func marshalYAMLNode(doc *yaml.Node) ([]byte, error) {
-	var builder strings.Builder
-	encoder := yaml.NewEncoder(&builder)
-	encoder.SetIndent(4)
-	if err := encoder.Encode(doc); err != nil {
-		return nil, err
-	}
-	if err := encoder.Close(); err != nil {
-		return nil, err
-	}
-	return []byte(builder.String()), nil
-}
-
 func ensureMappingValue(mapping *yaml.Node, key string) *yaml.Node {
 	if mapping.Kind != yaml.MappingNode {
 		mapping.Kind = yaml.MappingNode
@@ -1389,17 +1346,6 @@ func ensureMappingValue(mapping *yaml.Node, key string) *yaml.Node {
 
 func setMappingString(mapping *yaml.Node, key string, value string) {
 	setMappingNode(mapping, key, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value})
-}
-
-func setMappingScalar(mapping *yaml.Node, key string, value interface{}) {
-	switch t := value.(type) {
-	case bool:
-		setMappingNode(mapping, key, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: strconv.FormatBool(t)})
-	case string:
-		setMappingString(mapping, key, t)
-	default:
-		setMappingString(mapping, key, fmt.Sprint(t))
-	}
 }
 
 func setMappingStringSlice(mapping *yaml.Node, key string, values []string) {

@@ -533,18 +533,6 @@ func (p *probeData) newJob(source, id string) cronJob {
 	return job
 }
 
-func ageString(sec int64) string {
-	switch {
-	case sec < 120:
-		return fmt.Sprintf("%ds", sec)
-	case sec < 7200:
-		return fmt.Sprintf("%dm", sec/60)
-	case sec < 172800:
-		return fmt.Sprintf("%dh", sec/3600)
-	}
-	return fmt.Sprintf("%dd", sec/86400)
-}
-
 func unixString(sec int64) string {
 	if sec <= 0 {
 		return ""

@@ -9,12 +9,3 @@ func TestIntervalToScheduleWeekly(t *testing.T) {
 		t.Fatalf("weekly schedule = %q, want Monday 04:00", got)
 	}
 }
-
-func containsInterfaceString(items []interface{}, want string) bool {
-	for _, item := range items {
-		if item == want {
-			return true
-		}
-	}
-	return false
-}

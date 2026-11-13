@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 )
@@ -363,13 +362,4 @@ func mcpRefSynced(cfg *config, server mcpServerConfig, ref, home string) bool {
 		}
 	}
 	return false
-}
-
-func sortedHeldKeys(m map[string]heldItem) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
