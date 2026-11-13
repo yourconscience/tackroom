@@ -23,7 +23,7 @@ The knowledge directory is `$KNOWLEDGE_DIR`, default `~/Workspace/knowledge`. Th
 
 ## Tools
 
-`tackroom sync` builds every Go tool under the config root's `memory/tools/` into `$GOBIN` or `~/.local/bin`. It skips this without a Go toolchain and rebuilds only when sources change. Two ship with tackroom:
+`tackroom sync` builds every Go tool under the config root's `memory/tools/` into `$GOBIN` or `~/.local/bin`. It skips this without a Go toolchain and rebuilds only when sources change. The layout of the memory code layer is in [memory/README.md](https://github.com/yourconscience/tackroom/blob/main/memory/README.md). Two tools ship with tackroom:
 
 - `rem` is the capture and consolidation CLI.
 - `knowledge-sync` commits dirty vault changes, fetches, merges and pushes. It takes a lock, refuses to run when the checkout is not on the sync branch, and on a merge conflict aborts the merge and leaves a `sync-conflict-<time>` branch. It reads `KNOWLEDGE_REPO` (default `~/Workspace/knowledge`), `KNOWLEDGE_REMOTE` (default `origin`) and `KNOWLEDGE_BRANCH` (default `main`).
