@@ -1,6 +1,8 @@
 # tackroom brand
 
-Proposal, not yet applied to the site, dashboard or README. Open `preview.html` to compare both directions in light and dark.
+## Current theme: Graphite
+
+The site, docs pages and README pictures use Graphite (`tokens-graphite.css`, copied to `docs/site/tokens.css`). It is monochrome: the accent is the ink itself (`#111113` light, `#f2f2f3` dark) on `#fafafa` / `#141416` grounds, and hue appears only in lock states: pinned blue (`#0b5cad` / `#6aaef0`), held amber, blocked red, pass green. Pinned is a solid stamp, held and findings are dashed, pass is outlined, blocked is a 2px solid fill. Terminal blocks are light insets in light mode. The logo is a graphite tile with a silver rail and hook. Vendor marks sit on one silver tile, `--tr-mark-bg` `#aeb1b8`, the same in both themes, with a per-theme hairline `--tr-mark-line`. Why Graphite won: `THEMES.md`. The sections below describe the earlier A and B proposals and are kept for history.
 
 ## Positioning
 
@@ -45,7 +47,7 @@ The glyph is the severity and is identical in the CLI, dashboard, site and panel
 | State | Glyph | Colour role | Icon | Meaning |
 |---|---|---|---|---|
 | synced | `✓` | ok (green) | none | native config matches the repo |
-| pinned | `✓` | pin (brass in A), glyph ok | push-pin | external skill locked to a commit; show the short hash in mono |
+| pinned | `✓` | pin (blue in Graphite, brass in A) | push-pin | external skill locked to a commit; show the short hash in mono |
 | held | `!` | warn (orange) | timer | new pin younger than 72h; show `41h of 72h` and the time rail |
 | audit pass | `✓` | ok | stethoscope | no findings in the pinned content |
 | audit finding | `!` | warn | stethoscope | open finding; an unaccepted CRITICAL renders `✗ blocked` in bad |
@@ -63,7 +65,7 @@ Rules:
 
 - A nameplate is finished with the product name alone. Name in the body face at weight 600, the `tackroom.yaml` key under it in mono, the state line last.
 - No initial-letter tiles or other shapes that stand in for a logo.
-- The vendor mark is optional. It goes in one fixed slot, 24px, top right of the plate, on the neutral backing `#f4f4f6` with a `#76777e` hairline. The backing is the same in light and dark.
+- On the site each agent is one item: its mark at 28px on the silver tile `--tr-mark-bg` (`#aeb1b8`, same in light and dark) with a `--tr-mark-line` hairline, then its display name. Keys live on the capability matrix page.
 - Show a mark unmodified and in its own colours. Never recolour, mask, redraw, crop or animate one, and never put one on the brand accent.
 - Only marks whose terms clearly allow this use go in the slot. Six products (Claude Code, Codex, GitHub Copilot CLI, Gemini CLI, Antigravity CLI, Grok Build) need permission first, and two have no official mark. Until a mark is cleared, its plate ships without one.
 - The identity must work with every slot empty. No layout, colour or icon decision depends on a vendor mark.
@@ -91,7 +93,7 @@ Use these exact names in every surface. The CLI prints the key.
 | Kimi Code | `kimi` |
 | Amp | `amp` |
 
-Terminals: Herdr (panel), Tern (workspace), Rex (doctor check). They hang on their own rail and are never counted among the 15 harnesses.
+Terminals: Herdr (panel), Tern (workspace), Rex (doctor check). They sit in their own row and are never counted among the 15 harnesses.
 
 ## Icons
 
