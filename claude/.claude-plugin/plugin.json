@@ -1,0 +1,24 @@
+{
+  "name": "tackroom",
+  "version": "2.0.0",
+  "description": "tackroom in Claude Code: sync status and scheduled jobs in a pane, with Run now, Pause and Resume.",
+  "author": { "name": "yourconscience" },
+  "homepage": "https://github.com/yourconscience/tackroom",
+  "repository": "https://github.com/yourconscience/tackroom",
+  "license": "MIT",
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "tackroom": {
+      "type": "string",
+      "title": "tackroom program",
+      "description": "The tackroom program to run: a name on the PATH or a full path.",
+      "default": "tackroom"
+    },
+    "config": {
+      "type": "string",
+      "title": "Config file",
+      "description": "Full path to a tackroom YAML config. Empty uses tackroom's default.",
+      "default": ""
+    }
+  }
+}

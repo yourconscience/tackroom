@@ -1,0 +1,21 @@
+{
+  "name": "tackroom-pi",
+  "version": "2.0.0",
+  "private": true,
+  "description": "tackroom in Pi: sync status and scheduled jobs behind /tackroom. Installed with pi install, not npm; the npm wrapper for the CLI is in npm/.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourconscience/tackroom.git"
+  },
+  "keywords": ["pi-package"],
+  "pi": {
+    "extensions": ["./pi/extensions/tackroom.ts"],
+    "skills": [],
+    "prompts": [],
+    "themes": []
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-coding-agent": "*"
+  }
+}
