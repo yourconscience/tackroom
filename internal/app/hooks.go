@@ -295,6 +295,9 @@ func managedMemoryNativeCommands(home string, root string, cfgs ...config) []str
 			add(managedMemoryHookCommand(commandRoot, home, script))
 		}
 	}
+	for _, script := range []string{"sync.sh", "sync-vault-to-memory.sh", "sync-memory-to-vault.sh"} {
+		add(filepath.Join("~", ".agents", "bin", "memsearch", script))
+	}
 	return commands
 }
 
