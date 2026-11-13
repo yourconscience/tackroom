@@ -176,7 +176,7 @@ func initHarnesses() {
 			Skills:      skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
 				agentName:  "codex",
-				configPath: func(home string) string { return filepath.Join(home, ".codex", "config.toml") },
+				configPath: codexConfigPath,
 				inspect:    inspectCodexMCPServer,
 				patch:      patchCodexMCPServer,
 				remove:     removeCodexMCPServer,
@@ -188,6 +188,10 @@ func initHarnesses() {
 				agentName: "codex",
 				inspect:   inspectCodexHook,
 				patch:     patchCodexHook,
+			},
+			Settings: &settingsTarget{
+				configPath: codexConfigPath,
+				format:     settingsTOML,
 			},
 			RootInstructions: &rootInstructionsCapability{
 				Path:     func(home string) string { return filepath.Join(home, ".codex", "AGENTS.md") },
