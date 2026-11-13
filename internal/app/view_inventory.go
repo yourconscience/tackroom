@@ -39,6 +39,7 @@ type viewInventory struct {
 
 type viewAgent struct {
 	Name          string         `json:"name"`
+	DisplayName   string         `json:"display_name"`
 	Enabled       bool           `json:"enabled"`
 	Inspected     bool           `json:"inspected"`
 	Detected      bool           `json:"detected"`
@@ -105,7 +106,7 @@ func assembleInventory(cfg config, reports []agentReport, skills map[string]skil
 	var columns []string
 	for _, agent := range cfg.Agents {
 		_, hooks := hookTargetForHarness(agent.Name)
-		view := viewAgent{Name: agent.Name, Enabled: agent.Enabled, SkillRoot: agent.SkillRoot, Counts: map[string]int{}, SupportsMCP: hasMCPSupport(agent.Name), SupportsHooks: hooks, SupportsRoles: supportsRoles(agent.Name, agent.AgentRoot)}
+		view := viewAgent{Name: agent.Name, DisplayName: harnessDisplayName(agent.Name), Enabled: agent.Enabled, SkillRoot: agent.SkillRoot, Counts: map[string]int{}, SupportsMCP: hasMCPSupport(agent.Name), SupportsHooks: hooks, SupportsRoles: supportsRoles(agent.Name, agent.AgentRoot)}
 		if report, ok := byName[agent.Name]; ok {
 			view.Inspected = true
 			view.Detected = report.Detected

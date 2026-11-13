@@ -23,6 +23,8 @@ const (
 	memoryTierMemsearch = "memsearch"
 )
 
+// The memory-hermes-* names are retired: they stay listed so setup still strips
+// entries that releases before 2.0 wrote into tackroom.yaml.
 var managedMemoryHookNames = map[string]struct{}{
 	"memory-session-start":          {},
 	"memory-stop":                   {},

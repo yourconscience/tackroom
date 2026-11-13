@@ -1,68 +1,65 @@
-# Migrating from skillshare to tackroom
+# Migrating from skillshare
 
-skillshare and tackroom solve the same problem — one place for your agent skills, roles, hooks, MCP servers, and instructions — but tackroom adds dependency discipline (pins, audits, freshness holds), per-harness settings, periodic sync, and a memory tier. This guide maps a skillshare setup onto `tackroom.yaml`.
+skillshare and tackroom solve the same problem: one place for your agent skills, roles, hooks, MCP servers and instructions. This guide maps a skillshare setup onto `tackroom.yaml` and the `~/.agents` folders; [comparison.md](comparison.md) says where the two differ.
 
 ## Mapping
 
 | skillshare | tackroom |
 |---|---|
-| `sources.skills` (skill directories) | `~/.agents/skills/` for local skills; `external_skills:` for git sources you pin and audit |
-| `sources.agents` (roles) | `~/.agents/agents/` (rendered into each harness's own role format) |
-| `targets` (per-harness hooks, MCP, Pi packages) | top-level `hooks:` and `mcp_servers:`, and each agent's `packages:` / `settings:` |
-| `audit.block_threshold` | built-in audit gate: `doctor audit`, CRITICAL blocks sync, plus the 72h freshness hold on new pins |
-| instructions (AGENTS.md, SOUL.md, profile) | `instructions:` |
+| Skills source folder (default `~/.config/skillshare/skills`) | `~/.agents/skills/` for skills you wrote |
+| Skills installed from a repo (`skills:` entries with a `source`) | `external_skills:`, pinned in `tackroom.lock` |
+| Agents source folder | `~/.agents/agents/`, rendered into each harness's role format |
+| `targets` | `agents:` entries, one per harness; `setup` detects them |
+| `mcp.servers` | `mcp_servers:` |
+| Hooks managed with `skillshare hooks` | `hooks:` |
+| `audit.block_threshold` | `doctor audit`: an unaccepted CRITICAL finding in external content blocks sync, and new pins wait 72 hours |
+| An extra holding a shared `AGENTS.md` or similar | `~/.agents/AGENTS.md`, plus `instructions:` for more files |
 
 ## Steps
 
-1. **Keep skills and roles in place.** tackroom reads `~/.agents/skills/` and `~/.agents/agents/` natively, so a skillshare layout there carries over unchanged.
-2. **Pin external skills.** For every skill source skillshare pulled from a git URL, add an `external_skills:` entry so tackroom pins the commit and audits it:
-   ```yaml
-   external_skills:
-     - url: https://github.com/latent-spaces/brag
-       branch: main
-       skill_dirs: [skills/brag]
-       materialize: true
+1. **Preview.** `tackroom setup --dry-run` lists what it would import and changes nothing.
+2. **Copy what you wrote.** Skills are `skills/<name>/SKILL.md` and roles are `agents/<name>.md` directly under the config root:
+   ```bash
+   mkdir -p ~/.agents/skills ~/.agents/agents
+   cp -R ~/.config/skillshare/skills/<your-skill> ~/.agents/skills/
+   cp ~/.config/skillshare/agents/<your-role>.md ~/.agents/agents/
    ```
-3. **Move hooks** into a top-level `hooks:` block. skillshare's `rem-session-start` and `pr-triage-stop` become:
+3. **Pin external skills.** For each repo skillshare installed from, add it to tackroom so the commit is pinned and audited instead of copied:
+   ```bash
+   tackroom skill sources add owner/repo --skills a,b
+   ```
+4. **Move hooks** into a top-level `hooks:` block:
    ```yaml
    hooks:
-     - name: rem-session-start
+     - name: notify-stop
        enabled: true
-       event: SessionStart
-       command: ~/.local/share/rem/hooks/session-start.sh
-       timeout: 15
-       agents: [claude, codex, omp, pi]
+       event: Stop                       # Claude Code event names
+       command: ~/.agents/hooks/notify.sh
+       timeout: 10                       # seconds
+       agents: [claude, codex]           # optional; default: every harness with hooks
    ```
-4. **Move MCP servers** into `mcp_servers:`:
-   ```yaml
-   mcp_servers:
-     - name: agentsview
-       enabled: true
-       command: agentsview
-       args: [mcp]
-       agents: [claude, codex, pi, omp]
-   ```
-5. **Move Pi packages** into the `pi` agent's `packages:`, and any per-harness settings into `settings:`:
+5. **Move MCP servers** with `tackroom mcp add NAME --command ... [--arg ...]` or `--url ...`, or write them in `mcp_servers:`. To adopt one a harness already has, run `tackroom mcp import <harness> <name>`.
+6. **Move Pi packages and per-harness settings** under the harness's own entry:
    ```yaml
    agents:
      - name: pi
        enabled: true
        detect: pi
        packages:
-         - npm:pi-web-access@0.47.0
-         - npm:pi-subagents@0.84.0
+         - npm:<package>@<exact-version>
        settings:
-         defaultProvider: deepseek
-         defaultModel: deepseek-flash
+         <dotted.key>: <value>
    ```
-6. **Run it.** First machine: `tackroom setup`. After that: `tackroom sync` and `tackroom doctor`.
+7. **Run it.** On the first machine, `tackroom setup`. After that, `tackroom sync` and `tackroom doctor`.
+
+Skills that skillshare linked into a harness are relinked to the canonical copy on the first sync. A real folder with different content is never replaced without your confirmation, and then only after a backup.
 
 ## Verify
 
 - `tackroom status` shows every harness synced with no drift.
-- `tackroom doctor` is green: skills frontmatter valid, externals pinned and audited, hooks healthy, and no held or blocked items.
+- `tackroom doctor` has no failures, and any held or blocked item has a reason in `status`.
 - `tackroom hook list` and `tackroom mcp list` match what skillshare used to write.
 
-## Cleanup
+## Clean up
 
-Once `tackroom status` is green, remove skillshare's install (`brew uninstall skillshare`, the desktop app, and `~/.config/skillshare`) so the two tools never write the same harness files.
+Once `tackroom status` is clean, uninstall skillshare the way you installed it and remove its config folder, so the two tools never write the same harness files.

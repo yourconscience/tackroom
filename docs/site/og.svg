@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- Social card source. Render: rsvg-convert -w 1200 -h 630 og.svg -o og.png
+       Brand fonts are not installed system-wide, so the text uses Helvetica Neue and Menlo. -->
+  <rect width="1200" height="630" fill="#171719"/>
+  <g transform="translate(80 80) scale(1.875)">
+    <rect width="64" height="64" rx="14" fill="#212023"/>
+    <path d="M13 18H51" stroke="#c9a45a" stroke-width="8" stroke-linecap="round"/>
+    <path d="M27 18V38a8.5 8.5 0 0 0 17 0" fill="none" stroke="#f4f4f5" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <text x="80" y="330" fill="#ffffff" font-family="Helvetica Neue" font-weight="700" font-size="104" letter-spacing="-2.6">tackroom</text>
+  <text font-family="Helvetica Neue" font-size="38" fill="#b4b4b8">
+    <tspan x="80" y="408">tackroom syncs one ~/.agents repo into 15 coding agents</tspan>
+    <tspan x="80" y="458">and pins every outside skill to a commit.</tspan>
+  </text>
+  <rect x="80" y="520" width="1040" height="5" fill="#c9a45a"/>
+  <text y="576" font-family="Menlo" font-size="26" xml:space="preserve"><tspan x="80" fill="#d6b46c">✓ pinned b09718b</tspan><tspan x="430" fill="#f29b55">! held 41h of 72h</tspan><tspan x="780" fill="#f3808f">✗ blocked</tspan></text>
+</svg>

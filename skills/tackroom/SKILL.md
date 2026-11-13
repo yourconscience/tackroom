@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Factory Droid, OpenCode, Qwen Code, Pi, OMP, and Amp. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
 ---
 
 # tackroom
@@ -28,6 +28,7 @@ tackroom doctor audit revoke <item> <rule>
 tackroom config validate
 tackroom config print
 tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]
+tackroom tui [--config PATH]                    # read-only terminal view of agents, lock, crons and doctor; needs a terminal
 tackroom skill new <name> [--description ...]
 tackroom skill list [--agents ...]
 tackroom skill info <name>
@@ -194,7 +195,7 @@ Runs sync, status, and doctor as one health check. It fails on drift, conflicts,
 tackroom doctor --e2e
 ```
 
-`doctor audit` lists findings per item (`skill:`, `plugin:`, `role:`, `hook:`, `mcp:`, `package:`) and exits 1 when an external item has an unaccepted CRITICAL finding. Use `doctor audit accept <item> <rule> --reason "..."` to record a decision (stored in `tackroom.lock` under `accepted:`) and `doctor audit revoke <item> <rule>` to undo one.
+`doctor audit` lists findings per item (`skill:`, `plugin:`, `role:`, `hook:`, `mcp:`, `package:`) and exits 1 when an external item has an unaccepted CRITICAL finding: a prompt-injection phrase, a secret sent out or a credential file read, invisible tag characters, or a download piped into a shell (rule `remote-exec`). A match inside a Markdown code fence or a script comment counts one level lower. Use `doctor audit accept <item> <rule> --reason "..."` to record a decision (stored in `tackroom.lock` under `accepted:`) and `doctor audit revoke <item> <rule>` to undo one.
 
 ## view
 
@@ -227,5 +228,6 @@ tackroom view --ssh-host me@box                      # remote: print an ssh -L t
 | Gemini CLI | yes | yes | yes, `~/.gemini/settings.json` | yes, `~/.gemini/settings.json` |
 | Antigravity CLI | yes | no | yes, `~/.gemini/config/mcp_config.json` | yes, `~/.gemini/config/hooks.json` |
 | DeepSeek Harness | yes | no | yes, `tackroom-mcp-*` rows in `~/.dsh/cordis.patch.yml` | no |
+| Amp | yes, config-driven | no | yes, `amp.mcpServers` in Amp settings | no |
 
 Do not add a surface without a verified native adapter and focused tests.

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{.Title}} · tackroom</title>
+{{if .Summary}}<meta name="description" content="{{.Summary}}">
+{{end}}<link rel="icon" type="image/svg+xml" href="{{.Root}}assets/docs/logo.svg">
+<link rel="stylesheet" href="{{.Root}}tokens.css">
+<link rel="stylesheet" href="{{.Root}}assets/docs/docs.css">
+{{if .RawHref}}<link rel="alternate" type="text/markdown" href="{{.RawHref}}">
+{{end}}</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="bar">
+    <a class="brand" href="{{.Root}}"><img src="{{.Root}}assets/docs/logo.svg" alt="" width="28" height="28"><span>tackroom</span></a>
+    <nav class="top" aria-label="Site">
+      <a href="{{.DocsHref}}">Docs</a>
+      <a href="{{.RepoURL}}">GitHub</a>
+    </nav>
+  </div>
+</header>
+<div class="layout">
+  <details class="nav-narrow">
+    <summary>Docs menu</summary>
+    <nav aria-label="Docs">{{template "links" .Nav}}</nav>
+  </details>
+  <nav class="nav-wide" aria-label="Docs">{{template "links" .Nav}}</nav>
+  <main id="main">
+    <article class="doc">
+{{.Content}}
+    </article>
+    {{if .EditURL}}<p class="edit"><a href="{{.EditURL}}">Edit this page on GitHub</a></p>{{end}}
+  </main>
+</div>
+<footer class="site-footer">
+  <div class="bar">
+    <p>MIT licence</p>
+    <p><a href="{{.RepoURL}}">GitHub</a>{{if .RawHref}} · <a href="{{.RawHref}}">This page as Markdown</a>{{end}} · <a href="{{.Root}}llms.txt">llms.txt</a></p>
+  </div>
+</footer>
+</body>
+</html>
+{{define "links"}}<ul>{{range .}}<li><a href="{{.Href}}"{{if .Current}} aria-current="page"{{end}}>{{.Title}}</a></li>{{end}}</ul>{{end}}

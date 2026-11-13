@@ -106,9 +106,9 @@ function bar(parts) {
 }
 // Agent marks from the tackroom site; an agent without one gets its initial.
 const AGENT_MARKS = {
-  claude: 'a-claude-code', 'claude-code': 'a-claude-code', codex: 'a-codex', hermes: 'a-hermes', droid: 'a-droid', factory: 'a-droid',
+  claude: 'a-claude-code', 'claude-code': 'a-claude-code', codex: 'a-codex', droid: 'a-droid', factory: 'a-droid',
   pi: 'a-pi', omp: 'a-omp', qwen: 'a-qwen-code', 'qwen-code': 'a-qwen-code', opencode: 'a-opencode', amp: 'a-amp',
-  cursor: 'a-cursor', copilot: 'a-copilot', grok: 'a-grok', deepseek: 'a-deepseek',
+  cursor: 'a-cursor', copilot: 'a-copilot', grok: 'a-grok', dsh: 'a-deepseek',
 };
 function agentMark(name, cls = 'ag') {
   const id = AGENT_MARKS[name];
@@ -651,7 +651,7 @@ function nextFire(job, from) {
 }
 function weekdayClock(ms) { return `${DAY_NAMES[new Date(ms).getDay()]} ${clock(ms)}`; }
 const PAUSED = ['disabled', 'paused', 'not_loaded'];
-const SOURCE_ICONS = {launchd: 'i-launchd', crontab: 'i-crontab', systemd: 'i-gear', hermes: 'a-hermes', codex: 'a-codex', 'claude-desktop': 'a-claude-code', 'claude-cloud': 'a-claude-code', 'herdr-automations': 'i-alarm', openbot: 'i-robot'};
+const SOURCE_ICONS = {launchd: 'i-launchd', crontab: 'i-crontab', systemd: 'i-gear', codex: 'a-codex', 'claude-desktop': 'a-claude-code', 'claude-cloud': 'a-claude-code', 'herdr-automations': 'i-alarm'};
 const HEALTH = {ok: ['i-ok', 'Healthy'], idle: ['i-idle', 'No result'], warn: ['i-warn', 'Last run failed'], fail: ['i-fail', 'Failing'], paused: ['i-pause', 'Paused']};
 const HEALTH_ORDER = ['ok', 'idle', 'warn', 'fail', 'paused'];
 function sourceIcon(job) { return icon(SOURCE_ICONS[job.source] || 'i-crons', 'src-icon'); }

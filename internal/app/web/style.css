@@ -138,13 +138,11 @@ svg { width: 16px; height: 16px; flex: none; }
 .health.fail, .health-list .fail svg { color: var(--negative); }
 .health.idle, .health.paused, .health-list .idle svg, .health-list .paused svg { color: var(--faint); }
 .src-icon { width: 15px; height: 15px; color: var(--faint); }
-/* Agent marks keep their own colours; Hermes takes its fills from these classes because the CSP blocks style attributes. */
+/* Agent marks keep their own colours. */
 .ag { width: 18px; height: 18px; }
 .ag-card { width: 34px; height: 34px; }
 .ag-letter { display: inline-grid; place-items: center; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--control); color: var(--muted); font: 600 11px/1 var(--font); }
 .ag-card.ag-letter { font-size: 15px; }
-.hermes-bg { fill: var(--hermes-bg, transparent); }
-.hermes-ink { fill: var(--hermes-ink, currentColor); }
 .col-agent { display: inline-grid; justify-items: center; gap: 4px; }
 
 /* ---------- blocks: a titled group of panels ---------- */

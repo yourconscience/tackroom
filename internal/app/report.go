@@ -104,6 +104,11 @@ func reportProblems(repoReport repoLinkReport, reports []agentReport) []string {
 // repoLine, rootDocLine and sourceLines are shared by the sync and status reports.
 func repoLine(repoReport repoLinkReport) string {
 	if repoReport.State == stateSynced {
+		if repoReport.ActualTarget != "" && sameCleanPath(repoReport.ActualTarget, repoReport.Path) {
+			// The config root is ~/.agents itself (an in-place checkout, not a
+			// symlink to another path), so there is no target to point at.
+			return fmt.Sprintf("%s ~/.agents", ui.Mark("ok"))
+		}
 		line := fmt.Sprintf("%s ~/.agents %s %s", ui.Mark("ok"), ui.Dim.Render("->"), repoReport.ExpectedTarget)
 		if repoReport.Linked {
 			line += " " + ui.Dim.Render("(linked this run)")
@@ -295,7 +300,7 @@ func harnessState(r agentReport) string {
 	case !r.Detected:
 		return ui.Dim.Render("not detected")
 	case !r.Synced:
-		return ui.Mark("fail") + " " + ui.Yellow.Render("drifted")
+		return ui.Mark("warn") + " " + ui.Yellow.Render("drifted")
 	default:
 		return ui.Mark("ok") + " " + ui.Green.Render("synced")
 	}
@@ -662,7 +667,7 @@ func writeHarnessStatus(b *strings.Builder, report agentReport, repoRoot string,
 	if report.Synced {
 		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("ok"), ui.Green.Render("synced"))
 	} else {
-		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("fail"), ui.Yellow.Render("drifted"))
+		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("warn"), ui.Yellow.Render("drifted"))
 	}
 
 	if verbose {

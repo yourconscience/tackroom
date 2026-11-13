@@ -1,0 +1,13 @@
+schema = 1
+id = "tackroom-crons"
+name = "tackroom crons"
+version = "0.1.0"
+description = "tackroom's cron inventory as a Tern block: host health, per-host jobs, and Run now / Pause / Resume, from `tackroom cron collect` and the `tackroom cron` verbs."
+icon = "clock"
+host = "host.luau"
+window = "window.luau"
+
+[[blocks]]
+id = "crons"
+title = "Crons"
+palette = true

@@ -125,8 +125,6 @@ elif transcript and "/.factory/" in transcript and Path(transcript).suffix == ".
     print("factory-jsonl")
 elif data.get("platform") == "amp" or data.get("amp_thread_id"):
     print("amp-json")
-elif data.get("session_id") and not transcript:
-    print("hermes-json")
 else:
     print("claude-plugin")
 PY

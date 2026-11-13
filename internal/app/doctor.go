@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/yourconscience/tackroom/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/ui"
 	"gopkg.in/yaml.v3"
 )
 
@@ -60,6 +61,36 @@ func runDoctor(opts runOptions) error {
 		fmt.Printf("repo: %s\n\n", repoRoot)
 	}
 
+	results := runDoctorChecks(opts.SkipPackageAge, repoRoot, home, cfg, selected)
+
+	if opts.JSONOutput {
+		return printDoctorJSON(setupStreams(opts).out, repoRoot, results)
+	}
+
+	out := ui.Writer(setupStreams(opts).out)
+	fmt.Fprintln(out, "checks:")
+	nameWidth := 0
+	for _, r := range results {
+		nameWidth = max(nameWidth, len(r.name))
+	}
+
+	for _, r := range results {
+		fmt.Fprintf(out, "  %s %-*s  %s\n", ui.Mark(checkMarkKind(r.status)), nameWidth, r.name, ui.Dim.Render(r.detail))
+	}
+
+	passed, warned, failed := countChecks(results)
+	fmt.Fprintf(out, "\n%s\n", checkSummary(passed, warned, failed))
+
+	// Context advisory notes are informational only. They are printed after the
+	// summary and MUST NOT influence the exit decision below.
+	printContextNotes(cfg, repoRoot, home, selected)
+
+	return doctorExitError(failed, warned)
+}
+
+// runDoctorChecks runs every doctor check in the order doctor prints them.
+// Shared by `tackroom doctor` and the terminal view.
+func runDoctorChecks(skipPackageAge bool, repoRoot, home string, cfg config, selected []agentConfig) []checkResult {
 	var results []checkResult
 
 	results = append(results, checkSkillFrontmatter(repoRoot))
@@ -79,30 +110,19 @@ func runDoctor(opts runOptions) error {
 	results = append(results, checkTern())
 	results = append(results, checkRex())
 	results = append(results, checkHerdrAutomations(home))
-	results = append(results, checkExternalPackageAge(repoRoot, cfg, opts.SkipPackageAge, timeNow()))
+	results = append(results, checkExternalPackageAge(repoRoot, cfg, skipPackageAge, timeNow()))
 	results = append(results, checkExternalSkillSources(cfg, home))
 	results = append(results, checkMaterializedExternalSkills(repoRoot, cfg, home))
 	results = append(results, checkExternalSkillLock(repoRoot, cfg, home))
 	results = append(results, checkExternalSkillAudit(cfg, home))
 	results = append(results, checkNativeHookHealth(home, cfg, selected))
 	results = append(results, checkPeriodicSync(repoRoot, home, cfg))
+	return results
+}
 
-	if opts.JSONOutput {
-		return printDoctorJSON(setupStreams(opts).out, repoRoot, results)
-	}
-
-	fmt.Println("checks:")
-	labelWidth := 0
+// countChecks tallies check outcomes; checkSummary words them.
+func countChecks(results []checkResult) (passed, warned, failed int) {
 	for _, r := range results {
-		if len(r.name) > labelWidth {
-			labelWidth = len(r.name)
-		}
-	}
-
-	passed, warned, failed := 0, 0, 0
-	for _, r := range results {
-		padding := strings.Repeat(".", labelWidth-len(r.name)+3)
-		fmt.Printf("  %s %s %s (%s)\n", r.name, padding, r.status, r.detail)
 		switch r.status {
 		case checkStatusPass:
 			passed++
@@ -112,14 +132,11 @@ func runDoctor(opts runOptions) error {
 			failed++
 		}
 	}
+	return passed, warned, failed
+}
 
-	fmt.Printf("\n%d passed, %d warning, %d failed\n", passed, warned, failed)
-
-	// Context advisory notes are informational only. They are printed after the
-	// summary and MUST NOT influence the exit decision below.
-	printContextNotes(cfg, repoRoot, home, selected)
-
-	return doctorExitError(failed, warned)
+func checkSummary(passed, warned, failed int) string {
+	return fmt.Sprintf("%d passed, %d warning, %d failed", passed, warned, failed)
 }
 
 func checkNativeHookHealth(home string, cfg config, selected []agentConfig) checkResult {
@@ -541,13 +558,18 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 			lockedNames[name] = true
 		}
 	}
+	held := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
 	for _, src := range cfg.ExternalSkills {
 		if !src.Materialize {
 			continue
 		}
+		name := sourceName(src)
+		if _, ok := held[name]; ok {
+			continue // held or blocked: not materialized by design, not a defect
+		}
 		pin := lockEntryFor(lock, src)
 		if pin == nil {
-			issues = append(issues, fmt.Sprintf("%s has no matching lock pin", sourceName(src)))
+			issues = append(issues, fmt.Sprintf("%s has no matching lock pin", name))
 			continue
 		}
 		skills, err := discoverExternalSourceSkills(src, home)
@@ -613,10 +635,21 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 	}
 	if len(issues) > 0 {
 		sort.Strings(issues)
-		return checkResult{"materialized external skills", checkStatusFail, strings.Join(issues, "; ")}
+		detail := strings.Join(issues, "; ")
+		if note := heldBlockedNote(held); note != "" {
+			detail += "; " + note
+		}
+		return checkResult{"materialized external skills", checkStatusFail, detail}
 	}
 	if checked == 0 {
+		if note := heldBlockedNote(held); note != "" {
+			return checkResult{"materialized external skills", checkStatusPass, note}
+		}
 		return checkResult{"materialized external skills", checkStatusPass, "none configured"}
 	}
-	return checkResult{"materialized external skills", checkStatusPass, fmt.Sprintf("%d canonical copies match lock", checked)}
+	detail := fmt.Sprintf("%d canonical copies match lock", checked)
+	if note := heldBlockedNote(held); note != "" {
+		detail += "; " + note
+	}
+	return checkResult{"materialized external skills", checkStatusPass, detail}
 }

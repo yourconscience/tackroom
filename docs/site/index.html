@@ -3,951 +3,370 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>tackroom: one ~/.agents repo for every coding agent</title>
-<meta name="description" content="tackroom keeps skills, MCP servers, hooks and roles in one ~/.agents repo and syncs them into each coding agent's native config. Install with Homebrew or npm.">
+<title>tackroom: one ~/.agents repo for 15 coding agents, every outside skill pinned</title>
+<meta name="description" content="tackroom syncs one ~/.agents repo into 15 coding agents and pins every outside skill to a commit. It audits them and holds anything newer than 72 hours.">
+<link rel="canonical" href="https://yourconscience.github.io/tackroom/">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#f4f4f8" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#13131b" media="(prefers-color-scheme: dark)">
-<meta property="og:title" content="tackroom">
-<meta property="og:description" content="One ~/.agents repo, synced into Claude Code, Codex, Pi, OMP, Grok Build and more, in each agent's own format.">
+<meta name="theme-color" content="#f4f4f5" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#171719" media="(prefers-color-scheme: dark)">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="tackroom">
+<meta property="og:title" content="tackroom: one ~/.agents repo for 15 coding agents">
+<meta property="og:description" content="tackroom syncs one ~/.agents repo into 15 coding agents and pins every outside skill to a commit.">
 <meta property="og:url" content="https://yourconscience.github.io/tackroom/">
-<meta property="og:image" content="https://yourconscience.github.io/tackroom/brag.jpg">
+<meta property="og:image" content="https://yourconscience.github.io/tackroom/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="tackroom: syncs one ~/.agents repo into 15 coding agents and pins every outside skill to a commit.">
 <meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 64 64%22%3E%3Crect width=%2264%22 height=%2264%22 rx=%2215%22 fill=%22%231c1c28%22/%3E%3Cpath d=%22M14 20H50%22 stroke=%22%23b4befe%22 stroke-width=%227%22 stroke-linecap=%22round%22/%3E%3Cpath d=%22M28 20V40a8 8 0 0 0 16 0%22 fill=%22none%22 stroke=%22%23e6e7f2%22 stroke-width=%227%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap" rel="stylesheet">
-<link rel="preload" as="image" href="brag.jpg">
-<style>
-  :root {
-    --bg: #f4f4f8;
-    --bg-2: #ebebf2;
-    --surface: #fbfbfd;
-    --line: #dcdce6;
-    --text: #191924;
-    --muted: #5b5d72;
-    --faint: #8a8ca1;
-    --accent: #4f56c9;
-    --accent-ink: #fbfbfd;
-    --accent-soft: rgba(79, 86, 201, .09);
-    --code-bg: #1b1b26;
-    --code-line: #2c2c3c;
-    --code-text: #dcdeec;
-    --code-dim: #8a8ca6;
-    --code-ok: #a6e3a1;
-    --code-warn: #f9e2af;
-    --code-key: #b4befe;
-    --shadow: 0 1px 0 rgba(30, 30, 60, .04), 0 24px 60px -30px rgba(40, 44, 110, .35);
-    --r-lg: 18px;
-    --r-md: 12px;
-    --r-sm: 8px;
-    --gutter: clamp(16px, 4vw, 40px);
-    --display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
-    --sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
-    --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
-    --ease: cubic-bezier(.16, 1, .3, 1);
-    --hermes-bg: transparent;
-    --hermes-ink: currentColor;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #13131b;
-      --bg-2: #181822;
-      --surface: #1c1c28;
-      --line: #2a2a39;
-      --text: #e6e7f2;
-      --muted: #a0a2b9;
-      --faint: #6f7189;
-      --accent: #b4befe;
-      --accent-ink: #171725;
-      --accent-soft: rgba(180, 190, 254, .08);
-      --code-bg: #171721;
-      --code-line: #272735;
-      --shadow: 0 1px 0 rgba(255, 255, 255, .03), 0 30px 70px -34px rgba(0, 0, 0, .7);
-      --hermes-bg: #f5f5f7;
-      --hermes-ink: #141418;
-    }
-  }
-
-  *, *::before, *::after { box-sizing: border-box; }
-  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
-  body {
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font: 400 16px/1.6 var(--sans);
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-  }
-  img, video { display: block; max-width: 100%; height: auto; }
-  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 1px; }
-  a:hover { color: var(--accent); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
-  code { font-family: var(--mono); font-size: .9em; }
-  p code, li code, dd code, td code { padding: .08em .35em; border-radius: 5px; background: var(--bg-2); border: 1px solid var(--line); font-size: .84em; white-space: nowrap; }
-  h1, h2, h3 { font-family: var(--display); font-weight: 650; margin: 0; text-wrap: balance; }
-  h2 { font-size: clamp(1.85rem, 3.4vw, 2.75rem); line-height: 1.06; letter-spacing: -.028em; }
-  h3 { font-size: 1.12rem; letter-spacing: -.012em; line-height: 1.25; }
-  p { margin: 0; text-wrap: pretty; }
-  .icon { width: 1em; height: 1em; fill: currentColor; flex: none; }
-  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
-  .skip { position: absolute; left: 12px; top: -48px; padding: 8px 14px; border-radius: var(--r-sm); background: var(--accent); color: var(--accent-ink); z-index: 20; }
-  .skip:focus { top: 12px; }
-
-  .wrap { width: 100%; max-width: 1200px; margin-inline: auto; padding-inline: var(--gutter); }
-  section { padding-block: clamp(72px, 10vw, 128px) 0; }
-  .lead { color: var(--muted); font-size: 1.06rem; max-width: 60ch; margin-top: 16px; }
-  .note { color: var(--faint); font-size: .86rem; margin-top: 14px; }
-
-  /* nav */
-  .nav { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: saturate(1.4) blur(12px); -webkit-backdrop-filter: saturate(1.4) blur(12px); border-bottom: 1px solid transparent; transition: border-color .3s var(--ease); }
-  .nav.is-stuck { border-bottom-color: var(--line); }
-  .nav .wrap { display: flex; align-items: center; gap: 28px; height: 64px; }
-  .brand { font-family: var(--display); font-weight: 680; font-size: 1.32rem; letter-spacing: -.03em; text-decoration: none; }
-  .brand:hover { color: inherit; }
-  .nav-links { display: flex; gap: 24px; margin-left: auto; align-items: center; font-size: .94rem; color: var(--muted); }
-  .nav-links a { text-decoration: none; }
-  .nav-links .gh { display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; color: var(--text); background: var(--surface); transition: border-color .2s var(--ease), transform .2s var(--ease); }
-  .nav-links .gh:hover { border-color: var(--accent); }
-  .nav-links .gh:active { transform: translateY(1px); }
-  .nav-links .gh .icon { font-size: 1.05rem; }
-
-  /* hero */
-  .hero { display: grid; grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr); gap: clamp(32px, 4.5vw, 64px); align-items: center; padding-block: clamp(40px, 7vw, 88px) 0; }
-  .hero h1 { font-size: clamp(2.6rem, 4.6vw, 3.9rem); line-height: 1; letter-spacing: -.038em; font-weight: 640; }
-  .hero .sub { margin-top: 22px; font-size: clamp(1.06rem, 1.5vw, 1.2rem); line-height: 1.55; color: var(--muted); max-width: 34rem; }
-  .hero .sub code { font-size: .9em; }
-
-  .install { margin-top: 32px; max-width: 34rem; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
-  .tabs { display: flex; gap: 2px; padding: 6px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
-  .tabs::-webkit-scrollbar { display: none; }
-  .tab { appearance: none; border: 0; background: transparent; color: var(--muted); font: 500 .9rem/1 var(--sans); padding: 9px 12px; border-radius: var(--r-sm); cursor: pointer; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; transition: color .2s var(--ease), background .2s var(--ease); }
-  .tab .icon { font-size: 1.05rem; }
-  .tab:hover { color: var(--text); }
-  .tab[aria-selected="true"] { color: var(--text); background: var(--accent-soft); }
-  .tab[aria-selected="true"] .icon { color: var(--accent); }
-  .cmds { padding: 10px 8px 10px 16px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
-  .cmd { display: flex; align-items: center; gap: 10px; min-height: 42px; font-family: var(--mono); font-size: .92rem; }
-  .cmd .p { color: var(--accent); user-select: none; }
-  .cmd code { flex: 1; min-width: 0; overflow-x: auto; white-space: nowrap; scrollbar-width: none; font-size: 1em; transition: opacity .18s var(--ease), transform .25s var(--ease); }
-  .cmd code::-webkit-scrollbar { display: none; }
-  .cmd code.is-swapping { opacity: 0; transform: translateY(4px); }
-  .cmd[hidden] { display: none; }
-  .copy { appearance: none; flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 11px; border: 1px solid transparent; border-radius: var(--r-sm); background: transparent; color: var(--faint); font: 500 .8rem/1 var(--sans); cursor: pointer; transition: color .2s var(--ease), background .2s var(--ease), border-color .2s var(--ease), transform .12s var(--ease); }
-  .copy:hover { color: var(--text); background: var(--bg-2); }
-  .copy:active { transform: scale(.96); }
-  .copy .icon { font-size: 1rem; }
-  .copy .ok { display: none; }
-  .copy.is-done { color: var(--accent); }
-  .copy.is-done .ok { display: block; }
-  .copy.is-done .cp { display: none; }
-  .copy .label { min-width: 3.6em; text-align: left; }
-
-  .film { position: relative; margin: 0; border-radius: var(--r-lg); overflow: hidden; background: #11111a; box-shadow: var(--shadow); border: 1px solid var(--line); aspect-ratio: 16 / 9; }
-  .film > button { all: unset; position: absolute; inset: 0; cursor: pointer; display: block; }
-  .film img, .film video { width: 100%; height: 100%; object-fit: cover; }
-  .film img { transition: transform .9s var(--ease), filter .5s var(--ease); }
-  .film > button:hover img { transform: scale(1.015); filter: brightness(1.04); }
-  .play { position: absolute; left: 18px; bottom: 18px; display: inline-flex; align-items: center; gap: 10px; padding: 9px 16px 9px 10px; border-radius: 999px; background: rgba(19, 19, 27, .72); color: #f1f2fa; font: 500 .92rem/1 var(--sans); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12); transition: background .2s var(--ease), transform .2s var(--ease); }
-  .play .disc { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #b4befe; color: #171725; }
-  .play .disc .icon { font-size: .9rem; margin-left: 2px; }
-  .film > button:hover .play { background: rgba(19, 19, 27, .86); }
-  .film > button:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; border-radius: var(--r-lg); }
-  .film > button:active .play { transform: scale(.98); }
-
-
-  /* brand mark */
-  .brand { display: inline-flex; align-items: center; gap: 10px; }
-  .brand .mark { width: 30px; height: 30px; flex: none; border-radius: 7px; box-shadow: 0 0 0 1px var(--line); }
-  footer .brand .mark { width: 24px; height: 24px; }
-
-  /* name: a rail of pegs, one nameplate per agent */
-  .name { display: grid; gap: clamp(28px, 4vw, 44px); }
-  .name-copy { display: grid; gap: 14px; max-width: 62ch; }
-  .name-copy p { color: var(--muted); font-size: 1.06rem; }
-  .wall { position: relative; padding-top: 10px; }
-  .rail { position: absolute; left: 0; right: 0; top: 10px; height: 16px; border-radius: 8px; background: linear-gradient(180deg, color-mix(in srgb, var(--line) 60%, var(--surface)), var(--line)); box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .06); display: flex; justify-content: space-between; padding: 0 14px; align-items: center; }
-  .rail span { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); }
-  .pegs { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; position: relative; }
-  .pegs li { display: flex; flex-direction: column; align-items: center; min-width: 0; }
-  .peg { width: 14px; height: 14px; margin-top: 1px; border-radius: 50%; background: var(--accent); box-shadow: 0 2px 0 color-mix(in srgb, var(--accent) 55%, #000); position: relative; z-index: 1; }
-  .cord { width: 2px; height: 26px; background: var(--faint); }
-  .plate { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 22px 12px 16px; border-radius: 16px; border: 1px solid var(--line); background: var(--surface); box-shadow: var(--shadow); position: relative; transform-origin: 50% -26px; transition: transform .5s var(--ease); }
-  .plate::before { content: ""; position: absolute; top: 9px; left: 50%; width: 8px; height: 8px; margin-left: -4px; border-radius: 50%; background: var(--bg); box-shadow: inset 0 0 0 1.5px var(--line); }
-  .pegs li:nth-child(odd) .plate { transform: rotate(-2deg); }
-  .pegs li:nth-child(even) .plate { transform: rotate(1.6deg); }
-  .pegs li:hover .plate { transform: rotate(0); }
-  .plate b { font-family: var(--display); font-weight: 600; font-size: 1.02rem; text-align: center; }
-  .gear { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; }
-  .gear i { font: 500 .72rem/1 var(--mono); font-style: normal; color: var(--muted); padding: 4px 7px; border-radius: 6px; background: var(--accent-soft); }
-  @media (max-width: 920px) { .pegs { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; } .rail { display: none; } }
-  @media (max-width: 560px) { .pegs { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pegs li:last-child:nth-child(odd) { grid-column: 1 / -1; } .pegs li:last-child:nth-child(odd) .plate { max-width: calc(50% - 8px); } }
-
-  /* agent board */
-  .board { padding-block: clamp(48px, 6vw, 72px) 0; }
-  .board-title { font-size: clamp(1.3rem, 2vw, 1.6rem); letter-spacing: -.02em; color: var(--text); }
-  .board-grid { list-style: none; margin: 22px 0 0; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
-  .board-grid li { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 22px 12px 18px; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); transition: border-color .25s var(--ease), transform .25s var(--ease); }
-  .board-grid li:hover { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); transform: translateY(-2px); }
-  .board-grid b { margin-top: 10px; font-family: var(--display); font-weight: 600; font-size: 1.06rem; letter-spacing: -.01em; }
-  .board-grid span { color: var(--muted); font-size: .84rem; line-height: 1.35; }
-  .ag-big { width: 52px; height: 52px; }
-  .ag { width: 20px; height: 20px; flex: none; vertical-align: middle; }
-  .agent-cell { display: inline-flex; align-items: center; gap: 12px; }
-  .agent-cell .ag { width: 24px; height: 24px; }
-  .ex-out .tab .ag { width: 18px; height: 18px; }
-  @media (max-width: 920px) { .board-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-  @media (max-width: 560px) { .board-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ag-big { width: 44px; height: 44px; } }
-
-  /* first run */
-  .run { display: grid; grid-template-columns: minmax(0, 4.4fr) minmax(0, 7.6fr); gap: clamp(32px, 5vw, 80px); align-items: start; }
-  .run-side { position: sticky; top: 104px; }
-  .steps { list-style: none; margin: 36px 0 0; padding: 0; display: grid; gap: 4px; }
-  .steps a { display: grid; grid-template-columns: 22px 1fr; gap: 4px 14px; padding: 14px 16px 14px 14px; border-radius: var(--r-md); text-decoration: none; color: var(--muted); transition: background .35s var(--ease), color .35s var(--ease); }
-  .steps a::before { content: ""; grid-row: 1 / span 2; width: 3px; justify-self: center; border-radius: 3px; background: var(--line); transition: background .35s var(--ease); }
-  .steps b { font-family: var(--display); font-weight: 620; font-size: 1.1rem; color: var(--text); letter-spacing: -.01em; }
-  .steps span { font-size: .95rem; line-height: 1.5; }
-  .steps .is-active a { background: var(--surface); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
-  .steps .is-active a::before { background: var(--accent); }
-  .run-outs { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(28px, 4vw, 48px); min-width: 0; }
-  .out-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-  .term { margin: 0; border-radius: var(--r-lg); background: var(--code-bg); border: 1px solid var(--code-line); box-shadow: var(--shadow); overflow: hidden; }
-  .term-head { display: flex; align-items: center; gap: 10px; padding: 11px 16px; border-bottom: 1px solid var(--code-line); color: var(--code-dim); font: 500 .8rem/1 var(--mono); }
-  .term-head .icon { font-size: .95rem; color: var(--code-key); }
-  .term pre { margin: 0; padding: 18px 20px 20px; overflow-x: auto; color: var(--code-text); font: 400 .84rem/1.62 var(--mono); tab-size: 2; }
-  .term .c { color: var(--code-dim); }
-  .term .k { color: var(--code-key); }
-  .term .g { color: var(--code-ok); }
-  .term .y { color: var(--code-warn); }
-  .term .s { color: #f5c2e7; }
-  .out { min-width: 0; }
-
-  /* view */
-  .view-head { max-width: 46rem; }
-  .shot { margin: clamp(32px, 5vw, 56px) auto 0; width: min(1320px, calc(100% - 2 * var(--gutter))); }
-  .shot img { width: 100%; border-radius: var(--r-lg); border: 1px solid var(--line); box-shadow: var(--shadow); background: #181825; }
-  .shot figcaption { margin-top: 14px; color: var(--faint); font-size: .86rem; text-align: center; padding-inline: var(--gutter); }
-
-  /* crons */
-  .crons-term { margin-top: clamp(24px, 4vw, 36px); max-width: 52rem; }
-  .crons-herdr { margin-top: 18px; color: var(--muted); max-width: 60ch; }
-
-  /* explorer */
-  .ex-head { max-width: 44rem; }
-  .ex { margin-top: clamp(32px, 5vw, 52px); display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
-  .ex-src { position: sticky; top: 96px; }
-  .ex-src .term-head .tag { margin-left: auto; color: var(--code-key); }
-  .ex-out { border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
-  .ex-out .tabs { padding: 8px; }
-  .ex-panel { padding: 14px; display: grid; gap: 12px; }
-  .ex-panel[hidden] { display: none; }
-  .ex-panel.is-entering { animation: fade .35s var(--ease) both; }
-  .file { border-radius: var(--r-md); background: var(--code-bg); border: 1px solid var(--code-line); overflow: hidden; }
-  .file .term-head { padding: 9px 14px; }
-  .file .term-head .what { margin-left: auto; font-family: var(--sans); color: var(--code-dim); }
-  .file pre { margin: 0; padding: 12px 14px 14px; overflow-x: auto; color: var(--code-text); font: 400 .8rem/1.6 var(--mono); }
-  .file .k { color: var(--code-key); }
-  .file .c { color: var(--code-dim); }
-  .file .s { color: #f5c2e7; }
-  .ex-note { padding: 0 4px 4px; color: var(--muted); font-size: .9rem; }
-
-  .matrix { margin-top: clamp(40px, 6vw, 64px); }
-  .matrix h3 { font-size: 1.3rem; }
-  .tablewrap { margin-top: 18px; overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--surface); }
-  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .93rem; }
-  th, td { text-align: left; padding: 12px 18px; vertical-align: middle; }
-  thead th { font: 500 .8rem/1.2 var(--sans); color: var(--muted); padding-block: 14px; border-bottom: 1px solid var(--line); }
-  tbody tr:nth-child(even) { background: var(--accent-soft); }
-  tbody th { font-weight: 560; font-family: var(--display); font-size: 1rem; letter-spacing: -.005em; white-space: nowrap; }
-  td .yes { color: var(--accent); font-size: 1.05rem; vertical-align: -3px; }
-  td .t { color: var(--muted); }
-  td .no { color: var(--faint); }
-  .legend { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--muted); font-size: .86rem; }
-  .legend b { font-weight: 560; color: var(--text); }
-
-  /* bento */
-  .bento { margin-top: clamp(32px, 5vw, 52px); display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; }
-  .cell { border-radius: var(--r-lg); border: 1px solid var(--line); background: var(--surface); padding: clamp(20px, 2.4vw, 28px); display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-  .cell p { color: var(--muted); font-size: .96rem; }
-  .cell .mark { font-size: 1.5rem; color: var(--accent); margin-bottom: 6px; }
-  .cell .term { margin-top: auto; box-shadow: none; border-radius: var(--r-md); }
-  .cell .term pre { font-size: .76rem; padding: 14px 16px; }
-  .c-audit { grid-column: span 4; grid-row: span 2; background: linear-gradient(160deg, var(--accent-soft), transparent 55%), var(--surface); }
-  .c-audit .term { margin-top: 18px; }
-  .c-pin { grid-column: span 2; background: var(--bg-2); }
-  .c-own { grid-column: span 2; }
-  .c-sync { grid-column: span 3; }
-  .c-local { grid-column: span 3; background: var(--bg-2); }
-  .c-sync .term, .c-local .term { margin-top: 12px; }
-
-  /* compare */
-  .compare { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 8fr); gap: clamp(28px, 5vw, 72px); align-items: start; }
-  .compare .tablewrap { margin-top: 0; }
-  .compare table { min-width: 560px; }
-  .compare td.us { color: var(--text); font-weight: 520; }
-  .compare thead th a { color: var(--muted); }
-  .compare thead th.us { color: var(--accent); }
-
-  /* faq */
-  .faq { margin-top: clamp(28px, 4vw, 44px); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 36px 56px; }
-  .faq div { min-width: 0; }
-  .faq dt { font-family: var(--display); font-weight: 620; font-size: 1.12rem; letter-spacing: -.012em; }
-  .faq dd { margin: 8px 0 0; color: var(--muted); }
-
-  footer { margin-top: clamp(80px, 11vw, 140px); border-top: 1px solid var(--line); }
-  footer .wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 28px; padding-block: 32px 44px; color: var(--muted); font-size: .92rem; }
-  footer .brand { font-size: 1.1rem; color: var(--text); }
-  footer nav { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-left: auto; }
-  footer nav a { text-decoration: none; }
-
-  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @media (prefers-reduced-motion: no-preference) {
-    .rise { animation: rise .8s var(--ease) both; animation-delay: calc(var(--i, 0) * 90ms); }
-    @supports (animation-timeline: view()) {
-      .shot img { animation: lift linear both; animation-timeline: view(); animation-range: entry 0% cover 40%; }
-      @keyframes lift { from { transform: translateY(48px) scale(.97); opacity: .4; } to { transform: none; opacity: 1; } }
-    }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    html { scroll-behavior: auto; }
-    *, *::before, *::after { transition-duration: 0s !important; animation: none !important; }
-  }
-
-  @media (max-width: 920px) {
-    .hero { grid-template-columns: minmax(0, 1fr); }
-    .run { grid-template-columns: minmax(0, 1fr); }
-    .run-side { position: static; }
-    .steps { display: none; }
-    .out-text { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; margin-bottom: 14px; }
-    .out-text h3 { font-size: 1.2rem; }
-    .out-text p { margin-top: 6px; color: var(--muted); }
-    .ex { grid-template-columns: minmax(0, 1fr); }
-    .ex-src { position: static; }
-    .bento { grid-template-columns: minmax(0, 1fr); }
-    .c-audit, .c-pin, .c-own, .c-sync, .c-local { grid-column: auto; grid-row: auto; }
-    .faq { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-    .compare { grid-template-columns: minmax(0, 1fr); }
-  }
-  @media (max-width: 640px) {
-    .nav-links .hide-sm { display: none; }
-    .nav .wrap { gap: 16px; }
-    .install { border-radius: var(--r-md); }
-    .cmd { font-size: .84rem; }
-    .copy .label { display: none; }
-    .install .tab { padding: 9px 10px; }
-    .install .tab .icon { display: none; }
-    .cmds { padding-left: 12px; }
-    .play { left: 12px; bottom: 12px; font-size: .84rem; }
-    .term pre { font-size: .76rem; padding: 14px 14px 16px; }
-    footer nav { margin-left: 0; }
-  }
-</style>
+<meta name="twitter:title" content="tackroom: one ~/.agents repo for 15 coding agents">
+<meta name="twitter:description" content="tackroom syncs one ~/.agents repo into 15 coding agents and pins every outside skill to a commit.">
+<meta name="twitter:image" content="https://yourconscience.github.io/tackroom/og.png">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/public-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/public-sans-latin-700-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="style.css">
+<script>
+  // Apply a saved theme before first paint. Without a saved choice the page follows the system.
+  try { var t = localStorage.getItem("tackroom-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
 </head>
 <body>
+<!-- Phosphor Icons 2.1.1, regular weight (MIT), copied from internal/app/web/index.html and docs/brand/preview.html. -->
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
-<!-- Agent marks: lobehub/lobe-icons (MIT) for Claude Code, Codex, Cursor, GitHub Copilot, Grok, DeepSeek, Amp and Pi; each project's own repo or site for OpenCode, OMP, Qwen Code and Factory. -->
-<defs><linearGradient gradientUnits="userSpaceOnUse" id="tr-codex-grad" x1="12" x2="12" y1="3" y2="21"><stop stop-color="#B1A7FF"></stop><stop offset=".5" stop-color="#7A9DFF"></stop><stop offset="1" stop-color="#3941FF"></stop></linearGradient> <linearGradient id="tr-omp-grad" x1="0" y1="0" x2="1" y2="1"> <stop offset="0" stop-color="#ed4abf" /> <stop offset=".5" stop-color="#9b4dff" /> <stop offset="1" stop-color="#5ad8e6" /> </linearGradient> </defs>
-<symbol id="a-claude-code" viewBox="0 0 24 24"><path clip-rule="evenodd" d="M20.998 10.949H24v3.102h-3v3.028h-1.487V20H18v-2.921h-1.487V20H15v-2.921H9V20H7.488v-2.921H6V20H4.487v-2.921H3V14.05H0V10.95h3V5h17.998v5.949zM6 10.949h1.488V8.102H6v2.847zm10.51 0H18V8.102h-1.49v2.847z" fill="#D97757" fill-rule="evenodd"></path></symbol>
-<symbol id="a-codex" viewBox="0 0 24 24"><path d="M19.503 0H4.496A4.496 4.496 0 000 4.496v15.007A4.496 4.496 0 004.496 24h15.007A4.496 4.496 0 0024 19.503V4.496A4.496 4.496 0 0019.503 0z" fill="#fff"></path><path d="M9.064 3.344a4.578 4.578 0 012.285-.312c1 .115 1.891.54 2.673 1.275.01.01.024.017.037.021a.09.09 0 00.043 0 4.55 4.55 0 013.046.275l.047.022.116.057a4.581 4.581 0 012.188 2.399c.209.51.313 1.041.315 1.595a4.24 4.24 0 01-.134 1.223.123.123 0 00.03.115c.594.607.988 1.33 1.183 2.17.289 1.425-.007 2.71-.887 3.854l-.136.166a4.548 4.548 0 01-2.201 1.388.123.123 0 00-.081.076c-.191.551-.383 1.023-.74 1.494-.9 1.187-2.222 1.846-3.711 1.838-1.187-.006-2.239-.44-3.157-1.302a.107.107 0 00-.105-.024c-.388.125-.78.143-1.204.138a4.441 4.441 0 01-1.945-.466 4.544 4.544 0 01-1.61-1.335c-.152-.202-.303-.392-.414-.617a5.81 5.81 0 01-.37-.961 4.582 4.582 0 01-.014-2.298.124.124 0 00.006-.056.085.085 0 00-.027-.048 4.467 4.467 0 01-1.034-1.651 3.896 3.896 0 01-.251-1.192 5.189 5.189 0 01.141-1.6c.337-1.112.982-1.985 1.933-2.618.212-.141.413-.251.601-.33.215-.089.43-.164.646-.227a.098.098 0 00.065-.066 4.51 4.51 0 01.829-1.615 4.535 4.535 0 011.837-1.388zm3.482 10.565a.637.637 0 000 1.272h3.636a.637.637 0 100-1.272h-3.636zM8.462 9.23a.637.637 0 00-1.106.631l1.272 2.224-1.266 2.136a.636.636 0 101.095.649l1.454-2.455a.636.636 0 00.005-.64L8.462 9.23z" fill="url(#tr-codex-grad)"></path></symbol>
-<symbol id="a-cursor" viewBox="0 0 24 24"><g fill="currentColor" fill-rule="evenodd"><path d="M22.106 5.68L12.5.135a.998.998 0 00-.998 0L1.893 5.68a.84.84 0 00-.419.726v11.186c0 .3.16.577.42.727l9.607 5.547a.999.999 0 00.998 0l9.608-5.547a.84.84 0 00.42-.727V6.407a.84.84 0 00-.42-.726zm-.603 1.176L12.228 22.92c-.063.108-.228.064-.228-.061V12.34a.59.59 0 00-.295-.51l-9.11-5.26c-.107-.062-.063-.228.062-.228h18.55c.264 0 .428.286.296.514z"></path></g></symbol>
-<symbol id="a-copilot" viewBox="0 0 24 24"><g fill="currentColor" fill-rule="evenodd"><path d="M19.245 5.364c1.322 1.36 1.877 3.216 2.11 5.817.622 0 1.2.135 1.592.654l.73.964c.21.278.323.61.323.955v2.62c0 .339-.173.669-.453.868C20.239 19.602 16.157 21.5 12 21.5c-4.6 0-9.205-2.583-11.547-4.258-.28-.2-.452-.53-.453-.868v-2.62c0-.345.113-.679.321-.956l.73-.963c.392-.517.974-.654 1.593-.654l.029-.297c.25-2.446.81-4.213 2.082-5.52 2.461-2.54 5.71-2.851 7.146-2.864h.198c1.436.013 4.685.323 7.146 2.864zm-7.244 4.328c-.284 0-.613.016-.962.05-.123.447-.305.85-.57 1.108-1.05 1.023-2.316 1.18-2.994 1.18-.638 0-1.306-.13-1.851-.464-.516.165-1.012.403-1.044.996a65.882 65.882 0 00-.063 2.884l-.002.48c-.002.563-.005 1.126-.013 1.69.002.326.204.63.51.765 2.482 1.102 4.83 1.657 6.99 1.657 2.156 0 4.504-.555 6.985-1.657a.854.854 0 00.51-.766c.03-1.682.006-3.372-.076-5.053-.031-.596-.528-.83-1.046-.996-.546.333-1.212.464-1.85.464-.677 0-1.942-.157-2.993-1.18-.266-.258-.447-.661-.57-1.108-.32-.032-.64-.049-.96-.05zm-2.525 4.013c.539 0 .976.426.976.95v1.753c0 .525-.437.95-.976.95a.964.964 0 01-.976-.95v-1.752c0-.525.437-.951.976-.951zm5 0c.539 0 .976.426.976.95v1.753c0 .525-.437.95-.976.95a.964.964 0 01-.976-.95v-1.752c0-.525.437-.951.976-.951zM7.635 5.087c-1.05.102-1.935.438-2.385.906-.975 1.037-.765 3.668-.21 4.224.405.394 1.17.657 1.995.657h.09c.649-.013 1.785-.176 2.73-1.11.435-.41.705-1.433.675-2.47-.03-.834-.27-1.52-.63-1.813-.39-.336-1.275-.482-2.265-.394zm6.465.394c-.36.292-.6.98-.63 1.813-.03 1.037.24 2.06.675 2.47.968.957 2.136 1.104 2.776 1.11h.044c.825 0 1.59-.263 1.995-.657.555-.556.765-3.187-.21-4.224-.45-.468-1.335-.804-2.385-.906-.99-.088-1.875.058-2.265.394zM12 7.615c-.24 0-.525.015-.84.044.03.16.045.336.06.526l-.001.159a2.94 2.94 0 01-.014.25c.225-.022.425-.027.612-.028h.366c.187 0 .387.006.612.028-.015-.146-.015-.277-.015-.409.015-.19.03-.365.06-.526a9.29 9.29 0 00-.84-.044z"></path></g></symbol>
-<symbol id="a-grok" viewBox="0 0 24 24"><g fill="currentColor" fill-rule="evenodd"><path d="M9.27 15.29l7.978-5.897c.391-.29.95-.177 1.137.272.98 2.369.542 5.215-1.41 7.169-1.951 1.954-4.667 2.382-7.149 1.406l-2.711 1.257c3.889 2.661 8.611 2.003 11.562-.953 2.341-2.344 3.066-5.539 2.388-8.42l.006.007c-.983-4.232.242-5.924 2.75-9.383.06-.082.12-.164.179-.248l-3.301 3.305v-.01L9.267 15.292M7.623 16.723c-2.792-2.67-2.31-6.801.071-9.184 1.761-1.763 4.647-2.483 7.166-1.425l2.705-1.25a7.808 7.808 0 00-1.829-1A8.975 8.975 0 005.984 5.83c-2.533 2.536-3.33 6.436-1.962 9.764 1.022 2.487-.653 4.246-2.34 6.022-.599.63-1.199 1.259-1.682 1.925l7.62-6.815"></path></g></symbol>
-<symbol id="a-dsh" viewBox="0 0 24 24"><g fill="currentColor" fill-rule="evenodd"><path d="M23.748 4.482c-.254-.124-.364.113-.512.234-.051.039-.094.09-.137.136-.372.397-.806.657-1.373.626-.829-.046-1.537.214-2.163.848-.133-.782-.575-1.248-1.247-1.548-.352-.156-.708-.311-.955-.65-.172-.241-.219-.51-.305-.774-.055-.16-.11-.323-.293-.35-.2-.031-.278.136-.356.276-.313.572-.434 1.202-.422 1.84.027 1.436.633 2.58 1.838 3.393.137.093.172.187.129.323-.082.28-.18.552-.266.833-.055.179-.137.217-.329.14a5.526 5.526 0 01-1.736-1.18c-.857-.828-1.631-1.742-2.597-2.458a11.365 11.365 0 00-.689-.471c-.985-.957.13-1.743.388-1.836.27-.098.093-.432-.779-.428-.872.004-1.67.295-2.687.684a3.055 3.055 0 01-.465.137 9.597 9.597 0 00-2.883-.102c-1.885.21-3.39 1.102-4.497 2.623C.082 8.606-.231 10.684.152 12.85c.403 2.284 1.569 4.175 3.36 5.653 1.858 1.533 3.997 2.284 6.438 2.14 1.482-.085 3.133-.284 4.994-1.86.47.234.962.327 1.78.397.63.059 1.236-.03 1.705-.128.735-.156.684-.837.419-.961-2.155-1.004-1.682-.595-2.113-.926 1.096-1.296 2.746-2.642 3.392-7.003.05-.347.007-.565 0-.845-.004-.17.035-.237.23-.256a4.173 4.173 0 001.545-.475c1.396-.763 1.96-2.015 2.093-3.517.02-.23-.004-.467-.247-.588zM11.581 18c-2.089-1.642-3.102-2.183-3.52-2.16-.392.024-.321.471-.235.763.09.288.207.486.371.739.114.167.192.416-.113.603-.673.416-1.842-.14-1.897-.167-1.361-.802-2.5-1.86-3.301-3.307-.774-1.393-1.224-2.887-1.298-4.482-.02-.386.093-.522.477-.592a4.696 4.696 0 011.529-.039c2.132.312 3.946 1.265 5.468 2.774.868.86 1.525 1.887 2.202 2.891.72 1.066 1.494 2.082 2.48 2.914.348.292.625.514.891.677-.802.09-2.14.11-3.054-.614zm1-6.44a.306.306 0 01.415-.287.302.302 0 01.2.288.306.306 0 01-.31.307.303.303 0 01-.304-.308zm3.11 1.596c-.2.081-.399.151-.59.16a1.245 1.245 0 01-.798-.254c-.274-.23-.47-.358-.552-.758a1.73 1.73 0 01.016-.588c.07-.327-.008-.537-.239-.727-.187-.156-.426-.199-.688-.199a.559.559 0 01-.254-.078c-.11-.054-.2-.19-.114-.358.028-.054.16-.186.192-.21.356-.202.767-.136 1.146.016.352.144.618.408 1.001.782.391.451.462.576.685.914.176.265.336.537.445.848.067.195-.019.354-.25.452z"></path></g></symbol>
-<symbol id="a-amp" viewBox="0 0 24 24"><path d="M15.087 23.18L12.03 24l-2.097-7.823-5.738 5.738-2.251-2.251 5.718-5.719-7.769-2.082.82-3.057 11.294 3.08 3.08 11.295z" fill="#F34E3F"></path><path d="M19.505 18.762l-3.057.82-2.564-9.573-9.572-2.564.819-3.057 11.295 3.079 3.08 11.295z" fill="#F34E3F"></path><path d="M23.893 14.374l-3.057.82-2.565-9.572L8.7 3.057 9.52 0l11.295 3.08 3.079 11.294z" fill="#F34E3F"></path></symbol>
-<symbol id="a-pi" viewBox="0 0 24 24"><g fill="currentColor" fill-rule="evenodd"><path clip-rule="evenodd" d="M1 1h16.5v11H12v5.5H6.5V23H1V1zm5.5 5.5V12H12V6.5H6.5z"></path><path d="M17.5 12H23v11h-5.5V12z"></path></g></symbol>
-<symbol id="a-opencode" viewBox="96 96 320 320"> <path d="M320 224V352H192V224H320Z" fill="currentColor" fill-opacity=".45"></path> <path fill-rule="evenodd" clip-rule="evenodd" d="M384 416H128V96H384V416ZM320 160H192V352H320V160Z" fill="currentColor"></path></symbol>
-<symbol id="a-omp" viewBox="0 0 64 64"> <rect width="64" height="64" rx="12" fill="#0f0a14" /> <path fill="url(#tr-omp-grad)" d="M14 16h36v8H40v32h-8V24h-6v22h-8V24h-4z" /></symbol>
-<symbol id="a-qwen-code" viewBox="0 0 141.38 140"><path fill="#6D44E8" d="m140.93 85-16.35-28.33-1.93-3.34 8.66-15a3.323 3.323 0 0 0 0-3.34l-9.62-16.67c-.3-.51-.72-.93-1.22-1.22s-1.07-.45-1.67-.45H82.23l-8.66-15a3.33 3.33 0 0 0-2.89-1.67H51.43c-.59 0-1.17.16-1.66.45-.5.29-.92.71-1.22 1.22L32.19 29.98l-1.92 3.33H12.96c-.59 0-1.17.16-1.66.45-.5.29-.93.71-1.22 1.22L.45 51.66a3.323 3.323 0 0 0 0 3.34l18.28 31.67-8.66 15a3.32 3.32 0 0 0 0 3.34l9.62 16.67c.3.51.72.93 1.22 1.22s1.07.45 1.67.45h36.56l8.66 15a3.35 3.35 0 0 0 2.89 1.67h19.25a3.34 3.34 0 0 0 2.89-1.67l18.28-31.67h17.32c.6 0 1.17-.16 1.67-.45s.92-.71 1.22-1.22l9.62-16.67a3.323 3.323 0 0 0 0-3.34ZM51.44 3.33 61.07 20l-9.63 16.66h76.98l-9.62 16.66H45.67l-11.54-20zM57.21 120H22.58l9.63-16.67h19.25l-38.5-66.67h19.25l9.62 16.67L68.78 100l-11.55 20Zm61.59-33.34-9.62-16.67-38.49 66.67-9.63-16.67 9.63-16.66 26.94-46.67h23.1l17.32 30z" /></symbol>
-<symbol id="a-droid" viewBox="140 140 620 620"> <path d="M582.594 251.356C581.452 251.073 580.385 250.547 579.466 249.813C578.546 249.08 577.795 248.156 577.266 247.106C576.736 246.055 576.44 244.903 576.397 243.728C576.354 242.552 576.565 241.381 577.017 240.295C592.606 202.357 599.485 172.002 588.384 159.294C558.984 125.58 441.083 192.624 403.49 215.331C402.484 215.936 401.358 216.316 400.19 216.446C399.023 216.577 397.841 216.454 396.725 216.086C395.61 215.718 394.587 215.113 393.727 214.314C392.866 213.515 392.188 212.539 391.739 211.453C375.937 173.596 359.325 147.264 342.487 146.122C297.857 143.068 261.885 273.85 251.355 316.475C251.074 317.616 250.55 318.683 249.817 319.603C249.085 320.522 248.162 321.273 247.113 321.803C246.064 322.332 244.912 322.629 243.738 322.672C242.563 322.715 241.393 322.504 240.308 322.052C202.37 306.463 172.002 299.584 159.307 310.685C125.593 340.085 192.624 457.987 215.33 495.579C215.938 496.585 216.32 497.711 216.451 498.879C216.583 500.047 216.46 501.229 216.092 502.346C215.724 503.462 215.119 504.485 214.318 505.346C213.517 506.206 212.54 506.883 211.453 507.33C173.609 523.132 147.277 539.744 146.121 556.581C143.08 601.211 273.85 637.184 316.488 647.714C317.627 647.998 318.691 648.525 319.608 649.259C320.525 649.992 321.273 650.914 321.801 651.963C322.329 653.011 322.624 654.161 322.668 655.335C322.711 656.508 322.501 657.677 322.052 658.761C306.463 696.699 299.584 727.067 310.685 739.762C340.084 773.476 458 706.445 495.592 683.739C496.598 683.131 497.724 682.749 498.892 682.618C500.06 682.486 501.243 682.609 502.359 682.977C503.475 683.345 504.498 683.95 505.358 684.751C506.219 685.552 506.896 686.529 507.344 687.616C523.145 725.46 539.744 751.792 556.594 752.948C601.224 755.989 637.196 625.219 647.713 582.581C647.998 581.441 648.525 580.375 649.259 579.457C649.993 578.539 650.917 577.79 651.967 577.262C653.017 576.733 654.169 576.438 655.344 576.396C656.519 576.354 657.689 576.566 658.775 577.018C696.712 592.607 727.067 599.472 739.775 588.384C773.49 558.985 706.445 441.069 683.738 403.477C683.136 402.47 682.757 401.345 682.628 400.178C682.499 399.011 682.622 397.83 682.99 396.715C683.358 395.6 683.961 394.577 684.76 393.717C685.558 392.856 686.532 392.177 687.616 391.726C725.473 375.924 751.805 359.312 752.947 342.475C756.001 297.845 625.219 261.873 582.594 251.356ZM531.391 208.572C539.969 223.948 495.765 326.408 462.886 398.073C462.337 399.271 461.433 400.273 460.297 400.942C459.161 401.611 457.847 401.917 456.532 401.817C455.217 401.717 453.964 401.217 452.942 400.384C451.92 399.551 451.178 398.424 450.816 397.157C437.537 350.561 422.36 295.813 406.12 249.338C405.482 247.514 405.513 245.522 406.209 243.719C406.905 241.917 408.219 240.42 409.917 239.498C450.471 217.349 519.865 187.936 531.391 208.572ZM337.044 221.253C353.974 226.06 395.165 329.767 422.585 403.69C423.042 404.925 423.111 406.271 422.781 407.546C422.451 408.821 421.739 409.965 420.74 410.824C419.741 411.683 418.503 412.215 417.193 412.35C415.882 412.485 414.562 412.215 413.409 411.577C371.037 388.061 321.627 360.043 277.276 338.664C275.539 337.822 274.157 336.39 273.377 334.625C272.596 332.86 272.468 330.875 273.013 329.023C286.066 284.726 314.297 214.813 337.044 221.253ZM208.585 367.651C223.948 359.073 326.42 403.278 398.073 436.156C399.271 436.706 400.272 437.61 400.942 438.746C401.611 439.882 401.916 441.196 401.816 442.51C401.717 443.825 401.217 445.078 400.383 446.1C399.55 447.122 398.424 447.864 397.156 448.227C350.575 461.506 295.813 476.683 249.337 492.923C247.515 493.557 245.526 493.524 243.727 492.828C241.927 492.133 240.433 490.82 239.511 489.125C217.402 448.572 187.936 379.177 208.585 367.651ZM221.266 561.999C226.06 545.069 329.78 503.878 403.703 476.457C404.938 476 406.284 475.932 407.559 476.262C408.834 476.592 409.978 477.304 410.837 478.303C411.695 479.301 412.228 480.539 412.363 481.85C412.498 483.16 412.228 484.48 411.59 485.633C388.06 528.006 360.042 577.416 338.663 621.754C337.827 623.496 336.398 624.884 334.631 625.668C332.864 626.451 330.876 626.579 329.023 626.029C284.725 613.056 214.813 584.746 221.266 561.999ZM367.664 690.458C359.073 675.094 403.291 572.622 436.169 500.97C436.719 499.772 437.623 498.77 438.759 498.101C439.895 497.431 441.209 497.126 442.523 497.226C443.838 497.326 445.091 497.826 446.113 498.659C447.135 499.492 447.877 500.618 448.24 501.886C461.518 548.468 476.696 603.23 492.936 649.705C493.569 651.529 493.534 653.518 492.836 655.318C492.137 657.118 490.822 658.612 489.125 659.532C448.585 681.641 379.177 711.106 367.704 690.458H367.664ZM562.012 677.777C545.068 672.983 503.877 569.263 476.457 495.34C475.997 494.103 475.927 492.754 476.257 491.477C476.587 490.199 477.301 489.053 478.302 488.193C479.304 487.334 480.545 486.802 481.858 486.669C483.171 486.537 484.493 486.81 485.646 487.452C528.005 510.969 577.429 539 621.767 560.379C623.507 561.217 624.891 562.648 625.672 564.414C626.453 566.181 626.58 568.168 626.029 570.02C612.989 614.384 584.759 684.23 562.012 677.777ZM690.47 531.378C675.094 539.97 572.635 495.751 500.969 462.873C499.771 462.323 498.77 461.42 498.1 460.284C497.431 459.148 497.126 457.834 497.226 456.519C497.325 455.204 497.825 453.952 498.659 452.93C499.492 451.908 500.618 451.165 501.886 450.803C548.481 437.524 603.229 422.346 649.705 406.106C651.531 405.472 653.522 405.508 655.325 406.206C657.127 406.904 658.622 408.219 659.544 409.918C681.64 450.458 711.106 519.866 690.47 531.378ZM677.789 337.03C672.983 353.974 569.275 395.165 495.353 422.586C494.116 423.046 492.767 423.115 491.489 422.785C490.212 422.455 489.066 421.742 488.206 420.74C487.346 419.739 486.815 418.498 486.682 417.185C486.55 415.872 486.823 414.549 487.465 413.396C510.982 371.037 539 321.614 560.379 277.276C561.219 275.537 562.65 274.154 564.416 273.374C566.182 272.593 568.168 272.465 570.019 273.013C614.317 286.053 684.23 314.284 677.789 337.03Z" fill="currentColor"/></symbol>
-<symbol id="logo" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#1c1c28"/><path d="M14 20H50" stroke="#b4befe" stroke-width="7" stroke-linecap="round"/><path d="M28 20V40a8 8 0 0 0 16 0" fill="none" stroke="#e6e7f2" stroke-width="7" stroke-linecap="round"/></symbol>
-<symbol id="i-copy" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></symbol>
-<symbol id="i-check" viewBox="0 0 256 256"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></symbol>
-<symbol id="i-github-logo" viewBox="0 0 256 256"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></symbol>
-<symbol id="i-arrow-up-right" viewBox="0 0 256 256"><path d="M200,64V168a8,8,0,0,1-16,0V83.31L69.66,197.66a8,8,0,0,1-11.32-11.32L172.69,72H88a8,8,0,0,1,0-16H192A8,8,0,0,1,200,64Z"/></symbol>
-<symbol id="i-beer-bottle" viewBox="0 0 256 256"><path d="M245.66,42.34l-32-32a8,8,0,0,0-11.32,11.32l1.48,1.47L148.65,64.51l-38.22,7.65a8.05,8.05,0,0,0-4.09,2.18L23,157.66a24,24,0,0,0,0,33.94L64.4,233a24,24,0,0,0,33.94,0l83.32-83.31a8,8,0,0,0,2.18-4.09l7.65-38.22,41.38-55.17,1.47,1.48a8,8,0,0,0,11.32-11.32ZM96,107.31,148.69,160,104,204.69,51.31,152ZM81.37,224a7.94,7.94,0,0,1-5.65-2.34L34.34,180.28a8,8,0,0,1,0-11.31L40,163.31,92.69,216,87,221.66A8,8,0,0,1,81.37,224ZM177.6,99.2a7.92,7.92,0,0,0-1.44,3.23l-7.53,37.63L160,148.69,107.31,96l8.63-8.63,37.63-7.53a7.92,7.92,0,0,0,3.23-1.44l58.45-43.84,6.19,6.19Z"/></symbol>
-<symbol id="i-package" viewBox="0 0 256 256"><path d="M223.68,66.15,135.68,18a15.88,15.88,0,0,0-15.36,0l-88,48.17a16,16,0,0,0-8.32,14v95.64a16,16,0,0,0,8.32,14l88,48.17a15.88,15.88,0,0,0,15.36,0l88-48.17a16,16,0,0,0,8.32-14V80.18A16,16,0,0,0,223.68,66.15ZM128,32l80.34,44-29.77,16.3-80.35-44ZM128,120,47.66,76l33.9-18.56,80.34,44ZM40,90l80,43.78v85.79L40,175.82Zm176,85.78h0l-80,43.79V133.82l32-17.51V152a8,8,0,0,0,16,0V107.55L216,90v85.77Z"/></symbol>
-<symbol id="i-terminal" viewBox="0 0 256 256"><path d="M117.31,134l-72,64a8,8,0,1,1-10.63-12L100,128,34.69,70A8,8,0,1,1,45.32,58l72,64a8,8,0,0,1,0,12ZM216,184H120a8,8,0,0,0,0,16h96a8,8,0,0,0,0-16Z"/></symbol>
-<symbol id="i-push-pin" viewBox="0 0 256 256"><path d="M235.32,81.37,174.63,20.69a16,16,0,0,0-22.63,0L98.37,74.49c-10.66-3.34-35-7.37-60.4,13.14a16,16,0,0,0-1.29,23.78L85,159.71,42.34,202.34a8,8,0,0,0,11.32,11.32L96.29,171l48.29,48.29A16,16,0,0,0,155.9,224c.38,0,.75,0,1.13,0a15.93,15.93,0,0,0,11.64-6.33c19.64-26.1,17.75-47.32,13.19-60L235.33,104A16,16,0,0,0,235.32,81.37ZM224,92.69h0l-57.27,57.46a8,8,0,0,0-1.49,9.22c9.46,18.93-1.8,38.59-9.34,48.62L48,100.08c12.08-9.74,23.64-12.31,32.48-12.31A40.13,40.13,0,0,1,96.81,91a8,8,0,0,0,9.25-1.51L163.32,32,224,92.68Z"/></symbol>
-<symbol id="i-stethoscope" viewBox="0 0 256 256"><path d="M220,160a12,12,0,1,1-12-12A12,12,0,0,1,220,160Zm-4.55,39.29A48.08,48.08,0,0,1,168,240H144a48.05,48.05,0,0,1-48-48V151.49A64,64,0,0,1,40,88V40a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56V88a48,48,0,0,0,48.64,48c26.11-.34,47.36-22.25,47.36-48.83V48H136a8,8,0,0,1,0-16h24a8,8,0,0,1,8,8V87.17c0,32.84-24.53,60.29-56,64.31V192a32,32,0,0,0,32,32h24a32.06,32.06,0,0,0,31.22-25,40,40,0,1,1,16.23.27ZM232,160a24,24,0,1,0-24,24A24,24,0,0,0,232,160Z"/></symbol>
-<symbol id="i-devices" viewBox="0 0 256 256"><path d="M224,72H208V64a24,24,0,0,0-24-24H40A24,24,0,0,0,16,64v96a24,24,0,0,0,24,24H152v8a24,24,0,0,0,24,24h48a24,24,0,0,0,24-24V96A24,24,0,0,0,224,72ZM40,168a8,8,0,0,1-8-8V64a8,8,0,0,1,8-8H184a8,8,0,0,1,8,8v8H176a24,24,0,0,0-24,24v72Zm192,24a8,8,0,0,1-8,8H176a8,8,0,0,1-8-8V96a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8Zm-96,16a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h40A8,8,0,0,1,136,208Zm80-96a8,8,0,0,1-8,8H192a8,8,0,0,1,0-16h16A8,8,0,0,1,216,112Z"/></symbol>
-<symbol id="i-git-branch" viewBox="0 0 256 256"><path d="M232,64a32,32,0,1,0-40,31v17a8,8,0,0,1-8,8H96a23.84,23.84,0,0,0-8,1.38V95a32,32,0,1,0-16,0v66a32,32,0,1,0,16,0V144a8,8,0,0,1,8-8h88a24,24,0,0,0,24-24V95A32.06,32.06,0,0,0,232,64ZM64,64A16,16,0,1,1,80,80,16,16,0,0,1,64,64ZM96,192a16,16,0,1,1-16-16A16,16,0,0,1,96,192ZM200,80a16,16,0,1,1,16-16A16,16,0,0,1,200,80Z"/></symbol>
-<symbol id="i-play-fill" viewBox="0 0 256 256"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87a15.86,15.86,0,0,1,8.12-13.82,16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></symbol>
+  <symbol id="i-ok" viewBox="0 0 256 256"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol>
+  <symbol id="i-github" viewBox="0 0 256 256"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 256 256"><path d="M235.32,81.37,174.63,20.69a16,16,0,0,0-22.63,0L98.37,74.49c-10.66-3.34-35-7.37-60.4,13.14a16,16,0,0,0-1.29,23.78L85,159.71,42.34,202.34a8,8,0,0,0,11.32,11.32L96.29,171l48.29,48.29A16,16,0,0,0,155.9,224c.38,0,.75,0,1.13,0a15.93,15.93,0,0,0,11.64-6.33c19.64-26.1,17.75-47.32,13.19-60L235.33,104A16,16,0,0,0,235.32,81.37ZM224,92.69h0l-57.27,57.46a8,8,0,0,0-1.49,9.22c9.46,18.93-1.8,38.59-9.34,48.62L48,100.08c12.08-9.74,23.64-12.31,32.48-12.31A40.13,40.13,0,0,1,96.81,91a8,8,0,0,0,9.25-1.51L163.32,32,224,92.68Z"/></symbol>
+  <symbol id="i-timer" viewBox="0 0 256 256"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,216ZM173.66,90.34a8,8,0,0,1,0,11.32l-40,40a8,8,0,0,1-11.32-11.32l40-40A8,8,0,0,1,173.66,90.34ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></symbol>
+  <symbol id="i-audit" viewBox="0 0 256 256"><path d="M220,160a12,12,0,1,1-12-12A12,12,0,0,1,220,160Zm-4.55,39.29A48.08,48.08,0,0,1,168,240H144a48.05,48.05,0,0,1-48-48V151.49A64,64,0,0,1,40,88V40a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56V88a48,48,0,0,0,48.64,48c26.11-.34,47.36-22.25,47.36-48.83V48H136a8,8,0,0,1,0-16h24a8,8,0,0,1,8,8V87.17c0,32.84-24.53,60.29-56,64.31V192a32,32,0,0,0,32,32h24a32.06,32.06,0,0,0,31.22-25,40,40,0,1,1,16.23.27ZM232,160a24,24,0,1,0-24,24A24,24,0,0,0,232,160Z"/></symbol>
 </svg>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="nav" id="nav">
+<header class="top">
   <div class="wrap">
-    <a class="brand" href="./"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg>tackroom</a>
-    <nav class="nav-links" aria-label="Main">
-      <a class="hide-sm" href="#first-run">How it works</a>
-      <a class="hide-sm" href="#agents">Agents</a>
-      <a class="hide-sm" href="https://github.com/yourconscience/tackroom#readme">Docs</a>
-      <a class="gh" href="https://github.com/yourconscience/tackroom"><svg class="icon" aria-hidden="true"><use href="#i-github-logo"/></svg>GitHub</a>
+    <a class="brand" href="./"><img src="logo.svg" width="30" height="30" alt="">tackroom</a>
+    <nav aria-label="Main">
+      <a href="docs/">Docs</a>
+      <a href="https://github.com/yourconscience/tackroom"><svg class="ico" aria-hidden="true"><use href="#i-github"/></svg><span class="nl">GitHub</span></a>
     </nav>
+    <button class="theme" type="button" id="theme" hidden>Dark</button>
   </div>
 </header>
 
 <main id="main">
-  <div class="wrap">
-    <div class="hero">
-      <div>
-        <h1 class="rise" style="--i:0">Set up your coding agents once.</h1>
-        <p class="sub rise" style="--i:1">tackroom keeps skills, MCP servers, hooks and roles in one <code>~/.agents</code> repo and syncs them into each agent's native config.</p>
-        <div class="install rise" style="--i:2">
-          <div class="tabs" role="tablist" aria-label="Install with">
-            <button class="tab" role="tab" type="button" id="tab-brew" data-pm="brew" aria-controls="install-panel" aria-selected="true"><svg class="icon" aria-hidden="true"><use href="#i-beer-bottle"/></svg>Homebrew</button>
-            <button class="tab" role="tab" type="button" id="tab-npm" data-pm="npm" aria-controls="install-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg>npm</button>
-            <button class="tab" role="tab" type="button" id="tab-npx" data-pm="npx" aria-controls="install-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-package"/></svg>npx</button>
-            <button class="tab" role="tab" type="button" id="tab-curl" data-pm="curl" aria-controls="install-panel" aria-selected="false" tabindex="-1"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>Script</button>
-          </div>
-          <div class="cmds" role="tabpanel" id="install-panel" aria-labelledby="tab-brew">
-            <div class="cmd" id="row-install"><span class="p" aria-hidden="true">$</span><code id="cmd-install">brew install yourconscience/tap/tackroom</code><button class="copy" type="button" data-copy="cmd-install" aria-label="Copy install command"><svg class="icon cp" aria-hidden="true"><use href="#i-copy"/></svg><svg class="icon ok" aria-hidden="true"><use href="#i-check"/></svg><span class="label">Copy</span></button></div>
-            <div class="cmd" id="row-setup"><span class="p" aria-hidden="true">$</span><code id="cmd-setup">tackroom setup</code><button class="copy" type="button" data-copy="cmd-setup" aria-label="Copy setup command"><svg class="icon cp" aria-hidden="true"><use href="#i-copy"/></svg><svg class="icon ok" aria-hidden="true"><use href="#i-check"/></svg><span class="label">Copy</span></button></div>
-          </div>
+
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div class="hero-copy">
+        <h1 id="hero-title">Set up your coding agents once.</h1>
+        <p class="lead">tackroom syncs one <code>~/.agents</code> repo into 15 coding agents and pins every outside skill to a commit.</p>
+        <div class="cmd">
+          <code id="install-cmd">brew install yourconscience/tap/tackroom</code>
+          <button class="copy" type="button" data-copy="install-cmd" aria-label="Copy install command" hidden><svg class="ico cp-i" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ico ok-i" aria-hidden="true"><use href="#i-ok"/></svg><span class="lbl nl">Copy</span></button>
         </div>
+        <a class="second" href="#start">Other ways to install</a>
       </div>
-      <figure class="film rise" style="--i:3" id="film">
-        <button type="button" id="play" aria-label="Play the tackroom tour video, with sound">
-          <img src="brag.jpg" width="1920" height="1080" alt="A frame from the tackroom tour: one ~/.agents folder synced into claude-code, codex, hermes, pi, qwen-code and omp, each with its own config file">
-          <span class="play"><span class="disc"><svg class="icon" aria-hidden="true"><use href="#i-play-fill"/></svg></span>Watch the 23-second tour</span>
-        </button>
+      <figure class="term">
+        <figcaption>$ tackroom status (excerpt, demo home)</figcaption>
+<pre>repo   <span class="o">✓</span> ~/.agents
+sources
+  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>  https://github.com/acme/agent-skills
+
+claude   <span class="o">✓ synced</span>
+  managed     3 skills · 6 agents · 1 mcp
+<span class="d">...</span>
+Everything is synced.
+
+held or blocked (skipped by sync)
+  <span class="r"><b>blocked</b></span> skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."
+  <span class="y"><b>held</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); hold ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
       </figure>
     </div>
+  </section>
 
-    <section class="board" aria-labelledby="board-title">
-      <h2 id="board-title" class="board-title">Works with the agents you already run</h2>
-      <ul class="board-grid">
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-claude-code"/></svg><b>Claude Code</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-codex"/></svg><b>Codex</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-droid"/></svg><b>Factory Droid</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-qwen-code"/></svg><b>Qwen Code</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-opencode"/></svg><b>OpenCode</b><span>skills, roles, MCP</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-pi"/></svg><b>Pi</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-omp"/></svg><b>OMP</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-amp"/></svg><b>Amp</b><span>skills, MCP</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-cursor"/></svg><b>Cursor</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-copilot"/></svg><b>GitHub Copilot CLI</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-grok"/></svg><b>Grok Build</b><span>skills, roles, MCP, hooks</span></li>
-      <li><svg class="ag-big" aria-hidden="true"><use href="#a-dsh"/></svg><b>DeepSeek Harness</b><span>skills, MCP</span></li>
-      </ul>
-    </section>
-
-    <section class="name" aria-labelledby="name-title">
-      <div class="name-copy">
-        <h2 id="name-title">Why “tackroom”</h2>
-        <p>In a stable, the tack room is where the riding gear lives. Every horse has its own peg, with a saddle and bridle fitted to that horse and a plate with its name.</p>
-        <p>tackroom is that room for your coding agents. Skills, MCP servers, hooks and roles live in one place, <code>~/.agents</code>, and every agent gets its gear fitted to its own config format.</p>
+  <section id="agents" aria-labelledby="agents-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="agents-title">Works with 15 coding agents</h2>
+        <p>Each gets your setup in its own format. The <a href="docs/harnesses/">capability matrix</a> shows what each one supports.</p>
       </div>
-      <div class="wall" role="img" aria-label="A rail of pegs, one per agent, each holding a nameplate for Claude Code, Codex, Pi, Qwen Code and OMP with the gear tackroom syncs to it">
-        <div class="rail"><span></span><span></span><span></span></div>
-        <ul class="pegs">
-        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-claude-code"/></svg><b>Claude Code</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i><i>hooks</i></span></div></li>
-        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-codex"/></svg><b>Codex</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i><i>hooks</i></span></div></li>
-        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-pi"/></svg><b>Pi</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i></span></div></li>
-        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-qwen-code"/></svg><b>Qwen Code</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i><i>hooks</i></span></div></li>
-        <li><span class="peg"></span><span class="cord"></span><div class="plate"><svg class="ag-big" aria-hidden="true"><use href="#a-omp"/></svg><b>OMP</b><span class="gear"><i>skills</i><i>roles</i><i>MCP</i></span></div></li>
+      <ul class="plates">
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Claude Code</span><img class="mark" src="marks/claude.svg" width="24" height="24" alt=""></div><span class="plate-key">claude</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Codex</span><img class="mark" src="marks/codex.svg" width="24" height="24" alt=""></div><span class="plate-key">codex</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Factory Droid</span><img class="mark" src="marks/droid.svg" width="24" height="24" alt=""></div><span class="plate-key">droid</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">OMP</span><img class="mark" src="marks/omp.svg" width="24" height="24" alt=""></div><span class="plate-key">omp</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">OpenCode</span><img class="mark" src="marks/opencode.svg" width="24" height="24" alt=""></div><span class="plate-key">opencode</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Pi</span><img class="mark" src="marks/pi.svg" width="24" height="24" alt=""></div><span class="plate-key">pi</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Qwen Code</span><img class="mark" src="marks/qwen-code.svg" width="24" height="24" alt=""></div><span class="plate-key">qwen-code</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Cursor</span><img class="mark" src="marks/cursor.svg" width="24" height="24" alt=""></div><span class="plate-key">cursor</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Gemini CLI</span><img class="mark" src="marks/gemini.svg" width="24" height="24" alt=""></div><span class="plate-key">gemini</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">GitHub Copilot CLI</span><img class="mark" src="marks/copilot.svg" width="24" height="24" alt=""></div><span class="plate-key">copilot</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Grok Build</span><img class="mark" src="marks/grok.svg" width="24" height="24" alt=""></div><span class="plate-key">grok</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">DeepSeek Harness</span><img class="mark" src="marks/dsh.svg" width="24" height="24" alt=""></div><span class="plate-key">dsh</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Antigravity CLI</span><img class="mark" src="marks/agy.svg" width="24" height="24" alt=""></div><span class="plate-key">agy</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Kimi Code</span><img class="mark" src="marks/kimi.svg" width="24" height="24" alt=""></div><span class="plate-key">kimi</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Amp</span><img class="mark" src="marks/amp.svg" width="24" height="24" alt=""></div><span class="plate-key">amp</span></div></li>
+      </ul>
+      <h3 class="rail-label">Terminals</h3>
+      <ul class="plates">
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Herdr</span><img class="mark" src="marks/herdr.svg" width="24" height="24" alt=""></div><span class="plate-key">herdr</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Tern</span><img class="mark" src="marks/tern.png" width="24" height="24" alt=""></div><span class="plate-key">tern</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Rex</span><img class="mark" src="marks/rex.png" width="24" height="24" alt=""></div><span class="plate-key">rex</span></div></li>
+      </ul>
+      <p class="after"><a href="docs/herdr/">Herdr</a> gets a Crons panel, <a href="docs/tern/">Tern</a> a crons panel and a <code>tackroom tern</code> workspace, <a href="docs/rex/">Rex</a> a doctor check.</p>
+    </div>
+  </section>
+
+  <section id="lock" aria-labelledby="lock-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="lock-title">Outside skills are dependencies</h2>
+        <p>A skill from someone else's repo is code your agents will run. tackroom pins it in <code>tackroom.lock</code>, audits it, and holds anything under 72 hours old.</p>
+      </div>
+      <div class="lock-grid">
+        <figure class="term">
+          <figcaption>~/.agents/tackroom.lock (excerpt)</figcaption>
+<pre>external_skills:
+    - name: agent-skills
+      url: https://github.com/acme/agent-skills
+      branch: main
+      commit: <span class="h">b09718b944a55af3ffc686d6914b7e77b5a77775</span>
+<span class="d">      ...</span>
+holds:
+<span class="d">      ...</span>
+    - item: <span class="y">skill:lint-skills</span>
+      ref: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599
+      published_at: "2026-11-11T23:38:13Z"
+      time_source: git-commit-date
+      hold_until: <span class="y">"2026-11-14T23:38:13Z"</span></pre>
+          <details class="full"><summary>Show the whole file</summary>
+<pre><span class="d"># Managed by tackroom sync / tackroom skill update. Pins commits and materialized skill ownership.</span>
+version: 1
+external_skills:
+    - name: agent-skills
+      url: https://github.com/acme/agent-skills
+      branch: main
+      commit: <span class="h">b09718b944a55af3ffc686d6914b7e77b5a77775</span>
+      materialized:
+        - code-review
+        - pr-shepherd
+holds:
+    - item: skill:agent-skills
+      ref: git:https://github.com/acme/agent-skills@b09718b944a55af3ffc686d6914b7e77b5a77775
+      published_at: "2026-10-02T11:00:00Z"
+      time_source: git-commit-date
+      hold_until: "2026-10-05T11:00:00Z"
+    - item: <span class="y">skill:lint-skills</span>
+      ref: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599
+      published_at: "2026-11-11T23:38:13Z"
+      time_source: git-commit-date
+      hold_until: <span class="y">"2026-11-14T23:38:13Z"</span></pre>
+          </details>
+        </figure>
+        <ul class="states">
+          <li>
+            <svg class="ico pin" aria-hidden="true"><use href="#i-pin"/></svg>
+            <div class="state-body">
+              <span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>b09718b</code></span></span>
+              <span class="real"><span class="d">$ tackroom status</span>
+  agent-skills  ✓ b09718b  https://github.com/acme/agent-skills</span>
+              <p>Agents see this commit of <code>acme/agent-skills</code> and nothing newer. Only <code>tackroom skill update</code> moves the pin.</p>
+            </div>
+          </li>
+          <li>
+            <svg class="ico" aria-hidden="true"><use href="#i-timer"/></svg>
+            <div class="state-body">
+              <span class="tag t-warn"><span class="g">!</span><span class="w">held <code>41h of 72h</code></span></span>
+              <div class="hold"><div class="hold-track" role="img" aria-label="41 of 72 hours elapsed"><i></i><b></b></div><span class="hold-meta">31h left</span></div>
+              <span class="real"><span class="d">$ tackroom status</span>
+  held skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); hold ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</span>
+              <p>Sync skips it and agents keep what they have. Wait, or release it now with <code>tackroom sync --allow-fresh=skill:lint-skills</code>.</p>
+            </div>
+          </li>
+          <li>
+            <svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg>
+            <div class="state-body">
+              <span class="tag t-ok"><span class="g">✓</span><span class="w">audit pass</span></span>
+              <span class="real"><span class="d">$ tackroom doctor</span>
+  ✓ external skill audit          1 skills scanned, no risky patterns</span>
+              <p>Nothing to do.</p>
+            </div>
+          </li>
+          <li>
+            <svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg>
+            <div class="state-body">
+              <span class="tag t-warn"><span class="g">!</span><span class="w">audit finding <code>agent-config-write</code></span></span>
+              <span class="real"><span class="d">$ tackroom doctor audit</span>
+  HIGH     agent-config-write  skills/pr-shepherd/scripts/setup-ci.sh  cp ci-settings.json ~/.claude/settings.json</span>
+              <p>Reported, not blocked. Read it with <code>tackroom doctor audit</code> and decide whether to keep the source.</p>
+            </div>
+          </li>
+          <li>
+            <svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg>
+            <div class="state-body">
+              <span class="tag t-bad"><span class="g">✗</span><span class="w">blocked <code>exfiltration</code></span></span>
+              <span class="real"><span class="d">$ tackroom status</span>
+  blocked skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."</span>
+              <p>Sync skips it and any earlier pin stays. Wait for a fix upstream, or accept it with a reason: <code>tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."</code></p>
+            </div>
+          </li>
         </ul>
       </div>
-    </section>
+      <p class="lock-foot">New exact npm and PyPI versions in MCP servers and Pi packages get the same hold. Your own skills, roles, hooks and MCP entries are reported, never blocked. Demo output, captured 2026-11-13. <a href="docs/skills/">How it works</a></p>
+    </div>
+  </section>
 
-    <section id="first-run" class="run" aria-labelledby="run-title">
-      <div class="run-side">
-        <h2 id="run-title">The first five minutes</h2>
-        <p class="lead">Real output from a fresh home directory with six agents installed. Paths are shortened to <code>~</code>.</p>
-        <ol class="steps" aria-hidden="true">
-          <li data-step="install" class="is-active"><a href="#out-install" tabindex="-1"><b>Install</b><span>Homebrew, npm or npx. One Go binary for macOS or Linux.</span></a></li>
-          <li data-step="setup"><a href="#out-setup" tabindex="-1"><b>Set up</b><span>Finds your agents, shows what they already have, and imports it after you review each item.</span></a></li>
-          <li data-step="sync"><a href="#out-sync" tabindex="-1"><b>Sync</b><span>Writes skills, roles, MCP servers and hooks into every agent. Run it again any time; it only changes what drifted.</span></a></li>
-          <li data-step="check"><a href="#out-check" tabindex="-1"><b>Check</b><span>Validates every skill, confirms lock pins and scans third-party skills before they reach an agent.</span></a></li>
-        </ol>
+  <section id="start" aria-labelledby="start-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="start-title">The first five minutes</h2>
+        <p>One Go binary for macOS and Linux, on arm64 and x86-64.</p>
       </div>
-      <div class="run-outs">
-        <div class="out" id="out-install" data-step="install">
-          <div class="out-text"><h3>Install</h3><p>Homebrew, npm or npx. One Go binary for macOS or Linux.</p></div>
-          <figure class="term">
-            <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>install</figcaption>
-<pre><span class="k">$</span> brew install yourconscience/tap/tackroom
-<span class="c"># or: npm i -g tackroom</span>
-<span class="k">$</span> tackroom
-tackroom - manage shared skills, MCP, and canonical config
-
-Commands:
-  setup    Set up this machine and sync configured harnesses
-  status   Show harness, external lock, and memsearch state
-  sync     Regenerate committed artifacts and reconcile harnesses
-  doctor   Check pins, dependencies, and local health
-  config   Validate or print the canonical YAML
-  view     Author the canonical YAML in a loopback web UI (browser)</pre>
-          </figure>
-        </div>
-        <div class="out" id="out-setup" data-step="setup">
-          <div class="out-text"><h3>Set up</h3><p>Finds your agents, shows what they already have, and imports it after you review each item.</p></div>
-          <figure class="term">
-            <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>setup</figcaption>
-<pre><span class="k">$</span> tackroom setup --dry-run
-needs review:
-  mcp     context7  [claude]
-  skill   pr-review  [claude]
-identical everywhere (would be shared automatically):
-  skill   release-notes  [claude codex]
-
-<span class="k">$</span> tackroom setup --yes --memory off
-config root: ~/.agents
-
-imported 3 item(s) without prompting (--yes)
-
-claude: config already set
-codex: config already set
-omp: config already set
-pi: config already set
-qwen-code: config patched (added ~/.agents/skills)
-<span class="c">...first sync follows</span></pre>
-          </figure>
-        </div>
-        <div class="out" id="out-sync" data-step="sync">
-          <div class="out-text"><h3>Sync</h3><p>Writes skills, roles, MCP servers and hooks into every agent. Run it again any time; it only changes what drifted.</p></div>
-          <figure class="term">
-            <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>sync</figcaption>
-<pre><span class="k">$</span> tackroom sync
-<span class="k">$</span> tackroom status
-claude   <span class="g">✓ synced</span>
-  managed     4 skills · 6 agents · 1 mcp · 1 hooks
-codex   <span class="g">✓ synced</span>
-  managed     4 skills · 6 agents · 1 mcp · 1 hooks
-omp   <span class="g">✓ synced</span>
-  managed     4 skills · 6 agents
-pi   <span class="g">✓ synced</span>
-  managed     4 skills · 6 agents · 1 mcp
-qwen-code   <span class="g">✓ synced</span>
-  managed     4 skills · 6 agents
-
-Everything is synced.</pre>
-          </figure>
-        </div>
-        <div class="out" id="out-check" data-step="check">
-          <div class="out-text"><h3>Check</h3><p>Validates every skill, confirms lock pins and scans third-party skills before they reach an agent.</p></div>
-          <figure class="term">
-            <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg>doctor</figcaption>
-<pre><span class="k">$</span> tackroom doctor
-  skill frontmatter .............. <span class="g">pass</span> (4 skills valid)
-  skill spec ..................... <span class="g">pass</span> (4 skills conform to agentskills.io spec)
-  agent roles .................... <span class="g">pass</span> (6 roles valid)
-  package age .................... <span class="g">pass</span> (1 references at least 3 days old)
-  external skill lock ............ <span class="g">pass</span> (1 sources pinned and in sync)
-  external skill audit ........... <span class="g">pass</span> (1 skills scanned, no risky patterns)
-  native hooks ................... <span class="g">pass</span> (2 registrations, 2 managed, 0 unmanaged)
-<span class="c">...</span>
-14 passed, 3 warning, 0 failed</pre>
-          </figure>
-        </div>
-      </div>
-    </section>
-
-    <section id="view" aria-labelledby="view-title">
-      <div class="view-head">
-        <h2 id="view-title">Rather click than edit YAML?</h2>
-        <p class="lead"><code>tackroom view</code> opens a local dashboard over the same config: what every agent has on disk, which agents get each MCP server and hook, and what tackroom leaves alone. Change it, review the plan, then sync. It listens on 127.0.0.1 behind a session token.</p>
-      </div>
-    </section>
-  </div>
-
-  <figure class="shot">
-    <img src="view.webp" width="2880" height="1800" loading="lazy" decoding="async" alt="tackroom view in a browser: agents claude-code, codex, hermes, omp, pi and qwen-code with toggles, Hermes switched off, a context7 MCP server, and a Sync now button">
-    <figcaption>The demo config from above, right after switching Hermes off. The toggle edits tackroom.yaml; the next sync skips Hermes.</figcaption>
-  </figure>
-
-  <div class="wrap">
-    <section id="crons" aria-labelledby="crons-title">
-      <div class="view-head">
-        <h2 id="crons-title">Every scheduled job, on every machine</h2>
-        <p class="lead"><code>tackroom cron collect</code> lists launchd agents, crontab, systemd timers and the agents' own schedulers, here and over SSH, and flags crash loops, missing files and jobs that stopped firing. The Crons tab in <code>tackroom view</code> shows them per host, runs, pauses or resumes a launchd job, and gives a job tackroom owns a new schedule.</p>
-      </div>
-      <figure class="term crons-term"><pre><span class="k">$</span> tackroom cron collect --hosts local,mini --table   <span class="c"># every job on both Macs</span>
-<span class="k">$</span> tackroom cron run --host mini com.example.backup   <span class="c"># Run now</span>
-<span class="k">$</span> tackroom cron pause --host mini com.example.tunnel <span class="c"># off until resume, across logins</span>
-<span class="k">$</span> tackroom cron schedule digest "0 9 * * *"          <span class="c"># a job tackroom owns here</span></pre></figure>
-      <p class="crons-herdr">Living in <a href="https://herdr.dev">Herdr</a>? The same jobs and buttons come as a side panel: copy <code>herdr/</code> from the repo into <code>~/.config/herdr-app</code> and switch to the tackroom layout, or add the panel to your own. In Claude Code and Pi, <code>/tackroom</code> shows them too: <code>claude plugin install tackroom --marketplace yourconscience/tackroom</code> or <code>pi install git:github.com/yourconscience/tackroom@v2.0.0</code>.</p>
-    </section>
-
-    <section id="agents" aria-labelledby="agents-title">
-      <div class="ex-head">
-        <h2 id="agents-title">One entry in <code style="font-size:.86em;background:none;border:0;padding:0">~/.agents</code>, each agent's own format.</h2>
-        <p class="lead">The MCP server, hook, and instruction files from the demo, as written into each agent's files. Pick an agent.</p>
-      </div>
-      <div class="ex">
-        <figure class="term ex-src">
-          <figcaption class="term-head"><svg class="icon" aria-hidden="true"><use href="#i-git-branch"/></svg>~/.agents/tackroom.yaml<span class="tag">you edit this</span></figcaption>
-<pre><span class="k">mcp_servers:</span>
-  - name: context7
-    enabled: true
-    command: npx
-    args:
-      - -y
-      - <span class="s">'@upstash/context7-mcp'</span>
-    agents:
-      - claude
-      - codex
-      - pi
-<span class="k">hooks:</span>
-  - name: notify-on-stop
-    enabled: true
-    event: Stop
-    command: ~/.agents/hooks/notify.sh
-    timeout: 10
-    agents:
-      - claude
-      - codex
-<span class="k">instructions:</span>
-  - SOUL.md</pre>
-        </figure>
-        <div class="ex-out">
-          <div class="tabs" role="tablist" aria-label="Agent">
-            <button class="tab" role="tab" type="button" id="ag-claude" aria-controls="p-claude" aria-selected="true"><svg class="ag" aria-hidden="true"><use href="#a-claude-code"/></svg>Claude Code</button>
-            <button class="tab" role="tab" type="button" id="ag-codex" aria-controls="p-codex" aria-selected="false" tabindex="-1"><svg class="ag" aria-hidden="true"><use href="#a-codex"/></svg>Codex</button>
-            <button class="tab" role="tab" type="button" id="ag-pi" aria-controls="p-pi" aria-selected="false" tabindex="-1"><svg class="ag" aria-hidden="true"><use href="#a-pi"/></svg>Pi</button>
-            <button class="tab" role="tab" type="button" id="ag-qwen" aria-controls="p-qwen" aria-selected="false" tabindex="-1"><svg class="ag" aria-hidden="true"><use href="#a-qwen-code"/></svg>Qwen Code</button>
+      <ol class="steps">
+        <li>
+          <div class="say">
+            <h3>Install</h3>
+            <p>Homebrew (above) or npm. Both fetch the same release from GitHub and check its checksum.</p>
           </div>
-          <div class="ex-panel" role="tabpanel" id="p-claude" aria-labelledby="ag-claude">
-            <div class="file"><div class="term-head">~/.claude.json<span class="what">MCP</span></div>
-<pre><span class="k">"mcpServers"</span>: {
-  <span class="k">"context7"</span>: {
-    "type": "stdio",
-    "command": "npx",
-    "args": [
-      "-y",
-      "@upstash/context7-mcp"
-    ]
-  }
-}</pre></div>
-            <div class="file"><div class="term-head">~/.claude/settings.json<span class="what">hook</span></div>
-<pre><span class="k">"hooks"</span>: {
-  <span class="k">"Stop"</span>: [
-    {
-      "hooks": [
-        {
-          "command": "~/.agents/hooks/notify.sh",
-          "timeout": 10,
-          "type": "command"
-        }
-      ]
-    }
-  ]
-}</pre></div>
-            <div class="file"><div class="term-head">~/.claude/<span class="what">skills</span></div>
-<pre>skills/pr-review -&gt; ~/.agents/skills/pr-review
-skills/tackroom -&gt; ~/.agents/skills/tackroom</pre></div>
-            <div class="file"><div class="term-head">~/.claude/CLAUDE.md<span class="what">root doc</span></div>
-<pre><span class="c">&lt;!-- Generated by tackroom from ~/.agents/AGENTS.md, ~/.agents/SOUL.md; do not edit directly. --&gt;</span>
-@~/.agents/AGENTS.md
-@~/.agents/SOUL.md</pre></div>
-            <p class="ex-note">Claude Code expands <code>@</code> imports, so edits to <code>AGENTS.md</code> and <code>SOUL.md</code> show up without a sync. Without <code>instructions:</code>, <code>CLAUDE.md</code> is a plain link to <code>~/.agents/AGENTS.md</code>.</p>
+          <dl class="installs">
+            <div><dt>npm</dt><dd><code>npm install -g tackroom</code></dd></div>
+          </dl>
+        </li>
+        <li>
+          <div class="say">
+            <h3>Set up</h3>
+            <p><code>tackroom setup</code> creates <code>~/.agents</code>, finds your agents, copies in what they already have after you review each item, and runs the first sync. Originals stay where they are.</p>
           </div>
-          <div class="ex-panel" role="tabpanel" id="p-codex" aria-labelledby="ag-codex" hidden>
-            <div class="file"><div class="term-head">~/.codex/config.toml<span class="what">MCP</span></div>
-<pre><span class="k">[mcp_servers.context7]</span>
-command = "npx"
-args = ["-y", "@upstash/context7-mcp"]
-
-<span class="k">[features]</span>
-hooks = true</pre></div>
-            <div class="file"><div class="term-head">~/.codex/hooks.json<span class="what">hook</span></div>
-<pre><span class="k">"Stop"</span>: [
-  {
-    "hooks": [
-      {
-        "command": "~/.agents/hooks/notify.sh",
-        "timeout": 10,
-        "type": "command"
-      }
-    ]
-  }
-]</pre></div>
-            <div class="file"><div class="term-head">~/.codex/agents/reviewer.toml<span class="what">role</span></div>
-<pre><span class="c"># Generated by tackroom from agents/reviewer.md; do not edit directly.</span>
-name = "reviewer"
-description = "Reviews code changes, PRs, and implementations against specs..."</pre></div>
+        </li>
+        <li>
+          <div class="say">
+            <h3>Sync</h3>
+            <p>Writes each agent's native config from the repo. Run it again any time; it changes only what drifted, and skips what is held or blocked.</p>
           </div>
-          <div class="ex-panel" role="tabpanel" id="p-pi" aria-labelledby="ag-pi" hidden>
-            <div class="file"><div class="term-head">~/.pi/agent/mcp.json<span class="what">MCP</span></div>
-<pre><span class="k">"mcpServers"</span>: {
-  <span class="k">"context7"</span>: {
-    "args": [
-      "-y",
-      "@upstash/context7-mcp"
-    ],
-    "command": "npx"
-  }
-}</pre></div>
-            <div class="file"><div class="term-head">~/.pi/agent/<span class="what">skills</span></div>
-<pre>skills/pr-review -&gt; ~/.agents/skills/pr-review</pre></div>
-            <div class="file"><div class="term-head">~/.pi/agent/AGENTS.md<span class="what">root doc</span></div>
-<pre><span class="c">&lt;!-- Generated by tackroom from ~/.agents/AGENTS.md, ~/.agents/SOUL.md; do not edit directly. --&gt;</span>
-
-<span class="c">(AGENTS.md, then SOUL.md)</span></pre></div>
-            <p class="ex-note">Pi reads one instructions file, so it gets a copy that <code>tackroom sync</code> rewrites when a source changes. Pi reads MCP servers and roles through the <code>pi-mcp-adapter</code> and <code>pi-subagents</code> packages, which tackroom can pin in Pi's settings. Pi hooks run as generated extension modules for session start and end only, so this demo's <code>Stop</code> hook went to Claude Code and Codex.</p>
-          </div>
-          <div class="ex-panel" role="tabpanel" id="p-qwen" aria-labelledby="ag-qwen" hidden>
-            <div class="file"><div class="term-head">~/.qwen/settings.json<span class="what">skills</span></div>
-<pre>{
-  <span class="k">"skills"</span>: {
-    <span class="k">"directories"</span>: [
-      "~/.agents/skills"
-    ]
-  }
-}</pre></div>
-            <div class="file"><div class="term-head">~/.qwen/QWEN.md<span class="what">root doc</span></div>
-<pre><span class="c">&lt;!-- Generated by tackroom from ~/.agents/AGENTS.md, ~/.agents/SOUL.md; do not edit directly. --&gt;</span>
-
-<span class="c">(AGENTS.md, then SOUL.md)</span></pre></div>
-            <p class="ex-note">Qwen Code reads skills straight from <code>~/.agents/skills</code>, so tackroom only points its settings there. This demo did not target Qwen Code with the MCP server or hook.</p>
-          </div>
-        </div>
-      </div>
-
-      <div class="matrix">
-        <h3>What each agent gets</h3>
-        <div class="tablewrap">
-          <table>
-            <thead><tr><th scope="col">Agent</th><th scope="col">Skills</th><th scope="col">Roles</th><th scope="col">MCP servers</th><th scope="col">Hooks</th><th scope="col">Plugins</th></tr></thead>
-            <tbody id="matrix"></tbody>
-          </table>
-        </div>
-        <p class="legend"><span><svg class="icon" style="color:var(--accent);vertical-align:-2px" aria-hidden="true"><use href="#i-check"/></svg> <b>synced</b> tackroom writes it</span><span><b>settings</b> tackroom points the agent at <code>~/.agents/skills</code></span><span><b>native</b> the agent reads <code>~/.agents/skills</code> on its own</span><span><b>planned</b> on the roadmap</span></p>
-      </div>
-    </section>
-
-    <section id="safety" aria-labelledby="safety-title">
-      <h2 id="safety-title">Made to live next to the config you already have</h2>
-      <div class="bento">
-        <article class="cell c-audit">
-          <svg class="icon mark" aria-hidden="true"><use href="#i-stethoscope"/></svg>
-          <h3>Third-party skills get checked first</h3>
-          <p>A skill from someone else's repo is prompt code. <code>tackroom doctor</code> scans it for risky patterns and checks it against the agentskills.io spec. It also flags npm and PyPI packages your config pulls in if they are less than three days old.</p>
           <figure class="term">
-<pre><span class="k">$</span> tackroom doctor
-  package age .............. <span class="g">pass</span> (1 references at least 3 days old)
-  external skills .......... <span class="g">pass</span> (1 sources valid)
-  external skill lock ...... <span class="g">pass</span> (1 sources pinned and in sync)
-  external skill audit ..... <span class="g">pass</span> (1 skills scanned, no risky patterns)</pre>
-          </figure>
-        </article>
-        <article class="cell c-pin">
-          <svg class="icon mark" aria-hidden="true"><use href="#i-push-pin"/></svg>
-          <h3>Pinned to a commit</h3>
-          <p><code>tackroom.lock</code> records the exact commit. Nothing moves until you run <code>tackroom skill update</code>.</p>
-        </article>
-        <article class="cell c-own">
-          <svg class="icon mark" aria-hidden="true"><use href="#i-check"/></svg>
-          <h3>Your entries stay yours</h3>
-          <p>tackroom marks what it manages. Everything else in <code>.claude.json</code> or <code>config.toml</code> stays as you wrote it.</p>
-        </article>
-        <article class="cell c-sync">
-          <svg class="icon mark" aria-hidden="true"><use href="#i-git-branch"/></svg>
-          <h3>Same setup on every machine</h3>
-          <p><code>~/.agents</code> is a git repo. Push it to a private remote, then pull on the next machine.</p>
-          <figure class="term"><pre><span class="k">$</span> git clone git@github.com:you/agents.git ~/.agents
-<span class="k">$</span> tackroom sync --pull</pre></figure>
-        </article>
-        <article class="cell c-local">
-          <svg class="icon mark" aria-hidden="true"><use href="#i-devices"/></svg>
-          <h3>Machine-only settings</h3>
-          <p><code>tackroom.local.yaml</code> overlays the shared config and stays out of git, for a work laptop or a GPU box.</p>
-          <figure class="term"><pre><span class="c"># ~/.agents/tackroom.local.yaml</span>
-<span class="k">agents:</span>
-  - name: droid
-    enabled: false</pre></figure>
-        </article>
-      </div>
-    </section>
+            <figcaption>after adding three skill sources and one MCP server</figcaption>
+<pre><span class="p">$</span> tackroom sync
+tackroom sync  <span class="o">✓ synced</span>
 
-    <section id="compare" class="compare" aria-labelledby="compare-title">
-      <div class="compare-side">
+changes  +2 skills, +1 mcp (claude, codex, pi) · +2 skills (omp)
+repo     <span class="o">✓</span> ~/.agents
+sources  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>  https://github.com/acme/agent-skills
+
+╭─────────┬──────────┬────────┬────────┬─────┬───────┬─────────┬──────────╮
+│ harness │ state    │ skills │ agents │ mcp │ hooks │ plugins │ packages │
+├─────────┼──────────┼────────┼────────┼─────┼───────┼─────────┼──────────┤
+│ claude  │ <span class="o">✓ synced</span> │ 3      │ 6      │ 1   │ -     │ -       │ -        │
+│ codex   │ <span class="o">✓ synced</span> │ 3      │ 6      │ 1   │ -     │ -       │ -        │
+│ omp     │ <span class="o">✓ synced</span> │ 3      │ 6      │ -   │ -     │ -       │ -        │
+│ pi      │ <span class="o">✓ synced</span> │ 3      │ 6      │ 1   │ -     │ -       │ -        │
+│ cursor  │ <span class="o">✓ synced</span> │ 3      │ 6      │ -   │ -     │ -       │ -        │
+│ gemini  │ <span class="o">✓ synced</span> │ 3      │ 6      │ -   │ -     │ -       │ -        │
+│ grok    │ <span class="o">✓ synced</span> │ 3      │ 6      │ -   │ -     │ -       │ -        │
+╰─────────┴──────────┴────────┴────────┴─────┴───────┴─────────┴──────────╯
+<span class="d">...</span>
+skipped 1 blocked and 1 held item(s); see tackroom status</pre>
+          </figure>
+        </li>
+        <li>
+          <div class="say">
+            <h3>Check</h3>
+            <p><code>tackroom status</code> shows what is synced, held or blocked. <code>tackroom doctor</code> checks skills, roles, pins, audits and hooks. <code>tackroom tui</code> shows the same state in a full-screen terminal view, read-only, and <code>tackroom view</code> opens a local dashboard over the same config.</p>
+          </div>
+        </li>
+      </ol>
+      <!-- SLOT (not in this release): dashboard screenshot of `tackroom view` (Overview) from the demo home, 2880x1800 (16:10).
+           Add as <figure class="shot"><img src="dashboard.webp" width="2880" height="1800" loading="lazy" decoding="async" alt="..."><figcaption>...</figcaption></figure> -->
+    </div>
+  </section>
+
+  <section id="compare" aria-labelledby="compare-title">
+    <div class="wrap">
+      <div class="head">
         <h2 id="compare-title">Next to similar tools</h2>
-        <p class="lead">rulesync and ruler generate per-project config for many tools. tackroom carries one personal setup into the agents you use every day.</p>
+        <p>skillshare, rulesync, ruler and openskills cover some of the same ground. Three things set tackroom apart.</p>
       </div>
-      <div class="tablewrap">
-        <table>
-          <thead><tr><th scope="col"></th><th scope="col" class="us">tackroom</th><th scope="col"><a href="https://github.com/dyoshikawa/rulesync">rulesync</a></th><th scope="col"><a href="https://github.com/intellectronica/ruler">ruler</a></th><th scope="col"><a href="https://github.com/numman-ali/openskills">openskills</a></th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Scope</th><td class="us">one user, every project</td><td>per project</td><td>per project</td><td>user and project</td></tr>
-            <tr><th scope="row">Skills</th><td class="us">yes</td><td>yes</td><td>experimental</td><td>yes</td></tr>
-            <tr><th scope="row">MCP servers</th><td class="us">yes</td><td>yes</td><td>yes</td><td>no</td></tr>
-            <tr><th scope="row">Hooks</th><td class="us">yes</td><td>yes</td><td>no</td><td>no</td></tr>
-            <tr><th scope="row">Agent roles</th><td class="us">native per agent</td><td>yes</td><td>experimental</td><td>no</td></tr>
-            <tr><th scope="row">External skills</th><td class="us">pinned and audited</td><td>not pinned</td><td>not pinned</td><td>tracks source</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <section id="faq" aria-labelledby="faq-title">
-      <h2 id="faq-title">Before you install</h2>
-      <dl class="faq">
-        <div><dt>Will it overwrite what my agents already have?</dt><dd>No. <code>setup</code> copies existing skills, MCP servers and roles into <code>~/.agents</code> after you review each one, and <code>sync</code> only touches entries tackroom manages.</dd></div>
-        <div><dt>Which systems does it run on?</dt><dd>macOS and Linux, on Apple silicon, ARM and x86. Homebrew and npm install the same checksum-verified binary from GitHub Releases.</dd></div>
-        <div><dt>Do I have to use every surface?</dt><dd>No. Start with skills. MCP servers, hooks, roles and memory are separate sections of <code>tackroom.yaml</code>, and an agent you switch off is left alone.</dd></div>
-        <div><dt>What about Cursor?</dt><dd>Cursor reads <code>~/.agents/skills</code> on its own, so tackroom does not copy skills there. Sync writes its roles, MCP servers and hooks under <code>~/.cursor</code>.</dd></div>
-        <div><dt>Can someone use one of my skills without tackroom?</dt><dd>Yes. Any skill in your repo installs with <code>npx skills add you/agents -s name --copy</code>.</dd></div>
-        <div><dt>What pairs well with it?</dt><dd><a href="https://github.com/kenn-io/agentsview">AgentsView</a> to search past sessions, and <a href="https://herdr.dev">Herdr</a>, where tackroom's Crons panel sits next to your agents.</dd></div>
+      <dl class="vs">
+        <div><dt>One lockfile for every machine</dt><dd>External skills are pinned in <code>tackroom.lock</code>, which lives in your user-level config repo and is shared by every machine.</dd></div>
+        <div><dt>A 72-hour hold</dt><dd>New pins and new exact package versions wait 72 hours. A held item is skipped until you release it.</dd></div>
+        <div><dt>An audit gate</dt><dd>An unaccepted critical finding blocks the update, and the previous pin stays.</dd></div>
       </dl>
-    </section>
-  </div>
+      <p class="more"><a href="docs/comparison/">Full comparison</a></p>
+    </div>
+  </section>
+
+  <section id="name" class="name" aria-labelledby="name-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="name-title">Why the name</h2>
+      </div>
+      <p>In a tack room each horse's gear hangs on its own peg under its own nameplate. tackroom keeps one rail in <code>~/.agents</code> and fits each agent's gear to its own format. <a href="docs/philosophy/">More on the design</a></p>
+    </div>
+  </section>
+
+  <section id="faq" aria-labelledby="faq-title">
+    <div class="wrap">
+      <div class="head">
+        <h2 id="faq-title">Before you install</h2>
+      </div>
+      <div class="faq">
+        <details><summary>Will it overwrite what my agents already have?</summary><p>No. <code>setup</code> copies existing skills, MCP servers and roles into <code>~/.agents</code> after you review each one, and <code>sync</code> only touches entries tackroom manages. A file that differs is moved to a backup only after you agree, and <code>tackroom restore</code> puts it back.</p></details>
+        <details><summary>Do I have to use every surface?</summary><p>No. Start with skills. MCP servers, hooks and roles are separate sections of <code>tackroom.yaml</code>, and an agent you switch off is left alone.</p></details>
+        <details><summary>How do I get the same setup on another machine?</summary><p><code>~/.agents</code> is a git repo. Push it to a private remote, clone it on the next machine, and run <code>tackroom setup</code>. <code>setup</code> also installs a job that pulls and syncs every 15 minutes; <code>--no-cron</code> skips it.</p></details>
+        <details><summary>Can someone use one of my skills without tackroom?</summary><p>Yes. Any skill in your repo installs with <code>npx skills add you/agents -s name --copy</code>.</p></details>
+      </div>
+    </div>
+  </section>
+
 </main>
 
 <footer>
   <div class="wrap">
-    <a class="brand" href="./"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg>tackroom</a>
-    <span>MIT licensed. Agent logos belong to their owners. Tour music: <a href="https://ende.app/en/song/13007-chill-house-vol-1">Chill House Vol. 1</a> by Sascha Ende, <a href="https://ende.app/standard-license">CC BY 4.0</a>.</span>
+    <a class="brand" href="./"><img src="logo.svg" width="30" height="30" alt="">tackroom</a>
+    <p>MIT licensed. Agent names and logos belong to their owners and appear here only to say which tools tackroom works with; this does not imply any endorsement or affiliation.</p>
     <nav aria-label="Footer">
       <a href="https://github.com/yourconscience/tackroom">GitHub</a>
       <a href="https://github.com/yourconscience/tackroom/releases">Releases</a>
       <a href="https://www.npmjs.com/package/tackroom">npm</a>
       <a href="https://github.com/yourconscience/homebrew-tap">Homebrew tap</a>
-      <a href="https://github.com/yourconscience/tackroom/tree/main/docs">Docs</a>
+      <a href="docs/">Docs</a>
     </nav>
   </div>
 </footer>
 
 <script>
-(() => {
-  const $ = (s, r = document) => r.querySelector(s);
-  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-  const store = {
-    get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch {} },
-  };
-
-  // Install switcher
-  const CMDS = {
-    brew: ['brew install yourconscience/tap/tackroom', 'tackroom setup'],
-    npm: ['npm install -g tackroom', 'tackroom setup'],
-    npx: ['npx tackroom setup', null],
-    curl: ['curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh', 'tackroom setup'],
-  };
-  const installTabs = $$('.install .tab');
-  function pickInstall(pm, focus) {
-    if (!CMDS[pm]) return;
-    installTabs.forEach(t => {
-      const on = t.dataset.pm === pm;
-      t.setAttribute('aria-selected', on);
-      t.tabIndex = on ? 0 : -1;
-      if (on && focus) t.focus();
-    });
-    $('#install-panel').setAttribute('aria-labelledby', 'tab-' + pm);
-    const [a, b] = CMDS[pm];
-    const codeA = $('#cmd-install'), codeB = $('#cmd-setup');
-    codeA.classList.add('is-swapping');
-    setTimeout(() => {
-      codeA.textContent = a;
-      $('#row-setup').hidden = !b;
-      if (b) codeB.textContent = b;
-      codeA.classList.remove('is-swapping');
-    }, 120);
-    store.set('tackroom-install', pm);
-  }
-  const mac = /Mac/i.test(navigator.userAgentData?.platform || navigator.platform || '');
-  pickInstall(store.get('tackroom-install') || (mac ? 'brew' : 'npm'));
-  wireTabs(installTabs, t => pickInstall(t.dataset.pm, true));
-
-  // Copy buttons
-  $$('.copy').forEach(btn => btn.addEventListener('click', async () => {
-    const text = $('#' + btn.dataset.copy).textContent;
-    const label = $('.label', btn);
-    try {
-      await navigator.clipboard.writeText(text);
-      btn.classList.add('is-done');
-      label.textContent = 'Copied';
-    } catch {
-      const r = document.createRange();
-      r.selectNodeContents($('#' + btn.dataset.copy));
-      getSelection().removeAllRanges();
-      getSelection().addRange(r);
-      label.textContent = mac ? 'Press ⌘C' : 'Press Ctrl+C';
-    }
-    clearTimeout(btn._t);
-    btn._t = setTimeout(() => { btn.classList.remove('is-done'); label.textContent = 'Copy'; }, 1800);
-  }));
-
-  // Video: swap the poster for the player on demand, so the page never downloads it unasked
-  $('#play').addEventListener('click', () => {
-    const v = document.createElement('video');
-    v.src = 'brag.mp4';
-    v.poster = 'brag.jpg';
-    v.controls = true;
-    v.playsInline = true;
-    v.autoplay = true;
-    v.setAttribute('aria-label', 'tackroom tour video');
-    $('#film').replaceChildren(v);
-    v.play().catch(() => {});
-    v.focus();
-  });
-
-  // Agent explorer tabs
-  const agentTabs = $$('.ex-out .tab');
-  wireTabs(agentTabs, t => {
-    agentTabs.forEach(x => {
-      const on = x === t;
-      x.setAttribute('aria-selected', on);
-      x.tabIndex = on ? 0 : -1;
-      const panel = document.getElementById(x.getAttribute('aria-controls'));
-      panel.hidden = !on;
-      if (on) { panel.classList.remove('is-entering'); void panel.offsetWidth; panel.classList.add('is-entering'); }
-    });
-    t.focus();
-  });
-
-  function wireTabs(tabs, select) {
-    tabs.forEach((t, i) => {
-      t.addEventListener('click', () => select(t));
-      t.addEventListener('keydown', e => {
-        const d = { ArrowRight: 1, ArrowLeft: -1 }[e.key];
-        if (e.key === 'Home' || e.key === 'End') { e.preventDefault(); select(tabs[e.key === 'Home' ? 0 : tabs.length - 1]); }
-        if (d) { e.preventDefault(); select(tabs[(i + d + tabs.length) % tabs.length]); }
+(function () {
+  // Copy button: feedback that the command reached the clipboard.
+  document.querySelectorAll(".copy").forEach(function (btn) {
+    if (!navigator.clipboard) return;
+    btn.hidden = false;
+    var label = btn.querySelector(".lbl");
+    btn.addEventListener("click", function () {
+      var text = document.getElementById(btn.dataset.copy).textContent;
+      navigator.clipboard.writeText(text).then(function () {
+        btn.classList.add("done"); label.textContent = "Copied";
+        setTimeout(function () { btn.classList.remove("done"); label.textContent = "Copy"; }, 1600);
       });
     });
-  }
+  });
 
-  // Support matrix
-  const Y = '<svg class="icon yes" role="img" aria-label="synced"><use href="#i-check"/></svg>';
-  const T = s => `<span class="t">${s}</span>`;
-  const N = '<span class="no" aria-label="not synced">-</span>';
-  const KEYS = {"Claude Code": "claude-code", "Codex": "codex", "Factory Droid": "droid", "OpenCode": "opencode", "Qwen Code": "qwen-code", "Pi": "pi", "OMP": "omp", "Amp": "amp", "Cursor": "cursor", "GitHub Copilot CLI": "copilot", "Grok Build": "grok", "DeepSeek Harness": "dsh"};
-  const rows = [
-    ['Claude Code', Y, Y, Y, Y, T('directory marketplace')],
-    ['Codex', Y, Y, Y, Y, T('planned')],
-    ['Factory Droid', Y, Y, Y, Y, N],
-    ['OpenCode', T('native'), Y, Y, N, N],
-    ['Qwen Code', T('settings'), Y, Y, Y, T('skills and MCP')],
-    ['Pi', Y, T('with pi-subagents'), T('with pi-mcp-adapter'), T('session start, end'), T('skills and MCP')],
-    ['OMP', Y, Y, Y, T('session start, end'), N],
-    ['Amp', T('settings'), N, Y, N, N],
-    ['Cursor', T('native'), Y, Y, Y, N],
-    ['GitHub Copilot CLI', T('native'), Y, Y, Y, N],
-    ['Grok Build', T('native'), Y, Y, Y, N],
-    ['DeepSeek Harness', T('native'), N, Y, N, N],
-  ];
-  $('#matrix').innerHTML = rows.map(([name, ...cells]) =>
-    `<tr><th scope="row"><span class="agent-cell"><svg class="ag" aria-hidden="true"><use href="#a-${KEYS[name]}"/></svg>${name}</span></th>${cells.map(c => `<td>${c}</td>`).join('')}</tr>`).join('');
-
-  // Nav hairline once the page scrolls past the top
-  const nav = $('#nav');
-  const sentinel = document.createElement('div');
-  sentinel.style.cssText = 'position:absolute;top:0;height:1px;width:1px';
-  document.body.prepend(sentinel);
-  new IntersectionObserver(([e]) => nav.classList.toggle('is-stuck', !e.isIntersecting)).observe(sentinel);
-
-  // First-run walkthrough: highlight the step whose output is in the middle of the viewport
-  const steps = $$('.steps li');
-  const outs = $$('.out');
-  const io = new IntersectionObserver(entries => {
-    entries.forEach(e => {
-      if (!e.isIntersecting) return;
-      steps.forEach(s => s.classList.toggle('is-active', s.dataset.step === e.target.dataset.step));
-    });
-  }, { rootMargin: '-40% 0px -45% 0px' });
-  outs.forEach(o => io.observe(o));
+  // Theme toggle: switches to the other theme; picking the system's own theme clears the override.
+  var root = document.documentElement, btn = document.getElementById("theme");
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  function current() { return root.dataset.theme || (mq.matches ? "dark" : "light"); }
+  function paint() { btn.textContent = current() === "dark" ? "Light" : "Dark"; btn.setAttribute("aria-label", "Switch to " + btn.textContent.toLowerCase() + " theme"); }
+  btn.hidden = false; paint();
+  btn.addEventListener("click", function () {
+    var next = current() === "dark" ? "light" : "dark";
+    var system = mq.matches ? "dark" : "light";
+    try {
+      if (next === system) { delete root.dataset.theme; localStorage.removeItem("tackroom-theme"); }
+      else { root.dataset.theme = next; localStorage.setItem("tackroom-theme", next); }
+    } catch (e) { root.dataset.theme = next; }
+    paint();
+  });
+  mq.addEventListener("change", paint);
 })();
 </script>
 </body>

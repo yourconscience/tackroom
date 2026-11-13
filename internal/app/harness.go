@@ -53,6 +53,10 @@ type setupFunc func(home string, repoRoot string, cfg config) (bool, error)
 // harness is the central descriptor for a coding agent integration.
 // All feature dispatch reads capability fields instead of switching on agent names.
 type harness struct {
+	// DisplayName is the human-facing product name, used by the dashboard and
+	// other surfaces that show a friendly name rather than the config key.
+	DisplayName string
+
 	// Detect validates an executable after the generic PATH lookup.
 	// nil means the executable's presence is sufficient.
 	Detect func(executable string) bool
@@ -105,7 +109,8 @@ var harnessesOnce sync.Once
 func initHarnesses() {
 	harnesses = map[string]*harness{
 		"amp": {
-			Skills: skillsConfigDriven,
+			DisplayName: "Amp",
+			Skills:      skillsConfigDriven,
 			InspectSkills: func(agent agentConfig, expected map[string]string, agentsSkillRoot string, cfg config, home string) (agentReport, error) {
 				return inspectAmpAgent(agent, expected, agentsSkillRoot, cfg, home)
 			},
@@ -130,7 +135,8 @@ func initHarnesses() {
 		},
 
 		agentClaudeCode: {
-			Skills: skillsSymlink,
+			DisplayName: "Claude Code",
+			Skills:      skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
 				agentName:  agentClaudeCode,
 				configPath: func(home string) string { return filepath.Join(home, ".claude.json") },
@@ -166,7 +172,8 @@ func initHarnesses() {
 		},
 
 		"codex": {
-			Skills: skillsSymlink,
+			DisplayName: "Codex",
+			Skills:      skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
 				agentName:  "codex",
 				configPath: func(home string) string { return filepath.Join(home, ".codex", "config.toml") },
@@ -190,7 +197,8 @@ func initHarnesses() {
 		},
 
 		"droid": {
-			Skills: skillsSymlink,
+			DisplayName: "Factory Droid",
+			Skills:      skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
 				agentName:  "droid",
 				configPath: func(home string) string { return filepath.Join(home, ".factory", "mcp.json") },
@@ -215,6 +223,7 @@ func initHarnesses() {
 		},
 
 		agentOpenCode: {
+			DisplayName:      "OpenCode",
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: readsAgentsSkillsRoot,
 			MCP: mcpTargetPtr(mcpTarget{
@@ -234,8 +243,9 @@ func initHarnesses() {
 		},
 
 		agentPi: {
-			Detect: detectVanillaPi,
-			Skills: skillsSymlink,
+			DisplayName: "Pi",
+			Detect:      detectVanillaPi,
+			Skills:      skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
 				agentName:  agentPi,
 				configPath: func(home string) string { return filepath.Join(home, ".pi", "agent", "mcp.json") },
@@ -261,7 +271,8 @@ func initHarnesses() {
 		},
 
 		agentOMP: {
-			Skills: skillsSymlink,
+			DisplayName: "OMP",
+			Skills:      skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
 				agentName:  agentOMP,
 				configPath: func(home string) string { return filepath.Join(home, ".omp", "agent", "mcp.json") },
@@ -286,7 +297,8 @@ func initHarnesses() {
 		},
 
 		agentQwenCode: {
-			Skills: skillsConfigDriven,
+			DisplayName: "Qwen Code",
+			Skills:      skillsConfigDriven,
 			InspectSkills: func(agent agentConfig, expected map[string]string, agentsSkillRoot string, cfg config, home string) (agentReport, error) {
 				return inspectQwenAgent(agent, expected, agentsSkillRoot, cfg, home)
 			},
@@ -314,6 +326,7 @@ func initHarnesses() {
 		},
 
 		agentGemini: {
+			DisplayName:      "Gemini CLI",
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: readsAgentsSkillsRoot,
 			MCP: mcpTargetPtr(mcpTarget{
@@ -340,6 +353,7 @@ func initHarnesses() {
 		},
 
 		agentCursor: {
+			DisplayName:      "Cursor",
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: readsAgentsSkillsRoot,
 			MCP: mcpTargetPtr(mcpTarget{
@@ -362,6 +376,7 @@ func initHarnesses() {
 		},
 
 		agentCopilot: {
+			DisplayName:      "GitHub Copilot CLI",
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: readsAgentsSkillsRoot,
 			MCP: mcpTargetPtr(mcpTarget{
@@ -388,6 +403,7 @@ func initHarnesses() {
 		},
 
 		agentGrok: {
+			DisplayName:      "Grok Build",
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: readsAgentsSkillsRoot,
 			MCP: mcpTargetPtr(mcpTarget{
@@ -413,7 +429,8 @@ func initHarnesses() {
 		},
 
 		agentAgy: {
-			Skills: skillsSymlink,
+			DisplayName: "Antigravity CLI",
+			Skills:      skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
 				agentName:  agentAgy,
 				configPath: agyMCPConfigPath,
@@ -443,6 +460,7 @@ func initHarnesses() {
 		},
 
 		agentKimi: {
+			DisplayName:      "Kimi Code",
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: readsAgentsSkillsRoot,
 			MCP: mcpTargetPtr(mcpTarget{
@@ -464,6 +482,7 @@ func initHarnesses() {
 		},
 
 		agentDSH: {
+			DisplayName:      "DeepSeek Harness",
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: dshReadsAgentsSkills,
 			MCP: mcpTargetPtr(mcpTarget{
@@ -504,6 +523,15 @@ func mcpTargetPtr(t mcpTarget) *mcpTarget {
 // Returns nil if no harness is registered (unknown agent).
 func harnessFor(name string) *harness {
 	return getHarnesses()[normalizeAgentName(name)]
+}
+
+// harnessDisplayName returns the human-facing product name for a harness,
+// falling back to the config key for harnesses without one registered.
+func harnessDisplayName(name string) string {
+	if h := harnessFor(name); h != nil && h.DisplayName != "" {
+		return h.DisplayName
+	}
+	return name
 }
 
 // mcpTargetForHarness returns the MCP target from the harness registry.
