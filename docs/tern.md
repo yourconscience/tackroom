@@ -1,17 +1,17 @@
 # tackroom in Tern
 
-Tern is a multiplexing terminal. tackroom integrates with it optionally, in the same shape as the Herdr mod: a doctor check plus an optional layout/recipe, shipped in the repo.
+Tern is a multiplexing terminal. tackroom integrates with it optionally, in the same shape as the Herdr mod.
 
 ## Shipped
 
-- `tackroom doctor` checks Tern: installed, version, runnable (`checkTern`). An absent Tern reports `skipped` (a pass), never a failure, because Tern is optional.
+- `tackroom doctor` checks Tern: installed, version, runnable (`checkTern`). An absent Tern reports `skipped` (a pass), never a failure.
+- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane. `--dry-run` prints the `tern` commands; `--config PATH` uses a non-default root.
 
-## Planned (same contract as the Herdr mod)
+## Planned
 
-- `tern/` — a Tern session layout/recipe that opens a tackroom workspace: one pane for `tackroom status`, one for `tackroom cron collect`, one for the sync preview.
-- A Tern plugin pane that renders `tackroom cron collect` JSON with Run now / Pause / Resume, acting through the same `tackroom cron run|pause|resume` verbs the web view and Herdr mod use.
-- `tackroom tern install` to copy the layout into Tern's config, backing up first.
+- A Tern plugin pane that renders `tackroom cron collect` JSON with Run now / Pause / Resume, acting through the same `tackroom cron run|pause|resume` verbs (one contract with the web view and Herdr mod).
+- `tackroom tern install` to copy a layout into Tern's config, backing up first.
 
 ## Constraint
 
-Tern panes are terminals. Integration goes through Tern's plugin/layout system and the `tackroom` CLI verbs, not a web view, and never edits Tern config behind the person's back.
+Tern panes are terminals. Integration goes through the `tern` CLI and `tackroom` CLI verbs, and never edits Tern config behind the person's back.
