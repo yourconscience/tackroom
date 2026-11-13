@@ -11,6 +11,14 @@ import (
 )
 
 func runStatus(opts runOptions) error {
+	err := statusReport(opts)
+	if !opts.ExitCode {
+		return err
+	}
+	return mapStatusExit(err)
+}
+
+func statusReport(opts runOptions) error {
 	repoRoot, home, cfg, selected, err := loadContext(opts)
 	if err != nil {
 		return err
@@ -37,7 +45,7 @@ func runStatus(opts runOptions) error {
 			return err
 		}
 		if !view.Synced {
-			return errors.New("tackroom is not fully synced")
+			return notSyncedError{"tackroom is not fully synced"}
 		}
 		return nil
 	}
@@ -46,18 +54,61 @@ func runStatus(opts runOptions) error {
 		return err
 	}
 	if repoReport.State != stateSynced {
-		return errors.New("tackroom is not fully synced")
+		return notSyncedError{"tackroom is not fully synced"}
 	}
 	for _, report := range reports {
 		if report.Detected && !report.Synced {
-			return fmt.Errorf("%s is not synced", report.Name)
+			return notSyncedError{report.Name + " is not synced"}
 		}
 	}
 
 	return nil
 }
 
+// notSyncedError marks status drift: the machine is out of sync but nothing
+// errored. `status --exit-code` maps it to exit code 1; any other failure is 2.
+type notSyncedError struct{ msg string }
+
+func (e notSyncedError) Error() string { return e.msg }
+
+// statusExitError carries the process exit code `status --exit-code` should
+// end with: 1 for drift, 2 for a genuine error.
+type statusExitError struct {
+	code int
+	err  error
+}
+
+func (e statusExitError) Error() string { return e.err.Error() }
+func (e statusExitError) Unwrap() error { return e.err }
+
+func mapStatusExit(err error) error {
+	if err == nil {
+		return nil
+	}
+	var drift notSyncedError
+	if errors.As(err, &drift) {
+		return statusExitError{code: 1, err: err}
+	}
+	return statusExitError{code: 2, err: err}
+}
+
+// ExitCode maps a command error to a process exit code: 0 for nil, the carried
+// code for a status --exit-code result, and 1 for any other error.
+func ExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var se statusExitError
+	if errors.As(err, &se) {
+		return se.code
+	}
+	return 1
+}
+
 func runSync(opts runOptions) error {
+	if opts.DryRun {
+		return runSyncDryRun(opts)
+	}
 	repoRoot, home, cfg, selected, err := loadContext(opts)
 	if err != nil {
 		return err
@@ -189,6 +240,115 @@ func runSync(opts runOptions) error {
 			len(conflicts), strings.Join(conflicts, "; "), conflictHint(home))
 	}
 	return agentFailures(reports)
+}
+
+// runSyncDryRun computes the same plan a real sync would apply, through the
+// same inspection code, and prints it without writing anything or fetching
+// external sources.
+func runSyncDryRun(opts runOptions) error {
+	repoRoot, home, cfg, selected, err := loadContext(opts)
+	if err != nil {
+		return err
+	}
+
+	// A dry run never fetches or clones. External sources whose cache is
+	// absent are dropped from the plan and reported as "not fetched" below.
+	var notFetched []string
+	cfg, notFetched = withoutMissingSources(cfg, home)
+
+	injectPluginMCPServers(&cfg, home)
+
+	repoReport, err := inspectRepoLink(repoRoot, home)
+	if err != nil {
+		return err
+	}
+
+	expected, err := expectedSkills(repoRoot, home, cfg)
+	if err != nil {
+		return err
+	}
+	reports, err := inspectAgents(selected, expected, repoRoot, home, cfg)
+	if err != nil {
+		return err
+	}
+
+	streams := setupStreams(opts)
+	printReport(streams.out, false, repoReport, reports, home, cfg)
+
+	for _, name := range notFetched {
+		fmt.Fprintf(streams.out, "not fetched: %s\n", name)
+	}
+	if opts.ReplaceConflicts {
+		listReplaceableConflicts(streams.out, reports, home)
+	}
+
+	changes, harnesses := countSyncChanges(repoReport, reports)
+	fmt.Fprintf(streams.out, "\ndry run: %d changes across %d harnesses; nothing written\n", changes, harnesses)
+	return nil
+}
+
+// withoutMissingSources drops non-materialized external sources whose cache is
+// absent (a real sync would clone them) and returns their names. Materialized
+// sources' skills are committed in the repo, so they stay in the plan.
+func withoutMissingSources(cfg config, home string) (config, []string) {
+	var missing []string
+	kept := make([]externalSkillSource, 0, len(cfg.ExternalSkills))
+	for _, src := range cfg.ExternalSkills {
+		if !src.Materialize && !hasDir(filepath.Join(externalCacheDir(home), sourceName(src), ".git")) {
+			missing = append(missing, sourceName(src))
+			continue
+		}
+		kept = append(kept, src)
+	}
+	cfg.ExternalSkills = kept
+	return cfg, missing
+}
+
+// listReplaceableConflicts prints what `sync --replace-conflicts` would move
+// into a backup, without moving anything.
+func listReplaceableConflicts(w io.Writer, reports []agentReport, home string) {
+	var paths []string
+	for _, report := range reports {
+		for _, item := range report.Replaceable {
+			paths = append(paths, item.Path)
+		}
+	}
+	if len(paths) == 0 {
+		return
+	}
+	backupDir := newConflictBackupDir(home)
+	fmt.Fprintf(w, "\n%d existing file(s) differ from the shared copy and would be moved to %s and replaced with links:\n", len(paths), backupDir)
+	for _, path := range paths {
+		fmt.Fprintf(w, "  %s\n", path)
+	}
+}
+
+// countSyncChanges tallies the individual changes a sync would apply, and the
+// number of harnesses they touch. Conflicts are blockers, not changes, and are
+// reported separately by the plan.
+func countSyncChanges(repoReport repoLinkReport, reports []agentReport) (changes, harnesses int) {
+	if repoReport.State != stateSynced {
+		changes++
+	}
+	for _, report := range reports {
+		if report.Error != "" || !report.Detected {
+			continue
+		}
+		n := len(report.Adds) + len(report.Updates) + len(report.Removes) +
+			len(report.AddsAgent) + len(report.UpdatesAgent) + len(report.RemovesAgent) +
+			len(report.AddsMCP) + len(report.UpdatesMCP) + len(report.RemovesMCP) +
+			len(report.AddsHook) + len(report.UpdatesHook) +
+			len(report.UpdatesPackage) + len(report.RemovesPackage) +
+			len(report.AddsPlugin) + len(report.RemovesPlugin)
+		if report.RootState != "" && report.RootState != stateSynced {
+			n++
+		}
+		changes += n
+		if n > 0 {
+			harnesses++
+		}
+	}
+	return changes, harnesses
 }
 
 // replaceAllConflicts backs up and clears every replaceable conflict. When

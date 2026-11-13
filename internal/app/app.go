@@ -196,6 +196,9 @@ type runOptions struct {
 	// Verbose expands `status` back to the full per-surface managed and
 	// external skill lists and native root paths instead of the concise view.
 	Verbose bool
+	// ExitCode makes `status` map drift to exit 1 and errors to exit 2
+	// (instead of the default 1 for any failure).
+	ExitCode bool
 }
 
 func Run(args []string) error {
@@ -328,6 +331,7 @@ func parseStatusFlags(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.Verbose, "verbose", false, "Show full managed/external skill lists and native root paths")
 	fs.BoolVar(&opts.Verbose, "v", false, "Show full managed/external skill lists and native root paths")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the status as JSON (exit code 1 when anything is out of sync)")
+	fs.BoolVar(&opts.ExitCode, "exit-code", false, "Exit 0 when in sync, 1 when anything is pending, 2 on error")
 
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
@@ -352,6 +356,9 @@ func runSyncCommand(args []string) error {
 	opts, err := parseSyncFlags(args)
 	if err != nil {
 		return err
+	}
+	if opts.DryRun && opts.Pull {
+		return errors.New("sync --dry-run cannot be combined with --pull")
 	}
 	if opts.Pull {
 		opts.Pull = false
@@ -477,6 +484,7 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.Pull, "pull", false, "Pull the repo before syncing")
+	fs.BoolVar(&opts.DryRun, "dry-run", false, "Print the plan without writing anything or fetching external sources")
 	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup and link them")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the resulting status as JSON instead of the text report")
 	if err := fs.Parse(args); err != nil {
@@ -547,8 +555,8 @@ func printUsage() {
 // canonicalForms is the full command reference; group --help prints its lines.
 var canonicalForms = []string{
 	"  tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--dry-run] [--json]",
-	"  tackroom status [--verbose] [--agents ...]",
-	"  tackroom sync [--pull] [--agents ...]",
+	"  tackroom status [--verbose] [--exit-code] [--agents ...]",
+	"  tackroom sync [--dry-run] [--pull] [--replace-conflicts] [--agents ...]",
 	"  tackroom doctor [--e2e] [--agents ...]",
 	"  tackroom config <validate|print> [--config PATH]",
 	"  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
