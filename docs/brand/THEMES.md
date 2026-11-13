@@ -1,6 +1,6 @@
 # Theme candidates
 
-Open `theme-lab.html`: the same components under the current theme and four candidates, light and dark, with measured contrast. Rebuild it and the token files with `python3 docs/brand/lab-src/build.py .` from the repo root. Nothing here is applied to the site, docs, dashboard or panels yet.
+Graphite is the applied theme: `docs/site/tokens.css` and `tokens-graphite.css` hold it. The other three candidates below were explored and not taken. The dashboard and terminal panels are not rethemed yet.
 
 ## Diagnosis
 

@@ -109,7 +109,7 @@ main section.hero { border-top: 0; padding: 40px 0 48px; }
 .t-warn { color: var(--tr-warn); border-color: var(--tr-warn); border-style: dashed; }
 .t-warn .g { background: var(--tr-warn-bg); }
 .t-bad { color: var(--tr-surface); background: var(--tr-bad); border-color: var(--tr-bad); border-width: 2px; }
-.t-bad .w code { color: inherit; }
+.t-bad .w code { color: inherit; background: transparent; }
 .t-pin { color: var(--tr-surface); border-color: var(--tr-pin); background: var(--tr-pin); }
 .t-pin .w code { padding: 3px 6px; background: var(--tr-surface); border-radius: 2px; letter-spacing: .04em; }
 .hold { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; width: 100%; max-width: 320px; }
