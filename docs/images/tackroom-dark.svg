@@ -1,13 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="688" height="495" viewBox="0 0 688 495" role="img" aria-labelledby="t">
   <title id="t">tackroom setup and tackroom sync output: seven agents synced, one external skill source pinned at b09718b, one item blocked and one held</title>
   <style>
-    text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: 14px; fill: #e9e9ec; white-space: pre; }
-    .d { fill: #a1a2a8; } .o { fill: #5fc39c; } .y { fill: #f29b55; } .h { fill: #d6b46c; font-weight: 600; }
+    text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: 14px; fill: #e8e8ea; white-space: pre; }
+    .d { fill: #9d9da3; } .o { fill: #55c38f; } .y { fill: #f0a54a; } .h { fill: #6aaef0; font-weight: 600; }
   </style>
-  <rect x="0.5" y="0.5" width="687" height="494" rx="6" fill="#0e0e11" stroke="#2c2b31"/>
-  <rect x="1" y="1" width="686" height="3" rx="1.5" fill="#b8944f"/>
+  <rect x="0.5" y="0.5" width="687" height="494" rx="6" fill="#101012" stroke="#303035"/>
+  <rect x="1" y="1" width="686" height="3" rx="1.5" fill="#303035"/>
   <text x="24" y="30" class="d">~/.agents</text>
-  <line x1="0" y1="40" x2="688" y2="40" stroke="#2c2b31"/>
+  <line x1="0" y1="40" x2="688" y2="40" stroke="#303035"/>
   <text x="24" y="66"><tspan class="d">$</tspan> tackroom setup --yes --memory off --no-cron</text>
   <text x="24" y="83">tackroom setup</text>
   <text x="24" y="100">config root: ~/.agents</text>
