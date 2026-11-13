@@ -53,6 +53,14 @@ func desiredMCPServersForAgent(cfg config, agentName string) []mcpServerConfig {
 		if server.URL != "" && !hasRemoteMCPSupport(agentName) {
 			continue
 		}
+		if cfg.heldMCP[server.Name] {
+			// Inside its freshness hold: keep the entry the harness already has.
+			if existing, err := readNativeMCPServer(agentName, server.Name, cfg.heldHome); err == nil {
+				existing.Enabled, existing.Agents = true, server.Agents
+				servers = append(servers, existing)
+			}
+			continue
+		}
 		if len(server.Agents) == 0 {
 			if hasMCPSupport(agentName) {
 				servers = append(servers, server)

@@ -1,0 +1,328 @@
+package app
+
+import (
+	"flag"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
+// acceptedFinding records one accepted audit finding. Matching is on
+// (item, rule, evidence); the evidence hash has no line number, so unrelated
+// edits keep the acceptance and a changed payload does not.
+type acceptedFinding struct {
+	Item     string `yaml:"item"`
+	Rule     string `yaml:"rule"`
+	Evidence string `yaml:"evidence"`
+	Severity string `yaml:"severity"`
+	Reason   string `yaml:"reason"`
+	At       string `yaml:"at"`
+}
+
+// heldItem is an external item sync skipped: blocked by an audit finding or
+// held for freshness.
+type heldItem struct {
+	Item    string
+	Kind    string // "blocked" or "held"
+	Reason  string
+	Until   string // hold end, RFC 3339; empty for blocked
+	Command string // the exact command that overrides it
+}
+
+func isAccepted(lock lockFile, item string, f ruleFinding) bool {
+	for _, a := range lock.Accepted {
+		if a.Item == item && a.Rule == f.Rule && a.Evidence == f.Evidence {
+			return true
+		}
+	}
+	return false
+}
+
+func markAccepted(items []auditItem, lock lockFile) {
+	for i := range items {
+		for j := range items[i].Findings {
+			items[i].Findings[j].Accepted = isAccepted(lock, items[i].ID(), items[i].Findings[j])
+		}
+	}
+}
+
+// unacceptedCritical returns the findings that block an external item.
+func unacceptedCritical(item auditItem, lock lockFile) []ruleFinding {
+	var out []ruleFinding
+	for _, f := range item.Findings {
+		if f.Severity == sevCritical && !isAccepted(lock, item.ID(), f) {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// isLocalSourceURL is true for a source on this machine; it is audited like any
+// external source but has no publish time to hold on.
+func isLocalSourceURL(url string) bool {
+	u := strings.TrimSpace(url)
+	return strings.HasPrefix(u, "/") || strings.HasPrefix(u, "./") || strings.HasPrefix(u, "../") ||
+		strings.HasPrefix(u, "~") || strings.HasPrefix(u, "file://")
+}
+
+func sourceItemID(src externalSkillSource, home string) string {
+	kind := "skill"
+	if hasPluginManifest(filepath.Join(externalCacheDir(home), sourceName(src))) {
+		kind = "plugin"
+	}
+	return kind + ":" + sourceName(src)
+}
+
+// gateExternalSources decides, for every external source whose pin is new or
+// would change, whether sync may use it. A source already pinned in the lock is
+// never gated here. The candidate content is the source's cache checkout.
+func gateExternalSources(sources []externalSkillSource, home string, lock *lockFile, opts gateOptions) map[string]heldItem {
+	held := map[string]heldItem{}
+	for _, src := range sources {
+		if lockEntryFor(*lock, src) != nil {
+			continue
+		}
+		name := sourceName(src)
+		if !hasDir(filepath.Join(externalCacheDir(home), name, ".git")) {
+			continue
+		}
+		item := externalSourceItem(src, home)
+		if blockers := unacceptedCritical(item, *lock); len(blockers) > 0 {
+			held[name] = heldItem{
+				Item:    item.ID(),
+				Kind:    "blocked",
+				Reason:  fmt.Sprintf("%s in %s", blockers[0].Rule, blockers[0].File),
+				Command: fmt.Sprintf("tackroom doctor audit accept %s %s --reason \"...\"", item.ID(), blockers[0].Rule),
+			}
+			continue
+		}
+		if isLocalSourceURL(src.URL) {
+			continue // freshness applies to remote content only
+		}
+		if h, ok := gateSourceFreshness(src, home, item.ID(), lock, opts); ok {
+			held[name] = h
+		}
+	}
+	return held
+}
+
+// filterHeldSources drops held sources from the list sync works with.
+func filterHeldSources(sources []externalSkillSource, held map[string]heldItem) []externalSkillSource {
+	if len(held) == 0 {
+		return sources
+	}
+	var out []externalSkillSource
+	for _, src := range sources {
+		if _, ok := held[sourceName(src)]; !ok {
+			out = append(out, src)
+		}
+	}
+	return out
+}
+
+// keepHeldLockEntries restores the previous lock entry of every held source
+// and drops the new pin of sources that were never pinned.
+func keepHeldLockEntries(entries []externalLockEntry, prev lockFile, held map[string]heldItem) []externalLockEntry {
+	if len(held) == 0 {
+		return entries
+	}
+	var out []externalLockEntry
+	for _, e := range entries {
+		if _, ok := held[e.Name]; !ok {
+			out = append(out, e)
+		}
+	}
+	for name := range held {
+		if e := findLockEntry(prev, name); e != nil {
+			out = append(out, *e)
+		}
+	}
+	sortLockEntries(out)
+	return out
+}
+
+// restoreHeldCaches puts each held source's cache back on its previous pin so
+// nothing reads the candidate by accident.
+func restoreHeldCaches(sources []externalSkillSource, home string, prev lockFile, held map[string]heldItem) {
+	for _, src := range sources {
+		if _, ok := held[sourceName(src)]; !ok {
+			continue
+		}
+		if e := findLockEntry(prev, sourceName(src)); e != nil && e.URL == src.URL && e.Branch == src.Branch {
+			_ = gitCheckoutCommit(filepath.Join(externalCacheDir(home), sourceName(src)), e.Commit, src.Branch)
+		}
+	}
+}
+
+func printHeldSummary(w io.Writer, held map[string]heldItem) {
+	if len(held) == 0 {
+		return
+	}
+	blocked, holding := 0, 0
+	for _, h := range held {
+		if h.Kind == "blocked" {
+			blocked++
+		} else {
+			holding++
+		}
+	}
+	fmt.Fprintf(w, "skipped %d blocked and %d held item(s); see tackroom status\n", blocked, holding)
+}
+
+func runAuditAccept(args []string) error {
+	fs := flag.NewFlagSet("doctor audit accept", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	var cfgPath, reason string
+	fs.StringVar(&cfgPath, "config", "", "Path to tackroom YAML config")
+	fs.StringVar(&reason, "reason", "", "Why the finding is acceptable (required)")
+	pos, err := parseInterleaved(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 2 {
+		return fmt.Errorf("usage: tackroom doctor audit accept <item> <rule> --reason \"...\"")
+	}
+	if strings.TrimSpace(reason) == "" {
+		return fmt.Errorf("--reason is required")
+	}
+	repoRoot, home, cfg, _, err := loadContext(runOptions{ConfigPath: cfgPath})
+	if err != nil {
+		return err
+	}
+	lock, err := readLockFile(repoRoot)
+	if err != nil {
+		return err
+	}
+	n := 0
+	for _, item := range collectAuditItems(repoRoot, home, cfg) {
+		if item.ID() != pos[0] {
+			continue
+		}
+		for _, f := range item.Findings {
+			if f.Rule != pos[1] || isAccepted(lock, item.ID(), f) {
+				continue
+			}
+			lock.Accepted = append(lock.Accepted, acceptedFinding{
+				Item: item.ID(), Rule: f.Rule, Evidence: f.Evidence, Severity: f.Severity,
+				Reason: reason, At: timeNow().UTC().Format(time.RFC3339),
+			})
+			n++
+		}
+	}
+	if n == 0 {
+		return fmt.Errorf("no unaccepted %s finding on %s (see tackroom doctor audit)", pos[1], pos[0])
+	}
+	if err := writeLockFile(repoRoot, lock); err != nil {
+		return err
+	}
+	fmt.Printf("accepted %d %s finding(s) on %s\n", n, pos[1], pos[0])
+	return nil
+}
+
+func runAuditRevoke(args []string) error {
+	fs := flag.NewFlagSet("doctor audit revoke", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	var cfgPath string
+	fs.StringVar(&cfgPath, "config", "", "Path to tackroom YAML config")
+	pos, err := parseInterleaved(fs, args)
+	if err != nil {
+		return err
+	}
+	if len(pos) != 2 {
+		return fmt.Errorf("usage: tackroom doctor audit revoke <item> <rule>")
+	}
+	repoRoot, _, _, _, err := loadContext(runOptions{ConfigPath: cfgPath})
+	if err != nil {
+		return err
+	}
+	lock, err := readLockFile(repoRoot)
+	if err != nil {
+		return err
+	}
+	var kept []acceptedFinding
+	for _, a := range lock.Accepted {
+		if a.Item != pos[0] || a.Rule != pos[1] {
+			kept = append(kept, a)
+		}
+	}
+	if len(kept) == len(lock.Accepted) {
+		return fmt.Errorf("no accepted %s finding on %s", pos[1], pos[0])
+	}
+	removed := len(lock.Accepted) - len(kept)
+	lock.Accepted = kept
+	if err := writeLockFile(repoRoot, lock); err != nil {
+		return err
+	}
+	fmt.Printf("revoked %d %s finding(s) on %s\n", removed, pos[1], pos[0])
+	return nil
+}
+
+// printRuleFindings lists rule findings per item and returns how many
+// unaccepted CRITICAL findings sit on external items.
+func printRuleFindings(w io.Writer, items []auditItem, lock lockFile, asJSON bool) int {
+	blocked := 0
+	for _, item := range items {
+		if item.External {
+			blocked += len(unacceptedCritical(item, lock))
+		}
+	}
+	if asJSON {
+		type jsonItem struct {
+			Item     string        `json:"item"`
+			External bool          `json:"external"`
+			Findings []ruleFinding `json:"findings"`
+		}
+		out := struct {
+			Items   []jsonItem `json:"items"`
+			Blocked int        `json:"blocked"`
+		}{Items: []jsonItem{}, Blocked: blocked}
+		for _, item := range items {
+			out.Items = append(out.Items, jsonItem{item.ID(), item.External, append([]ruleFinding{}, item.Findings...)})
+		}
+		_ = encodeJSON(w, out)
+		return blocked
+	}
+	fmt.Fprintln(w, "rule findings by item")
+	total := 0
+	for _, item := range items {
+		if len(item.Findings) == 0 {
+			continue
+		}
+		scope := "local"
+		if item.External {
+			scope = "external"
+		}
+		fmt.Fprintf(w, "%s (%s)\n", item.ID(), scope)
+		for _, f := range item.Findings {
+			total++
+			tags := ""
+			if f.Lowered {
+				tags += " lowered"
+			}
+			if f.Accepted {
+				tags += " accepted"
+			}
+			fmt.Fprintf(w, "  %-8s %s%s  %s  %s\n", f.Severity, f.Rule, tags, f.File, f.Match)
+		}
+	}
+	fmt.Fprintf(w, "%d rule finding(s); %d unaccepted CRITICAL on external items\n", total, blocked)
+	return blocked
+}
+
+// heldLines renders one status line per held or blocked item.
+func heldLines(held map[string]heldItem) []string {
+	var lines []string
+	for _, h := range held {
+		line := fmt.Sprintf("%s %s: %s", h.Kind, h.Item, h.Reason)
+		if h.Until != "" {
+			line += "; hold ends " + h.Until
+		}
+		lines = append(lines, line+"; override: "+h.Command)
+	}
+	sort.Strings(lines)
+	return lines
+}

@@ -22,6 +22,12 @@ type config struct {
 	// profile kept elsewhere) that every agent's root doc carries after
 	// AGENTS.md, in order. Relative paths resolve against the config root.
 	Instructions []string `yaml:"instructions,omitempty"`
+
+	// heldMCP names MCP servers whose package version is inside its freshness
+	// hold. desiredMCPServersForAgent keeps what each harness already has for
+	// them and writes nothing new. Set by gatePackages; never from YAML.
+	heldMCP  map[string]bool
+	heldHome string
 	// ContextNoteTokens is the estimated skill-listing token threshold above
 	// which `tackroom doctor` prints a soft context advisory note. Absent
 	// (nil) uses contextNoteTokensDefault; 0 (or negative) disables the note.
@@ -207,6 +213,10 @@ type runOptions struct {
 	// ExitCode makes `status` map drift to exit 1 and errors to exit 2
 	// (instead of the default 1 for any failure).
 	ExitCode bool
+	// AllowFresh* release items held for freshness (sync --allow-fresh).
+	AllowFreshAll    bool
+	AllowFreshItems  []string
+	AllowFreshReason string
 }
 
 func Run(args []string) error {
@@ -379,7 +389,13 @@ func runDoctorCommand(args []string) error {
 	if len(args) > 0 {
 		switch args[0] {
 		case "audit":
-			opts, err := parseSubcommandFlags("doctor audit", args[1:])
+			if len(args) > 1 && args[1] == "accept" {
+				return runAuditAccept(args[2:])
+			}
+			if len(args) > 1 && args[1] == "revoke" {
+				return runAuditRevoke(args[2:])
+			}
+			opts, err := parseAuditFlags(args[1:])
 			if err != nil {
 				return err
 			}
@@ -496,6 +512,7 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Print the plan without writing anything or fetching external sources")
 	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup and link them")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the resulting status as JSON instead of the text report")
+	addAllowFreshFlags(fs, &opts)
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
@@ -565,8 +582,11 @@ func printUsage() {
 var canonicalForms = []string{
 	"  tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--no-cron] [--dry-run] [--json]",
 	"  tackroom status [--verbose] [--exit-code] [--agents ...]",
-	"  tackroom sync [--dry-run] [--pull] [--replace-conflicts] [--agents ...]",
+	"  tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]",
 	"  tackroom doctor [--e2e] [--agents ...]",
+	"  tackroom doctor audit [--json]            # findings per item; exit 1 on an unaccepted CRITICAL in external content",
+	"  tackroom doctor audit accept <item> <rule> --reason \"...\"   # item is kind:name, e.g. skill:foo",
+	"  tackroom doctor audit revoke <item> <rule>",
 	"  tackroom config <validate|print> [--config PATH]",
 	"  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
 	"  tackroom skill new <name> [--description ...]",
@@ -575,7 +595,7 @@ var canonicalForms = []string{
 	"  tackroom skill sources [--json]           # external sources: configured and installed elsewhere",
 	"  tackroom skill sources search <query>     # find sources on skills.sh",
 	"  tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync]",
-	"  tackroom skill update [name ...]",
+	"  tackroom skill update [name ...] [--allow-fresh[=item,...]]",
 	"  tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]",
 	"  tackroom mcp <list|add|import|remove> [options]   # add: --command ... or --url ... [--header 'Name: value']",
 	"  tackroom restore [<backup> | latest] [--dry-run]",

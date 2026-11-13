@@ -40,14 +40,22 @@ func repoName(url string) string {
 // newly configured sources, and refreshes materialized copies before harness
 // reconciliation can observe them.
 func syncExternalRepos(sources []externalSkillSource, home string, repoRoot string) error {
+	_, err := syncExternalReposGated(sources, home, repoRoot, nil)
+	return err
+}
+
+// syncExternalReposGated is syncExternalRepos plus the sync-time gate: when
+// gate is non-nil, a source whose pin is new and that has an unaccepted
+// CRITICAL finding (or is inside its freshness hold) is skipped and returned.
+func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot string, gate *gateOptions) (map[string]heldItem, error) {
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cacheRoot := externalCacheDir(home)
 	if len(sources) > 0 {
 		if err := os.MkdirAll(cacheRoot, 0o755); err != nil {
-			return fmt.Errorf("create %s: %w", cacheRoot, err)
+			return nil, fmt.Errorf("create %s: %w", cacheRoot, err)
 		}
 	}
 	unavailable := make(map[string]bool)
@@ -60,20 +68,30 @@ func syncExternalRepos(sources []externalSkillSource, home string, repoRoot stri
 				unavailable[name] = true
 				continue
 			}
-			return err
+			return nil, err
 		}
 	}
-	plan, err := planMaterializedSkills(sources, home, repoRoot, lock, true, unavailable)
-	if err != nil {
-		return err
+	var held map[string]heldItem
+	original := lock
+	if gate != nil {
+		held = gateExternalSources(sources, home, &lock, *gate)
+		restoreHeldCaches(sources, home, original, held)
+		for name := range held {
+			unavailable[name] = true
+		}
 	}
-	if err := writeLockIfChanged(sources, home, repoRoot, lock); err != nil {
-		return err
+	active := filterHeldSources(sources, held)
+	plan, err := planMaterializedSkills(active, home, repoRoot, lock, true, unavailable)
+	if err != nil {
+		return nil, err
+	}
+	if err := writeLockIfChanged(active, home, repoRoot, lock, held); err != nil {
+		return nil, err
 	}
 	if err := applyMaterializedSkills(plan); err != nil {
-		return restoreMaterializationLock(repoRoot, lock, err)
+		return nil, restoreMaterializationLock(repoRoot, original, err)
 	}
-	return nil
+	return held, nil
 }
 
 // refreshExternalCache brings the local cache for src to its lock pin (or the
@@ -122,7 +140,7 @@ func committedMaterializationCurrent(src externalSkillSource, lock lockFile, rep
 
 // updateExternalRepos advances the named source pins (or all when names is
 // empty), writes the lock, then immediately refreshes their canonical copies.
-func updateExternalRepos(sources []externalSkillSource, home string, repoRoot string, names []string) error {
+func updateExternalRepos(sources []externalSkillSource, home string, repoRoot string, names []string, gate gateOptions) error {
 	selected, err := selectExternalSources(sources, names)
 	if err != nil {
 		return err
@@ -145,19 +163,64 @@ func updateExternalRepos(sources []externalSkillSource, home string, repoRoot st
 		} else if err := gitFetchReset(cachePath, src.Branch); err != nil {
 			return fmt.Errorf("update external %s: %w", name, err)
 		}
-		fmt.Printf("updated %s -> %s\n", name, externalSkillCommit(cachePath))
 	}
-	plan, err := planMaterializedSkills(selected, home, repoRoot, lock, false, nil)
+	// The new pin is a candidate: an unaccepted CRITICAL finding or a freshness
+	// hold keeps the previous pin and skips the source.
+	original := lock
+	held := gateUpdatedSources(selected, home, &lock, gate)
+	restoreHeldCaches(selected, home, original, held)
+	selected = filterHeldSources(selected, held)
+	for _, src := range selected {
+		fmt.Printf("updated %s -> %s\n", sourceName(src), externalSkillCommit(filepath.Join(cacheRoot, sourceName(src))))
+	}
+	for name, h := range held {
+		fmt.Printf("skipped %s: %s %s; %s\n", name, h.Kind, h.Reason, h.Command)
+	}
+	keep := make(map[string]bool, len(held))
+	for name := range held {
+		keep[name] = true
+	}
+	plan, err := planMaterializedSkills(selected, home, repoRoot, lock, false, keep)
 	if err != nil {
 		return err
 	}
-	if err := writeLockAfterUpdate(sources, home, repoRoot, lock, selected); err != nil {
-		return err
+	if err := writeLockAfterUpdate(sources, home, repoRoot, lock, selected, held); err != nil {
+		return restoreMaterializationLock(repoRoot, original, err)
 	}
 	if err := applyMaterializedSkills(plan); err != nil {
-		return restoreMaterializationLock(repoRoot, lock, err)
+		return restoreMaterializationLock(repoRoot, original, err)
 	}
 	return nil
+}
+
+// gateUpdatedSources gates the selected sources whose checkout moved off the
+// locked pin, or that are not pinned yet.
+func gateUpdatedSources(selected []externalSkillSource, home string, lock *lockFile, gate gateOptions) map[string]heldItem {
+	var candidates []externalSkillSource
+	for _, src := range selected {
+		pin := lockEntryFor(*lock, src)
+		head := externalSkillCommitFull(filepath.Join(externalCacheDir(home), sourceName(src)))
+		if pin == nil || pin.Commit != head {
+			candidates = append(candidates, src)
+		}
+	}
+	// Present the candidates as unpinned so the sync gate evaluates them.
+	probe := *lock
+	probe.ExternalSkills = nil
+	for _, e := range lock.ExternalSkills {
+		isCandidate := false
+		for _, src := range candidates {
+			if sourceName(src) == e.Name {
+				isCandidate = true
+			}
+		}
+		if !isCandidate {
+			probe.ExternalSkills = append(probe.ExternalSkills, e)
+		}
+	}
+	held := gateExternalSources(candidates, home, &probe, gate)
+	lock.Holds = probe.Holds
+	return held
 }
 
 func selectExternalSources(sources []externalSkillSource, names []string) ([]externalSkillSource, error) {
@@ -187,16 +250,19 @@ func externalSourceNames(sources []externalSkillSource) []string {
 	return names
 }
 
-func writeLockIfChanged(sources []externalSkillSource, home string, repoRoot string, lock lockFile) error {
-	entries := rebuildLockEntries(sources, home, lock)
-	if lockEntriesEqual(lock.ExternalSkills, entries) {
+// writeLockIfChanged records the pins of active sources. A held source keeps
+// its previous entry (or none), so its candidate commit is never locked.
+func writeLockIfChanged(sources []externalSkillSource, home string, repoRoot string, lock lockFile, held map[string]heldItem) error {
+	previous := lock
+	entries := keepHeldLockEntries(rebuildLockEntries(sources, home, lock), previous, held)
+	if lockEntriesEqual(lock.ExternalSkills, entries) && !holdsChanged(repoRoot, lock) {
 		return nil
 	}
 	lock.ExternalSkills = entries
 	return writeLockFile(repoRoot, lock)
 }
 
-func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot string, lock lockFile, selected []externalSkillSource) error {
+func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot string, lock lockFile, selected []externalSkillSource, held map[string]heldItem) error {
 	selectedNames := make(map[string]bool, len(selected))
 	for _, src := range selected {
 		selectedNames[sourceName(src)] = true
@@ -217,7 +283,8 @@ func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot s
 			break
 		}
 	}
-	if lockEntriesEqual(lock.ExternalSkills, entries) {
+	entries = keepHeldLockEntries(entries, lock, held)
+	if lockEntriesEqual(lock.ExternalSkills, entries) && !holdsChanged(repoRoot, lock) {
 		return nil
 	}
 	lock.ExternalSkills = entries

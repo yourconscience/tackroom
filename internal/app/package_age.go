@@ -33,9 +33,10 @@ type packageReference struct {
 }
 
 type packageRelease struct {
-	Version   string
-	Released  time.Time
-	SourceURL string
+	Version    string
+	Released   time.Time
+	SourceURL  string
+	TimeSource string // npm-time or pypi-max-upload
 }
 
 type packageAgeResolver func(packageReference) (packageRelease, error)
@@ -79,7 +80,7 @@ func checkExternalPackageAgeWithResolver(repoRoot string, cfg config, skip bool,
 		return checkResult{"package age", checkStatusWarn, "registry lookup failed (offline or a wrong pin?): " + strings.Join(unresolved, "; ")}
 	}
 	if len(fresh) > 0 {
-		return checkResult{"package age", checkStatusWarn, fmt.Sprintf("package newer than %d days: %s; pin an older release or wait, or pass --skip-package-age", defaultPackageAgeMinimumDays, strings.Join(fresh, "; "))}
+		return checkResult{"package age", checkStatusWarn, fmt.Sprintf("package newer than %d days: %s; sync holds new MCP and Pi package references until then (see tackroom status); pin an older release or wait, or pass --skip-package-age", defaultPackageAgeMinimumDays, strings.Join(fresh, "; "))}
 	}
 	detail := fmt.Sprintf("%d references at least %d days old", len(refs)-exempt, defaultPackageAgeMinimumDays)
 	if exempt > 0 {
@@ -113,6 +114,17 @@ func collectPackageReferences(repoRoot string, cfg config) ([]packageReference, 
 		}
 		for _, ref := range packageReferencesFromCommand(server.Command, server.Args, "tackroom.yaml:"+server.Name) {
 			add(ref)
+		}
+	}
+
+	for _, agent := range cfg.Agents {
+		if agent.Packages == nil {
+			continue
+		}
+		for _, spec := range *agent.Packages {
+			if ref, ok := piPackageReference(spec, "tackroom.yaml:"+agent.Name+" packages"); ok {
+				add(ref)
+			}
 		}
 	}
 
@@ -335,11 +347,17 @@ func resolvePyPIRelease(ref packageReference) (packageRelease, error) {
 	if len(files) == 0 {
 		return packageRelease{}, fmt.Errorf("version %q not found", version)
 	}
-	released, err := time.Parse(time.RFC3339, strings.TrimSuffix(files[0].UploadTime, "Z")+"Z")
-	if err != nil {
-		return packageRelease{}, fmt.Errorf("parse upload time: %w", err)
+	var released time.Time
+	for _, f := range files {
+		t, err := time.Parse(time.RFC3339, strings.TrimSuffix(f.UploadTime, "Z")+"Z")
+		if err != nil {
+			return packageRelease{}, fmt.Errorf("parse upload time: %w", err)
+		}
+		if t.After(released) {
+			released = t
+		}
 	}
-	return packageRelease{Version: version, Released: released, SourceURL: endpoint}, nil
+	return packageRelease{Version: version, Released: released, SourceURL: endpoint, TimeSource: "pypi-max-upload"}, nil
 }
 
 // resolvePyPIVersionedRelease uses the per-version endpoint, which omits the
@@ -357,11 +375,18 @@ func resolvePyPIVersionedRelease(ref packageReference) (packageRelease, error) {
 	if len(doc.URLs) == 0 {
 		return packageRelease{}, fmt.Errorf("version %q not found", ref.Version)
 	}
-	released, err := time.Parse(time.RFC3339, strings.TrimSuffix(doc.URLs[0].UploadTime, "Z")+"Z")
-	if err != nil {
-		return packageRelease{}, fmt.Errorf("parse upload time: %w", err)
+	// Files can be added to a release later, so the newest upload counts.
+	var released time.Time
+	for _, f := range doc.URLs {
+		t, err := time.Parse(time.RFC3339, strings.TrimSuffix(f.UploadTime, "Z")+"Z")
+		if err != nil {
+			return packageRelease{}, fmt.Errorf("parse upload time: %w", err)
+		}
+		if t.After(released) {
+			released = t
+		}
 	}
-	return packageRelease{Version: ref.Version, Released: released, SourceURL: endpoint}, nil
+	return packageRelease{Version: ref.Version, Released: released, SourceURL: endpoint, TimeSource: "pypi-max-upload"}, nil
 }
 
 func resolveNPMRelease(ref packageReference) (packageRelease, error) {
@@ -386,7 +411,7 @@ func resolveNPMRelease(ref packageReference) (packageRelease, error) {
 	if err != nil {
 		return packageRelease{}, fmt.Errorf("parse release time: %w", err)
 	}
-	return packageRelease{Version: version, Released: released, SourceURL: endpoint}, nil
+	return packageRelease{Version: version, Released: released, SourceURL: endpoint, TimeSource: "npm-time"}, nil
 }
 
 func getJSON(endpoint string, target interface{}) error {
