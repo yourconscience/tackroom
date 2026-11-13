@@ -25,7 +25,7 @@ Both only read. `skill list` prints, for each detected harness, every entry in i
 | Label | Meaning |
 |---|---|
 | `managed (local)` | A link to a skill in your config root. |
-| `managed (external: acme/agent-skills@774ddc2)` | A link to an external source's skill, pinned at that commit. `(unpinned)` replaces the commit while the lock has no pin. |
+| `managed (external: acme/agent-skills@b09718b)` | A link to an external source's skill, pinned at that commit. `(unpinned)` replaces the commit while the lock has no pin. |
 | `missing (not linked)` | Expected but absent. `sync` creates the link. |
 | `drifted symlink -> TARGET` | The link points somewhere other than the canonical folder. |
 | `stale managed (...)` | A link into the store for a skill that is no longer canonical. `sync` removes it. |

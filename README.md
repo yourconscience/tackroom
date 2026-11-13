@@ -6,7 +6,7 @@ tackroom syncs one `~/.agents` repo into 15 coding agents and pins every outside
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/tackroom-dark.svg">
-  <img src="docs/images/tackroom-light.svg" width="688" alt="Output of tackroom setup and tackroom sync: config root ~/.agents, seven agents synced, the acme/agent-skills source pinned at 774ddc2, one item blocked and one held.">
+  <img src="docs/images/tackroom-light.svg" width="688" alt="Output of tackroom setup and tackroom sync: config root ~/.agents, seven agents synced, the acme/agent-skills source pinned at b09718b, one item blocked and one held.">
 </picture>
 
 [Website](https://yourconscience.github.io/tackroom/) · [Docs](https://yourconscience.github.io/tackroom/docs/) · [Releases](https://github.com/yourconscience/tackroom/releases)

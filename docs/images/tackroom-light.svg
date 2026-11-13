@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="688" height="495" viewBox="0 0 688 495" role="img" aria-labelledby="t">
-  <title id="t">tackroom setup and tackroom sync output: seven agents synced, one external skill source pinned at 774ddc2, one item blocked and one held</title>
+  <title id="t">tackroom setup and tackroom sync output: seven agents synced, one external skill source pinned at b09718b, one item blocked and one held</title>
   <style>
     text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: 14px; fill: #161618; white-space: pre; }
     .d { fill: #4f5056; } .o { fill: #1d7550; } .y { fill: #a84a0b; } .h { fill: #7a5a17; font-weight: 600; }
@@ -16,7 +16,7 @@
   <text x="24" y="168">tackroom sync  <tspan class="o">✓ synced</tspan></text>
   <text x="24" y="202">changes  +2 skills, +1 mcp (claude, codex, pi) · +2 skills (omp)</text>
   <text x="24" y="219">repo     <tspan class="o">✓</tspan> ~/.agents</text>
-  <text x="24" y="236">sources  agent-skills  <tspan class="o">✓</tspan> <tspan class="h">774ddc2</tspan>  https://github.com/acme/agent-skills</text>
+  <text x="24" y="236">sources  agent-skills  <tspan class="o">✓</tspan> <tspan class="h">b09718b</tspan>  https://github.com/acme/agent-skills</text>
   <text x="24" y="270">╭─────────┬──────────┬────────┬────────┬─────┬───────┬─────────┬──────────╮</text>
   <text x="24" y="287">│ harness │ state    │ skills │ agents │ mcp │ hooks │ plugins │ packages │</text>
   <text x="24" y="304">├─────────┼──────────┼────────┼────────┼─────┼───────┼─────────┼──────────┤</text>

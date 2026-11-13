@@ -72,7 +72,7 @@
         <figcaption>$ tackroom status (excerpt, demo home)</figcaption>
 <pre>repo   <span class="o">✓</span> ~/.agents
 sources
-  agent-skills  <span class="o">✓</span> <span class="h">774ddc2</span>  https://github.com/acme/agent-skills
+  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>  https://github.com/acme/agent-skills
 
 claude   <span class="o">✓ synced</span>
   managed     3 skills · 6 agents · 1 mcp
@@ -81,7 +81,7 @@ Everything is synced.
 
 held or blocked (skipped by sync)
   <span class="r"><b>blocked</b></span> skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."
-  <span class="y"><b>held</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@ab9ea7e5f6b6d3543f2e51166951eec3ac79415d published 2026-11-11T23:03:39Z (git-commit-date); hold ends 2026-11-14T23:03:39Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
+  <span class="y"><b>held</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); hold ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
       </figure>
     </div>
   </section>
@@ -132,15 +132,15 @@ held or blocked (skipped by sync)
     - name: agent-skills
       url: https://github.com/acme/agent-skills
       branch: main
-      commit: <span class="h">774ddc2fe1f82fcbf5dee12c463fd3062006c5c0</span>
+      commit: <span class="h">b09718b944a55af3ffc686d6914b7e77b5a77775</span>
 <span class="d">      ...</span>
 holds:
 <span class="d">      ...</span>
     - item: <span class="y">skill:lint-skills</span>
-      ref: git:https://github.com/example/lint-skills@ab9ea7e5f6b6d3543f2e51166951eec3ac79415d
-      published_at: "2026-11-11T23:03:39Z"
+      ref: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599
+      published_at: "2026-11-11T23:38:13Z"
       time_source: git-commit-date
-      hold_until: <span class="y">"2026-11-14T23:03:39Z"</span></pre>
+      hold_until: <span class="y">"2026-11-14T23:38:13Z"</span></pre>
           <details class="full"><summary>Show the whole file</summary>
 <pre><span class="d"># Managed by tackroom sync / tackroom skill update. Pins commits and materialized skill ownership.</span>
 version: 1
@@ -148,30 +148,30 @@ external_skills:
     - name: agent-skills
       url: https://github.com/acme/agent-skills
       branch: main
-      commit: <span class="h">774ddc2fe1f82fcbf5dee12c463fd3062006c5c0</span>
+      commit: <span class="h">b09718b944a55af3ffc686d6914b7e77b5a77775</span>
       materialized:
         - code-review
         - pr-shepherd
 holds:
     - item: skill:agent-skills
-      ref: git:https://github.com/acme/agent-skills@774ddc2fe1f82fcbf5dee12c463fd3062006c5c0
+      ref: git:https://github.com/acme/agent-skills@b09718b944a55af3ffc686d6914b7e77b5a77775
       published_at: "2026-10-02T11:00:00Z"
       time_source: git-commit-date
       hold_until: "2026-10-05T11:00:00Z"
     - item: <span class="y">skill:lint-skills</span>
-      ref: git:https://github.com/example/lint-skills@ab9ea7e5f6b6d3543f2e51166951eec3ac79415d
-      published_at: "2026-11-11T23:03:39Z"
+      ref: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599
+      published_at: "2026-11-11T23:38:13Z"
       time_source: git-commit-date
-      hold_until: <span class="y">"2026-11-14T23:03:39Z"</span></pre>
+      hold_until: <span class="y">"2026-11-14T23:38:13Z"</span></pre>
           </details>
         </figure>
         <ul class="states">
           <li>
             <svg class="ico pin" aria-hidden="true"><use href="#i-pin"/></svg>
             <div class="state-body">
-              <span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>774ddc2</code></span></span>
+              <span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>b09718b</code></span></span>
               <span class="real"><span class="d">$ tackroom status</span>
-  agent-skills  ✓ 774ddc2  https://github.com/acme/agent-skills</span>
+  agent-skills  ✓ b09718b  https://github.com/acme/agent-skills</span>
               <p>Agents see this commit of <code>acme/agent-skills</code> and nothing newer. Only <code>tackroom skill update</code> moves the pin.</p>
             </div>
           </li>
@@ -181,7 +181,7 @@ holds:
               <span class="tag t-warn"><span class="g">!</span><span class="w">held <code>41h of 72h</code></span></span>
               <div class="hold"><div class="hold-track" role="img" aria-label="41 of 72 hours elapsed"><i></i><b></b></div><span class="hold-meta">31h left</span></div>
               <span class="real"><span class="d">$ tackroom status</span>
-  held skill:lint-skills: git:https://github.com/example/lint-skills@ab9ea7e5f6b6d3543f2e51166951eec3ac79415d published 2026-11-11T23:03:39Z (git-commit-date); hold ends 2026-11-14T23:03:39Z; override: tackroom sync --allow-fresh=skill:lint-skills</span>
+  held skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); hold ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</span>
               <p>Sync skips it and agents keep what they have. Wait, or release it now with <code>tackroom sync --allow-fresh=skill:lint-skills</code>.</p>
             </div>
           </li>
@@ -197,9 +197,9 @@ holds:
           <li>
             <svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg>
             <div class="state-body">
-              <span class="tag t-warn"><span class="g">!</span><span class="w">audit finding <code>remote-exec</code></span></span>
+              <span class="tag t-warn"><span class="g">!</span><span class="w">audit finding <code>agent-config-write</code></span></span>
               <span class="real"><span class="d">$ tackroom doctor audit</span>
-  HIGH     remote-exec  skills/pr-shepherd/scripts/setup-ci.sh  curl -fsSL https://ci-tools.example.com/install.sh | sh</span>
+  HIGH     agent-config-write  skills/pr-shepherd/scripts/setup-ci.sh  cp ci-settings.json ~/.claude/settings.json</span>
               <p>Reported, not blocked. Read it with <code>tackroom doctor audit</code> and decide whether to keep the source.</p>
             </div>
           </li>
@@ -252,7 +252,7 @@ tackroom sync  <span class="o">✓ synced</span>
 
 changes  +2 skills, +1 mcp (claude, codex, pi) · +2 skills (omp)
 repo     <span class="o">✓</span> ~/.agents
-sources  agent-skills  <span class="o">✓</span> <span class="h">774ddc2</span>  https://github.com/acme/agent-skills
+sources  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>  https://github.com/acme/agent-skills
 
 ╭─────────┬──────────┬────────┬────────┬─────┬───────┬─────────┬──────────╮
 │ harness │ state    │ skills │ agents │ mcp │ hooks │ plugins │ packages │
