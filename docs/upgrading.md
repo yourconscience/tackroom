@@ -6,6 +6,15 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## Unreleased
+
+Codex now installs an agent-plugins-spec source with `mcp: true` as a native plugin, through `codex plugin`. `tackroom.yaml` and `tackroom.lock` keep their formats. See [Codex plugins](plugins.md#codex-plugins).
+
+- If a source with `mcp: true` already synced into Codex, the next `tackroom sync` moves it. It removes that source's skill links from `~/.codex/skills` and the `[mcp_servers]` rows tackroom wrote for it, backs up `~/.codex/config.toml`, and installs `<name>@tackroom` with `codex plugin add`. Codex then also gets the plugin's `streamable-http` servers.
+- A source that sets `skills:`, `skill_dir:` or `skill_dirs:`, that sets no `mcp: true`, or that lists Codex in `exclude_agents` or leaves it out of `mcp_agents` keeps its links and rows.
+- `codex` must be on `PATH`. A failed `codex plugin` call is reported for the Codex plugin surface only; the other surfaces still apply.
+- To keep one source out of Codex, set `enabled = false` under `[plugins."<name>@tackroom"]` in `~/.codex/config.toml`, or add `codex` to its `exclude_agents`.
+
 ## To 2.1
 
 Nothing to migrate: `tackroom.yaml` and `tackroom.lock` keep their formats.

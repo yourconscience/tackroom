@@ -53,6 +53,9 @@ func desiredMCPServersForAgent(cfg config, agentName string) []mcpServerConfig {
 		if server.URL != "" && !hasRemoteMCPSupport(agentName) {
 			continue
 		}
+		if agentName == agentCodex && cfg.codexPluginMCP[server.Name] {
+			continue
+		}
 		// Apply agent targeting before the freshness hold, so a held server is
 		// not retained for an agent that no longer targets it.
 		if len(server.Agents) == 0 {

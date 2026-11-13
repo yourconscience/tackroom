@@ -314,6 +314,9 @@ func runSync(opts runOptions) error {
 	if err := applyClaudePluginSync(reports, repoRoot, home); err != nil {
 		return err
 	}
+	if err := applyCodexPluginSync(reports, inspectCfg, home); err != nil {
+		return err
+	}
 
 	repoReport, err = inspectRepoLink(repoRoot, home)
 	if err != nil {
