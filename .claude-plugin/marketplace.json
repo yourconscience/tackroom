@@ -1,0 +1,6 @@
+{
+  "name": "tackroom",
+  "owner": { "name": "yourconscience" },
+  "description": "tackroom's own Claude Code plugin",
+  "plugins": [{ "name": "tackroom", "source": "./claude" }]
+}

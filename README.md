@@ -225,6 +225,20 @@ cp herdr/layouts/tackroom.* ~/.config/herdr-app/layouts/   # then ctrl-shift-l t
 
 The panel runs `tackroom` from your PATH with the default config; set the block's `tackroom` and `config` props otherwise. Design: [docs/herdr.md](docs/herdr.md).
 
+## Claude Code and Pi
+
+The same view comes to Claude Code and Pi as plugins. Both run `tackroom` from your PATH, show which harnesses are out of sync, list the jobs from `tackroom cron collect`, and act through the same `tackroom cron run|pause|resume` verbs as the Crons tab.
+
+- [`claude/`](claude/) is a Claude Code plugin. `/tackroom` opens a pane with the sync status, health counts per host, the jobs that need attention and every job per host; a job opens into its details with Run now, Pause and Resume.
+- [`pi/`](pi/) is a Pi package. `/tackroom` lists the jobs with the sync status in the title; picking one shows its details and the same actions.
+
+```bash
+claude plugin install tackroom --marketplace yourconscience/tackroom
+pi install git:github.com/yourconscience/tackroom@v2.0.0
+```
+
+On a Pi target with a `packages` list in `tackroom.yaml`, add the `git:` line there instead, because `sync` writes that list as a whole. The Claude Code plugin takes two options in `/config`: `tackroom`, the program to run, and `config`, the full path of a config file other than the default. The Pi package uses `tackroom` on the PATH and `$TACKROOM_HOME`.
+
 ## Companion tools
 
 tackroom does one job. These tools pair well with it; install and run them on their own:
