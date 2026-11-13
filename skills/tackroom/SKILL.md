@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, DeepSeek Harness (dsh), Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
 ---
 
 # tackroom
@@ -18,23 +18,28 @@ Never infer configuration from the current project. Never replace a user's confi
 ## Commands
 
 ```bash
-tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--dry-run] [--json]
-tackroom status [--verbose] [--agents ...]
-tackroom sync [--pull] [--agents ...]
+tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--no-cron] [--dry-run] [--json]
+tackroom status [--verbose] [--exit-code] [--agents ...]
+tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]
 tackroom doctor [--e2e] [--agents ...]
+tackroom doctor audit [--json]                  # findings per item; exit 1 on an unaccepted CRITICAL in external content
+tackroom doctor audit accept <item> <rule> --reason "..."   # record an audit decision; item is kind:name, e.g. skill:foo
+tackroom doctor audit revoke <item> <rule>
 tackroom config validate
 tackroom config print
-tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host]
+tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]
 tackroom skill new <name> [--description ...]
 tackroom skill list [--agents ...]
 tackroom skill info <name>
 tackroom skill sources [--json]
 tackroom skill sources search <query> [--json]
 tackroom skill sources add <owner/repo[/path] | git URL> [--skills a,b | --all] [--latest] [--name N] [--no-sync]
-tackroom skill update [name ...]
+tackroom skill update [name ...] [--allow-fresh[=item,...]]
 tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]
 tackroom mcp <list|add|import|remove> [options]
 tackroom restore [<backup> | latest] [--dry-run]
+tackroom pull [options]        # git pull --ff-only, then sync; what the periodic job runs
+tackroom cron [--interval 15m|--deps|--remove]   # periodic sync job, installed by setup; default 15m
 tackroom cron collect [--hosts local,HOST...] [--table] # read-only scheduled-job inventory
 tackroom cron apply [--dry-run]       # install crons.jobs entries with schedule+command as launchd, systemd or crontab units
 tackroom cron run|pause|resume [--host HOST] ID   # act on a launchd job, here or over SSH
@@ -65,8 +70,9 @@ First-run setup:
 5. Shows an interactive review screen: share, keep harness-specific, or skip per item; items identical across harnesses are shared automatically. Imports are copy or conversion only; originals remain untouched.
 6. In non-interactive runs it falls back to sequential prompts; `--yes` answers every prompt with its default and never reads stdin, `--dry-run` prints candidates and exits without changes, `--json` emits the detection result and exits.
 7. Registers the chosen memory tier.
-8. Patches only the required native harness settings.
-9. Runs the first sync.
+8. Installs the periodic sync job (`tackroom pull` every 15 minutes), unless `--no-cron`.
+9. Patches only the required native harness settings.
+10. Runs the first sync.
 
 Setup also imports existing instructions files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, ...) into `~/.agents/AGENTS.md`, then backs up the originals to `~/.local/state/tackroom/backups/<time>/` and links them.
 
@@ -101,7 +107,7 @@ Reports each configured harness as detected or not detected and compares the fou
 - hooks
 - agent roles
 
-Missing, drifted, conflicting, stale managed, and unrelated external entries are reported separately.
+Missing, drifted, conflicting, stale managed, and unrelated external entries are reported separately. `--exit-code` exits 0 in sync, 1 on drift, 2 on error; held and blocked items do not count as drift.
 
 ## sync
 
@@ -132,6 +138,8 @@ For hooks, sync registers only declared entries on harnesses with verified hook 
 Claude Code plugins (mods, workflows, monitors, output styles, LSP, `bin/`) stay in Claude's native layout under the config root, listed in `<config-root>/.claude-plugin/marketplace.json`. `sync` registers that directory as a marketplace in `~/.claude/settings.json` (`extraKnownMarketplaces`) and enables each relative-path entry (`enabledPlugins`). Claude Code reads it in place: edit, then `/reload-plugins`. User disables (kept across a marketplace rename) and `defaultEnabled: false` are respected; stale enable keys are pruned and removing the marketplace file removes the registration. A name already registered with another source, or a malformed file, is a conflict and nothing is written. `doctor` runs `claude plugin validate` on it when Claude Code is detected.
 
 `sync --pull` runs `git pull --ff-only` in the private canonical repository before reconciliation.
+
+`sync --dry-run` prints the plan a real sync would apply, including held and blocked items, and writes nothing (it fetches nothing and makes no registry lookups). `sync --allow-fresh` releases held fresh items, all or a comma list with `--allow-fresh=item,...`, optionally recording `--reason "..."`; held and blocked items do not count as drift.
 
 ## External skills
 
@@ -186,6 +194,8 @@ Runs sync, status, and doctor as one health check. It fails on drift, conflicts,
 tackroom doctor --e2e
 ```
 
+`doctor audit` lists findings per item (`skill:`, `plugin:`, `role:`, `hook:`, `mcp:`, `package:`) and exits 1 when an external item has an unaccepted CRITICAL finding. Use `doctor audit accept <item> <rule> --reason "..."` to record a decision (stored in `tackroom.lock` under `accepted:`) and `doctor audit revoke <item> <rule>` to undo one.
+
 ## view
 
 Opens the canonical config UI in your browser: the review-first authoring surface, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no Node or separate daemon). Views: Overview (agent cards with sync state, counts and estimated skill-listing tokens), Skills and Roles (matrices of what is on disk per agent), MCP & hooks (toggle an entry or the agents it targets), Unmanaged (foreign skills, conflicts, stale links with the next command), Crons (scheduled jobs and failing services on the hosts in `crons.hosts`, the same data as `tackroom cron collect`, with Run now, Pause and Resume for launchd jobs and a schedule field for owned ones), and Config (edit, check and save the YAML). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step in which every destructive item must be ticked. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
@@ -212,8 +222,10 @@ tackroom view --ssh-host me@box                      # remote: print an ssh -L t
 | Qwen Code | yes, config-driven | yes | yes | yes |
 | Cursor | yes | yes | yes, `~/.cursor/mcp.json` | yes, `~/.cursor/hooks.json` |
 | GitHub Copilot CLI | yes | yes | yes, `~/.copilot/mcp-config.json` | yes, `~/.copilot/hooks/tackroom.json` |
+| Kimi Code | yes | yes | yes, `~/.kimi-code/mcp.json` | yes, `~/.kimi-code/config.toml` |
 | Grok Build | yes | yes | yes, `~/.grok/config.toml` | yes, `~/.grok/hooks/tackroom.json` |
 | Gemini CLI | yes | yes | yes, `~/.gemini/settings.json` | yes, `~/.gemini/settings.json` |
+| Antigravity CLI | yes | no | yes, `~/.gemini/config/mcp_config.json` | yes, `~/.gemini/config/hooks.json` |
 | DeepSeek Harness | yes | no | yes, `tackroom-mcp-*` rows in `~/.dsh/cordis.patch.yml` | no |
 
 Do not add a surface without a verified native adapter and focused tests.
