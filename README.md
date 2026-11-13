@@ -80,7 +80,7 @@ Five surfaces, each rendered into the harness's own format. tackroom does not in
 | Factory Droid | yes | yes | yes | yes | -- |
 | OpenCode | yes† | yes | yes | -- | -- |
 | Qwen Code | yes, config-driven | yes | yes | yes | skills + MCP§ |
-| OMP (pi fork) | yes | yes | yes | session‡ | -- |
+| OMP | yes | yes | yes | session‡ | -- |
 | Pi* | yes | yes* | yes | session‡ | skills + MCP* |
 
 \* Vanilla [pi](https://github.com/earendil-works/pi) gains managed roles through `pi-subagents`. Pi 1.0 and later read MCP servers from `~/.pi/agent/mcp.json` natively; older versions need `pi-mcp-adapter`, which also projects Agent Plugins (and replaces the built-in MCP support when installed). A Pi target can also declare a pinned `packages` list; `sync` writes that list to `~/.pi/agent/settings.json`, and Pi installs missing packages on its next startup. Tackroom does not install the Pi executable itself. The OMP fork remains a separate target.
@@ -150,7 +150,7 @@ Candidates are inert until you promote them into durable instructions — consol
 
 ## Roles
 
-Markdown role definitions in `~/.agents/agents/`, rendered to each harness's native format (Claude Markdown, Codex TOML, Qwen Markdown, Droid, Cursor and Grok Markdown, Copilot `.agent.md`). Generic `model` tiers (`haiku`/`sonnet`/`opus`) render natively for Claude and Droid; Codex omits them and uses its own default unless a per-harness override pins an exact id. Six starter roles ship with the tool; yours win on name collision. Details in [docs/roles.md](docs/roles.md).
+Markdown role definitions in `~/.agents/agents/`, rendered to each harness's native format (Claude Markdown, Codex TOML, Qwen Markdown, Factory Droid, Cursor and Grok Markdown, Copilot `.agent.md`). Generic `model` tiers (`haiku`/`sonnet`/`opus`) render natively for Claude and Factory Droid; Codex omits them and uses its own default unless a per-harness override pins an exact id. Six starter roles ship with the tool; yours win on name collision. Details in [docs/roles.md](docs/roles.md).
 
 ## Claude Code plugins
 

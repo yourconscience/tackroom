@@ -18,7 +18,7 @@ tackroom is a user-level dotfiles manager for coding agents: it syncs skills, MC
 | Per-harness settings | ✓ | — | — | — | — |
 | Periodic sync | ✓ | — | — | — | — |
 | Desktop app | — (web view) | ✓ | — | — | — |
-| Terminal panels | ✓ Herdr/Tern/Rex | — | — | — | — |
+| Terminal panels | ✓ Herdr Crons panel · Tern workspace command · Rex doctor check only | — | — | — | — |
 | Harness depth | deep | broad | broad | broad | narrow |
 
 ✓ full · ~ partial · — none
