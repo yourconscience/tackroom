@@ -5,7 +5,7 @@ Tern is a multiplexing terminal. tackroom integrates with it optionally, in the 
 ## Shipped
 
 - `tackroom doctor` checks Tern: installed, version, runnable (`checkTern`). An absent Tern reports `skipped` (a pass), never a failure.
-- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane. `--dry-run` prints the `tern` commands; `--config PATH` uses a non-default root.
+- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane. The window then shows that session. `--dry-run` prints the `tern` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`.
 
 ## Planned
 

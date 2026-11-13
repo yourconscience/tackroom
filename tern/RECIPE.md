@@ -8,7 +8,7 @@
 
 ## What you get
 
-- One command: `tackroom tern` (or `tackroom tern --config PATH` for a non-default config root).
+- One command: `tackroom tern` (or `tackroom tern --config PATH` with the path of a non-default `tackroom.yaml`).
 - Each pane is kept open after its one-shot command finishes, so the output stays readable.
 - `--dry-run` prints the `tern` commands without touching Tern.
 
@@ -17,16 +17,20 @@
 It shells out to the `tern` CLI:
 
 ```
-tern new session tackroom --cwd <root> --keep-open
-tern split @focused right --cwd <root> --keep-open -- tackroom status
-tern split @focused down --cwd <root> --keep-open -- tackroom cron collect --table
+tern new session tackroom --cwd <root> --keep-open --json
+tern split <shell> right --cwd <root> --keep-open --json -- tackroom status
+tern split <status> down --cwd <root> --keep-open --json -- tackroom cron collect --table
+tern focus <shell> --json
 ```
+
+`<shell>` and `<status>` are the block ids the earlier commands print. Tern does not show a new session by itself, so `@focused` would be the pane you are working in; the last command makes the window show the new session.
 
 ## Watch out
 
 - Needs `tern` on PATH; the Tern daemon starts itself if it isn't running.
+- A second run fails with Tern's "a session is already called `tackroom`"; close that session first.
 - Needs `tackroom` on the PATH Tern runs programs with, or the status and crons panes report command-not-found.
-- `--config` is passed to the status and crons commands only when given; the shell pane always opens in the config root.
+- `--config` is passed to the status and crons commands only when given; every pane opens in the folder that holds the config file.
 
 ## Not planned
 
