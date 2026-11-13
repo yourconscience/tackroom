@@ -58,7 +58,7 @@ tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
 
 ## Restart on upgrade
 
-A running view checks every 15 seconds whether the `tackroom` binary it started from has been replaced, by `brew upgrade`, the install script or `go install`. Once the new file has stayed unchanged for one more check, the view restarts itself with `--no-open` and prints `tackroom binary at <path> changed; restarting view`.
+A running view checks every 15 seconds whether the `tackroom` binary it started from has been replaced, by `brew upgrade`, `npm install -g` or `go install`. Once the new file has stayed unchanged for one more check, the view restarts itself with `--no-open` and prints `tackroom binary at <path> changed; restarting view`.
 
 The token file keeps the URL and open sessions valid. If the restart fails, the view keeps serving the old version and says so.
 

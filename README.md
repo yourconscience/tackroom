@@ -16,10 +16,9 @@ tackroom syncs one `~/.agents` repo into 15 coding agents and pins every outside
 ```bash
 brew install yourconscience/tap/tackroom
 npm install -g tackroom
-curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
 ```
 
-Pick one. Each installs the same checksum-verified binary for macOS or Linux, arm64 or x86-64.
+Pick one. Both install the same checksum-verified binary for macOS or Linux, arm64 or x86-64.
 
 ## Set up
 
