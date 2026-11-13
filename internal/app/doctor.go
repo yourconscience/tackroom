@@ -540,13 +540,18 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 			lockedNames[name] = true
 		}
 	}
+	held := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
 	for _, src := range cfg.ExternalSkills {
 		if !src.Materialize {
 			continue
 		}
+		name := sourceName(src)
+		if _, ok := held[name]; ok {
+			continue // held or blocked: not materialized by design, not a defect
+		}
 		pin := lockEntryFor(lock, src)
 		if pin == nil {
-			issues = append(issues, fmt.Sprintf("%s has no matching lock pin", sourceName(src)))
+			issues = append(issues, fmt.Sprintf("%s has no matching lock pin", name))
 			continue
 		}
 		skills, err := discoverExternalSourceSkills(src, home)
@@ -612,10 +617,21 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 	}
 	if len(issues) > 0 {
 		sort.Strings(issues)
-		return checkResult{"materialized external skills", checkStatusFail, strings.Join(issues, "; ")}
+		detail := strings.Join(issues, "; ")
+		if note := heldBlockedNote(held); note != "" {
+			detail += "; " + note
+		}
+		return checkResult{"materialized external skills", checkStatusFail, detail}
 	}
 	if checked == 0 {
+		if note := heldBlockedNote(held); note != "" {
+			return checkResult{"materialized external skills", checkStatusPass, note}
+		}
 		return checkResult{"materialized external skills", checkStatusPass, "none configured"}
 	}
-	return checkResult{"materialized external skills", checkStatusPass, fmt.Sprintf("%d canonical copies match lock", checked)}
+	detail := fmt.Sprintf("%d canonical copies match lock", checked)
+	if note := heldBlockedNote(held); note != "" {
+		detail += "; " + note
+	}
+	return checkResult{"materialized external skills", checkStatusPass, detail}
 }

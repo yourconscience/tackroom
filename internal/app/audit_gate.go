@@ -202,6 +202,34 @@ func printHeldSummary(w io.Writer, held map[string]heldItem) {
 	fmt.Fprintf(w, "skipped %d blocked and %d held item(s); see tackroom status\n", blocked, holding)
 }
 
+// heldBlockedNote describes held and blocked external sources in one line and
+// points at the action that resolves each; empty when nothing is held or
+// blocked. Used by the doctor external-skill checks so a held or blocked source
+// is reported as such instead of as an unpinned or missing-materialization
+// defect.
+func heldBlockedNote(held map[string]heldItem) string {
+	heldN, blockedN := 0, 0
+	for _, h := range held {
+		if h.Kind == "blocked" {
+			blockedN++
+		} else {
+			heldN++
+		}
+	}
+	if heldN+blockedN == 0 {
+		return ""
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "%d held, %d blocked (skipped by sync); see tackroom status", heldN, blockedN)
+	if heldN > 0 {
+		b.WriteString("; a hold ends on its own or with sync --allow-fresh=<item>")
+	}
+	if blockedN > 0 {
+		b.WriteString("; a blocked item needs tackroom doctor audit accept ... or a fix upstream")
+	}
+	return b.String()
+}
+
 func runAuditAccept(args []string) error {
 	fs := flag.NewFlagSet("doctor audit accept", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
