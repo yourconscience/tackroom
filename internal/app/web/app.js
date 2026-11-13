@@ -300,7 +300,8 @@ function renderOverview(root) {
   const pending = inv.agents.reduce((sum, agent) => sum + (agent.inspected ? agent.pending : 0), 0);
   const unsynced = inv.agents.filter((agent) => agent.inspected && agent.detected && !agent.error && !agent.synced).length;
   actions(
-    pending > 0 ? chip('warn', 'i-warn', `${plural(pending, 'change')} waiting`)
+    !inv.agents.length ? chip('warn', 'i-warn', 'No agents')
+      : pending > 0 ? chip('warn', 'i-warn', `${plural(pending, 'change')} waiting`)
       : unsynced > 0 ? chip('warn', 'i-warn', `${plural(unsynced, 'agent')} out of sync`) : chip('ok', 'i-ok', 'All synced'),
     inv.revision ? chip('', 'i-commit', inv.revision.slice(0, 7), `Config revision ${inv.revision}`) : null);
 
@@ -329,8 +330,20 @@ function renderOverview(root) {
   const crons = store.crons ? h('section', {class: 'block'},
     h('div', {class: 'block-title'}, icon('i-crons'), h('h2', {}, h('a', {href: '#crons', text: 'Crons'})), cronTrouble ? h('span', {class: 'count-chip bad', title: 'Jobs that need attention', text: String(cronTrouble)}) : null),
     h('div', {class: 'hero-grid'}, [...new Set(cronJobs.map((job) => job.host))].map((host) => hostCard(host, store.crons)), upNextCard(cronJobs))) : null;
-  mount(root, tiles, attention, h('div', {class: 'cards'}, inv.agents.map(agentCard)), crons);
+  const agents = inv.agents.length ? h('div', {class: 'cards'}, inv.agents.map(agentCard)) : noAgents();
+  mount(root, tiles, attention, agents, crons);
 }
+
+// An empty agents list is a config state, not a load in progress: say so and name the command that fills it.
+function noAgents() {
+  return h('section', {class: 'card'},
+    h('h2', {text: 'No agents in your config'}),
+    h('p', {class: 'muted'}, 'tackroom.yaml lists no agents, so sync has nothing to write to. Setup finds the agents installed on this machine, adds them to tackroom.yaml and syncs them.'),
+    command('tackroom setup'),
+    h('p', {class: 'muted'}, 'Or add them by hand in ', h('a', {href: '#config', text: 'Config'}), '.'));
+}
+// A command to run in a terminal, with a copy button.
+function command(text) { return h('div', {class: 'command'}, h('code', {text}), copyButton(text)); }
 
 function tile(iconId, label, value, href, bad = false) {
   return h(href ? 'a' : 'div', {class: 'kpi', href}, h('span', {class: 'kpi-label'}, icon(iconId), label), h('b', {class: bad ? 'kpi-value bad' : 'kpi-value', text: String(value)}));
@@ -370,9 +383,11 @@ function agentCard(agent) {
 function fact(iconId, label, value, kind = '') { return h('li', {class: kind}, icon(iconId), h('span', {text: label}), h('b', {text: String(value)})); }
 
 // ---------- matrices ----------
+// The agent's mark shows beside its dot only when the matrix stacks on a narrow screen.
+function cellMark(agent) { return h('span', {class: 'cell-agent', 'aria-hidden': 'true'}, agentMark(agent)); }
 function cell(state, agent) {
   const word = CELLS[state] || CELLS.unknown;
-  return h('span', {class: `cell ${state}`, role: 'img', title: `${agent}: ${word}`, 'aria-label': `${agent}: ${word}`});
+  return [cellMark(agent), h('span', {class: `cell ${state}`, role: 'img', title: `${agent}: ${word}`, 'aria-label': `${agent}: ${word}`})];
 }
 // How many agent cells are in each state, as a figure, a bar and a legend.
 function coverage(items, states, noun) {
@@ -485,7 +500,7 @@ function wiringTable(kind, rows) {
           'aria-pressed': String(targeted), 'aria-label': `${row.name} on ${agent}: ${word}`,
           title: locked ? `${agent}: ${word}` : `${agent}: ${word}. Select to ${targeted ? 'remove' : 'add'} this agent.`,
           onclick: () => toggleTarget(section, supportKey, row, agent, targeted),
-        }));
+        }, cellMark(agent)));
       });
       return h('tr', {}, lead, cells);
     }))));

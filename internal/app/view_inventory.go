@@ -102,7 +102,7 @@ func assembleInventory(cfg config, reports []agentReport, skills map[string]skil
 	for _, report := range reports {
 		byName[report.Name] = report
 	}
-	inv := viewInventory{Skills: []viewSkill{}, Roles: []viewRole{}, MCP: []viewWired{}, Hooks: []viewWired{}, Unmanaged: []viewUnmanaged{}}
+	inv := viewInventory{Agents: []viewAgent{}, Skills: []viewSkill{}, Roles: []viewRole{}, MCP: []viewWired{}, Hooks: []viewWired{}, Unmanaged: []viewUnmanaged{}}
 	var columns []string
 	for _, agent := range cfg.Agents {
 		_, hooks := hookTargetForHarness(agent.Name)
