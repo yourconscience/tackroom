@@ -7,12 +7,6 @@ tackroom skill new review-checklist --description "Pre-merge review checklist"
 tackroom sync
 ```
 
-Already wrote a skill inside one harness? Promote it to canonical so every agent gets it:
-
-```bash
-tackroom skill promote my-skill        # finds it in a native skill root, copies it under ~/.agents
-```
-
 ## External skills: pinned, audited
 
 Pulling skills from other people's repos is installing prompt code from strangers — tackroom treats it like a dependency, not a download. Adding one is a separate step, never part of setup:
@@ -43,8 +37,12 @@ external_skills:
 - `exclude_agents: [claude]` keeps the source's skills away from the listed agents.
 - `tackroom.lock` pins the source to an exact commit; agents only ever see the pinned tree.
 - `materialize: true` copies the selected directories into `~/.agents/skills/<name>` so the content is versioned in your repo and diffable on update.
-- `tackroom skill update [name ...]` is the only thing that advances a pin — updates are deliberate, never implicit.
+- `tackroom skill update [name ...]` is the only thing that advances a pin; updates are deliberate, never implicit.
 - `tackroom doctor` scans external sources for risky patterns (exfiltration, shell abuse) and detects drift between the lock and the materialized copies.
+
+Two gates apply to outside content only. A new or changed reference to an exact npm or PyPI version (in an MCP server command or a Pi `packages` entry), or a new or changed external skill pin, is held until 72 hours after its publish time (npm `time[version]`, PyPI latest upload, git committer date); an unknown publish time means held. A held item is skipped and what is already in the harness stays. `sync --allow-fresh` (also `skill update --allow-fresh`) releases and records it, and `status` lists each held or blocked item with the reason, the hold end and the exact override command.
+
+New or changed external content with an unaccepted CRITICAL finding is skipped by sync and the previous pin stays. `doctor audit` lists findings per item (`skill:`, `plugin:`, `role:`, `hook:`, `mcp:`, `package:`); `doctor audit accept <item> <rule> --reason "..."` records the decision in `tackroom.lock` under `accepted:`, and `revoke` removes one. Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing, and a git commit date counts as a weaker time source than a registry publish time.
 
 ## Plugins
 
