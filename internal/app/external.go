@@ -865,11 +865,17 @@ type externalTreeEntry struct {
 }
 
 func externalSkillTreesEqual(left string, right string) (bool, error) {
-	leftTree, err := externalTree(left)
+	return externalTreesEqual(left, right, false)
+}
+
+// externalTreesEqual is externalSkillTreesEqual with an option to ignore a
+// top-level .git, whose contents change with every fetch.
+func externalTreesEqual(left string, right string, skipGit bool) (bool, error) {
+	leftTree, err := externalTree(left, skipGit)
 	if err != nil {
 		return false, err
 	}
-	rightTree, err := externalTree(right)
+	rightTree, err := externalTree(right, skipGit)
 	if err != nil {
 		return false, err
 	}
@@ -884,7 +890,7 @@ func externalSkillTreesEqual(left string, right string) (bool, error) {
 	return true, nil
 }
 
-func externalTree(root string) (map[string]externalTreeEntry, error) {
+func externalTree(root string, skipGit bool) (map[string]externalTreeEntry, error) {
 	tree := make(map[string]externalTreeEntry)
 	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -893,6 +899,12 @@ func externalTree(root string) (map[string]externalTreeEntry, error) {
 		rel, err := filepath.Rel(root, path)
 		if err != nil {
 			return err
+		}
+		if skipGit && rel == ".git" {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		info, err := os.Lstat(path)
 		if err != nil {

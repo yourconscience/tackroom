@@ -41,7 +41,7 @@ tackroom tui      # the same state in a full-screen terminal view, read-only
 - **MCP servers**: written into each agent's own config file.
 - **Hooks**: one definition, rendered with each agent's event names.
 - **Agent roles**: Markdown roles rendered as Claude Markdown, Codex TOML, Copilot `.agent.md` and the rest.
-- **Plugins**: Claude Code plugins load in place from the repo; [agent-plugins-spec](https://agent-plugins.org) sources add their skills and MCP servers.
+- **Plugins**: Claude Code plugins load in place from the repo; [agent-plugins-spec](https://agent-plugins.org) sources add their skills and MCP servers, and Codex installs them as native plugins.
 
 Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GEMINI.md` and the others.
 

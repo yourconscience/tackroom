@@ -76,12 +76,21 @@ func discoverLocalSkills(repoRoot string, _ string) ([]discoveredSkill, error) {
 }
 
 // expectedSkillsForAgent drops the skills of external sources that exclude
-// this agent. A materialized source's skills are the ones its lock entry owns;
-// a direct source's are discovered in its cache.
+// this agent, or that Codex loads as a native plugin. A materialized source's
+// skills are the ones its lock entry owns; a direct source's are discovered in
+// its cache.
 func expectedSkillsForAgent(base map[string]string, repoRoot string, home string, cfg config, agentName string) (map[string]string, error) {
+	// Codex gets a native plugin's skills from the plugin, not from links.
+	nativeCodex := map[string]bool{}
+	if normalizeAgentName(agentName) == agentCodex {
+		plugins, _ := codexPluginSources(cfg, home)
+		for _, p := range plugins {
+			nativeCodex[p.Source] = true
+		}
+	}
 	var excluded []externalSkillSource
 	for _, src := range cfg.ExternalSkills {
-		if stringInSlice(normalizeAgentName(agentName), src.ExcludeAgents) {
+		if stringInSlice(normalizeAgentName(agentName), src.ExcludeAgents) || nativeCodex[sourceName(src)] {
 			excluded = append(excluded, src)
 		}
 	}
@@ -371,6 +380,9 @@ func inspectAgent(agent agentConfig, expected map[string]string, repoRoot string
 		return agentReport{}, err
 	}
 	if err := augmentClaudePluginReport(&report, agent, repoRoot, home); err != nil {
+		return agentReport{}, err
+	}
+	if err := augmentCodexPluginReport(&report, agent, cfg, home); err != nil {
 		return agentReport{}, err
 	}
 

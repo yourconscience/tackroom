@@ -214,6 +214,15 @@ func injectPluginMCPServersMode(cfg *config, home string, createDataDir bool) {
 		existingNames[s.Name] = true
 	}
 
+	nativeCodex := map[string]bool{}
+	nativePlugins, duplicates := codexPluginSources(*cfg, home)
+	for _, p := range nativePlugins {
+		nativeCodex[p.Source] = true
+	}
+	for _, d := range duplicates {
+		fmt.Fprintf(os.Stderr, "warning: plugin name declared by several sources: %s; none is installed into Codex\n", d)
+	}
+
 	type injected struct {
 		server     mcpServerConfig
 		sourceName string
@@ -282,5 +291,11 @@ func injectPluginMCPServersMode(cfg *config, home string, createDataDir bool) {
 			continue
 		}
 		cfg.MCPServers = append(cfg.MCPServers, sources[0].server)
+		if nativeCodex[sources[0].sourceName] {
+			if cfg.codexPluginMCP == nil {
+				cfg.codexPluginMCP = map[string]bool{}
+			}
+			cfg.codexPluginMCP[serverName] = true
+		}
 	}
 }
