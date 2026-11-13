@@ -388,7 +388,7 @@ func runCronProbe(host, only string) ([]probeSection, error) {
 	if host == "local" {
 		cmd = exec.CommandContext(ctx, "sh", "-s", "--", token, only)
 	} else {
-		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "sh -s -- "+token+" "+only)
+		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "sh -s -- "+shellJoin([]string{token, only}))
 	}
 	cmd.Stdin = strings.NewReader(cronsProbeScript)
 	var stderr strings.Builder

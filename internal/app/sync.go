@@ -64,7 +64,7 @@ func statusReport(opts runOptions) error {
 	}
 	printStatusReport(setupStreams(opts).out, repoRoot, repoReport, reports, home, cfg, opts.Verbose)
 	printHeldSection(setupStreams(opts).out, held)
-	if problem := periodicSyncProblem(); problem != "" {
+	for _, problem := range periodicSyncProblems(repoRoot, home, cfg) {
 		fmt.Fprintln(setupStreams(opts).out, "warning: "+problem)
 	}
 	if err := agentFailures(reports); err != nil {

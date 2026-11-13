@@ -32,6 +32,10 @@ type config struct {
 	// which `tackroom doctor` prints a soft context advisory note. Absent
 	// (nil) uses contextNoteTokensDefault; 0 (or negative) disables the note.
 	ContextNoteTokens *int `yaml:"context_note_tokens,omitempty"`
+	// PeriodicSync opts out of the periodic `tackroom pull` job. Absent (nil)
+	// defaults to true; only an explicit false disables it and silences the
+	// "periodic sync is off" warning. The per-machine local overlay wins.
+	PeriodicSync *bool `yaml:"periodic_sync,omitempty"`
 }
 
 type uiConfig struct {
