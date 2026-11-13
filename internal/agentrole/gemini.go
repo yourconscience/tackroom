@@ -10,7 +10,7 @@ var geminiToolMapping = map[string]string{
 
 // renderGemini writes a Gemini CLI local subagent (~/.gemini/agents/*.md).
 // Without a model the subagent uses the session's model.
-func renderGemini(role Role) string {
+func renderGemini(role Role) (string, error) {
 	model := strings.TrimSpace(role.Gemini.Model)
 	if model == "" {
 		if generic := strings.TrimSpace(role.Model); generic != "" && !canonicalModelTier(generic) {
@@ -34,5 +34,5 @@ func renderGemini(role Role) string {
 		}
 	}
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }

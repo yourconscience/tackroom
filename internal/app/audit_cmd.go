@@ -118,7 +118,7 @@ func runAudit(opts runOptions) error {
 	}
 
 	lock, _ := readLockFile(repoRoot)
-	items := collectAuditItems(repoRoot, home, cfg)
+	items := acceptAuditItems(repoRoot, home, cfg)
 	markAccepted(items, lock)
 	blocked := printRuleFindings(os.Stdout, items, lock, opts.JSONOutput)
 	if crit > 0 {

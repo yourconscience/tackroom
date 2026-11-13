@@ -239,8 +239,35 @@ func removeNativeManagedMemoryHooks(home string, root string, prior config, curr
 			changed++
 		}
 	}
+	entryRemovers := []struct {
+		path   string
+		agent  string
+		remove func(string, []nativeHookEntry) (bool, error)
+	}{
+		{agyHooksConfigPath(home), agentAgy, removeAgyNativeHookEntries},
+		{kimiConfigPath(home), agentKimi, removeKimiNativeHookEntries},
+	}
+	for _, target := range entryRemovers {
+		var entries []nativeHookEntry
+		for _, event := range memoryHookEvents {
+			for _, command := range commands {
+				entries = append(entries, nativeHookEntry{Agent: target.agent, Event: event, Command: command, ConfigPath: target.path})
+			}
+		}
+		didChange, err := target.remove(target.path, entries)
+		if err != nil {
+			return changed, err
+		}
+		if didChange {
+			changed++
+		}
+	}
 	return changed, nil
 }
+
+// memoryHookEvents are the events the managed memory hooks register, used to
+// match per-entry adapters that key removal on event plus command.
+var memoryHookEvents = []string{"SessionStart", "Stop", "SessionEnd"}
 
 func managedMemoryNativeCommands(home string, root string, cfgs ...config) []string {
 	seen := make(map[string]struct{})

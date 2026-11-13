@@ -9,7 +9,7 @@ var piToolMapping = map[string]string{
 
 // renderPi emits the user-agent format consumed by pi-subagents. Vanilla Pi
 // ignores this directory when the extension is absent.
-func renderPi(role Role) string {
+func renderPi(role Role) (string, error) {
 	model := strings.TrimSpace(role.Pi.Model)
 	if model == "" && !canonicalModelTier(role.Model) {
 		model = strings.TrimSpace(role.Model)
@@ -31,5 +31,5 @@ func renderPi(role Role) string {
 		}
 	}
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }

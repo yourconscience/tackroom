@@ -7,7 +7,7 @@ import "strings"
 var grokEfforts = map[string]bool{"low": true, "medium": true, "high": true, "xhigh": true, "max": true}
 
 // renderGrok writes Claude tool names: Grok Build resolves them in `tools:`.
-func renderGrok(role Role) string {
+func renderGrok(role Role) (string, error) {
 	model := strings.TrimSpace(role.Grok.Model)
 	if model == "" {
 		if generic := strings.TrimSpace(role.Model); generic != "" && !canonicalModelTier(generic) {
@@ -32,5 +32,5 @@ func renderGrok(role Role) string {
 	}
 	writeYAMLScalar(&b, "color", role.Color)
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }

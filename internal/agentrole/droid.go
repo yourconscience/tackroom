@@ -8,7 +8,7 @@ var droidToolMapping = map[string][]string{
 }
 var droidFallbackTools = []string{"Read", "LS", "Grep", "Glob"}
 
-func renderDroid(role Role) string {
+func renderDroid(role Role) (string, error) {
 	model := strings.TrimSpace(role.Droid.Model)
 	if model == "" {
 		model = droidModelFor(role.Model)
@@ -34,7 +34,7 @@ func renderDroid(role Role) string {
 		}
 	}
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }
 
 func droidModelFor(model string) string {

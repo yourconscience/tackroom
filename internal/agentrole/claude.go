@@ -2,7 +2,7 @@ package agentrole
 
 import "strings"
 
-func renderClaude(role Role) string {
+func renderClaude(role Role) (string, error) {
 	model := strings.TrimSpace(role.Claude.Model)
 	if model == "" {
 		model = strings.TrimSpace(role.Model)
@@ -20,5 +20,5 @@ func renderClaude(role Role) string {
 	}
 	writeYAMLScalar(&b, "color", role.Color)
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }

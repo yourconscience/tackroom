@@ -22,7 +22,10 @@ func writeAgentsFixture(t *testing.T, repoRoot, name, data string) {
 
 func TestRenderAgentRolePrefillsConfiguredModel(t *testing.T) {
 	role := agentrole.Role{Name: "builder", Description: "Builds features", Instructions: "Implement."}
-	path, content, ok := renderAgentRole(role, agentConfig{Name: agentClaudeCode, AgentRoot: t.TempDir(), RoleModel: "configured-model"})
+	path, content, ok, err := renderAgentRole(role, agentConfig{Name: agentClaudeCode, AgentRoot: t.TempDir(), RoleModel: "configured-model"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !ok {
 		t.Fatal("claude role was not rendered")
 	}

@@ -71,7 +71,8 @@ func isLocalSourceURL(url string) bool {
 
 // gateExternalSources decides, for every external source whose pin is new or
 // would change, whether sync may use it. A source already pinned in the lock is
-// never gated here. The candidate content is the source's cache checkout.
+// never gated here. The candidate content is the checkout under home's external
+// cache, so a caller staging a candidate passes the staging home.
 func gateExternalSources(sources []externalSkillSource, home string, lock *lockFile, opts gateOptions) map[string]heldItem {
 	held := map[string]heldItem{}
 	for _, src := range sources {
@@ -138,7 +139,7 @@ func keepHeldLockEntries(entries []externalLockEntry, prev lockFile, held map[st
 }
 
 // restoreHeldCaches puts each held source's cache back on its previous pin so
-// nothing reads the candidate by accident.
+// the shared cache never serves a pin the gate rejected.
 func restoreHeldCaches(sources []externalSkillSource, home string, prev lockFile, held map[string]heldItem) {
 	for _, src := range sources {
 		if _, ok := held[sourceName(src)]; !ok {
@@ -148,6 +149,42 @@ func restoreHeldCaches(sources []externalSkillSource, home string, prev lockFile
 			_ = gitCheckoutCommit(filepath.Join(externalCacheDir(home), sourceName(src)), e.Commit, src.Branch)
 		}
 	}
+}
+
+// pendingCandidateItems returns the audit items of external sources whose
+// rejected candidate is still staged. The shared cache only ever holds accepted
+// content, so a candidate the gate blocked is inspectable here and nowhere else.
+func pendingCandidateItems(home string, cfg config) []auditItem {
+	candidateHome := externalCandidateHome(home)
+	var items []auditItem
+	for _, src := range cfg.ExternalSkills {
+		if !hasDir(filepath.Join(externalCandidatePath(home, sourceName(src)), ".git")) {
+			continue
+		}
+		items = append(items, externalSourceItem(src, candidateHome))
+	}
+	return items
+}
+
+// acceptAuditItems is collectAuditItems with each pending candidate checkout
+// standing in for the shared checkout it would replace once accepted.
+func acceptAuditItems(repoRoot, home string, cfg config) []auditItem {
+	candidates := pendingCandidateItems(home, cfg)
+	if len(candidates) == 0 {
+		return collectAuditItems(repoRoot, home, cfg)
+	}
+	pending := make(map[string]bool, len(candidates))
+	for _, item := range candidates {
+		pending[item.Name] = true
+	}
+	var items []auditItem
+	for _, item := range collectAuditItems(repoRoot, home, cfg) {
+		if item.External && pending[item.Name] {
+			continue
+		}
+		items = append(items, item)
+	}
+	return append(items, candidates...)
 }
 
 func printHeldSummary(w io.Writer, held map[string]heldItem) {
@@ -190,7 +227,7 @@ func runAuditAccept(args []string) error {
 		return err
 	}
 	n := 0
-	for _, item := range collectAuditItems(repoRoot, home, cfg) {
+	for _, item := range acceptAuditItems(repoRoot, home, cfg) {
 		if item.ID() != pos[0] {
 			continue
 		}

@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-func renderCodex(role Role) string {
+func renderCodex(role Role) (string, error) {
 	model := strings.TrimSpace(role.Codex.Model)
 	if model == "" {
 		model = codexModelFor(role.Model)
@@ -27,7 +27,7 @@ func renderCodex(role Role) string {
 	b.WriteString("developer_instructions = ")
 	b.WriteString(strconv.Quote(role.Instructions))
 	b.WriteString("\n")
-	return b.String()
+	return b.String(), nil
 }
 
 func codexModelFor(model string) string {

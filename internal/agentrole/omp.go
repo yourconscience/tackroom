@@ -7,7 +7,7 @@ var ompToolMapping = map[string]string{
 	"webfetch": "read", "websearch": "web_search", "write": "write",
 }
 
-func renderOMP(role Role) string {
+func renderOMP(role Role) (string, error) {
 	model := strings.TrimSpace(role.OMP.Model)
 	if model == "" {
 		model = strings.TrimSpace(role.Model)
@@ -28,5 +28,5 @@ func renderOMP(role Role) string {
 		}
 	}
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }

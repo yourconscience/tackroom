@@ -31,6 +31,16 @@ var managedMemoryHookNames = map[string]struct{}{
 	"memory-hermes-memory-to-vault": {},
 }
 
+// memoryHookReplyUnsupported lists harnesses whose hook reply contract the
+// shared memory scripts cannot satisfy. The scripts answer in Claude Code's
+// hookSpecificOutput.additionalContext shape; Antigravity's SessionStart reads
+// injectSteps and its Stop reads decision
+// (https://antigravity.google/docs/hooks), so registering them there would run
+// the hook without injecting anything.
+var memoryHookReplyUnsupported = map[string]struct{}{
+	agentAgy: {},
+}
+
 type setupIO struct {
 	in  io.Reader
 	out io.Writer
@@ -241,6 +251,9 @@ func upsertSetupAgents(cfg *config, detected []agentConfig) {
 
 func applyMemoryTier(cfg *config, tier string, root string, home string) error {
 	tier = normalizeMemoryTier(tier)
+	if tier != memoryTierOff {
+		warnSkippedMemoryHookAgents(*cfg)
+	}
 	startTargets := memoryHookAgents(*cfg, "SessionStart")
 	stopTargets := memoryHookAgents(*cfg, "Stop")
 	endTargets := memoryHookAgents(*cfg, "SessionEnd")
@@ -297,10 +310,27 @@ func memoryHookAgents(cfg config, event string) []string {
 		if _, ok := hookTargetForHarness(agent.Name); !ok {
 			continue
 		}
+		if _, unsupported := memoryHookReplyUnsupported[agent.Name]; unsupported {
+			continue
+		}
 		agents = append(agents, agent.Name)
 	}
 	sort.Strings(agents)
 	return agents
+}
+
+// warnSkippedMemoryHookAgents says which enabled agents the memory tier leaves
+// out, so a skipped hook is never silent.
+func warnSkippedMemoryHookAgents(cfg config) {
+	for _, agent := range cfg.Agents {
+		if !agent.Enabled {
+			continue
+		}
+		if _, unsupported := memoryHookReplyUnsupported[agent.Name]; !unsupported {
+			continue
+		}
+		fmt.Fprintf(os.Stderr, "warning: memory hooks skipped for %s: the memory scripts reply in Claude Code's hookSpecificOutput.additionalContext, and %s reads injectSteps instead\n", agent.Name, agent.Name)
+	}
 }
 
 func normalizeMemoryTier(tier string) string {

@@ -143,7 +143,10 @@ func TestPiAndOMPRenderersProduceNativeRoles(t *testing.T) {
 	}
 	home := t.TempDir()
 
-	piPath, piContent, ok := renderAgentRole(role, agentConfig{Name: agentPi, AgentRoot: filepath.Join(home, ".pi", "agent", "agents")})
+	piPath, piContent, ok, err := renderAgentRole(role, agentConfig{Name: agentPi, AgentRoot: filepath.Join(home, ".pi", "agent", "agents")})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !ok || piPath != filepath.Join(home, ".pi", "agent", "agents", "researcher.md") {
 		t.Fatalf("Pi role path=%q ok=%v", piPath, ok)
 	}
@@ -151,7 +154,10 @@ func TestPiAndOMPRenderersProduceNativeRoles(t *testing.T) {
 		t.Fatalf("Pi role should map effort and omit legacy model tier:\n%s", piContent)
 	}
 
-	path, content, ok := renderAgentRole(role, agentConfig{Name: agentOMP, AgentRoot: filepath.Join(home, ".omp", "agent", "agents")})
+	path, content, ok, err := renderAgentRole(role, agentConfig{Name: agentOMP, AgentRoot: filepath.Join(home, ".omp", "agent", "agents")})
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !ok {
 		t.Fatal("OMP role was not rendered")
 	}

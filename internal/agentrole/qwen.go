@@ -7,7 +7,7 @@ var qwenToolMapping = map[string]string{
 	"read": "read_file", "webfetch": "web_fetch", "websearch": "web_search", "write": "write_file",
 }
 
-func renderQwen(role Role) string {
+func renderQwen(role Role) (string, error) {
 	model := strings.TrimSpace(role.Qwen.Model)
 	if model == "" {
 		if generic := strings.TrimSpace(role.Model); generic != "" && !canonicalModelTier(generic) {
@@ -33,5 +33,5 @@ func renderQwen(role Role) string {
 		}
 	}
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }

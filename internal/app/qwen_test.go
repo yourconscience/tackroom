@@ -175,7 +175,10 @@ func TestRenderQwenAgentRoleUsesNativeFrontmatter(t *testing.T) {
 		Qwen:         agentrole.QwenOptions{ApprovalMode: "plan"},
 		Instructions: "Review without editing.",
 	}
-	content := roleRenderer(agentQwenCode).Render(role)
+	content, err := roleRenderer(agentQwenCode).Render(role)
+	if err != nil {
+		t.Fatal(err)
+	}
 	parts := strings.SplitN(content, "---\n", 3)
 	if len(parts) != 3 {
 		t.Fatalf("Qwen role lacks frontmatter:\n%s", content)
@@ -251,13 +254,19 @@ hooks:
 
 func TestQwenRoleRenderUsesConfiguredModel(t *testing.T) {
 	role := agentrole.Role{Name: "builder", Description: "Builds features", Model: "qwen3-coder-plus", Instructions: "Implement."}
-	content := roleRenderer(agentQwenCode).Render(role)
+	content, err := roleRenderer(agentQwenCode).Render(role)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(content, "model: \"qwen3-coder-plus\"") {
 		t.Fatalf("configured role_model not applied to Qwen role:\n%s", content)
 	}
 
 	alias := agentrole.Role{Name: "reviewer", Description: "Reviews code", Model: "opus", Instructions: "Review."}
-	content = roleRenderer(agentQwenCode).Render(alias)
+	content, err = roleRenderer(agentQwenCode).Render(alias)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if strings.Contains(content, "model: opus") {
 		t.Fatalf("tier alias leaked into Qwen role:\n%s", content)
 	}

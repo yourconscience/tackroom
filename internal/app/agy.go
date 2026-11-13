@@ -157,8 +157,9 @@ func readAgyNativeHooks(agent string, path string) ([]nativeHookEntry, error) {
 	return entries, nil
 }
 
-// removeAgyNativeHookEntries deletes each named hooks.json entry that holds a
-// matching command.
+// removeAgyNativeHookEntries removes the matching event+command handlers from
+// hooks.json and drops each named entry only once it holds no handlers, so
+// unrelated events and commands in the same entry survive.
 func removeAgyNativeHookEntries(path string, entries []nativeHookEntry) (bool, error) {
 	raw, err := readAgyHooks(path)
 	if err != nil {
@@ -166,18 +167,31 @@ func removeAgyNativeHookEntries(path string, entries []nativeHookEntry) (bool, e
 	}
 	changed := false
 	for name, nameRaw := range raw {
-		named, _ := nameRaw.(map[string]interface{})
-	match:
-		for _, commands := range agyHookCommands(named) {
-			for _, command := range commands {
-				for _, entry := range entries {
-					if hookCommandMatches(command, entry.Command) {
-						delete(raw, name)
-						changed = true
-						break match
-					}
-				}
+		named, ok := nameRaw.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		events := 0
+		for event, itemsRaw := range named {
+			items, ok := itemsRaw.([]interface{})
+			if !ok {
+				// "enabled" and other non-event fields stay untouched.
+				continue
 			}
+			events++
+			kept := filterAgyHookItems(event, items, entries)
+			if len(kept) == len(items) {
+				continue
+			}
+			changed = true
+			if len(kept) == 0 {
+				delete(named, event)
+				continue
+			}
+			named[event] = kept
+		}
+		if events > 0 && !hasAgyHookEvent(named) {
+			delete(raw, name)
 		}
 	}
 	if !changed {
@@ -191,6 +205,63 @@ func removeAgyNativeHookEntries(path string, entries []nativeHookEntry) (bool, e
 		return false, fmt.Errorf("write %s: %w", path, err)
 	}
 	return true, nil
+}
+
+func hasAgyHookEvent(named map[string]interface{}) bool {
+	for _, itemsRaw := range named {
+		if _, ok := itemsRaw.([]interface{}); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// filterAgyHookItems drops the handlers for one event that match entries of the
+// same event, including handlers nested in a matcher group.
+func filterAgyHookItems(event string, items []interface{}, entries []nativeHookEntry) []interface{} {
+	kept := make([]interface{}, 0, len(items))
+	for _, itemRaw := range items {
+		item, ok := itemRaw.(map[string]interface{})
+		if !ok {
+			kept = append(kept, itemRaw)
+			continue
+		}
+		nested, nestedOK := item["hooks"].([]interface{})
+		if !nestedOK {
+			if !agyHookHandlerMatches(event, item, entries) {
+				kept = append(kept, item)
+			}
+			continue
+		}
+		handlers := make([]interface{}, 0, len(nested))
+		for _, handlerRaw := range nested {
+			handler, ok := handlerRaw.(map[string]interface{})
+			if !ok || !agyHookHandlerMatches(event, handler, entries) {
+				handlers = append(handlers, handlerRaw)
+			}
+		}
+		if len(nested) > 0 && len(handlers) == 0 {
+			continue
+		}
+		if len(handlers) != len(nested) {
+			item["hooks"] = handlers
+		}
+		kept = append(kept, item)
+	}
+	return kept
+}
+
+func agyHookHandlerMatches(event string, handler map[string]interface{}, entries []nativeHookEntry) bool {
+	command, _ := handler["command"].(string)
+	if strings.TrimSpace(command) == "" {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.Event == event && hookCommandMatches(command, entry.Command) {
+			return true
+		}
+	}
+	return false
 }
 
 // checkAgyDuplicateSkills warns when a skill sits in both skill roots the CLI

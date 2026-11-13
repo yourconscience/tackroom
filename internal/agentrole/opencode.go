@@ -2,7 +2,7 @@ package agentrole
 
 import "strings"
 
-func renderOpenCode(role Role) string {
+func renderOpenCode(role Role) (string, error) {
 	mode := strings.TrimSpace(role.Opencode.Mode)
 	if mode == "" {
 		mode = "subagent"
@@ -24,5 +24,5 @@ func renderOpenCode(role Role) string {
 		b.WriteString("\n")
 	}
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }
