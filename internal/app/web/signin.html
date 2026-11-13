@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+  <meta name="apple-mobile-web-app-title" content="tackroom">
+  <title>tackroom</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <!-- Served without a session, for a browser or a home screen app that has no session cookie yet. -->
+  <main class="signin">
+    <h1 class="page-title"><img class="mark" src="./icons/icon-192.png" alt="">tackroom</h1>
+    <p>This view needs its token. It is the part after <code>?token=</code> in the URL <code>tackroom view</code> printed, and it is in <code>view.token</code> on the machine that runs the view, under <code>~/.local/state/tackroom</code> unless <code>--token-file</code> moved it.</p>
+    <form class="field" method="get" action="./">
+      <span>Token</span>
+      <input name="token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" required aria-label="Token">
+      <button class="primary" type="submit">Open</button>
+    </form>
+    <p class="note">A token that does not match brings you back here.</p>
+  </main>
+</body>
+</html>

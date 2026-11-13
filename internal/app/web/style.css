@@ -447,6 +447,12 @@ button.cell:disabled { cursor: default; }
 .destructive label { display: flex; align-items: flex-start; gap: 10px; font-size: var(--fs-body); cursor: pointer; }
 .destructive input { margin-top: 3px; accent-color: var(--negative); }
 
+/* ---------- sign-in: the page a browser or home screen app gets before it has a session ---------- */
+.signin { display: grid; gap: 16px; max-width: 440px; margin: 0 auto; padding: 48px 16px; }
+.signin .mark { width: 32px; height: 32px; }
+.signin form { gap: 10px; }
+.signin form button { justify-self: start; }
+
 /* ---------- toast ---------- */
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); z-index: 30; transform: translateX(-50%); max-width: min(560px, calc(100vw - 32px)); padding: 10px 16px; border-radius: var(--radius-control); background: var(--primary); color: var(--primary-ink); box-shadow: var(--float-shadow); font-size: var(--fs-body); overflow-wrap: anywhere; }
 .toast.bad { background: var(--negative); color: var(--primary-ink); }

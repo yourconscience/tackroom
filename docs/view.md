@@ -30,7 +30,7 @@ ui:
 
 ## The token
 
-Requests straight to `http://127.0.0.1:PORT` or `localhost` from the same machine need no token, so a bookmark keeps working. A request through a proxy, or with a non-loopback `Host` or forwarding headers, needs the session. The startup URL carries a token, which the server swaps for an `HttpOnly`, `SameSite=Strict` cookie.
+Requests straight to `http://127.0.0.1:PORT` or `localhost` from the same machine need no token, so a bookmark keeps working. A request through a proxy, or with a non-loopback `Host` or forwarding headers, needs the session. The startup URL carries a token, which the server swaps for an `HttpOnly`, `SameSite=Strict` cookie. A browser without that cookie gets a page that asks for the token.
 
 On a machine shared with other users, anyone who can reach its loopback can use the view.
 
@@ -54,7 +54,18 @@ For HTTPS over a tailnet you expose the loopback port yourself. `--secure-cookie
 ```bash
 tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765
 tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
+tailscale serve status                         # prints the https URL on your tailnet
 ```
+
+## On a phone
+
+The view is a web app you can add to a phone's home screen; there is no native app. With the two commands above running and the phone on the same tailnet:
+
+1. Send the startup URL to the phone with `https://<machine>.<tailnet>.ts.net/tackroom/` in place of `http://127.0.0.1:8765/`, keeping `?token=...`, and open it.
+2. Add it to the home screen: Share, then Add to Home Screen in Safari; Add to Home screen in Chrome's menu.
+3. The icon opens the view in its own window. If it asks for the token, paste the value from `view.token`.
+
+The manifest and icons are served without the token; they carry no config data. There is no service worker and no offline copy: every screen needs the running view.
 
 ## Restart on upgrade
 
