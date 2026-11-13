@@ -63,12 +63,7 @@ func statusReport(opts runOptions) error {
 		return nil
 	}
 	printStatusReport(setupStreams(opts).out, repoRoot, repoReport, reports, home, cfg, opts.Verbose)
-	if lines := heldLines(held); len(lines) > 0 {
-		fmt.Fprintln(setupStreams(opts).out, "\nheld or blocked (skipped by sync)")
-		for _, line := range lines {
-			fmt.Fprintf(setupStreams(opts).out, "  %s\n", line)
-		}
-	}
+	printHeldSection(setupStreams(opts).out, held)
 	if problem := periodicSyncProblem(); problem != "" {
 		fmt.Fprintln(setupStreams(opts).out, "warning: "+problem)
 	}
@@ -85,6 +80,36 @@ func statusReport(opts runOptions) error {
 	}
 
 	return nil
+}
+
+// printHeldSection lists held and blocked items; status and sync --dry-run
+// share it so both show the same lines.
+func printHeldSection(w io.Writer, held map[string]heldItem) {
+	lines := heldLines(held)
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "\nheld or blocked (skipped by sync)")
+	for _, line := range lines {
+		fmt.Fprintf(w, "  %s\n", line)
+	}
+}
+
+// printDryGateNotes reports what a dry run could not decide without a registry
+// lookup and what --allow-fresh would release.
+func printDryGateNotes(w io.Writer, notes *dryGateNotes) {
+	if len(notes.unchecked) > 0 {
+		fmt.Fprintln(w, "\nfreshness not checked (a dry run makes no registry lookup; a real sync may hold these)")
+		for _, item := range sortedKeys(notes.unchecked) {
+			fmt.Fprintf(w, "  %s %s\n", item, notes.unchecked[item])
+		}
+	}
+	if len(notes.released) > 0 {
+		fmt.Fprintln(w, "\nwould release with --allow-fresh (nothing recorded)")
+		for _, item := range sortedKeys(notes.released) {
+			fmt.Fprintf(w, "  %s %s\n", item, notes.released[item])
+		}
+	}
 }
 
 // notSyncedError marks status drift: the machine is out of sync but nothing
@@ -291,7 +316,24 @@ func runSyncDryRun(opts runOptions) error {
 	var notFetched []string
 	cfg, notFetched = withoutMissingSources(cfg, home)
 
+	// Held and blocked items come from the local cache and the lock only: a
+	// dry run reads the lock, never writes it, and makes no registry lookup.
+	lock, err := readLockFile(repoRoot)
+	if err != nil {
+		return err
+	}
+	gate := gateOptionsFor(opts)
+	gate.dry = newDryGateNotes()
+	held := gateExternalSources(cfg.ExternalSkills, home, &lock, gate)
+	cfg.ExternalSkills = filterHeldSources(cfg.ExternalSkills, held)
 	injectPluginMCPServersMode(&cfg, home, false)
+	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gate, false)
+	if err != nil {
+		return err
+	}
+	for k, v := range pkgHeld {
+		held["package-hold:"+k] = v
+	}
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
 	if err != nil {
@@ -328,6 +370,8 @@ func runSyncDryRun(opts runOptions) error {
 	starterPlan.report(streams.out)
 	printReport(streams.out, false, repoReport, reports, home, cfg)
 
+	printHeldSection(streams.out, held)
+	printDryGateNotes(streams.out, gate.dry)
 	for _, name := range notFetched {
 		fmt.Fprintf(streams.out, "not fetched: %s\n", name)
 	}

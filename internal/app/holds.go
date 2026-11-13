@@ -35,6 +35,20 @@ type gateOptions struct {
 	allowAll   bool
 	allowItems map[string]bool
 	reason     string
+	// dry is set by sync --dry-run to collect what the run cannot decide
+	// without a registry lookup, and what --allow-fresh would release.
+	dry *dryGateNotes
+}
+
+// dryGateNotes maps item to lock ref for the two cases a dry run reports apart
+// from held items.
+type dryGateNotes struct {
+	unchecked map[string]string
+	released  map[string]string
+}
+
+func newDryGateNotes() *dryGateNotes {
+	return &dryGateNotes{unchecked: map[string]string{}, released: map[string]string{}}
 }
 
 func (o gateOptions) allows(item string) bool { return o.allowAll || o.allowItems[item] }
@@ -110,6 +124,14 @@ func holdIndex(lock lockFile, item, ref string) int {
 // undecided reference is then not held.
 func decideHold(item, ref string, lock *lockFile, opts gateOptions, lookup func() (time.Time, string, error)) (heldItem, bool) {
 	idx := holdIndex(*lock, item, ref)
+	if idx < 0 && lookup == nil && opts.dry != nil {
+		if opts.allows(item) {
+			opts.dry.released[item] = ref
+		} else {
+			opts.dry.unchecked[item] = ref
+		}
+		return heldItem{}, false
+	}
 	if idx < 0 || (lock.Holds[idx].TimeSource == timeSourceUnknown && lock.Holds[idx].Allowed == nil && lookup != nil) {
 		if lookup == nil {
 			return heldItem{}, false
@@ -130,6 +152,9 @@ func decideHold(item, ref string, lock *lockFile, opts gateOptions, lookup func(
 	}
 	entry := &lock.Holds[idx]
 	if entry.Allowed == nil && opts.allows(item) {
+		if opts.dry != nil && holdInForce(*entry, opts.now) {
+			opts.dry.released[item] = ref
+		}
 		entry.Allowed = &holdAllowed{At: opts.now.UTC().Format(time.RFC3339), Reason: opts.reason}
 	}
 	if entry.Allowed != nil {
@@ -145,6 +170,15 @@ func decideHold(item, ref string, lock *lockFile, opts gateOptions, lookup func(
 	}
 	return heldItem{Item: item, Kind: "held", Reason: fmt.Sprintf("%s published %s (%s)", ref, entry.PublishedAt, entry.TimeSource),
 		Until: entry.HoldUntil, Command: command}, true
+}
+
+// holdInForce reports whether an undecided-or-unexpired hold still blocks sync.
+func holdInForce(entry holdEntry, now time.Time) bool {
+	if entry.TimeSource == timeSourceUnknown {
+		return true
+	}
+	until, err := time.Parse(time.RFC3339, entry.HoldUntil)
+	return err == nil && now.Before(until)
 }
 
 // gateSourceFreshness holds a new external skill pin until 72 hours after the
