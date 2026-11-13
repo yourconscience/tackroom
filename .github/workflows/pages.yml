@@ -2,7 +2,15 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
-    paths: [docs/site/**]
+    paths:
+      - docs/site/**
+      - docs/*.md
+      - docs/brand/tokens-a.css
+      - docs/brand/logo-a.svg
+      - internal/app/web/fonts/**
+      - internal/app/web/THIRD_PARTY_NOTICES.md
+      - tools/sitedocs/**
+      - .github/workflows/pages.yml
   workflow_dispatch:
 
 permissions:
@@ -22,9 +30,15 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: tools/sitedocs/go.mod
+          cache-dependency-path: tools/sitedocs/go.sum
       - uses: actions/configure-pages@v5
+      - name: Build site
+        run: go -C tools/sitedocs run . -out "$RUNNER_TEMP/site"
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/site
+          path: ${{ runner.temp }}/site
       - id: deployment
         uses: actions/deploy-pages@v4
