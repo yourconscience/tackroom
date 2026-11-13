@@ -273,7 +273,7 @@ a.kpi:hover { background: var(--raised); }
 .cron-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .cron-schedule { display: flex; gap: 8px; flex: 1 1 260px; min-width: 0; }
 /* 16px keeps iOS Safari from zooming the page when the field takes focus. */
-.cron-schedule input { flex: 1; min-width: 0; min-height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); font-family: var(--font-mono); font-size: 16px; }
+.cron-schedule input { flex: 1 1 8ch; width: 8ch; min-width: 0; min-height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); font-family: var(--font-mono); font-size: 16px; }
 button.danger { border-color: var(--negative); color: var(--negative); }
 button.danger:hover:not(:disabled) { background: var(--pill-negative-bg); }
 .cron-actions .note { flex-basis: 100%; margin: 0; }
