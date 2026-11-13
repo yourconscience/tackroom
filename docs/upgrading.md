@@ -6,7 +6,13 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
-## Unreleased
+## To 2.2
+
+Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats. One thing moves on its own, for Codex users with plugin sources (below).
+
+- New: Codex settings. Keys under `settings:` on the `codex` agent are written into `~/.codex/config.toml`; every other key in that file is kept. See [Per-harness settings](setup.md#per-harness-settings).
+- New: `tackroom cron add`, `cron edit` and `cron remove` for jobs tackroom owns on this machine, with the same actions in the web view and the Herdr panel. See [crons.md](crons.md#add-edit-and-remove-owned-jobs).
+- `tackroom view` uses the Graphite theme and now has a light theme that follows the OS setting.
 
 Codex now installs an agent-plugins-spec source with `mcp: true` as a native plugin, through `codex plugin`. `tackroom.yaml` and `tackroom.lock` keep their formats. See [Codex plugins](plugins.md#codex-plugins).
 
