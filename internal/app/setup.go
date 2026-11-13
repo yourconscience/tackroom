@@ -158,7 +158,11 @@ func runSetup(opts runOptions) error {
 	}
 	if !opts.NoCron {
 		// Setup is the one place besides `tackroom cron` that installs the
-		// job. A scheduler that cannot take it must not fail the setup.
+		// job. A scheduler that cannot take it must not fail the setup. An
+		// installed job is left alone, so a chosen --interval survives.
+		if job, _ := readPeriodicSync(); job != nil {
+			return nil
+		}
 		if err := installPeriodicSync(cronOptions{runOptions: syncOpts}); err != nil {
 			fmt.Fprintf(streams.out, "warning: periodic sync not installed: %v\nfix and retry: tackroom cron\n", err)
 		}
