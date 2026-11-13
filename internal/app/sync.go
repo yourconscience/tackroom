@@ -383,7 +383,7 @@ func countSyncChanges(repoReport repoLinkReport, reports []agentReport, replaceC
 			len(report.AddsAgent) + len(report.UpdatesAgent) + len(report.RemovesAgent) +
 			len(report.AddsMCP) + len(report.UpdatesMCP) + len(report.RemovesMCP) +
 			len(report.AddsHook) + len(report.UpdatesHook) +
-			len(report.UpdatesPackage) + len(report.RemovesPackage) +
+			len(report.UpdatesPackage) + len(report.RemovesPackage) + len(report.UpdatesSetting) +
 			len(report.AddsPlugin) + len(report.RemovesPlugin)
 		if report.RootState == stateMissing || report.RootState == stateDrifted {
 			n++
