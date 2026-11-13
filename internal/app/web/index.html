@@ -68,6 +68,7 @@
     <symbol id="i-search" viewBox="0 0 256 256"><path fill="currentColor" d="M229.66,218.34l-50.07-50.06a88.11,88.11,0,1,0-11.31,11.31l50.06,50.07a8,8,0,0,0,11.32-11.32ZM40,112a72,72,0,1,1,72,72A72.08,72.08,0,0,1,40,112Z"/></symbol>
     <symbol id="i-drift" viewBox="0 0 256 256"><path fill="currentColor" d="M213.66,181.66l-32,32a8,8,0,0,1-11.32-11.32L188.69,184H48a8,8,0,0,1,0-16H188.69l-18.35-18.34a8,8,0,0,1,11.32-11.32l32,32A8,8,0,0,1,213.66,181.66Zm-139.32-64a8,8,0,0,0,11.32-11.32L67.31,88H208a8,8,0,0,0,0-16H67.31L85.66,53.66A8,8,0,0,0,74.34,42.34l-32,32a8,8,0,0,0,0,11.32Z"/></symbol>
     <symbol id="i-minus" viewBox="0 0 256 256"><path fill="currentColor" d="M176,128a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,128Zm56,0A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 256 256"><path fill="currentColor" d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></symbol>
   </svg>
 
   <div class="app">
@@ -123,6 +124,23 @@
         <button id="apply-sync" class="primary" type="button" disabled>Apply sync</button>
       </div>
     </div>
+  </dialog>
+
+  <dialog id="job-panel" class="panel" aria-labelledby="job-title">
+    <form id="job-form" novalidate>
+      <div class="panel-head">
+        <div><p class="eyebrow">Scheduled job</p><h2 id="job-title"></h2></div>
+        <button id="close-job" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button>
+      </div>
+      <div id="job-body" class="panel-body"></div>
+      <div class="panel-foot">
+        <p id="job-note" class="note bad" role="alert" hidden></p>
+        <div class="foot-actions">
+          <button id="cancel-job" type="button">Cancel</button>
+          <button id="submit-job" class="primary" type="submit"></button>
+        </div>
+      </div>
+    </form>
   </dialog>
 
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
