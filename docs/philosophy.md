@@ -7,10 +7,12 @@ Your skills, roles, hooks and instructions live in a folder of yours: `--config`
 
 Check: `tackroom config validate` prints the file it used; `tackroom setup` offers `git init`.
 
-## Each harness gets its own format, and only what it has
-Roles render as TOML for Codex and Markdown elsewhere, and Gemini CLI gets its own tool names. Where a harness has no surface, tackroom writes nothing: Antigravity CLI gets no roles, OpenCode no hooks.
+## One config for every harness, plus what makes each one itself
+You declare skills, MCP servers, hooks, roles and plugins once in `tackroom.yaml`, and every harness gets them in its own format: roles as TOML for Codex and Markdown elsewhere, hooks under each harness's event names, Gemini CLI with its own tool names.
 
-Check: `tackroom hook list` ends with `unsupported hook surfaces:` for the harnesses you have; [roles.md](roles.md) lists every path.
+The harnesses with features worth keeping get their own block next to the shared one: `settings:` keys written into the native settings files of Claude Code, Pi and OMP, Claude Code plugins loaded in place, a pinned `packages` list for Pi. Where a harness has no surface, tackroom writes nothing: Antigravity CLI gets no roles, OpenCode no hooks.
+
+Check: [harnesses.md](harnesses.md) is the matrix of who gets what; `tackroom hook list` ends with `unsupported hook surfaces:` for the harnesses you have; [roles.md](roles.md) lists every path.
 
 ## Import copies; unrelated config is left alone
 Import copies what your harnesses already have and never moves or deletes the original. Sync writes only entries it marks as managed and only the settings keys you declare. When it must replace a native file, it asks first and keeps the original in a backup.
