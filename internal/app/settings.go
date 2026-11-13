@@ -47,9 +47,9 @@ var settingsManagedKeys = map[string][]string{
 }
 
 // secretKeySegment matches a key segment that must hold an environment
-// reference rather than a literal secret. It is a substring match so names such
-// as ANTHROPIC_AUTH_TOKEN or githubToken are caught too.
-var secretKeySegment = regexp.MustCompile(`(?i)(token|secret|password|api.?key|authorization|credential)`)
+// reference rather than a literal secret. The segment must end with the word,
+// so ANTHROPIC_AUTH_TOKEN or clientSecret are caught but maxTokens is not.
+var secretKeySegment = regexp.MustCompile(`(?i)(token|secret|password|passwd|api[_-]?key|authorization|credentials?)$`)
 
 // settingsValues resolves the declared values for one agent, expanding every
 // ${ENV} reference (a missing variable is an error, so a typo cannot write an
