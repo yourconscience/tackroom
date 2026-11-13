@@ -160,6 +160,20 @@ MCP servers are stdio (`mcp add NAME --command ...`) or remote (`mcp add NAME --
 
 `sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` stays compact; `--verbose` adds the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.
 
+## Herdr
+
+[`herdr/`](herdr/) brings the Crons tab into the [Herdr](https://herdr.dev) app as a native side panel: the same jobs per host, health counts and Run now / Pause / Resume, drawn from the same `tackroom cron collect` and acting through the same `tackroom cron` verbs. The folder is laid out like `~/.config/herdr-app`:
+
+- `mods/tackroom`, the panel. Add it to your own layout as a block in the `panel-body` stack ([recipe](herdr/mods/tackroom/RECIPE.md)).
+- `layouts/tackroom.json` with `mods/tackroom-toggle`, Herdr's main layout plus the panel and a Crons button beside Files and Changes ([recipe](herdr/RECIPE.md)).
+
+```bash
+cp -R herdr/mods/tackroom herdr/mods/tackroom-toggle ~/.config/herdr-app/mods/
+cp herdr/layouts/tackroom.* ~/.config/herdr-app/layouts/   # then ctrl-shift-l to switch to it
+```
+
+The panel runs `tackroom` from your PATH with the default config; set the block's `tackroom` and `config` props otherwise. Design: [docs/herdr.md](docs/herdr.md).
+
 ## Companion tools
 
 tackroom does one job. These tools pair well with it; install and run them on their own:
@@ -252,6 +266,8 @@ The script refuses to run unless the tree is clean, `HEAD` matches `origin/main`
 - [docs/roles.md](docs/roles.md) — role format, model tiers, per-harness overrides
 - [docs/memory.md](docs/memory.md) — memory tiers, rem workflow, vault layout
 - [docs/comparison.md](docs/comparison.md) — how tackroom differs from rulesync, ruler, openskills
+- [docs/crons.md](docs/crons.md) — cron inventory, owned jobs, the Crons tab and its actions
+- [docs/herdr.md](docs/herdr.md) — the Herdr panel and layout, and what is planned for them
 - [Troubleshooting](docs/troubleshooting.md)
 - [memory/README.md](memory/README.md) — memory layer layout, hooks, and tools
 

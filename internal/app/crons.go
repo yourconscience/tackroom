@@ -61,6 +61,11 @@ type cronJob struct {
 	// Inferred names the fields derived by tackroom rather than read from the
 	// scheduler or declared in the manifest.
 	Inferred []string `json:"inferred,omitempty"`
+	// Health, ShortName and ScheduleText are what both views draw
+	// (crons_words.go): one implementation for the web view and the Herdr panel.
+	Health       string `json:"health,omitempty"`
+	ShortName    string `json:"short_name,omitempty"`
+	ScheduleText string `json:"schedule_text,omitempty"`
 }
 
 type cronAccess struct {
@@ -135,7 +140,9 @@ func collectCrons(configPath string, hosts []string) (cronsScanResult, error) {
 	if len(hosts) == 0 {
 		hosts = []string{"local"}
 	}
-	return scanCrons(hosts, manifest), nil
+	result := scanCrons(hosts, manifest)
+	annotateCronJobs(result.Jobs, time.Now())
+	return result, nil
 }
 
 func splitCSV(value string) []string {

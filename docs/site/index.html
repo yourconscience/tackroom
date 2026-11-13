@@ -229,6 +229,10 @@
   .shot img { width: 100%; border-radius: var(--r-lg); border: 1px solid var(--line); box-shadow: var(--shadow); background: #181825; }
   .shot figcaption { margin-top: 14px; color: var(--faint); font-size: .86rem; text-align: center; padding-inline: var(--gutter); }
 
+  /* crons */
+  .crons-term { margin-top: clamp(24px, 4vw, 36px); max-width: 52rem; }
+  .crons-herdr { margin-top: 18px; color: var(--muted); max-width: 60ch; }
+
   /* explorer */
   .ex-head { max-width: 44rem; }
   .ex { margin-top: clamp(32px, 5vw, 52px); display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
@@ -562,6 +566,18 @@ Everything is synced.</pre>
   </figure>
 
   <div class="wrap">
+    <section id="crons" aria-labelledby="crons-title">
+      <div class="view-head">
+        <h2 id="crons-title">Every scheduled job, on every machine</h2>
+        <p class="lead"><code>tackroom cron collect</code> lists launchd agents, crontab, systemd timers and the agents' own schedulers, here and over SSH, and flags crash loops, missing files and jobs that stopped firing. The Crons tab in <code>tackroom view</code> shows them per host, runs, pauses or resumes a launchd job, and gives a job tackroom owns a new schedule.</p>
+      </div>
+      <figure class="term crons-term"><pre><span class="k">$</span> tackroom cron collect --hosts local,mini --table   <span class="c"># every job on both Macs</span>
+<span class="k">$</span> tackroom cron run --host mini com.example.backup   <span class="c"># Run now</span>
+<span class="k">$</span> tackroom cron pause --host mini com.example.tunnel <span class="c"># off until resume, across logins</span>
+<span class="k">$</span> tackroom cron schedule digest "0 9 * * *"          <span class="c"># a job tackroom owns here</span></pre></figure>
+      <p class="crons-herdr">Living in <a href="https://herdr.dev">Herdr</a>? The same jobs and buttons come as a side panel: copy <code>herdr/</code> from the repo into <code>~/.config/herdr-app</code> and switch to the tackroom layout, or add the panel to your own.</p>
+    </section>
+
     <section id="agents" aria-labelledby="agents-title">
       <div class="ex-head">
         <h2 id="agents-title">One entry in <code style="font-size:.86em;background:none;border:0;padding:0">~/.agents</code>, each agent's own format.</h2>
