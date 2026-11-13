@@ -351,7 +351,7 @@ type hostScan struct {
 
 func scanCronHost(host string) hostScan {
 	scan := hostScan{host: host}
-	sections, err := runCronProbe(host)
+	sections, err := runCronProbe(host, "")
 	if err != nil {
 		for _, source := range cronSources {
 			scan.access = append(scan.access, cronAccess{Host: host, Source: source, State: "not_scanned", Detail: err.Error()})
@@ -374,7 +374,9 @@ func scanCronHost(host string) hostScan {
 	return scan
 }
 
-func runCronProbe(host string) ([]probeSection, error) {
+// runCronProbe reads scheduler state on host. only, an owned unit id, limits
+// the probe to what can hold that unit.
+func runCronProbe(host, only string) ([]probeSection, error) {
 	tokenBytes := make([]byte, 12)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return nil, err
@@ -384,9 +386,9 @@ func runCronProbe(host string) ([]probeSection, error) {
 	defer cancel()
 	var cmd *exec.Cmd
 	if host == "local" {
-		cmd = exec.CommandContext(ctx, "sh", "-s", "--", token)
+		cmd = exec.CommandContext(ctx, "sh", "-s", "--", token, only)
 	} else {
-		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "sh -s -- "+token)
+		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "sh -s -- "+token+" "+only)
 	}
 	cmd.Stdin = strings.NewReader(cronsProbeScript)
 	var stderr strings.Builder

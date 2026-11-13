@@ -196,6 +196,8 @@ type runOptions struct {
 	// Verbose expands `status` back to the full per-surface managed and
 	// external skill lists and native root paths instead of the concise view.
 	Verbose bool
+	// NoCron makes setup skip installing the periodic sync job.
+	NoCron bool
 }
 
 func Run(args []string) error {
@@ -461,6 +463,7 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Emit detection result as JSON and exit")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Show detected import candidates and exit without changes (overrides --yes)")
 	fs.BoolVar(&opts.AssumeYes, "yes", false, "Answer every prompt with its default, never read stdin: import everything, initialize git, back up and replace conflicting files")
+	fs.BoolVar(&opts.NoCron, "no-cron", false, "Do not install the periodic sync job (tackroom pull every 15m)")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
@@ -515,7 +518,7 @@ func parseCronFlags(args []string) (cronOptions, error) {
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names")
 	fs.BoolVar(&opts.Remove, "remove", false, "Remove the cron entry instead of installing")
 	fs.BoolVar(&opts.Deps, "deps", false, "Install dependency maintenance cron instead of auto-pull")
-	fs.StringVar(&opts.Interval, "interval", cronIntervalDefault, "Pull interval: 5m, 15m, 30m, 1h, 6h, 12h, daily, weekly")
+	fs.StringVar(&opts.Interval, "interval", "", "Pull interval: 5m, 15m, 30m, 1h, 6h, 12h, daily, weekly (default 15m; weekly with --deps)")
 
 	if err := fs.Parse(args); err != nil {
 		return cronOptions{}, err
@@ -546,7 +549,7 @@ func printUsage() {
 
 // canonicalForms is the full command reference; group --help prints its lines.
 var canonicalForms = []string{
-	"  tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--dry-run] [--json]",
+	"  tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--no-cron] [--dry-run] [--json]",
 	"  tackroom status [--verbose] [--agents ...]",
 	"  tackroom sync [--pull] [--agents ...]",
 	"  tackroom doctor [--e2e] [--agents ...]",
@@ -592,8 +595,8 @@ func printAllUsage() {
 	}
 	fmt.Println()
 	fmt.Println("Maintenance:")
-	fmt.Println("  tackroom cron [--interval 30m|--deps|--remove]")
-	fmt.Println("  tackroom pull [options]          # git pull --ff-only, then sync; what cron runs")
+	fmt.Println("  tackroom cron [--interval 15m|--deps|--remove]   # periodic sync job, installed by setup; default 15m")
+	fmt.Println("  tackroom pull [options]          # git pull --ff-only (a failure only warns), then sync; what the job runs")
 	fmt.Println("  tackroom doctor <audit|deps> [options]")
 	fmt.Println("  tackroom sync deps [options]")
 	fmt.Println("  tackroom memsearch <setup|status> [options]")

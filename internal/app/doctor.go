@@ -81,6 +81,7 @@ func runDoctor(opts runOptions) error {
 	results = append(results, checkExternalSkillLock(repoRoot, cfg, home))
 	results = append(results, checkExternalSkillAudit(cfg, home))
 	results = append(results, checkNativeHookHealth(home, cfg, selected))
+	results = append(results, checkPeriodicSync())
 
 	if opts.JSONOutput {
 		return printDoctorJSON(setupStreams(opts).out, repoRoot, results)

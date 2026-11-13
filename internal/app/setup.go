@@ -46,6 +46,7 @@ func runSetup(opts runOptions) error {
 		if err != nil {
 			return err
 		}
+		detection.PlannedActions = setupPlannedActions(opts)
 		enc := json.NewEncoder(streams.out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(detection)
@@ -57,6 +58,9 @@ func runSetup(opts runOptions) error {
 			return err
 		}
 		fmt.Fprint(streams.out, renderDetectionSummary(detection))
+		for _, action := range setupPlannedActions(opts) {
+			fmt.Fprintf(streams.out, "\nplanned: %s\n", action)
+		}
 		if sources := rootInstructionSources(repoRoot, detected, home); len(sources) > 0 {
 			fmt.Fprintln(streams.out, "\nroot instructions to import into AGENTS.md (originals are backed up, then linked):")
 			for _, src := range sources {
@@ -149,7 +153,17 @@ func runSetup(opts runOptions) error {
 	// Setup adopts this machine: native files that differ from the shared
 	// copy are backed up and linked (after a prompt; --yes accepts).
 	syncOpts.ReplaceConflicts = true
-	return runSync(syncOpts)
+	if err := runSync(syncOpts); err != nil {
+		return err
+	}
+	if !opts.NoCron {
+		// Setup is the one place besides `tackroom cron` that installs the
+		// job. A scheduler that cannot take it must not fail the setup.
+		if err := installPeriodicSync(cronOptions{runOptions: syncOpts}); err != nil {
+			fmt.Fprintf(streams.out, "warning: periodic sync not installed: %v\nfix and retry: tackroom cron\n", err)
+		}
+	}
+	return nil
 }
 
 // offerGitInit proposes versioning a fresh config root. Skipped when the root
@@ -295,11 +309,18 @@ func runPull(opts runOptions) error {
 		return err
 	}
 
-	cmd := exec.Command("git", "-C", repoRoot, "pull", "--ff-only")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git pull: %w", err)
+	// A git step that cannot fast-forward (no remote, offline, diverged, dirty
+	// tree, not a repository) must not stop the sync: the local copy still
+	// has to reach the harnesses. The exit code reflects the sync only.
+	out, err := exec.Command("git", "-C", repoRoot, "pull", "--ff-only").CombinedOutput()
+	if err != nil {
+		msg := firstLine(strings.TrimSpace(string(out)))
+		if msg == "" {
+			msg = err.Error()
+		}
+		fmt.Fprintf(os.Stderr, "warning: git pull --ff-only failed, syncing the local copy: %s\n", msg)
+	} else {
+		os.Stdout.Write(out)
 	}
 
 	return runSync(opts)
@@ -313,7 +334,7 @@ type cronOptions struct {
 }
 
 const (
-	cronIntervalDefault = "30m"
+	cronIntervalDefault = "15m"
 	cronIntervalWeekly  = "weekly"
 )
 
@@ -347,10 +368,10 @@ func runCron(opts cronOptions) error {
 	if opts.ConfigPath, err = filepath.Abs(configPath); err != nil {
 		return err
 	}
-	cronCmd, interval := cronCommandForOptions(binaryPath, opts)
-	id, mode := "tackroom-pull", "pull"
+	job := cronJobForOptions(binaryPath, opts)
+	id, mode := job.ID, "pull"
 	if opts.Deps {
-		id, mode = "tackroom-deps", "sync deps"
+		mode = "sync deps"
 	}
 	manifest, err := loadCronsManifest(opts.ConfigPath)
 	if err != nil {
@@ -362,7 +383,7 @@ func runCron(opts cronOptions) error {
 	}
 	var desired []ownedCronJob
 	if !opts.Remove {
-		desired = append(desired, ownedCronJob{ID: id, Schedule: intervalToSchedule(interval), Command: []string{"/bin/sh", "-c", cronCmd}})
+		desired = append(desired, job)
 	}
 	installed, err := readOwnedCronUnits(home)
 	if err != nil {
@@ -379,23 +400,25 @@ func runCron(opts cronOptions) error {
 	return runCronPlan(plan, backend, home, legacy, false)
 }
 
-func cronCommandForOptions(binaryPath string, opts cronOptions) (string, string) {
-	mode := "pull"
-	interval := opts.Interval
+// cronJobForOptions is the built-in job. It runs the tackroom binary directly
+// with the installing shell's PATH, so harness executables are found without
+// a shell and without sourcing a profile.
+func cronJobForOptions(binaryPath string, opts cronOptions) ownedCronJob {
+	id, args, interval := "tackroom-pull", []string{"pull"}, opts.Interval
 	if opts.Deps {
-		mode = "sync deps"
-		if interval == "" || interval == cronIntervalDefault {
+		id, args = "tackroom-deps", []string{"sync", "deps"}
+		if interval == "" {
 			interval = cronIntervalWeekly
 		}
 	}
 	if interval == "" {
 		interval = cronIntervalDefault
 	}
-	command := fmt.Sprintf(". \"$HOME/.profile\" 2>/dev/null; %q %s", binaryPath, mode)
+	command := append([]string{binaryPath}, args...)
 	if opts.ConfigPath != "" {
-		command += fmt.Sprintf(" --config %q", opts.ConfigPath)
+		command = append(command, "--config", opts.ConfigPath)
 	}
-	return command, interval
+	return ownedCronJob{ID: id, Schedule: intervalToSchedule(interval), Command: command, Path: os.Getenv("PATH")}
 }
 
 func intervalToSchedule(interval string) string {
@@ -404,7 +427,7 @@ func intervalToSchedule(interval string) string {
 		return "*/5 * * * *"
 	case "15m":
 		return "*/15 * * * *"
-	case cronIntervalDefault:
+	case "30m":
 		return "*/30 * * * *"
 	case "1h", "hourly":
 		return "0 * * * *"
@@ -417,6 +440,6 @@ func intervalToSchedule(interval string) string {
 	case cronIntervalWeekly:
 		return "0 4 * * 1"
 	default:
-		return "*/30 * * * *"
+		return "*/15 * * * *"
 	}
 }

@@ -39,6 +39,8 @@ type detectionResult struct {
 	Items        []detectedItem `json:"items"`
 	Resolved     []detectedItem `json:"resolved,omitempty"`
 	AutoResolved int            `json:"auto_resolved"`
+	// PlannedActions are the non-import steps setup would take.
+	PlannedActions []string `json:"planned_actions,omitempty"`
 }
 
 // runDetection scans all detected harnesses for non-managed skills, roles, and
