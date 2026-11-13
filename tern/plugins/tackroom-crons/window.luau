@@ -22,4 +22,4 @@ tern.command({
 	run = open_crons,
 })
 
-tern.bind("cmd+shift+c", "plugin.tackroom-crons.open")
+tern.bind("ctrl+alt+c", "plugin.tackroom-crons.open")

@@ -1,8 +1,10 @@
 # tackroom crons in Tern
 
-A Tern block that shows every scheduled job tackroom collects, on every host in `crons.hosts`: host health, what needs attention, and each job's schedule and last run, with Run now, Pause and Resume for launchd jobs. It shows the same data as the Crons tab of `tackroom view` and the Herdr panel, and acts through the same `tackroom cron` verbs.
+A block for the [Tern terminal](https://stencil.so/tern) that shows every scheduled job tackroom collects, on every host in `crons.hosts`: host health, what needs attention, and each job's schedule and last run, with Run now, Pause and Resume for launchd jobs. It shows the same data as the Crons tab of `tackroom view` and the Herdr panel, and acts through the same `tackroom cron` verbs.
 
 ## Install
+
+From a tackroom checkout:
 
 ```sh
 tern plugin link ./tern/plugins/tackroom-crons
@@ -10,7 +12,7 @@ tern plugin link ./tern/plugins/tackroom-crons
 tern plugin install ./tern/plugins/tackroom-crons
 ```
 
-Open with **Open tackroom crons** in the palette, or `⌘⇧C`. To change it, bind the action `plugin.tackroom-crons.open` in Tern's Keyboard settings.
+Open with **Open tackroom crons** in the palette, or `Ctrl+Alt+C`. To change it, bind the action `plugin.tackroom-crons.open` in Tern's Keyboard settings.
 
 ## What you see
 
