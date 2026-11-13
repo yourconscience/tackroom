@@ -51,6 +51,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 
 - `tackroom config validate [--config PATH]` checks the config and prints its file and revision.
 - `tackroom config print [--config PATH]` prints the shared, local and effective config.
+- `tackroom config inventory [--config PATH]` prints, as JSON, what the web view's Overview, Skills, Roles and MCP & hooks tabs draw: per harness the counts and state, per skill, role, MCP server and hook its state in each harness (`ok`, `drift`, `missing`, `conflict`, `off`, `disabled`, `unsupported`, `absent`, `error`), and each skill's origin. Read-only. The [Herdr panel](herdr.md) draws it.
 - `tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]` opens the loopback web UI. See [view.md](view.md).
 
 ## Scheduled jobs
@@ -108,7 +109,7 @@ A real `sync` still syncs the other harnesses when one has a conflict, and then 
 
 - `NO_COLOR` set to any non-empty value drops the color on a terminal; bold and dim stay. `CLICOLOR_FORCE=1` keeps the styling in a pipe.
 - `sync` prints a summary of what the run changed, with harnesses that changed alike grouped, then a table with one row per harness and the managed items per harness. `status` stays compact and `--verbose` adds the full lists and native paths.
-- `--json` on `status`, `sync`, `doctor`, `doctor audit`, `setup`, `publish` and `skill sources` prints one JSON document on stdout. `cron collect` prints JSON by default. `hook list` prints tab-separated lines.
+- `--json` on `status`, `sync`, `doctor`, `doctor audit`, `setup`, `publish` and `skill sources` prints one JSON document on stdout. `cron collect` and `config inventory` print JSON by default. `hook list` prints tab-separated lines.
 - Warnings and notes go to stderr, so a pipe sees only the report.
 
 ## Related tools

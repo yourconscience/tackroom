@@ -603,7 +603,7 @@ var canonicalForms = []string{
 	"  tackroom doctor audit [--json]            # findings per item; exit 1 on an unaccepted CRITICAL in external content",
 	"  tackroom doctor audit accept <item> <rule> --reason \"...\"   # item is kind:name, e.g. skill:foo",
 	"  tackroom doctor audit revoke <item> <rule>",
-	"  tackroom config <validate|print> [--config PATH]",
+	"  tackroom config <validate|print|inventory> [--config PATH]   # inventory prints the web view's inventory as JSON",
 	"  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
 	"  tackroom tui [--config PATH]               # read-only terminal view of agents, lock, crons and doctor",
 	"  tackroom skill new <name> [--description ...]",

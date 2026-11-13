@@ -27,6 +27,7 @@ tackroom doctor audit accept <item> <rule> --reason "..."   # record an audit de
 tackroom doctor audit revoke <item> <rule>
 tackroom config validate
 tackroom config print
+tackroom config inventory                       # the web view's inventory as JSON: harnesses, skills, roles, MCP servers, hooks
 tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]
 tackroom tui [--config PATH]                    # read-only terminal view of agents, lock, crons and doctor; needs a terminal
 tackroom skill new <name> [--description ...]
