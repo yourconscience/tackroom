@@ -591,7 +591,7 @@ func summarizeSyncPlan(reports []agentReport) []string {
 		}{
 			{"add skill", report.Adds}, {"add role", report.AddsAgent}, {"add MCP", report.AddsMCP}, {"add hook", report.AddsHook},
 			{"update skill", report.Updates}, {"overwrite role", report.UpdatesAgent}, {"update MCP", report.UpdatesMCP},
-			{"update hook", report.UpdatesHook}, {"update package", report.UpdatesPackage}, {"add plugin", report.AddsPlugin},
+			{"update hook", report.UpdatesHook}, {"update package", report.UpdatesPackage}, {"update setting", report.UpdatesSetting}, {"add plugin", report.AddsPlugin},
 			{"remove skill", report.Removes}, {"remove role", report.RemovesAgent}, {"remove package", report.RemovesPackage},
 			{"remove plugin", report.RemovesPlugin},
 		} {

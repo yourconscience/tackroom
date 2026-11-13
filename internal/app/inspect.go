@@ -367,6 +367,9 @@ func inspectAgent(agent agentConfig, expected map[string]string, repoRoot string
 	if err := augmentPiPackageReport(&report, agent, home); err != nil {
 		return agentReport{}, err
 	}
+	if err := augmentSettingsReport(&report, agent, home); err != nil {
+		return agentReport{}, err
+	}
 	if err := augmentClaudePluginReport(&report, agent, repoRoot, home); err != nil {
 		return agentReport{}, err
 	}
@@ -458,7 +461,7 @@ func isReportSynced(report agentReport) bool {
 	if len(report.MissingMCP) > 0 || len(report.DriftedMCP) > 0 || len(report.MissingAgent) > 0 || len(report.DriftedAgent) > 0 {
 		return false
 	}
-	if len(report.MissingHook) > 0 || len(report.DriftedHook) > 0 || len(report.DriftedPackage) > 0 {
+	if len(report.MissingHook) > 0 || len(report.DriftedHook) > 0 || len(report.DriftedPackage) > 0 || len(report.DriftedSetting) > 0 {
 		return false
 	}
 	if len(report.MissingPlugin) > 0 || len(report.StalePlugin) > 0 || len(report.StaleMCP) > 0 {

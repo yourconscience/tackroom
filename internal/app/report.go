@@ -179,6 +179,7 @@ func actionsBySurface(r agentReport) []surfaceActions {
 		{"mcp", r.AddsMCP, r.UpdatesMCP, r.RemovesMCP},
 		{"hooks", r.AddsHook, r.UpdatesHook, nil},
 		{"packages", nil, r.UpdatesPackage, r.RemovesPackage},
+		{"settings", nil, r.UpdatesSetting, nil},
 		{"plugins", r.AddsPlugin, nil, r.RemovesPlugin},
 	}
 }
@@ -374,6 +375,7 @@ func managedRows(r agentReport) []field {
 	list("mcp", r.ManagedMCP)
 	list("hooks", r.ManagedHook)
 	list("packages", r.ManagedPackage)
+	list("settings", r.ManagedSetting)
 	list("plugins", r.ManagedPlugin)
 	list("plugins off", r.DisabledPlugin)
 	list("external", r.External)
@@ -472,6 +474,7 @@ func sortReportLists(report *agentReport) {
 	sort.Strings(report.ManagedMCP)
 	sort.Strings(report.ManagedHook)
 	sort.Strings(report.ManagedPackage)
+	sort.Strings(report.ManagedSetting)
 	sort.Strings(report.ManagedPlugin)
 	sort.Strings(report.MissingPlugin)
 	sort.Strings(report.DisabledPlugin)
@@ -483,12 +486,14 @@ func sortReportLists(report *agentReport) {
 	sort.Strings(report.DriftedMCP)
 	sort.Strings(report.DriftedHook)
 	sort.Strings(report.DriftedPackage)
+	sort.Strings(report.DriftedSetting)
 	sort.Strings(report.Missing)
 	sort.Strings(report.MissingAgent)
 	sort.Strings(report.MissingMCP)
 	sort.Strings(report.MissingHook)
 	sort.Strings(report.UnsupportedHook)
 	sort.Strings(report.UpdatesPackage)
+	sort.Strings(report.UpdatesSetting)
 	sort.Strings(report.RemovesPackage)
 	sort.Strings(report.Conflicts)
 	sort.Strings(report.StaleManaged)
@@ -529,6 +534,7 @@ func restoreSyncActions(current []agentReport, preflight []agentReport) {
 			current[i].RemovesMCP = append([]string{}, original.RemovesMCP...)
 			current[i].UpdatesHook = append([]string{}, original.UpdatesHook...)
 			current[i].UpdatesPackage = append([]string{}, original.UpdatesPackage...)
+			current[i].UpdatesSetting = append([]string{}, original.UpdatesSetting...)
 			current[i].RemovesPackage = append([]string{}, original.RemovesPackage...)
 			current[i].AddsPlugin = append([]string{}, original.AddsPlugin...)
 			current[i].RemovesPlugin = append([]string{}, original.RemovesPlugin...)
@@ -704,6 +710,9 @@ func surfaceCounts(r agentReport) string {
 	if n := len(r.ManagedPackage); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d packages", n))
 	}
+	if n := len(r.ManagedSetting); n > 0 {
+		parts = append(parts, fmt.Sprintf("%d settings", n))
+	}
 	if n := len(r.ManagedPlugin); n > 0 {
 		parts = append(parts, fmt.Sprintf("%d plugins", n))
 	}
@@ -747,6 +756,7 @@ func driftBuckets(r agentReport) []driftBucket {
 		{"hooks unsupported", r.UnsupportedHook, bucketNotice},
 		{"packages drifted", r.DriftedPackage, bucketDrift},
 		{"packages removed", r.RemovesPackage, bucketAction},
+		{"settings drifted", r.DriftedSetting, bucketDrift},
 		{"plugins missing", r.MissingPlugin, bucketDrift},
 		{"plugins stale", r.StalePlugin, bucketDrift},
 		{"conflicts", r.Conflicts, bucketConflict},
