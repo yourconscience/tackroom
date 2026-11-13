@@ -526,6 +526,9 @@ func expandPath(path string, home string) string {
 	switch {
 	case path == "~":
 		return home
+	case strings.HasPrefix(path, "~/.kimi-code/") && strings.TrimSpace(os.Getenv("KIMI_CODE_HOME")) != "":
+		// Kimi Code moves its skills and agents directories with $KIMI_CODE_HOME.
+		return filepath.Join(kimiHome(home), strings.TrimPrefix(path, "~/.kimi-code/"))
 	case strings.HasPrefix(path, "~/"):
 		return filepath.Join(home, strings.TrimPrefix(path, "~/"))
 	default:
