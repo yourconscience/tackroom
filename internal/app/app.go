@@ -53,13 +53,14 @@ type externalSkillSource struct {
 }
 
 type agentConfig struct {
-	Name      string    `yaml:"name"`
-	Enabled   bool      `yaml:"enabled"`
-	SkillRoot string    `yaml:"skill_root"`
-	AgentRoot string    `yaml:"agent_root,omitempty"`
-	Detect    string    `yaml:"detect,omitempty"`
-	RoleModel string    `yaml:"role_model,omitempty"`
-	Packages  *[]string `yaml:"packages,omitempty"`
+	Name      string         `yaml:"name"`
+	Enabled   bool           `yaml:"enabled"`
+	SkillRoot string         `yaml:"skill_root"`
+	AgentRoot string         `yaml:"agent_root,omitempty"`
+	Detect    string         `yaml:"detect,omitempty"`
+	RoleModel string         `yaml:"role_model,omitempty"`
+	Packages  *[]string      `yaml:"packages,omitempty"`
+	Settings  map[string]any `yaml:"settings,omitempty"`
 }
 
 // publishTarget declares a remote skill registry to push canonical skills to.
@@ -113,12 +114,14 @@ type agentReport struct {
 	ManagedMCP      []string
 	ManagedHook     []string
 	ManagedPackage  []string
+	ManagedSetting  []string
 	ManagedPlugin   []string
 	Drifted         []string
 	DriftedAgent    []string
 	DriftedMCP      []string
 	DriftedHook     []string
 	DriftedPackage  []string
+	DriftedSetting  []string
 	Missing         []string
 	MissingAgent    []string
 	MissingMCP      []string
@@ -144,12 +147,15 @@ type agentReport struct {
 	UpdatesMCP     []string
 	UpdatesHook    []string
 	UpdatesPackage []string
+	UpdatesSetting []string
 	Removes        []string
 	RemovesAgent   []string
 	RemovesMCP     []string
 	RemovesPackage []string
 	RemovesPlugin  []string
 	Synced         bool
+
+	UnsupportedSetting []string // a settings: block on a harness without settings support
 }
 
 // replaceableConflict is a native file or skill directory that sits where

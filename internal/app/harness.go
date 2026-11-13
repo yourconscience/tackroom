@@ -78,6 +78,10 @@ type harness struct {
 	// Hooks holds the hook config target. nil = no hook support.
 	Hooks *hookTarget
 
+	// Settings holds a native settings file tackroom patches key by key.
+	// nil = no settings support.
+	Settings *settingsTarget
+
 	// RootInstructions describes a root instructions symlink. nil = none.
 	RootInstructions *rootInstructionsCapability
 
@@ -143,6 +147,10 @@ func initHarnesses() {
 				agentName: agentClaudeCode,
 				inspect:   inspectClaudeHook,
 				patch:     patchClaudeHook,
+			},
+			Settings: &settingsTarget{
+				configPath: claudeHooksConfigPath,
+				format:     settingsJSON,
 			},
 			RootInstructions: &rootInstructionsCapability{
 				Path:     func(home string) string { return filepath.Join(home, ".claude", "CLAUDE.md") },
@@ -240,6 +248,10 @@ func initHarnesses() {
 			}),
 			roles: roleRenderer(agentPi),
 			Hooks: extensionHookTarget(agentPi, piExtensionHookDir),
+			Settings: &settingsTarget{
+				configPath: piSettingsPath,
+				format:     settingsJSON,
+			},
 			RootInstructions: &rootInstructionsCapability{
 				Path:     func(home string) string { return filepath.Join(home, ".pi", "agent", "AGENTS.md") },
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
@@ -261,6 +273,10 @@ func initHarnesses() {
 			}),
 			roles: roleRenderer(agentOMP),
 			Hooks: extensionHookTarget(agentOMP, ompExtensionHookDir),
+			Settings: &settingsTarget{
+				configPath: ompConfigPath,
+				format:     settingsYAML,
+			},
 			// OMP falls back to ~/.agents/AGENTS.md; its own file wins when
 			// present, so composed instructions and other config roots land here.
 			RootInstructions: &rootInstructionsCapability{

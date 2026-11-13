@@ -158,6 +158,9 @@ func runSync(opts runOptions) error {
 	if err := applyAgentPackageSync(reports, selected, home); err != nil {
 		return err
 	}
+	if err := applyAgentSettingsSync(reports, selected, home); err != nil {
+		return err
+	}
 	if err := applyClaudePluginSync(reports, repoRoot, home); err != nil {
 		return err
 	}
