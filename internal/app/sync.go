@@ -256,12 +256,18 @@ func runSyncDryRun(opts runOptions) error {
 	var notFetched []string
 	cfg, notFetched = withoutMissingSources(cfg, home)
 
-	injectPluginMCPServers(&cfg, home)
+	injectPluginMCPServersMode(&cfg, home, false)
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
 	if err != nil {
 		return err
 	}
+	if repoReport.State == stateConflict {
+		printReport(setupStreams(opts).out, false, repoReport, nil, home, cfg)
+		return fmt.Errorf("sync aborted due to conflicts: repo link: %s", repoReport.Path)
+	}
+
+	repoReport.Linked = repoReport.State != stateSynced
 
 	expected, err := expectedSkills(repoRoot, home, cfg)
 	if err != nil {
@@ -271,8 +277,20 @@ func runSyncDryRun(opts runOptions) error {
 	if err != nil {
 		return err
 	}
+	for i := range reports {
+		// A real sync links or rewrites the root doc; say so in the plan headline.
+		r := &reports[i]
+		r.RootLinked = r.Detected && len(r.Conflicts) == 0 && r.RootPath != "" && (r.RootState == stateMissing || r.RootState == stateDrifted)
+	}
+
+	// Starter files a real sync would scaffold, refresh or retire.
+	starterPlan, err := previewStarterFiles(repoRoot)
+	if err != nil {
+		return err
+	}
 
 	streams := setupStreams(opts)
+	starterPlan.report(streams.out)
 	printReport(streams.out, false, repoReport, reports, home, cfg)
 
 	for _, name := range notFetched {
@@ -282,8 +300,9 @@ func runSyncDryRun(opts runOptions) error {
 		listReplaceableConflicts(streams.out, reports, home)
 	}
 
-	changes, harnesses := countSyncChanges(repoReport, reports)
-	fmt.Fprintf(streams.out, "\ndry run: %d changes across %d harnesses; nothing written\n", changes, harnesses)
+	changes, harnesses := countSyncChanges(repoReport, reports, opts.ReplaceConflicts)
+	changes += len(starterPlan.Scaffolded) + len(starterPlan.Updated) + len(starterPlan.Removed)
+	fmt.Fprintf(streams.out, "\ndry run: %s across %s; nothing written\n", plural(changes, "change"), plural(harnesses, "harness"))
 	return nil
 }
 
@@ -323,10 +342,23 @@ func listReplaceableConflicts(w io.Writer, reports []agentReport, home string) {
 	}
 }
 
+// plural renders "1 change" or "2 changes"; "harness" takes "es".
+func plural(n int, noun string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", noun)
+	}
+	if strings.HasSuffix(noun, "s") || strings.HasSuffix(noun, "h") {
+		return fmt.Sprintf("%d %ses", n, noun)
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
+}
+
 // countSyncChanges tallies the individual changes a sync would apply, and the
-// number of harnesses they touch. Conflicts are blockers, not changes, and are
-// reported separately by the plan.
-func countSyncChanges(repoReport repoLinkReport, reports []agentReport) (changes, harnesses int) {
+// number of harnesses they touch. A harness with conflicts is left untouched by
+// a real sync, so it counts nothing; with replaceConflicts, replaceable
+// conflicts become links and count as changes. Other conflicts are reported
+// separately by the plan.
+func countSyncChanges(repoReport repoLinkReport, reports []agentReport, replaceConflicts bool) (changes, harnesses int) {
 	if repoReport.State != stateSynced {
 		changes++
 	}
@@ -334,13 +366,20 @@ func countSyncChanges(repoReport repoLinkReport, reports []agentReport) (changes
 		if report.Error != "" || !report.Detected {
 			continue
 		}
-		n := len(report.Adds) + len(report.Updates) + len(report.Removes) +
+		replaced := 0
+		if len(report.Conflicts) > 0 {
+			if !replaceConflicts || len(report.Replaceable) != len(report.Conflicts) {
+				continue
+			}
+			replaced = len(report.Replaceable)
+		}
+		n := replaced + len(report.Adds) + len(report.Updates) + len(report.Removes) +
 			len(report.AddsAgent) + len(report.UpdatesAgent) + len(report.RemovesAgent) +
 			len(report.AddsMCP) + len(report.UpdatesMCP) + len(report.RemovesMCP) +
 			len(report.AddsHook) + len(report.UpdatesHook) +
 			len(report.UpdatesPackage) + len(report.RemovesPackage) +
 			len(report.AddsPlugin) + len(report.RemovesPlugin)
-		if report.RootState != "" && report.RootState != stateSynced {
+		if report.RootState == stateMissing || report.RootState == stateDrifted {
 			n++
 		}
 		changes += n
