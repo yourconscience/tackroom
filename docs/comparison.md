@@ -1,32 +1,30 @@
-# How tackroom differs
+# tackroom vs the field
 
-Different tools solve different parts of agent-config fragmentation.
+tackroom is a user-level dotfiles manager for coding agents: it syncs skills, MCP servers, hooks, roles, root instructions, and memory across the harnesses you use, and pins + audits anything you install from strangers.
 
-| Tool | Scope | What it does |
-|---|---|---|
-| [rulesync](https://github.com/dyoshikawa/rulesync), [ruler](https://github.com/intellectronica/ruler) | per-project | Generate agent config inside a repo |
-| [openskills](https://github.com/numman-ali/openskills) | user-level | Install skills |
-| [dot-agents](https://github.com/dot-agents/dot-agents) | user-level | Symlink rules and MCP config once |
-| [dotagent](https://github.com/johnlindquist/dotagent) | one-shot | Convert between agent config formats |
-| `AGENTS.md` | per-project | Project-level agent instructions |
-| **tackroom** | user-level | Sync skills, MCP, hooks, roles, root instructions, and memory across harnesses continuously |
+## Comparison
 
-## Detailed comparison
+| | **tackroom** | [skillshare](https://github.com/runkids/skillshare) | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) |
+|---|---|---|---|---|---|
+| Scope | user | user | project | project | user + project |
+| Skills | ✓ | ✓ | ✓ | ~ | ✓ |
+| MCP | ✓ | ✓ | ✓ | ✓ | — |
+| Hooks | ✓ | ✓ | ✓ | — | — |
+| Roles | ✓ native | ✓ | ✓ | ~ | — |
+| Root instructions | ✓ | ✓ | ✓ | ✓ | — |
+| Memory tier | ✓ (`rem`) | — | — | — | — |
+| Pin + audit externals | ✓ lock + audit | ~ audit only | — | — | ~ no pin |
+| Freshness hold (72h) | ✓ | — | — | — | — |
+| Per-harness settings | ✓ | — | — | — | — |
+| Periodic sync | ✓ | — | — | — | — |
+| Desktop app | — (web view) | ✓ | — | — | — |
+| Terminal panels | ✓ Herdr/Tern/Rex | — | — | — | — |
+| Harness depth | deep | broad | broad | broad | narrow |
 
-tackroom' own harness coverage is listed below; competitor breadth is described qualitatively, since their exact tool counts drift over time.
+✓ full · ~ partial · — none
 
-| | tackroom | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) |
-|---|---|---|---|---|
-| Scope | user-level | project-level | project-level | user + project |
-| Skills sync | yes | yes | experimental | yes |
-| MCP sync | yes | yes | yes | no |
-| Hooks sync | yes | yes | no | no |
-| Agent roles | rendered native | yes | experimental | no |
-| Root instructions | symlinked per harness | generated files | generated files | no |
-| Memory tooling | built in (`rem`) | no | no | no |
-| Pinned + audited externals | lock file + audit | no pinning | no pinning | tracks source, no pin |
-| Harness coverage | 9 deep | broad | broad | narrow |
+## skillshare vs tackroom
 
-## Positioning
+skillshare is the closest tool: same user-level sync, plus a desktop app and one simple `merge` mode. tackroom is the stricter, deeper version — pins, audits, freshness holds, per-harness settings, periodic sync, and a `rem` memory tier. skillshare audits but does not pin, so a source can change under you.
 
-Project-level generators win on tool breadth: if you need every team member's repo to emit config for 30 tools, use rulesync or ruler. tackroom is the complement, not the competitor: one personal setup, carried deeply into the harnesses you actually live in, following you across machines like dotfiles, with dependency discipline (pins, audits) applied to the prompt code you install from strangers.
+The rest is project-level or single-surface: rulesync and ruler generate config per repo; openskills ships skills only. tackroom is the only one that treats a personal setup as a dependency-managed dotfiles repo. [Migrate from skillshare →](skillshare-migration.md)
