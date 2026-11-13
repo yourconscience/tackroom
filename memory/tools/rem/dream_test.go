@@ -51,9 +51,9 @@ func TestAddDedupesAcrossDays(t *testing.T) {
 }
 
 func TestCollapseExactDuplicatesKeepFirst(t *testing.T) {
-	in := "# Hermes Memory Export\n\nAuto-synced.\n\n## Sync 2026-05-01 00:00 UTC\n\n- unique fact A\n\n## Sync 2026-05-02 00:00 UTC\n\n- fact B\n- fact C\n\n## Sync 2026-05-03 00:00 UTC\n\n- FACT B!\n- fact C\n"
+	in := "# Memory Export\n\nAuto-synced.\n\n## Sync 2026-05-01 00:00 UTC\n\n- unique fact A\n\n## Sync 2026-05-02 00:00 UTC\n\n- fact B\n- fact C\n\n## Sync 2026-05-03 00:00 UTC\n\n- FACT B!\n- fact C\n"
 	got, dropped := collapseExactDuplicates(in)
-	want := "# Hermes Memory Export\n\nAuto-synced.\n\n## Sync 2026-05-01 00:00 UTC\n\n- unique fact A\n\n## Sync 2026-05-02 00:00 UTC\n\n- fact B\n- fact C\n"
+	want := "# Memory Export\n\nAuto-synced.\n\n## Sync 2026-05-01 00:00 UTC\n\n- unique fact A\n\n## Sync 2026-05-02 00:00 UTC\n\n- fact B\n- fact C\n"
 	if dropped != 1 || got != want {
 		t.Errorf("dropped=%d got=%q want=%q", dropped, got, want)
 	}

@@ -230,54 +230,14 @@ def provider_source(payload: dict[str, Any]) -> str:
     if hint:
         return hint
     marker = str(payload.get("platform") or payload.get("agent") or "").strip().lower()
-    if marker in {"amp", "codex", "omp", "droid", "factory", "hermes"}:
+    if marker in {"amp", "codex", "omp", "droid", "factory"}:
         return "droid" if marker == "factory" else marker
     if payload.get("amp_thread_id"):
         return "amp"
     transcript = str(payload.get("transcript_path") or "")
     if "/.factory/" in os.path.expanduser(transcript) and Path(transcript).suffix == ".jsonl":
         return "droid"
-    session_id = payload.get("session_id") or payload.get("sessionId")
-    if session_id and not transcript and not payload.get("messages"):
-        hermes_home = Path(os.path.expanduser(os.environ.get("HERMES_HOME", "~/.hermes")))
-        if (hermes_home / "sessions" / f"session_{session_id}.json").is_file():
-            return "hermes"
     return "basic"
-
-
-def normalize_provider_payload(payload: dict[str, Any]) -> tuple[dict[str, Any], str, bool]:
-    """Load provider-owned session data while keeping digest rendering shared.
-
-    The third value reports whether capture may proceed. Hermes content lives in
-    a provider-owned session file that can lag the hook, and recording a stub
-    digest for that session id would make the real transcript look like a replay
-    later, so capture is skipped until the file is readable.
-    """
-    source = provider_source(payload)
-    if source != "hermes":
-        return payload, source, True
-
-    session_id = payload.get("session_id") or payload.get("sessionId")
-    if not session_id:
-        return payload, source, True
-    raw_id = str(session_id)
-    if raw_id != Path(raw_id).name:
-        raise HookError("Hermes session_id must not contain path separators")
-    hermes_home = Path(os.path.expanduser(os.environ.get("HERMES_HOME", "~/.hermes")))
-    session_path = hermes_home / "sessions" / f"session_{raw_id}.json"
-    if not session_path.is_file():
-        return payload, source, False
-    try:
-        session_data = json.loads(session_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise HookError(f"cannot read Hermes session file {session_path}: {exc}") from exc
-    if not isinstance(session_data, dict):
-        raise HookError(f"Hermes session file must contain a JSON object: {session_path}")
-    normalized = dict(payload)
-    normalized.update(session_data)
-    normalized.setdefault("session_id", raw_id)
-    normalized["source_transcript"] = str(session_path)
-    return normalized, source, True
 
 
 def collect_messages(payload: dict[str, Any]) -> tuple[list[dict[str, Any]], datetime | None, str | None]:
@@ -399,7 +359,7 @@ def build_digest(payload: dict[str, Any], messages: list[dict[str, Any]], starte
         lines.append("- paths mentioned:")
         for path in paths:
             lines.append(f"  - `{truncate(path, 180)}`")
-    source_transcript = payload.get("source_transcript") or payload.get("transcript_path")
+    source_transcript = payload.get("transcript_path")
     if isinstance(source_transcript, str) and source_transcript.strip():
         lines.append(f"- source transcript: `{truncate(source_transcript, 220)}`")
     if not users and not assistant:
@@ -425,7 +385,6 @@ def marker_exists(sessions_dir: Path, session_id: str) -> bool:
         f"<!-- basic-memory-session:{session_id}:start -->",
         f"<!-- amp-session:{session_id}:start -->",
         f"<!-- droid-session:{session_id}:start -->",
-        f"<!-- hermes-session:{session_id}:start -->",
     ]
     try:
         paths = sorted({*sessions_dir.glob("*.md"), *sessions_dir.glob("*.markdown")})
@@ -480,14 +439,8 @@ def context_json(context: str) -> str:
 
 def session_end(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout) -> int:
     try:
-        payload, source, provider_ready = normalize_provider_payload(parse_payload(stdin))
-        if not provider_ready:
-            session_id = payload.get("session_id") or payload.get("sessionId")
-            print(
-                json.dumps({"action": "continue", "message": f"Hermes session log not found for {session_id}; capture skipped"}),
-                file=stdout,
-            )
-            return 0
+        payload = parse_payload(stdin)
+        source = provider_source(payload)
         if source != "basic":
             payload["tackroom_memory_source"] = source
         knowledge_dir = knowledge_dir_from_env()
@@ -505,13 +458,13 @@ def session_end(stdin: TextIO = sys.stdin, stdout: TextIO = sys.stdout) -> int:
     else:
         basic_message = f"basic memory skipped replayed session {session_id}"
 
-    display_source = {"amp": "Amp", "droid": "Droid", "hermes": "Hermes"}.get(source)
+    display_source = {"amp": "Amp", "droid": "Droid"}.get(source)
     if display_source:
         if appended:
             message = f"memsearch updated from {display_source} session {session_id}"
         else:
             message = f"memory skipped replayed {display_source} session {session_id}"
-        if source in {"amp", "hermes"}:
+        if source == "amp":
             print(json.dumps({"action": "continue", "message": message, "output_file": str(target)}), file=stdout)
         else:
             print(continuation_json(output_file=str(target), systemMessage=message), file=stdout)

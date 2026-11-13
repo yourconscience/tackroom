@@ -24,9 +24,6 @@ case "$kind" in
   factory-jsonl)
     dispatch_basic_digest "$payload" droid
     ;;
-  hermes-json)
-    dispatch_basic_digest "$payload" hermes
-    ;;
   codex|omp)
     dispatch_basic_digest "$payload" "$kind"
     ;;

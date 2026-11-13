@@ -178,52 +178,6 @@ class BasicMemoryHookTests(unittest.TestCase):
             self.assertEqual(malformed.stdout, "")
             self.assertIn("invalid hook JSON", malformed.stderr)
 
-    def test_amp_and_hermes_payloads_use_shared_digest_and_redact(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            knowledge = tmp_path / "knowledge"
-            env = self.env_with_knowledge(knowledge, {"MEMSEARCH_PLUGIN_DIR": str(tmp_path / "missing")})
-            secret = "providersecret123456789"
-
-            amp_payload = {
-                "platform": "amp",
-                "session_id": "amp-redact",
-                "session_start": "2026-07-16T03:04:05Z",
-                "messages": [
-                    {"role": "user", "content": f"Use api_key={secret} in ./amp"},
-                    {"role": "assistant", "content": f"Authorization: Bearer {secret}"},
-                ],
-            }
-            amp = subprocess.run(
-                ["/bin/bash", str(SESSION_END_HOOK)], input=json.dumps(amp_payload), text=True,
-                capture_output=True, env=env, check=False,
-            )
-            self.assertEqual(amp.returncode, 0, amp.stderr)
-            self.assertEqual(json.loads(amp.stdout)["action"], "continue")
-
-            hermes_home = tmp_path / "hermes"
-            hermes_sessions = hermes_home / "sessions"
-            hermes_sessions.mkdir(parents=True)
-            hermes_data = {
-                "session_id": "hermes-redact",
-                "session_start": "2026-07-16T04:05:06Z",
-                "model": f"model password={secret}",
-                "messages": [{"role": "user", "content": f"Open ./hermes?secret={secret}"}],
-            }
-            (hermes_sessions / "session_hermes-redact.json").write_text(json.dumps(hermes_data), encoding="utf-8")
-            hermes = subprocess.run(
-                ["/bin/bash", str(SESSION_END_HOOK)], input=json.dumps({"session_id": "hermes-redact"}),
-                text=True, capture_output=True, env={**env, "HERMES_HOME": str(hermes_home)}, check=False,
-            )
-            self.assertEqual(hermes.returncode, 0, hermes.stderr)
-            self.assertEqual(json.loads(hermes.stdout)["action"], "continue")
-
-            content = (knowledge / "sessions" / "2026-07-16.md").read_text(encoding="utf-8")
-            self.assertIn("- source: amp", content)
-            self.assertIn("- source: hermes", content)
-            self.assertNotIn(secret, content)
-            self.assertIn("[REDACTED]", content)
-
     def test_basic_digest_redacts_unlabelled_provider_tokens(self):
         with tempfile.TemporaryDirectory() as tmp:
             knowledge = Path(tmp) / "knowledge"
@@ -301,47 +255,6 @@ class BasicMemoryHookTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             content = (knowledge / "sessions" / "2026-07-16.md").read_text(encoding="utf-8")
             self.assertIn("Keep the partial Factory session.", content)
-
-    def test_hermes_missing_session_log_defers_capture_instead_of_recording_a_stub(self):
-        with tempfile.TemporaryDirectory() as tmp:
-            tmp_path = Path(tmp)
-            knowledge = tmp_path / "knowledge"
-            hermes_home = tmp_path / "hermes"
-            (hermes_home / "sessions").mkdir(parents=True)
-            env = self.env_with_knowledge(
-                knowledge,
-                {"HERMES_HOME": str(hermes_home), "PATH": "/usr/bin:/bin", "MEMSEARCH_PLUGIN_DIR": str(tmp_path / "missing")},
-            )
-            payload = {"session_id": "hermes-deferred", "session_start": "2026-07-16T07:08:09Z"}
-
-            first = subprocess.run(
-                ["/bin/bash", str(SESSION_END_HOOK)], input=json.dumps(payload), text=True,
-                capture_output=True, env=env, check=False,
-            )
-            self.assertEqual(first.returncode, 0, first.stderr)
-            self.assertIn("session log not found", first.stdout)
-            self.assertFalse((knowledge / "sessions" / "2026-07-16.md").exists())
-
-            # The provider file appears later: the real transcript must still capture.
-            (hermes_home / "sessions" / "session_hermes-deferred.json").write_text(
-                json.dumps({
-                    "session_id": "hermes-deferred",
-                    "session_start": "2026-07-16T07:08:09Z",
-                    "messages": [
-                        {"role": "user", "content": "Capture the deferred Hermes session."},
-                        {"role": "assistant", "content": "Captured."},
-                    ],
-                }),
-                encoding="utf-8",
-            )
-            second = subprocess.run(
-                ["/bin/bash", str(SESSION_END_HOOK)], input=json.dumps(payload), text=True,
-                capture_output=True, env=env, check=False,
-            )
-            self.assertEqual(second.returncode, 0, second.stderr)
-            content = (knowledge / "sessions" / "2026-07-16.md").read_text(encoding="utf-8")
-            self.assertIn("Capture the deferred Hermes session.", content)
-            self.assertIn("- source: hermes", content)
 
     def test_session_end_dispatch_cleans_temporary_payload(self):
         with tempfile.TemporaryDirectory() as tmp:
