@@ -71,10 +71,31 @@ func (s *configWebServer) handleCronAction(w http.ResponseWriter, r *http.Reques
 		writeAPIError(w, http.StatusUnprocessableEntity, "cron_action_failed", err.Error())
 		return
 	}
-	viewCrons.Lock()
-	viewCrons.at = time.Time{} // the next GET collects again
-	viewCrons.Unlock()
-	writeJSON(w, http.StatusOK, map[string]string{"output": out})
+	fresh := refreshedCronJob(s.doc.sharedPath, job)
+	if fresh != nil {
+		patchCronScan(func(candidate cronJob) bool { return sameCronJob(candidate, job) }, fresh)
+	} else {
+		invalidateCronScan()
+	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"output": out, "job": fresh})
+}
+
+func sameCronJob(a, b cronJob) bool { return a.Host == b.Host && a.Source == b.Source && a.ID == b.ID }
+
+// refreshedCronJob scans the job's host again and returns the job's record as
+// it now is, so a client can redraw that one row without a full collect. nil
+// when the scan fails or no longer lists the job.
+func refreshedCronJob(configPath string, job cronJob) *cronJob {
+	scan, err := collectCrons(configPath, []string{job.Host})
+	if err != nil {
+		return nil
+	}
+	for i := range scan.Jobs {
+		if sameCronJob(scan.Jobs[i], job) {
+			return &scan.Jobs[i]
+		}
+	}
+	return nil
 }
 
 // runCronActionCommand is `tackroom cron run|pause|resume ID` and

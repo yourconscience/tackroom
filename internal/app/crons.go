@@ -51,6 +51,7 @@ type cronJob struct {
 	// DeclaredSchedule is the crons.jobs schedule of an owned job, as written;
 	// Schedule is what the scheduler holds after translation.
 	DeclaredSchedule string   `json:"declared_schedule,omitempty"`
+	DeclaredCommand  []string `json:"declared_command,omitempty"`
 	Runs             *int     `json:"runs,omitempty"`
 	LastExit         *int     `json:"last_exit,omitempty"`
 	LastStatus       string   `json:"last_status,omitempty"`
@@ -68,6 +69,10 @@ type cronJob struct {
 	Health       string `json:"health,omitempty"`
 	ShortName    string `json:"short_name,omitempty"`
 	ScheduleText string `json:"schedule_text,omitempty"`
+	// Editable is true when `cron edit` and `cron remove` can change this job
+	// from this machine; EditNote says why not (annotateCronEditable).
+	Editable bool   `json:"editable,omitempty"`
+	EditNote string `json:"edit_note,omitempty"`
 }
 
 type cronAccess struct {
@@ -144,6 +149,7 @@ func collectCrons(configPath string, hosts []string) (cronsScanResult, error) {
 	}
 	result := scanCrons(hosts, manifest)
 	annotateCronJobs(result.Jobs, time.Now())
+	annotateCronEditable(result.Jobs, manifest)
 	return result, nil
 }
 
@@ -271,14 +277,14 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 				job.Inferred = removeString(job.Inferred, "connectors")
 			}
 			job.Effect = entry.Effect
-			job.DeclaredSchedule = entry.Schedule
+			job.DeclaredSchedule, job.DeclaredCommand = entry.Schedule, entry.Command
 		}
 		if matched || !manifestEntryRead(entry, access, sameHost) {
 			continue
 		}
 		jobs = append(jobs, cronJob{
 			Host: entry.Host, Source: entry.Source, ID: id, State: "missing", CreatedBy: entry.CreatedBy,
-			Connectors: entry.Connectors, Effect: entry.Effect,
+			Connectors: entry.Connectors, Effect: entry.Effect, DeclaredSchedule: entry.Schedule, DeclaredCommand: entry.Command,
 			Problems: []string{"declared in crons.jobs but not found on any scanned host"},
 		})
 	}

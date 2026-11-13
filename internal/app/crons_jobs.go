@@ -286,6 +286,31 @@ func planCronJobChange(shared, home string, manifest cronsManifest, ch cronJobCh
 	return edits, nil
 }
 
+// annotateCronEditable marks the jobs `cron edit` and `cron remove` can change
+// from this machine, and gives the reason for each one they cannot, for the
+// clients to show. changeCronJob makes the same decisions again when it runs.
+func annotateCronEditable(jobs []cronJob, manifest cronsManifest) {
+	for i := range jobs {
+		job := &jobs[i]
+		entry := manifest.Jobs[job.ID]
+		declared := entry.Schedule != "" && len(entry.Command) > 0
+		switch {
+		case job.State == "missing" && !declared:
+			job.EditNote = "Declared in crons.jobs as a note, not as a job tackroom owns. Edit it by hand."
+		case job.State != "missing" && !job.Owned:
+			job.EditNote = "tackroom changes only the jobs it installs from crons.jobs (dev.tackroom.<id>). This one lives outside it; change it where it lives."
+		case job.State != "missing" && job.Host != "local":
+			job.EditNote = fmt.Sprintf("This job runs on %s. Edit tackroom.yaml and let that machine run cron apply.", job.Host)
+		case !declared:
+			job.EditNote = "No longer declared in crons.jobs. Run tackroom cron apply to remove its unit."
+		case entry.Host != "" && entry.Host != manifest.Self:
+			job.EditNote = fmt.Sprintf("Declared for host %s, not this machine. Edit tackroom.yaml and let that machine run cron apply.", entry.Host)
+		default:
+			job.Editable = true
+		}
+	}
+}
+
 // checkCronHost refuses a host `cron apply` would stop on (crons.self unset)
 // and, for the view, a job that belongs to another machine.
 func checkCronHost(manifest cronsManifest, host string, localOnly bool) error {
@@ -390,9 +415,10 @@ func spliceCronJob(data []byte, id string, job *yaml.Node, indent int) (out []by
 	}
 	// endOf is the last line of the entry at stack[level].Content[i]: the line
 	// before the next key at any level, less the blank and comment lines that
-	// trail it (they belong to what follows).
-	endOf := func(level, i int) int {
-		start, next := stack[level].Content[i].Line, len(lines)+1
+	// trail it (they belong to what follows). next is where that key starts.
+	endOf := func(level, i int) (end, next int) {
+		start := stack[level].Content[i].Line
+		next = len(lines) + 1
 		for ; level >= 0; level-- {
 			if i+2 < len(stack[level].Content) {
 				next = stack[level].Content[i+2].Line
@@ -402,11 +428,11 @@ func spliceCronJob(data []byte, id string, job *yaml.Node, indent int) (out []by
 				i = keys[level-1]
 			}
 		}
-		end := next - 1
+		end = next - 1
 		for end > start && commentOnly(lines[end-1]) {
 			end--
 		}
-		return end
+		return end, next
 	}
 	encode := func(wrap []string, key *yaml.Node, column int) ([]string, bool) {
 		entry := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map", Content: []*yaml.Node{key, job}}
@@ -437,10 +463,32 @@ func spliceCronJob(data []byte, id string, job *yaml.Node, indent int) (out []by
 	}
 	switch {
 	case at >= 0:
-		first, last = stack[depth].Content[at].Line, endOf(depth, at)
+		var next int
+		first = stack[depth].Content[at].Line
+		last, next = endOf(depth, at)
 		if job == nil {
 			for first > 1 && strings.HasPrefix(strings.TrimSpace(lines[first-2]), "#") {
 				first-- // the comment lines right above the entry go with it
+			}
+			// The last job takes with it a jobs: and crons: block that holds
+			// nothing else, the way `cron add` made them. A comment anywhere
+			// in the block, or any other key, keeps the block.
+			blank := func(from, to int) bool { // lines strictly between from and to
+				for n := from + 1; n < to; n++ {
+					if strings.TrimSpace(lines[n-1]) != "" {
+						return false
+					}
+				}
+				return true
+			}
+			bare := func(key *yaml.Node) bool { return key.HeadComment+key.LineComment+key.FootComment == "" }
+			jobsKey := stack[1].Content[keys[1]]
+			if len(stack[depth].Content) == 2 && bare(jobsKey) && blank(jobsKey.Line, first) && blank(last, next) {
+				first = jobsKey.Line
+				cronsKey := stack[0].Content[keys[0]]
+				if len(stack[1].Content) == 2 && len(stack[0].Content) > 2 && bare(cronsKey) && blank(cronsKey.Line, jobsKey.Line) {
+					first = cronsKey.Line
+				}
 			}
 		} else {
 			key := *stack[depth].Content[at]
@@ -448,7 +496,7 @@ func spliceCronJob(data []byte, id string, job *yaml.Node, indent int) (out []by
 			text, ok = encode(nil, &key, key.Column)
 		}
 	case job != nil:
-		last = endOf(depth, len(stack[depth].Content)-2)
+		last, _ = endOf(depth, len(stack[depth].Content)-2)
 		first = last + 1
 		text, ok = encode(path[depth:], &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: id}, stack[depth].Content[0].Column)
 		if ok && !strings.HasSuffix(lines[last-1], "\n") {
@@ -616,17 +664,24 @@ func runCronJobCommand(action string, args []string) error {
 	if action == "add" {
 		fs.BoolVar(&local, "local", false, "Write tackroom.local.yaml instead of tackroom.yaml")
 	}
-	id, parseArgs := "", args
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		id, parseArgs = args[0], args[1:]
+	// The id may come before, between or after the flags: Go's flag package
+	// stops at the first plain word, so parse again after each one.
+	var words []string
+	for rest := args; ; {
+		if err := fs.Parse(rest); err != nil {
+			return err
+		}
+		if fs.NArg() == 0 {
+			break
+		}
+		words, rest = append(words, fs.Arg(0)), fs.Args()[1:]
 	}
-	if err := fs.Parse(parseArgs); err != nil {
-		return err
+	if len(words) > 1 {
+		return fmt.Errorf("usage: tackroom cron %s ID [flags]; the command is --command plus one --arg per argument", action)
 	}
-	if id == "" && fs.NArg() == 1 {
-		id = fs.Arg(0)
-	} else if fs.NArg() != 0 {
-		return fmt.Errorf("usage: tackroom cron %s ID [flags]; flags go after the id, and the command is --command plus one --arg per argument", action)
+	id := ""
+	if len(words) == 1 {
+		id = words[0]
 	}
 	given := map[string]bool{}
 	fs.Visit(func(f *flag.Flag) { given[f.Name] = true })
@@ -700,23 +755,11 @@ func (s *configWebServer) handleCronJobs(w http.ResponseWriter, r *http.Request)
 	}
 	cronActionMu.Unlock()
 	if !ch.DryRun {
-		viewCrons.Lock()
 		if err == nil {
-			// Swap the job's rows in the last scan for the fresh one, so the
-			// next action on its row is not stale.
-			jobs := make([]cronJob, 0, len(viewCrons.result.Jobs)+1)
-			for _, job := range viewCrons.result.Jobs {
-				if job.ID != ch.ID || (job.Host != "local" && job.State != "missing") {
-					jobs = append(jobs, job)
-				}
-			}
-			if res.Job != nil {
-				jobs = append(jobs, *res.Job)
-			}
-			viewCrons.result.Jobs = jobs
+			patchCronScan(func(job cronJob) bool { return job.ID == ch.ID && (job.Host == "local" || job.State == "missing") }, res.Job)
+		} else {
+			invalidateCronScan() // apply may have changed units before it failed
 		}
-		viewCrons.at = time.Time{} // the next GET collects again
-		viewCrons.Unlock()
 	}
 	if err != nil {
 		writeAPIError(w, http.StatusUnprocessableEntity, "cron_action_failed", err.Error())
