@@ -91,6 +91,8 @@ type builder struct {
 	byFile map[string]*doc // repo path (docs/setup.md) to doc
 	index  *doc
 	nav    []*doc // reading order, index excluded
+
+	missing []string // relative links whose target is not in the repo; the build fails on any
 }
 
 func main() {
@@ -226,6 +228,9 @@ func (b *builder) load() error {
 			b.rewriteLinks(d)
 		}
 	}
+	if len(b.missing) > 0 {
+		return fmt.Errorf("links to paths that do not exist in the repo:\n  %s", strings.Join(b.missing, "\n  "))
+	}
 	return nil
 }
 
@@ -276,6 +281,9 @@ func (b *builder) rewriteLinks(d *doc) {
 			d.refs = append(d.refs, ref{t, frag})
 			dest = relDir(d.Dir, t.Dir)
 		} else {
+			if _, err := os.Stat(filepath.Join(b.root, filepath.FromSlash(target))); err != nil {
+				b.missing = append(b.missing, d.File+" -> "+string(l.Destination))
+			}
 			dest = b.githubURL(target)
 		}
 		if frag != "" {
