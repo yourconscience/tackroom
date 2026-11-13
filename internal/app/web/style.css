@@ -273,7 +273,11 @@ a.kpi:hover { background: var(--raised); }
 .cron-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .cron-schedule { display: flex; gap: 8px; flex: 1 1 260px; min-width: 0; }
 /* 16px keeps iOS Safari from zooming the page when the field takes focus. */
-.cron-schedule input { flex: 1; min-width: 0; min-height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); font-family: var(--font-mono); font-size: 16px; }
+.cron-schedule input { flex: 1 1 8ch; width: 8ch; min-width: 0; min-height: var(--control-height); padding: 0 10px; border: 1px solid var(--control); border-radius: var(--radius-control); background: var(--surface); font-family: var(--font-mono); font-size: 16px; }
+button.danger { border-color: var(--negative); color: var(--negative); }
+button.danger:hover:not(:disabled) { background: var(--pill-negative-bg); }
+.cron-actions .note { flex-basis: 100%; margin: 0; }
+.cron-actions .note b { color: var(--text); font-weight: 600; }
 .problems { margin: 0; padding-left: 18px; display: grid; gap: 2px; color: var(--negative); font-size: 13px; }
 
 /* ---------- pills, tags ---------- */
@@ -369,6 +373,15 @@ button.cell:disabled { cursor: default; }
 .panel-body { flex: 1; overflow-y: auto; padding: 16px 22px; display: grid; gap: 14px; align-content: start; }
 .panel-foot { display: grid; gap: 10px; padding: 14px 22px; border-top: 1px solid var(--rule); }
 .foot-actions { display: flex; justify-content: flex-end; gap: 10px; }
+/* The add, edit and delete form fills the panel; its body scrolls, its buttons stay. */
+.panel form { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.field { display: grid; gap: 6px; min-width: 0; }
+.field > span { color: var(--muted); font-size: 13px; }
+.field small { color: var(--faint); font-size: 12px; overflow-wrap: anywhere; }
+/* 16px keeps iOS Safari from zooming the page when a field takes focus. */
+.field input, .field textarea { width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid var(--control); border-radius: var(--radius-card); background: var(--ground); font: 16px/1.4 var(--font-mono); }
+.field textarea { min-height: 88px; resize: vertical; }
+.field input:read-only { color: var(--muted); }
 .note { color: var(--muted); font-size: 13px; }
 .note.bad { color: var(--negative); }
 .plan-agent { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--border); border-radius: var(--radius-card); }

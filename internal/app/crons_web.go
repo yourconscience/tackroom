@@ -32,3 +32,33 @@ func (s *configWebServer) handleCrons(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, viewCrons.result)
 }
+
+// patchCronScan puts a fresh record into the cached scan in place of the rows
+// drop matches (at the first one's place), or removes them when fresh is nil,
+// so the next action on that row finds it as it now is. The next GET still
+// collects again.
+func patchCronScan(drop func(cronJob) bool, fresh *cronJob) {
+	viewCrons.Lock()
+	defer viewCrons.Unlock()
+	jobs := make([]cronJob, 0, len(viewCrons.result.Jobs)+1)
+	placed := fresh == nil
+	for _, job := range viewCrons.result.Jobs {
+		if !drop(job) {
+			jobs = append(jobs, job)
+		} else if !placed {
+			jobs, placed = append(jobs, *fresh), true
+		}
+	}
+	if !placed {
+		jobs = append(jobs, *fresh)
+	}
+	viewCrons.result.Jobs = jobs
+	viewCrons.at = time.Time{}
+}
+
+// invalidateCronScan makes the next GET collect again.
+func invalidateCronScan() {
+	viewCrons.Lock()
+	viewCrons.at = time.Time{}
+	viewCrons.Unlock()
+}

@@ -1,11 +1,13 @@
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { exec, props, theme, notify } from "herdr";
+import { exec, props, theme, notify, openOverlay, nextCommand } from "herdr";
+import JobForm, { runTackroom } from "./form.js";
 
 // tackroom's Crons tab inside Herdr. It draws the same `tackroom cron collect`
 // JSON the web view draws, including the health, short name and schedule
 // words tackroom works out once for both, and acts through the same
-// `tackroom cron run|pause|resume` verbs.
+// `tackroom cron run|pause|resume` verbs. Add, Edit and Delete open form.js as
+// a dialog of this same mod and run `tackroom cron add|edit|remove`.
 
 // A launchd job that is off offers Resume, as in the web view.
 const OFF = ["disabled", "not_loaded"];
@@ -36,6 +38,8 @@ const tone = (t, h) => ({ fail: t.ansi1, warn: t.ansi3, ok: t.ansi2, idle: t.dim
 export default class Crons extends View {
   init(_props, cx) {
     const p = props() ?? {};
+    // The add, edit and delete dialog is this mod opened as an overlay.
+    if (p.form) { this.form = new JobForm(); this.form.init(p, cx); return; }
     this.bin = p.tackroom ?? "tackroom";
     this.config = p.config ?? "";
     this.data = null;
@@ -43,24 +47,22 @@ export default class Crons extends View {
     this.loading = false;
     this.busy = "";
     this.open = new Set();
-    this.home = null;
     // A collect probes every host over SSH, so poll gently; Collect refreshes at once.
     cx.timer.every(Math.max(60, p.refresh ?? 300) * 1000, (cx) => this.load(cx));
     this.load(cx);
-  }
-
-  async expand(path) {
-    if (!path.startsWith("~/")) return path;
-    if (this.home == null) this.home = (await exec("/bin/sh", ["-c", 'printf %s "$HOME"'])).stdout;
-    return this.home + path.slice(1);
+    // The dialog sends "reload" after it changes a job.
+    cx.spawn(async (cx) => { for (;;) { if ((await nextCommand()) === "reload") this.load(cx); } });
   }
 
   // args is ["cron", verb, ...]; --config goes right after the verb, because
   // Go's flag parsing stops at the first positional argument (the job id).
-  async tackroom(args, timeout) {
-    const bin = await this.expand(this.bin);
-    const cfg = this.config ? ["--config", await this.expand(this.config)] : [];
-    return exec(bin, [...args.slice(0, 2), ...cfg, ...args.slice(2)], { timeout });
+  tackroom(args, timeout) {
+    return runTackroom({ bin: this.bin, config: this.config }, args, timeout);
+  }
+
+  openForm(mode, j) {
+    const job = j && { id: j.id, short_name: j.short_name, declared_schedule: j.declared_schedule, declared_command: j.declared_command, effect: j.effect };
+    openOverlay({ mod: "tackroom", kind: "dialog", width: 420, props: { form: { mode, job }, tackroom: this.bin, config: this.config } });
   }
 
   load(cx) {
@@ -117,7 +119,8 @@ export default class Crons extends View {
       .child(label);
   }
 
-  render() {
+  render(cx) {
+    if (this.form) return this.form.render(cx);
     const t = theme();
     const d = this.data;
     const jobs = d?.jobs ?? [];
@@ -127,6 +130,7 @@ export default class Crons extends View {
       .child(svg("mods/tackroom/crons.svg").size(14).text_color(t.muted))
       .child(div().flex_1().text_size(13).font_semibold().child("Crons"))
       .child(div().text_size(11).text_color(t.dim).child(this.loading ? "collecting…" : d ? clock(d.scanned_at) : ""))
+      .child(this.button("add", "Add", () => this.openForm("add"), false, false, t))
       .child(this.button("collect", "Collect", (cx) => this.load(cx), false, this.loading, t))
       .child(this.button("web", "Web", () => this.openWeb(), false, false, t));
 
@@ -198,10 +202,15 @@ export default class Crons extends View {
         .child(div().w(62).flex_none().text_color(t.dim).child(label))
         .child(div().flex_1().min_w(0).text_color(t.muted).child(String(value)))),
     ];
-    if (acts.length) {
-      lines.push(h_flex().gap(6).pt(4).children(acts.map(([verb, label], i) =>
-        this.button(`${key(j)}:${verb}`, this.busy === key(j) ? "…" : label, (cx) => this.act(j, verb, cx), i === 0, busy, t))));
+    const buttons = acts.map(([verb, label], i) =>
+      this.button(`${key(j)}:${verb}`, this.busy === key(j) ? "…" : label, (cx) => this.act(j, verb, cx), i === 0, busy, t));
+    // The server says which jobs tackroom owns here (editable) and why not for the rest.
+    if (j.editable) {
+      buttons.push(this.button(`${key(j)}:edit`, "Edit", () => this.openForm("edit", j), false, busy, t));
+      buttons.push(this.button(`${key(j)}:delete`, "Delete", () => this.openForm("delete", j), false, busy, t));
     }
+    if (buttons.length) lines.push(h_flex().gap(6).pt(4).children(buttons));
+    if (!j.editable && j.edit_note) lines.push(div().pt(2).text_color(t.dim).child(`No edit or delete. ${j.edit_note}`));
     return v_flex().ml(22).mb(6).gap(3).text_size(11).children(lines);
   }
 }

@@ -38,6 +38,7 @@ const store = {
   cronsError: '',
   cronsLoading: false,
   cronFilter: 'all',
+  cronPatches: [],
 };
 
 // ---------- helpers ----------
@@ -278,7 +279,7 @@ const HELP = {
   roles: 'Agent roles from agents/*.md, rendered into each agent that supports subagents.',
   wiring: 'Which agents get each MCP server and hook. Select a dot to add or remove that agent; changes save to your config right away and Sync writes them to the agents.',
   unmanaged: "Things in your agents' folders that tackroom did not put there. tackroom never deletes them; copy the promote command to manage one.",
-  crons: 'Scheduled jobs and services on every host in crons.hosts (tackroom.local.yaml). The CLI shows the same: tackroom cron collect --table.',
+  crons: 'Scheduled jobs and services on every host in crons.hosts (tackroom.local.yaml). Add cron declares a job tackroom owns; Edit and Delete change only those. The CLI shows the same: tackroom cron collect --table.',
   config: 'Shared is tackroom.yaml in your config root; Local overrides it on this machine only; Effective is what sync uses.',
 };
 
@@ -532,8 +533,12 @@ const STRIP_HOURS = 24;
 async function loadCrons(refresh = false) {
   store.cronsLoading = true;
   if (store.view === 'crons') renderView();
+  const started = Date.now();
   try {
-    store.crons = await api(`/api/crons${refresh ? '?refresh=1' : ''}`);
+    const data = await api(`/api/crons${refresh ? '?refresh=1' : ''}`);
+    // A row changed after this collect began is newer than what it read.
+    for (const patch of store.cronPatches.filter((item) => item.at >= started)) data.jobs = replaceCronRow(data.jobs || [], patch.matches, patch.fresh);
+    store.crons = data;
     store.cronsError = '';
   } catch (error) {
     store.cronsError = error.message;
@@ -686,6 +691,7 @@ function openCron(job) {
 function renderCrons(root) {
   const data = store.crons;
   actions(
+    h('button', {type: 'button', class: 'primary', onclick: () => openJobPanel('add')}, icon('i-plus'), 'Add cron'),
     data ? h('span', {class: 'stamp', title: `Collected ${new Date(Date.parse(data.scanned_at)).toLocaleString()}`}, icon('i-crontab'), clock(Date.parse(data.scanned_at))) : null,
     h('button', {type: 'button', class: store.cronsLoading ? 'icon-button spinning' : 'icon-button', disabled: store.cronsLoading || undefined, 'aria-label': 'Collect again', title: store.cronsLoading ? 'Collecting…' : 'Collect again', onclick: () => loadCrons(true)}, icon('i-refresh')));
   if (!data) {
@@ -850,33 +856,156 @@ function cronTable(rows, showHost) {
     tbody));
 }
 
-// Run, pause and resume a launchd job; owned jobs on this machine also take a new schedule.
+// Run, pause and resume a launchd job. A job tackroom owns here also takes a new
+// schedule, Edit and Delete; for any other job the server says why not (edit_note).
 function cronActions(job) {
-  if (job.source !== 'launchd' || !job.unit) return null;
-  const busy = Boolean(store.cronBusy) || store.cronsLoading;
+  const launchd = job.source === 'launchd' && job.unit;
+  if (!launchd && !job.editable && !job.edit_note) return null;
+  const busy = Boolean(store.cronBusy);
   const off = ['disabled', 'not_loaded'].includes(job.state);
   const button = (label, action, cls) => h('button', {type: 'button', class: cls, disabled: busy || undefined, onclick: () => cronAction(job, action), text: label});
-  const input = job.owned && job.host === 'local' && job.state !== 'disabled'
+  const input = launchd && job.owned && job.host === 'local' && job.state !== 'disabled'
     ? h('input', {type: 'text', value: job.declared_schedule || '', placeholder: '0 9 * * *', 'aria-label': 'Schedule (cron expression)', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off'})
     : null;
   return h('div', {class: 'cron-actions'},
-    off ? button('Resume', 'resume', 'primary') : [button('Run now', 'run', 'primary'), button('Pause', 'pause')],
+    launchd ? (off ? button('Resume', 'resume', 'primary') : [button('Run now', 'run', 'primary'), button('Pause', 'pause')]) : null,
+    job.editable ? [
+      h('button', {type: 'button', disabled: busy || undefined, onclick: () => openJobPanel('edit', job), text: 'Edit'}),
+      h('button', {type: 'button', class: 'danger', disabled: busy || undefined, onclick: () => openJobPanel('delete', job), text: 'Delete'}),
+    ] : null,
     input ? h('form', {class: 'cron-schedule', onsubmit: (event) => { event.preventDefault(); cronAction(job, 'schedule', input.value); }},
       input, h('button', {type: 'submit', disabled: busy || undefined, text: 'Save schedule'})) : null,
-    store.cronBusy === cronKey(job) ? h('span', {class: 'muted', text: 'Working…'}) : null);
+    store.cronBusy === cronKey(job) ? h('span', {class: 'muted', text: 'Working…'}) : null,
+    !job.editable && job.edit_note ? h('p', {class: 'note'}, h('b', {text: 'No edit or delete. '}), job.edit_note) : null);
 }
 async function cronAction(job, action, schedule) {
   store.cronBusy = cronKey(job);
   renderView();
   const done = {run: 'Started', pause: 'Paused', resume: 'Resumed', schedule: 'New schedule applied to'}[action];
   try {
-    await api('/api/crons/action', {method: 'POST', body: JSON.stringify({host: job.host, source: job.source, id: job.id, action, ...(action === 'schedule' ? {schedule} : {})})});
+    const result = await api('/api/crons/action', {method: 'POST', body: JSON.stringify({host: job.host, source: job.source, id: job.id, action, ...(action === 'schedule' ? {schedule} : {})})});
     toast(`${done} ${job.short_name}`);
+    // The answer carries the job as it now is: redraw that row now, and let the
+    // full collect below catch up in the background.
+    if (result.job) patchCronRow((row) => row.host === job.host && row.source === job.source && row.id === job.id, result.job);
   } catch (error) {
     toast(error.message, true);
   }
   store.cronBusy = '';
-  await loadCrons(true);
+  renderView();
+  loadCrons(true);
+}
+
+// A row changed by an action or an edit is redrawn from the server's answer at
+// once. A collect that began before that answer holds older data for the row,
+// so loadCrons applies the same patch to its result.
+function replaceCronRow(jobs, matches, fresh) {
+  const out = [];
+  let placed = !fresh;
+  for (const job of jobs) {
+    if (!matches(job)) out.push(job);
+    else if (!placed) { out.push(fresh); placed = true; }
+  }
+  if (!placed) out.push(fresh);
+  return out;
+}
+function patchCronRow(matches, fresh) {
+  store.cronPatches = store.cronPatches.filter((patch) => Date.now() - patch.at < 120000);
+  store.cronPatches.push({at: Date.now(), matches, fresh});
+  if (!store.crons) return;
+  store.crons = {...store.crons, jobs: replaceCronRow(store.crons.jobs || [], matches, fresh)};
+  renderChrome();
+  renderView();
+}
+
+// ---------- cron jobs: add, edit, delete ----------
+// One drawer for the three. POST /api/crons/jobs does the work (the same code as
+// `tackroom cron add|edit|remove`) and answers with the job's fresh record. A
+// refusal shows in the form, where it can be fixed, not only in a toast.
+const jobDialog = {mode: '', job: null, busy: false};
+const quoted = (arg) => (/[\s"']/.test(arg) ? JSON.stringify(arg) : arg);
+function jobField(label, control, hint) {
+  return h('label', {class: 'field'}, h('span', {text: label}), control, hint ? h('small', {text: hint}) : null);
+}
+function setJobNote(message) {
+  const note = document.getElementById('job-note');
+  note.textContent = message;
+  note.hidden = !message;
+}
+function openJobPanel(mode, job) {
+  Object.assign(jobDialog, {mode, job: job || null, busy: false});
+  const [executable = '', ...args] = job?.declared_command || [];
+  const text = (name, value, extra = {}) => h('input', {type: 'text', name, value, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', ...extra});
+  document.getElementById('job-title').textContent = {add: 'Add cron', edit: `Edit ${job?.short_name}`, delete: `Delete ${job?.short_name}?`}[mode];
+  const submit = document.getElementById('submit-job');
+  submit.textContent = {add: 'Add cron', edit: 'Save changes', delete: 'Delete'}[mode];
+  submit.className = mode === 'delete' ? 'danger' : 'primary';
+  submit.disabled = false;
+  setJobNote('');
+  let first = document.getElementById('cancel-job');
+  if (mode === 'delete') {
+    mount(document.getElementById('job-body'),
+      h('p', {}, 'This removes ', h('b', {text: job.short_name}), ' from your tackroom config and its unit from this machine. tackroom touches no other job.'),
+      h('div', {class: 'detail-grid'}, h('dl', {}, [['Schedule', job.declared_schedule], ['Command', (job.declared_command || []).map(quoted).join(' ')], ['Effect', job.effect]]
+        .filter(([, value]) => value).flatMap(([label, value]) => [h('dt', {text: label}), h('dd', {class: 'code', text: value})]))));
+  } else {
+    mount(document.getElementById('job-body'),
+      mode === 'add'
+        ? jobField('Name', text('id', '', {placeholder: 'nightly-backup', maxlength: '63'}), 'Lowercase letters, digits and dashes. The unit is dev.tackroom.<name>.')
+        : jobField('Name', text('id', job.id, {readonly: true})),
+      jobField('Schedule', text('schedule', job?.declared_schedule || '', {placeholder: '0 9 * * 1-5'}), 'Five fields: minute hour day-of-month month weekday. Not both a day of month and a weekday.'),
+      jobField('Command', text('command', executable, {placeholder: '/usr/bin/git'}), 'The program: a name on PATH or an absolute path. ~ and $HOME expand when the unit is written.'),
+      jobField('Arguments', h('textarea', {name: 'args', rows: '3', placeholder: '-C\n/srv/notes\npull', autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false'}, args.join('\n')), 'One argument per line, kept as typed.'),
+      jobField('Effect (optional)', text('effect', job?.effect || ''), 'What it changes, shown in the Crons tab.'));
+    first = document.querySelector('#job-body input:not([readonly])');
+  }
+  const panel = document.getElementById('job-panel');
+  if (!panel.open) panel.showModal();
+  first.focus();
+}
+function closeJobPanel() {
+  const panel = document.getElementById('job-panel');
+  if (panel.open) panel.close();
+}
+async function submitJob(event) {
+  event.preventDefault();
+  if (jobDialog.busy) return;
+  const {mode, job} = jobDialog;
+  const form = new FormData(event.currentTarget);
+  const command = form.get('command')?.trim() ? [form.get('command').trim(), ...String(form.get('args') || '').split('\n').map((line) => line.replace(/\r$/, '')).filter(Boolean)] : [];
+  const schedule = String(form.get('schedule') || '').trim();
+  const effect = String(form.get('effect') || '').trim();
+  let body;
+  if (mode === 'delete') {
+    body = {action: 'remove', id: job.id};
+  } else if (mode === 'add') {
+    body = {action: 'add', id: String(form.get('id') || '').trim(), schedule, command, ...(effect ? {effect} : {})};
+  } else {
+    // Only what changed goes in the request, so the rest of the entry stays as written.
+    body = {action: 'edit', id: job.id};
+    if (schedule !== (job.declared_schedule || '')) body.schedule = schedule;
+    if (command.join('\n') !== (job.declared_command || []).join('\n')) body.command = command;
+    if (effect !== (job.effect || '')) body.effect = effect;
+    if (Object.keys(body).length === 2) { closeJobPanel(); toast('Nothing to change.'); return; }
+  }
+  jobDialog.busy = true;
+  const submit = document.getElementById('submit-job');
+  const label = submit.textContent;
+  submit.disabled = true;
+  submit.textContent = 'Working…';
+  setJobNote('');
+  try {
+    const result = await api('/api/crons/jobs', {method: 'POST', body: JSON.stringify(body)});
+    closeJobPanel();
+    patchCronRow((row) => row.id === body.id && (row.host === 'local' || row.state === 'missing'), result.job);
+    toast({add: `Added ${body.id}`, edit: `Saved ${job?.short_name}`, delete: `Deleted ${job?.short_name}`}[mode]);
+    loadCrons(true);
+  } catch (error) {
+    setJobNote(error.message);
+    submit.disabled = false;
+    submit.textContent = label;
+  }
+  jobDialog.busy = false;
 }
 
 // ---------- config ----------
@@ -1033,6 +1162,9 @@ document.getElementById('close-sync').addEventListener('click', () => document.g
 document.getElementById('cancel-sync').addEventListener('click', () => document.getElementById('sync-panel').close());
 document.getElementById('apply-sync').addEventListener('click', applySync);
 document.getElementById('sync-panel').addEventListener('click', (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
+document.getElementById('job-form').addEventListener('submit', submitJob);
+document.getElementById('close-job').addEventListener('click', closeJobPanel);
+document.getElementById('cancel-job').addEventListener('click', closeJobPanel);
 document.addEventListener('click', (event) => {
   const menu = document.getElementById('links-menu');
   if (menu.open && !menu.contains(event.target)) menu.open = false;

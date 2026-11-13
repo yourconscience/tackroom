@@ -254,6 +254,8 @@ func (s *configWebServer) handler() http.Handler {
 			s.handleCrons(w, r)
 		case "/api/crons/action":
 			s.handleCronAction(w, r)
+		case "/api/crons/jobs":
+			s.handleCronJobs(w, r)
 		default:
 			if strings.HasPrefix(r.URL.Path, "/fonts/") && strings.HasSuffix(r.URL.Path, ".woff2") && !strings.Contains(r.URL.Path[len("/fonts/"):], "/") {
 				s.handleAsset(w, r)
