@@ -1,6 +1,6 @@
 # Web view
 
-`tackroom view` opens a local dashboard over your config: the sync state of every harness, what is on disk, MCP and hook targeting, scheduled jobs and a YAML editor. It listens on loopback only and never runs `sync` on its own.
+`tackroom view` opens a local dashboard over your config: the sync state of every harness, outside sources with their pins, holds and blocks, what is on disk, MCP and hook targeting, scheduled jobs and a YAML editor. It is where you look and act day to day; every action calls the same code as a CLI command, and the CLI stays the surface for scripts and SSH. It listens on loopback only and never runs `sync` on its own.
 
 ```bash
 tackroom view                                  # start it and open your browser
@@ -17,7 +17,7 @@ tackroom config print                          # shared, local and effective con
 - `--config PATH` opens another config file; without it the file is [resolved as for every command](commands.md#config-resolution).
 - A second `tackroom view` finds the running one, prints its URL and starts nothing. Without `--addr` it looks where the last view recorded its address.
 
-The seven tabs are Overview, Skills, Roles, MCP & hooks, Unmanaged, Crons and Config. Skills and Roles are matrices of what is on disk per harness. Unmanaged lists items in harness folders that tackroom did not put there and never deletes them. Crons shows the inventory from [crons.md](crons.md#the-web-view-and-actions).
+The seven tabs are Overview, Skills, Roles, MCP & hooks, Unmanaged, Crons and Config. Overview lists every outside source: pinned, held or blocked, with the reason and the command that releases or accepts it, the same items `tackroom status` lists. Skills and Roles are matrices of what is on disk per harness. Unmanaged lists items in harness folders that tackroom did not put there and never deletes them. Crons shows the inventory from [crons.md](crons.md#the-web-view-and-actions).
 
 To add entries to the header's Links menu, list them under `ui.links` in either config file:
 
