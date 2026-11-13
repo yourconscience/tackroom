@@ -200,6 +200,12 @@ func externalDataDir(home string) string {
 }
 
 func injectPluginMCPServers(cfg *config, home string) {
+	injectPluginMCPServersMode(cfg, home, true)
+}
+
+// injectPluginMCPServersMode is injectPluginMCPServers with control over
+// creating each plugin's data directory; a dry run passes false.
+func injectPluginMCPServersMode(cfg *config, home string, createDataDir bool) {
 	cacheRoot := externalCacheDir(home)
 	dataRoot := externalDataDir(home)
 
@@ -238,9 +244,11 @@ func injectPluginMCPServers(cfg *config, home string) {
 		}
 
 		pluginDataPath := filepath.Join(dataRoot, name)
-		if err := os.MkdirAll(pluginDataPath, 0o755); err != nil {
-			fmt.Fprintf(os.Stderr, "warning: external %s: cannot create plugin data dir: %v; MCP ignored\n", name, err)
-			continue
+		if createDataDir {
+			if err := os.MkdirAll(pluginDataPath, 0o755); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: external %s: cannot create plugin data dir: %v; MCP ignored\n", name, err)
+				continue
+			}
 		}
 
 		servers, problems, err := discoverPluginMCPServers(cachePath, manifest.Schema, pluginDataPath)
