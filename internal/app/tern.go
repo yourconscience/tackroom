@@ -15,8 +15,8 @@ import (
 // runTernCommand opens a tackroom workspace in the Tern terminal: a session
 // named "tackroom" in the config root, with a shell pane, a `tackroom status`
 // pane on the right, and a `tackroom cron collect --table` pane below it, and
-// shows that session in the window. It is the optional OMP integration for
-// Tern; an absent Tern is an error, not a silent no-op.
+// shows that session in the window. It is the optional Tern terminal
+// integration; an absent Tern is an error, not a silent no-op.
 func runTernCommand(args []string) error {
 	fs := flag.NewFlagSet("tern", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
