@@ -66,7 +66,7 @@ The token file keeps the URL and open sessions valid. If the restart fails, the 
 
 - **Config files.** Toggles on Overview and MCP & hooks save to the file that defines the item: `tackroom.local.yaml` when it has the entry, else `tackroom.yaml`. The Config tab edits either file as YAML, with a check step before Save. Edits keep comments and keys tackroom does not know. Each save checks the file's revision, so a change made elsewhere is reported as stale instead of overwritten. Turning a harness off stops syncing it and removes nothing from disk.
 - **Harness files, through Sync.** Sync opens a per-harness plan first. Each destructive item must be ticked before it applies: removing a skill, role, plugin or MCP server, or overwriting a role. If the plan or the config changed since the preview, you preview again.
-- **Launchd jobs.** The Crons tab runs, pauses and resumes a launchd job, and changes the schedule of a job tackroom owns on that machine ([crons.md](crons.md#the-web-view-and-actions)).
+- **Launchd jobs.** The Crons tab runs, pauses and resumes a launchd job, changes the schedule of a job tackroom owns on that machine, and adds, edits and deletes owned jobs ([crons.md](crons.md#the-web-view-and-actions)).
 
 ## What it cannot change
 

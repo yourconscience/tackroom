@@ -49,6 +49,8 @@ Each job is one JSON record. Main fields:
 | `state` | `scheduled`, `service`, `disabled`, `paused`, `not_loaded`, `dead` or `missing`. |
 | `health` | `ok`, `warn`, `fail`, `idle` or `paused`, computed once for every view. |
 | `created_by`, `connectors`, `effect` | From the manifest below, or inferred. |
+| `declared_schedule`, `declared_command` | The `schedule` and `command` list a `crons.jobs` entry declares, as written. |
+| `editable`, `edit_note` | `editable` is true for a job `cron edit` and `cron remove` can change from this machine; otherwise `edit_note` says why not (a job tackroom did not install, one on another host, a note-only entry). |
 | `problems`, `inferred` | Findings, and the names of fields tackroom derived rather than read. |
 
 ### Access states
@@ -66,10 +68,11 @@ Each job is one JSON record. Main fields:
 
 `tackroom view` has a Crons tab with the same inventory. It collects on first open, caches for a minute and collects again on request. Jobs that need attention come first, then one table per host with an access chip per source. A job needs attention when it has problems or is `dead` or `missing`; a paused job's old error does not count until it is turned on again.
 
-A launchd job's row offers Run now, Pause and Resume; an owned job on the machine the view runs on also takes a new schedule. The CLI verbs do the same for scripts and other clients, such as the [Herdr panel](herdr.md).
+A launchd job's row offers Run now, Pause and Resume; an owned job on the machine the view runs on also takes a new schedule. The tab has an Add cron button, and an open row of a job tackroom owns here has Edit and Delete. Any other row has neither, and says why (`edit_note`). The CLI verbs do the same for scripts and other clients, such as the [Herdr panel](herdr.md).
 
 - Run is `launchctl kickstart gui/$UID/<label>`. Pause is `launchctl disable` then `bootout`, so the job stays off across logins and `collect` reports it `disabled`. Resume is `launchctl enable`, then `bootstrap` of the plist when it is not loaded. On another host the same script runs over SSH.
 - An action addresses a job by host, source and id as the last scan reported it, never by a label or path from the request. The view answers `stale_crons` for a job that is not in its last scan.
+- An action answers `{"output", "job"}`, where `job` is the job's record from a fresh scan of its host. The web view redraws that one row from it at once, so Pause turns into Resume without waiting; the full collect still runs in the background and does not overwrite a row changed after it began.
 - A schedule change rewrites `crons.jobs.<id>.schedule` in the file that declares the job (`tackroom.local.yaml` when it has the id, else `tackroom.yaml`), then runs `cron apply`. A paused job must be resumed first.
 - Only launchd jobs have actions. crontab, systemd timers and the other sources are read-only.
 
@@ -145,17 +148,17 @@ tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host 
 tackroom cron remove ID
 ```
 
-All three take `--dry-run`, `--no-apply` and `--config PATH`, and the id comes first. `--dry-run` prints the YAML change and the `apply` plan and writes nothing. Without `--no-apply` each runs `cron apply` after writing, which stays the only writer of native units.
+All three take `--dry-run`, `--no-apply` and `--config PATH`; the id may come before, between or after the flags. `--dry-run` prints the YAML change and the `apply` plan and writes nothing. Without `--no-apply` each runs `cron apply` after writing, which stays the only writer of native units.
 
 - A command is `--command` plus one `--arg` per argument, in order, stored as a YAML list: `--command /usr/bin/git --arg -C --arg /srv/notes --arg pull` becomes `command: [/usr/bin/git, -C, /srv/notes, pull]`. `edit --command` replaces the whole list.
-- `add` writes `crons.jobs.<id>` to `tackroom.yaml`, or to `tackroom.local.yaml` with `--local`. `edit` changes only the fields you pass, in the file that declares the job (`tackroom.local.yaml` when it has the id). `--host ""` and `--effect ""` remove the field. `remove` deletes the declaration, from both files when both declare it, with the comment lines directly above it.
+- `add` writes `crons.jobs.<id>` to `tackroom.yaml`, or to `tackroom.local.yaml` with `--local`. `edit` changes only the fields you pass, in the file that declares the job (`tackroom.local.yaml` when it has the id). `--host ""` and `--effect ""` remove the field. `remove` deletes the declaration, from both files when both declare it, with the comment lines directly above it. When that was the last job, the `jobs:` and `crons:` keys that held it go too, so an `add` followed by a `remove` leaves the file as it was; a `crons:` block with another key or any comment keeps its place.
 - Only the lines of the touched entry are rewritten. Every other byte of the file stays as it was, and comments inside the touched entry are kept but may be re-spaced. A file whose `crons` section is in flow style, or has no block `jobs` mapping to extend, is re-encoded whole instead. The write is atomic and keeps the file's mode. No backup copy is made, the same as for a schedule change; the config root is meant to be in git.
 - Refused before anything is written: an invalid or reserved id, a schedule the `apply` parser rejects, an empty command, a command not found on `PATH` here (when this machine will install it and `--no-apply` is not given), a `host` while `crons.self` is unset, `add` of an id that exists, `edit` or `remove` of an id that is not declared, and an id that is declared without both `schedule` and `command`. The last kind are inventory annotations; edit them by hand.
 - If `apply` fails after the write, the declaration stays saved and the error says so; fix the cause and run `tackroom cron apply`.
 
 tackroom creates, changes and deletes only jobs it owns. Any launchd, systemd, crontab or other job without tackroom's prefix is never touched by these commands, and an id that `collect` reports but that is not declared is refused with an error that says so.
 
-The view serves the same operations as `POST /api/crons/jobs`, with the token, origin and CSRF checks of `/api/crons/action`. The body is JSON: `action` (`add`, `edit` or `remove`) and `id`, plus `schedule`, `command` (a list, executable first), `host`, `effect`, `local`, `dry_run` and `no_apply` as above; unknown fields are refused. The answer carries `files` (the YAML files written), `diff`, `plan` (the lines `apply` printed) and `job`, the job's fresh record from a scan of this machine so a client can refresh one row (`null` after a removal or a dry run). Errors use the usual `{"error": {"code", "message"}}` shape: `invalid_request` (400) for a malformed body, `cron_action_failed` (422) for a refusal or a failed apply. A job for another host is refused with a message to edit `tackroom.yaml` and let that machine run `cron apply`.
+The view serves the same operations as `POST /api/crons/jobs`, with the token, origin and CSRF checks of `/api/crons/action`. The body is JSON: `action` (`add`, `edit` or `remove`) and `id`, plus `schedule`, `command` (a list, executable first), `host`, `effect`, `local`, `dry_run` and `no_apply` as above; unknown fields are refused. The answer carries `files` (the YAML files written), `diff`, `plan` (the lines `apply` printed) and `job`, the job's fresh record from a scan of this machine so a client can refresh one row (`null` after a removal or a dry run). The web view's Add cron, Edit and Delete post to it; the form takes the name (add only), schedule, command, one argument per line and an optional effect, sends only the fields an edit changed, and shows a refusal in the form. Delete asks first. Errors use the usual `{"error": {"code", "message"}}` shape: `invalid_request` (400) for a malformed body, `cron_action_failed` (422) for a refusal or a failed apply. A job for another host is refused with a message to edit `tackroom.yaml` and let that machine run `cron apply`.
 
 ## Built-in jobs
 
