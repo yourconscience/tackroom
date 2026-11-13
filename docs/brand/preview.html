@@ -1,0 +1,709 @@
+<!doctype html>
+<html lang="en" data-dir="a">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>tackroom identity proposal</title>
+<meta name="description" content="Two visual directions for tackroom, Rail and plate and Lavender unified, each in light and dark.">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Public+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500&family=Bricolage+Grotesque:opsz,wght@12..96,500..700&family=Geist:wght@400..600&family=Geist+Mono:wght@400..500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: light dark;
+    --tr-bg: #f4f4f5;
+    --tr-surface: #ffffff;
+    --tr-raised: #eaeaed;
+    --tr-line: #dcdce0;
+    --tr-line-strong: #8e8f96;
+    --tr-text: #161618;
+    --tr-muted: #4f5056;
+    --tr-faint: #8e8f96;
+    --tr-accent: #b08a3f;
+    --tr-accent-ink: #17130a;
+    --tr-accent-text: #7a5a17;
+    --tr-rail: #9a7631;
+    --tr-ok: #1d7550;
+    --tr-ok-bg: #e5f1eb;
+    --tr-warn: #a84a0b;
+    --tr-warn-bg: #fbede2;
+    --tr-bad: #be2741;
+    --tr-bad-bg: #fbe7ea;
+    --tr-pin: #7a5a17;
+    --tr-pin-bg: #f4ecdc;
+    --tr-focus: #7a5a17;
+    --tr-tile: #212023;
+    --tr-hook: #f4f4f5;
+    --tr-logo-rail: #c9a45a;
+    --tr-mark-bg: #f4f4f6;
+    --tr-mark-line: #76777e;
+    --tr-code-bg: #18181b;
+    --tr-code-text: #e9e9ec;
+    --tr-code-dim: #a1a2a8;
+    --tr-code-ok: #5fc39c;
+    --tr-code-warn: #f29b55;
+    --tr-code-bad: #f3808f;
+    --tr-code-pin: #d6b46c;
+    --tr-font-display: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+    --tr-font-body: "Public Sans", ui-sans-serif, system-ui, sans-serif;
+    --tr-font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --tr-radius-card: 6px;
+    --tr-radius-plate: 2px;
+    --tr-radius-control: 6px;
+    --tr-radius-chip: 3px;
+    --tr-display-weight: 700;
+    --tr-display-tracking: -0.025em;
+    --tr-rail-width: 3px;
+    --tr-fs-caption: 14px;
+    --tr-fs-ui: 14px;
+    --tr-fs-body: 16px;
+    --tr-fs-lead: 18px;
+    --tr-fs-h3: 21px;
+    --tr-fs-h2: 28px;
+    --tr-fs-h1: 38px;
+    --tr-fs-display: 50px;
+    --tr-lh-body: 1.55;
+    --tr-lh-tight: 1.1;
+    --tr-space-1: 4px;
+    --tr-space-2: 8px;
+    --tr-space-3: 12px;
+    --tr-space-4: 16px;
+    --tr-space-5: 24px;
+    --tr-space-6: 32px;
+    --tr-space-7: 48px;
+  }
+  :root[data-dir="b"] {
+    --tr-bg: #f4f4f8;
+    --tr-surface: #fbfbfd;
+    --tr-raised: #ebebf2;
+    --tr-line: #dcdce6;
+    --tr-line-strong: #8a8ca1;
+    --tr-text: #191924;
+    --tr-muted: #5b5d72;
+    --tr-faint: #8a8ca1;
+    --tr-accent: #4f56c9;
+    --tr-accent-ink: #fbfbfd;
+    --tr-accent-text: #4f56c9;
+    --tr-rail: #4f56c9;
+    --tr-ok: #2a7537;
+    --tr-ok-bg: #e6f2e8;
+    --tr-warn: #8f5a00;
+    --tr-warn-bg: #f8efdc;
+    --tr-bad: #bd2d55;
+    --tr-bad-bg: #f9e6ec;
+    --tr-pin: #4f56c9;
+    --tr-pin-bg: #e8e9fa;
+    --tr-focus: #4f56c9;
+    --tr-tile: #1c1c28;
+    --tr-hook: #e6e7f2;
+    --tr-logo-rail: #b4befe;
+    --tr-mark-bg: #f4f4f6;
+    --tr-mark-line: #76777e;
+    --tr-code-bg: #1b1b26;
+    --tr-code-text: #dcdeec;
+    --tr-code-dim: #9597b1;
+    --tr-code-ok: #a6e3a1;
+    --tr-code-warn: #f9e2af;
+    --tr-code-bad: #f38ba8;
+    --tr-code-pin: #b4befe;
+    --tr-font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --tr-font-body: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+    --tr-font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+    --tr-radius-card: 12px;
+    --tr-radius-plate: 12px;
+    --tr-radius-control: 999px;
+    --tr-radius-chip: 6px;
+    --tr-display-weight: 650;
+    --tr-display-tracking: -0.035em;
+    --tr-rail-width: 3px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --tr-bg: #171719;
+      --tr-surface: #131217;
+      --tr-raised: #212023;
+      --tr-line: #2c2b31;
+      --tr-line-strong: #6b6b72;
+      --tr-text: #ffffff;
+      --tr-muted: #b4b4b8;
+      --tr-faint: #6b6b72;
+      --tr-accent: #c9a45a;
+      --tr-accent-ink: #17130a;
+      --tr-accent-text: #d8b56e;
+      --tr-rail: #b8944f;
+      --tr-ok: #5fc39c;
+      --tr-ok-bg: #1a2824;
+      --tr-warn: #f29b55;
+      --tr-warn-bg: #2d2117;
+      --tr-bad: #f3808f;
+      --tr-bad-bg: #2d1a20;
+      --tr-pin: #d8b56e;
+      --tr-pin-bg: #29231a;
+      --tr-focus: #d8b56e;
+      --tr-tile: #212023;
+      --tr-hook: #f4f4f5;
+      --tr-logo-rail: #c9a45a;
+      --tr-mark-bg: #f4f4f6;
+      --tr-mark-line: #76777e;
+      --tr-code-bg: #0e0e11;
+      --tr-code-text: #e9e9ec;
+      --tr-code-dim: #a1a2a8;
+      --tr-code-ok: #5fc39c;
+      --tr-code-warn: #f29b55;
+      --tr-code-bad: #f3808f;
+      --tr-code-pin: #d6b46c;
+    }
+    :root[data-dir="b"]:not([data-theme="light"]) {
+      --tr-bg: #13131b;
+      --tr-surface: #1c1c28;
+      --tr-raised: #181822;
+      --tr-line: #2a2a39;
+      --tr-line-strong: #6f7189;
+      --tr-text: #e6e7f2;
+      --tr-muted: #a0a2b9;
+      --tr-faint: #6f7189;
+      --tr-accent: #b4befe;
+      --tr-accent-ink: #171725;
+      --tr-accent-text: #b4befe;
+      --tr-rail: #b4befe;
+      --tr-ok: #a6e3a1;
+      --tr-ok-bg: #1d2a25;
+      --tr-warn: #f9e2af;
+      --tr-warn-bg: #2b2620;
+      --tr-bad: #f38ba8;
+      --tr-bad-bg: #2d1d29;
+      --tr-pin: #b4befe;
+      --tr-pin-bg: #242640;
+      --tr-focus: #b4befe;
+      --tr-tile: #1c1c28;
+      --tr-hook: #e6e7f2;
+      --tr-logo-rail: #b4befe;
+      --tr-mark-bg: #f4f4f6;
+      --tr-mark-line: #76777e;
+      --tr-code-bg: #171721;
+      --tr-code-text: #dcdeec;
+      --tr-code-dim: #9597b1;
+      --tr-code-ok: #a6e3a1;
+      --tr-code-warn: #f9e2af;
+      --tr-code-bad: #f38ba8;
+      --tr-code-pin: #b4befe;
+    }
+  }
+  :root[data-theme="dark"] {
+    --tr-bg: #171719;
+    --tr-surface: #131217;
+    --tr-raised: #212023;
+    --tr-line: #2c2b31;
+    --tr-line-strong: #6b6b72;
+    --tr-text: #ffffff;
+    --tr-muted: #b4b4b8;
+    --tr-faint: #6b6b72;
+    --tr-accent: #c9a45a;
+    --tr-accent-ink: #17130a;
+    --tr-accent-text: #d8b56e;
+    --tr-rail: #b8944f;
+    --tr-ok: #5fc39c;
+    --tr-ok-bg: #1a2824;
+    --tr-warn: #f29b55;
+    --tr-warn-bg: #2d2117;
+    --tr-bad: #f3808f;
+    --tr-bad-bg: #2d1a20;
+    --tr-pin: #d8b56e;
+    --tr-pin-bg: #29231a;
+    --tr-focus: #d8b56e;
+    --tr-tile: #212023;
+    --tr-hook: #f4f4f5;
+    --tr-logo-rail: #c9a45a;
+    --tr-mark-bg: #f4f4f6;
+    --tr-mark-line: #76777e;
+    --tr-code-bg: #0e0e11;
+    --tr-code-text: #e9e9ec;
+    --tr-code-dim: #a1a2a8;
+    --tr-code-ok: #5fc39c;
+    --tr-code-warn: #f29b55;
+    --tr-code-bad: #f3808f;
+    --tr-code-pin: #d6b46c;
+  }
+  :root[data-dir="b"][data-theme="dark"] {
+    --tr-bg: #13131b;
+    --tr-surface: #1c1c28;
+    --tr-raised: #181822;
+    --tr-line: #2a2a39;
+    --tr-line-strong: #6f7189;
+    --tr-text: #e6e7f2;
+    --tr-muted: #a0a2b9;
+    --tr-faint: #6f7189;
+    --tr-accent: #b4befe;
+    --tr-accent-ink: #171725;
+    --tr-accent-text: #b4befe;
+    --tr-rail: #b4befe;
+    --tr-ok: #a6e3a1;
+    --tr-ok-bg: #1d2a25;
+    --tr-warn: #f9e2af;
+    --tr-warn-bg: #2b2620;
+    --tr-bad: #f38ba8;
+    --tr-bad-bg: #2d1d29;
+    --tr-pin: #b4befe;
+    --tr-pin-bg: #242640;
+    --tr-focus: #b4befe;
+    --tr-tile: #1c1c28;
+    --tr-hook: #e6e7f2;
+    --tr-logo-rail: #b4befe;
+    --tr-mark-bg: #f4f4f6;
+    --tr-mark-line: #76777e;
+    --tr-code-bg: #171721;
+    --tr-code-text: #dcdeec;
+    --tr-code-dim: #9597b1;
+    --tr-code-ok: #a6e3a1;
+    --tr-code-warn: #f9e2af;
+    --tr-code-bad: #f38ba8;
+    --tr-code-pin: #b4befe;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--tr-bg); color: var(--tr-text); font: 400 var(--tr-fs-body)/var(--tr-lh-body) var(--tr-font-body); -webkit-font-smoothing: antialiased; overflow-wrap: anywhere; }
+  h1, h2, h3 { font-family: var(--tr-font-display); font-weight: var(--tr-display-weight); letter-spacing: var(--tr-display-tracking); line-height: var(--tr-lh-tight); margin: 0; text-wrap: balance; }
+  h2 { font-size: var(--tr-fs-h2); }
+  h3 { font-size: var(--tr-fs-h3); letter-spacing: -.01em; }
+  p { margin: 0; text-wrap: pretty; }
+  code, .mono { font-family: var(--tr-font-mono); font-size: var(--tr-fs-caption); }
+  a { color: var(--tr-accent-text); text-underline-offset: 3px; }
+  :focus-visible { outline: 2px solid var(--tr-focus); outline-offset: 2px; }
+  .muted { color: var(--tr-muted); }
+  .ico { width: 18px; height: 18px; flex: none; fill: currentColor; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* page frame */
+  .bar { position: sticky; top: 0; z-index: 5; background: var(--tr-bg); border-bottom: 1px solid var(--tr-line); }
+  .bar-in { max-width: 720px; margin: 0 auto; padding: 10px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .bar-title { display: flex; align-items: center; gap: 10px; font-weight: 600; margin-right: auto; }
+  .bar-title svg { width: 24px; height: 24px; }
+  .seg { display: inline-flex; padding: 2px; gap: 2px; border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-control); }
+  .seg button { font: 500 var(--tr-fs-body)/1 var(--tr-font-body); color: var(--tr-muted); background: none; border: 0; min-height: 36px; padding: 0 12px; border-radius: var(--tr-radius-control); cursor: pointer; }
+  .seg button[aria-pressed="true"] { background: var(--tr-text); color: var(--tr-bg); }
+  .page { max-width: 720px; margin: 0 auto; padding: 0 16px 72px; }
+  section { padding-top: 48px; display: grid; gap: 16px; }
+  section > p { color: var(--tr-muted); max-width: 62ch; }
+  .intro { padding-top: 28px; }
+  .intro h1 { font-size: var(--tr-fs-h1); }
+  .verdict { padding: 12px 14px; border: 1px solid var(--tr-line); border-left: 3px solid var(--tr-rail); border-radius: var(--tr-radius-card); background: var(--tr-surface); }
+  .sub { font: 600 var(--tr-fs-body)/1.3 var(--tr-font-body); margin-top: 8px; }
+  .scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  /* logo */
+  .sizes { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 16px; }
+  .sizes figure { margin: 0; display: grid; justify-items: center; gap: 6px; }
+  .sizes figcaption { font: 400 var(--tr-fs-caption)/1 var(--tr-font-mono); color: var(--tr-muted); }
+  .mk-tile { fill: var(--tr-tile); }
+  .mk-rail { stroke: var(--tr-logo-rail); }
+  .mk-hook { stroke: var(--tr-hook); }
+  .mono-mark { color: var(--tr-text); }
+  .lockup { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .lockup svg { width: 44px; height: 44px; }
+  .wordmark { font-family: var(--tr-font-display); font-weight: var(--tr-display-weight); letter-spacing: var(--tr-display-tracking); font-size: 38px; line-height: 1; }
+  .panel { padding: 16px; border: 1px solid var(--tr-line); border-radius: var(--tr-radius-card); background: var(--tr-surface); display: grid; gap: 16px; }
+
+  /* palette */
+  .swatch-group h3 { font-size: var(--tr-fs-body); font-family: var(--tr-font-body); font-weight: 600; letter-spacing: 0; margin-bottom: 8px; }
+  .swatches { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .swatches li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 2px 10px; align-items: center; }
+  .swatches i { grid-row: span 2; width: 36px; height: 36px; border-radius: var(--tr-radius-chip); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tr-text) 18%, transparent); }
+  .swatches b { font: 500 var(--tr-fs-caption)/1.2 var(--tr-font-mono); }
+  .swatches span { font: 400 var(--tr-fs-caption)/1.2 var(--tr-font-mono); color: var(--tr-muted); }
+  .pairs { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .pairs li { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--tr-line); }
+  .pairs .aa { width: 40px; height: 32px; display: grid; place-items: center; border-radius: var(--tr-radius-chip); font-weight: 600; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--tr-text) 14%, transparent); }
+  .pairs .use { font-size: var(--tr-fs-body); line-height: 1.3; }
+  .pairs .use span { display: block; font: 400 var(--tr-fs-caption)/1.3 var(--tr-font-mono); color: var(--tr-muted); }
+  .pairs .r { font: 500 var(--tr-fs-body)/1.2 var(--tr-font-mono); text-align: right; white-space: nowrap; }
+  .pairs .r span { display: block; font-size: var(--tr-fs-caption); color: var(--tr-muted); }
+
+  /* type */
+  .type-list { display: grid; gap: 14px; }
+  .type-list > div { display: grid; gap: 2px; padding-bottom: 12px; border-bottom: 1px solid var(--tr-line); }
+  .type-list .spec { font: 400 var(--tr-fs-caption)/1.3 var(--tr-font-mono); color: var(--tr-muted); }
+
+  /* the rail and its plates */
+  .rail-group { display: grid; gap: 10px; }
+  .plates { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 12px; row-gap: 18px; }
+  .plates > li { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; }
+  .plates > li::before { content: ""; position: absolute; top: 0; height: var(--tr-rail-width); background: var(--tr-rail); left: -6px; right: -6px; border-radius: 0; }
+  .plates > li:nth-child(odd)::before { left: 0; }
+  .plates > li:nth-child(even)::before { right: 0; }
+  .plates > li:last-child::before { right: 0; }
+  .hanger { width: 16px; height: 18px; margin-top: 0; stroke: var(--tr-muted); fill: none; stroke-width: 2; stroke-linecap: round; }
+  .plate { width: 100%; margin-top: -2px; padding: 12px 12px 10px; display: grid; gap: 2px; align-content: start; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-plate); box-shadow: inset 0 0 0 3px var(--tr-surface), inset 0 0 0 4px var(--tr-line); }
+  .plate-top { display: flex; align-items: flex-start; gap: 8px; }
+  .plate-name { font: 600 var(--tr-fs-body)/1.25 var(--tr-font-display); letter-spacing: -.005em; min-width: 0; }
+  .plate-key { font: 400 var(--tr-fs-caption)/1.3 var(--tr-font-mono); color: var(--tr-muted); }
+  .plate-state { margin-top: 6px; font-size: var(--tr-fs-body); display: flex; gap: 6px; align-items: baseline; }
+  .plate-state .g { font-family: var(--tr-font-mono); font-weight: 500; }
+  .mark-slot { flex: none; width: 24px; height: 24px; margin-left: auto; border-radius: 4px; background: var(--tr-mark-bg); box-shadow: inset 0 0 0 1px var(--tr-mark-line); }
+  .mark-slot.empty { background: transparent; box-shadow: none; outline: 1px dashed var(--tr-mark-line); outline-offset: -1px; }
+  .note { font-size: var(--tr-fs-body); color: var(--tr-muted); }
+  html[data-dir="b"] .plate { box-shadow: 0 1px 0 color-mix(in srgb, var(--tr-text) 6%, transparent); border-color: var(--tr-line); }
+  html[data-dir="b"] .plates > li::before { border-radius: 2px; }
+
+  /* status vocabulary */
+  .ok { color: var(--tr-ok); } .warn { color: var(--tr-warn); } .bad { color: var(--tr-bad); } .pin { color: var(--tr-pin); }
+  .tag { display: inline-flex; align-items: stretch; max-width: 100%; border-radius: var(--tr-radius-chip); font-size: var(--tr-fs-body); line-height: 1; overflow: hidden; border: 1px solid; }
+  .tag .g { display: grid; place-items: center; min-width: 28px; padding: 0 6px; font: 500 var(--tr-fs-body)/1 var(--tr-font-mono); }
+  .tag .w { display: flex; align-items: center; gap: 8px; padding: 7px 10px 7px 8px; min-width: 0; }
+  .tag .w code { color: var(--tr-text); font-size: var(--tr-fs-caption); }
+  .tag.t-ok { border-color: color-mix(in srgb, var(--tr-ok) 45%, transparent); color: var(--tr-ok); } .tag.t-ok .g { background: var(--tr-ok-bg); }
+  .tag.t-warn { border-color: color-mix(in srgb, var(--tr-warn) 45%, transparent); color: var(--tr-warn); } .tag.t-warn .g { background: var(--tr-warn-bg); }
+  .tag.t-bad { border-color: color-mix(in srgb, var(--tr-bad) 45%, transparent); color: var(--tr-bad); } .tag.t-bad .g { background: var(--tr-bad-bg); }
+  .tag.t-pin { border-color: var(--tr-pin); border-top-width: var(--tr-rail-width); color: var(--tr-pin); } .tag.t-pin .g { background: var(--tr-pin-bg); color: var(--tr-ok); }
+  .tag.t-pin .w code { padding: 3px 6px; background: var(--tr-pin-bg); border-radius: 2px; letter-spacing: .04em; }
+  html[data-dir="b"] .tag { border-radius: 999px; }
+  html[data-dir="b"] .tag.t-pin { border-top-width: 1px; }
+  .vocab { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .vocab li { display: grid; gap: 6px; }
+  .vocab p { color: var(--tr-muted); }
+  .hold { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; width: 100%; max-width: 358px; }
+  .hold-track { position: relative; height: var(--tr-rail-width); background: var(--tr-line); }
+  .hold-track i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p); background: var(--tr-warn); }
+  .hold-track b { position: absolute; top: -5px; width: 1px; height: 13px; background: var(--tr-line-strong); }
+  .hold-track b:nth-of-type(1) { left: 33.33%; } .hold-track b:nth-of-type(2) { left: 66.66%; } .hold-track b:nth-of-type(3) { right: 0; width: 2px; background: var(--tr-text); }
+  .hold-meta { font: 400 var(--tr-fs-caption)/1 var(--tr-font-mono); color: var(--tr-muted); }
+
+  /* lock list, used by the hero and the dashboard tile */
+  .locks { list-style: none; margin: 0; padding: 0; border-top: var(--tr-rail-width) solid var(--tr-rail); }
+  .locks li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 4px 10px; padding: 12px 0; border-bottom: 1px solid var(--tr-line); }
+  .locks .ico { margin-top: 2px; color: var(--tr-muted); }
+  .locks .ico.pin { color: var(--tr-pin); }
+  .locks .nm { font: 500 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
+  .locks .src { font: 400 var(--tr-fs-caption)/1.3 var(--tr-font-mono); color: var(--tr-muted); }
+  .locks .st { grid-column: 2; display: grid; gap: 8px; justify-items: start; }
+
+  /* mocks */
+  .frame { border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-card); overflow: hidden; background: var(--tr-bg); }
+  .frame-cap { font: 400 var(--tr-fs-caption)/1 var(--tr-font-mono); color: var(--tr-muted); padding: 10px 14px; border-bottom: 1px solid var(--tr-line); background: var(--tr-surface); }
+  .hero { padding: 16px; display: grid; gap: 18px; }
+  .hero-nav { display: flex; align-items: center; gap: 10px; }
+  .hero-nav svg { width: 28px; height: 28px; }
+  .hero-nav .wm { font-family: var(--tr-font-display); font-weight: var(--tr-display-weight); letter-spacing: var(--tr-display-tracking); font-size: 22px; }
+  .hero-nav a { margin-left: auto; font-size: var(--tr-fs-body); color: var(--tr-text); }
+  .hero h1 { font-size: var(--tr-fs-h1); }
+  .hero .line { font-size: var(--tr-fs-lead); color: var(--tr-muted); }
+  .cmd { display: flex; align-items: center; gap: 10px; padding: 0 0 0 12px; border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-control); background: var(--tr-surface); }
+  .cmd code { flex: 1; min-width: 0; padding: 12px 0; white-space: nowrap; overflow-x: auto; font-size: var(--tr-fs-caption); }
+  .cmd code::before { content: "$ "; color: var(--tr-muted); }
+  .cmd button { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: 0; border-left: 1px solid var(--tr-line); background: var(--tr-accent); color: var(--tr-accent-ink); font: 600 var(--tr-fs-body)/1 var(--tr-font-body); border-radius: 0 calc(var(--tr-radius-control) - 1px) calc(var(--tr-radius-control) - 1px) 0; cursor: pointer; }
+  .lockview { border: 1px solid var(--tr-line); border-radius: var(--tr-radius-card); background: var(--tr-surface); padding: 12px 14px 4px; display: grid; gap: 10px; }
+  .lockview-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font: 500 var(--tr-fs-caption)/1.3 var(--tr-font-mono); }
+  .lockview-head span { color: var(--tr-muted); }
+  .lockview .locks { border-top-width: 1px; border-top-color: var(--tr-line); }
+  .lockview .locks li:last-child { border-bottom: 0; }
+
+  .tile { background: var(--tr-surface); border: 1px solid var(--tr-line); border-radius: var(--tr-radius-card); padding: 16px; display: grid; gap: 14px; }
+  .tile-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+  .tile-head h3 { font-family: var(--tr-font-body); font-size: var(--tr-fs-body); font-weight: 600; letter-spacing: 0; }
+  .tile-head span { font: 400 var(--tr-fs-caption)/1 var(--tr-font-mono); color: var(--tr-muted); }
+  .seg-bar { display: flex; gap: 2px; height: 10px; }
+  .seg-bar span { background: var(--tr-pin); }
+  .seg-bar .w { background: var(--tr-warn); }
+  .counts { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .counts li { display: grid; gap: 2px; }
+  .counts b { font: 500 var(--tr-fs-h3)/1.1 var(--tr-font-mono); }
+  .counts span { font-size: var(--tr-fs-body); color: var(--tr-muted); }
+
+  .term { margin: 0; padding: 14px 16px; background: var(--tr-code-bg); color: var(--tr-code-text); border-radius: var(--tr-radius-card); font: 400 var(--tr-fs-caption)/1.6 var(--tr-font-mono); overflow-x: auto; }
+  .term .d { color: var(--tr-code-dim); } .term .o { color: var(--tr-code-ok); } .term .y { color: var(--tr-code-warn); } .term .r { color: var(--tr-code-bad); } .term .h { color: var(--tr-code-pin); } .term b { font-weight: 500; }
+
+  .readme { padding: 16px; display: grid; gap: 14px; background: var(--tr-surface); }
+  .readme svg.lg { width: 72px; height: 72px; }
+  .readme h1 { font-family: var(--tr-font-body); font-size: 30px; font-weight: 600; letter-spacing: 0; padding-bottom: 8px; border-bottom: 1px solid var(--tr-line); }
+  .readme .links { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+  .readme pre { margin: 0; padding: 12px 14px; background: var(--tr-raised); border-radius: 6px; font: 400 var(--tr-fs-caption)/1.6 var(--tr-font-mono); overflow-x: auto; }
+
+  .footer { padding-top: 48px; color: var(--tr-muted); }
+  @media (min-width: 600px) {
+    .plates { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .plates > li::before { left: -6px; right: -6px; }
+    .plates > li:nth-child(3n+1)::before { left: 0; }
+    .plates > li:nth-child(3n)::before, .plates > li:last-child::before { right: 0; }
+    .swatches { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (prefers-reduced-motion: no-preference) { .seg button { transition: background .12s ease, color .12s ease; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="mark" viewBox="0 0 64 64"><rect class="mk-tile" width="64" height="64" rx="14"/><path class="mk-rail" d="M13 18H51" stroke-width="8" stroke-linecap="round"/><path class="mk-hook" d="M27 18V38a8.5 8.5 0 0 0 17 0" fill="none" stroke-width="8" stroke-linecap="round"/></symbol>
+    <symbol id="mark-mono" viewBox="0 0 64 64"><path d="M13 18H51" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M27 18V38a8.5 8.5 0 0 0 17 0" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></symbol>
+    <!-- Phosphor Regular 2.1.1 (MIT), the dashboard's icon set -->
+    <symbol id="i-pin" viewBox="0 0 256 256"><path d="M235.32,81.37,174.63,20.69a16,16,0,0,0-22.63,0L98.37,74.49c-10.66-3.34-35-7.37-60.4,13.14a16,16,0,0,0-1.29,23.78L85,159.71,42.34,202.34a8,8,0,0,0,11.32,11.32L96.29,171l48.29,48.29A16,16,0,0,0,155.9,224c.38,0,.75,0,1.13,0a15.93,15.93,0,0,0,11.64-6.33c19.64-26.1,17.75-47.32,13.19-60L235.33,104A16,16,0,0,0,235.32,81.37ZM224,92.69h0l-57.27,57.46a8,8,0,0,0-1.49,9.22c9.46,18.93-1.8,38.59-9.34,48.62L48,100.08c12.08-9.74,23.64-12.31,32.48-12.31A40.13,40.13,0,0,1,96.81,91a8,8,0,0,0,9.25-1.51L163.32,32,224,92.68Z"/></symbol>
+    <symbol id="i-timer" viewBox="0 0 256 256"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,216ZM173.66,90.34a8,8,0,0,1,0,11.32l-40,40a8,8,0,0,1-11.32-11.32l40-40A8,8,0,0,1,173.66,90.34ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></symbol>
+    <symbol id="i-audit" viewBox="0 0 256 256"><path d="M220,160a12,12,0,1,1-12-12A12,12,0,0,1,220,160Zm-4.55,39.29A48.08,48.08,0,0,1,168,240H144a48.05,48.05,0,0,1-48-48V151.49A64,64,0,0,1,40,88V40a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56V88a48,48,0,0,0,48.64,48c26.11-.34,47.36-22.25,47.36-48.83V48H136a8,8,0,0,1,0-16h24a8,8,0,0,1,8,8V87.17c0,32.84-24.53,60.29-56,64.31V192a32,32,0,0,0,32,32h24a32.06,32.06,0,0,0,31.22-25,40,40,0,1,1,16.23.27ZM232,160a24,24,0,1,0-24,24A24,24,0,0,0,232,160Z"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 256 256"><path d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></symbol>
+  </defs>
+</svg>
+
+<header class="bar">
+  <div class="bar-in">
+    <span class="bar-title"><svg aria-hidden="true"><use href="#mark"/></svg><span id="dir-name">Rail and plate</span></span>
+    <div class="seg" role="group" aria-label="Direction">
+      <button type="button" data-set-dir="a" aria-pressed="true">A</button>
+      <button type="button" data-set-dir="b" aria-pressed="false">B</button>
+    </div>
+    <div class="seg" role="group" aria-label="Theme">
+      <button type="button" data-set-theme="light" aria-pressed="false">Light</button>
+      <button type="button" data-set-theme="dark" aria-pressed="false">Dark</button>
+    </div>
+  </div>
+</header>
+
+<main class="page">
+  <section class="intro">
+    <h1>tackroom identity, two directions</h1>
+    <p>Switch between A and B, and light and dark, at the top. Every component below is the same markup in both directions, so they compare like for like.</p>
+    <div class="verdict">
+      <p><strong>A, Rail and plate</strong> (recommended): the dashboard's neutral greys, Public Sans and IBM Plex Mono, one brass accent, and the logo's rail and hook as the structure.</p>
+      <p class="sub">B, Lavender unified</p>
+      <p>The current site system (lavender, Bricolage Grotesque, Geist, Geist Mono) carried into the dashboard and README.</p>
+    </div>
+  </section>
+
+  <section id="mark-section">
+    <h2>Mark</h2>
+    <p>The current rail and hook, recoloured, with strokes thickened from 7 to 8 units and the drawing centred on the tile so it holds at 16px.</p>
+    <div class="panel">
+      <div class="sizes">
+        <figure><svg width="16" height="16" aria-hidden="true"><use href="#mark"/></svg><figcaption>16</figcaption></figure>
+        <figure><svg width="24" height="24" aria-hidden="true"><use href="#mark"/></svg><figcaption>24</figcaption></figure>
+        <figure><svg width="32" height="32" aria-hidden="true"><use href="#mark"/></svg><figcaption>32</figcaption></figure>
+        <figure><svg width="64" height="64" aria-hidden="true"><use href="#mark"/></svg><figcaption>64</figcaption></figure>
+        <figure><svg width="128" height="128" role="img" aria-label="tackroom mark"><use href="#mark"/></svg><figcaption>128</figcaption></figure>
+      </div>
+      <div class="sizes mono-mark">
+        <figure><svg width="16" height="16" aria-hidden="true"><use href="#mark-mono"/></svg><figcaption>16</figcaption></figure>
+        <figure><svg width="24" height="24" aria-hidden="true"><use href="#mark-mono"/></svg><figcaption>24</figcaption></figure>
+        <figure><svg width="32" height="32" aria-hidden="true"><use href="#mark-mono"/></svg><figcaption>32</figcaption></figure>
+        <figure><svg width="64" height="64" aria-hidden="true"><use href="#mark-mono"/></svg><figcaption>mono 64</figcaption></figure>
+      </div>
+      <div class="lockup"><svg aria-hidden="true"><use href="#mark"/></svg><span class="wordmark">tackroom</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Palette</h2>
+    <p>Values for the selected direction and theme. Ratios were computed by a script with the WCAG 2.x formula; body text needs 4.5:1, UI graphics 3:1.</p>
+    <div id="swatches" class="panel"></div>
+    <h3>Contrast of every pair in use</h3>
+    <ul id="pairs" class="pairs"></ul>
+  </section>
+
+  <section>
+    <h2>Type</h2>
+    <div class="type-list">
+      <div><span class="spec">Display 50</span><span style="font: var(--tr-display-weight) var(--tr-fs-display)/1.02 var(--tr-font-display); letter-spacing: var(--tr-display-tracking)">tackroom</span></div>
+      <div><span class="spec">H1 38</span><h1 style="font-size: var(--tr-fs-h1)">Your agent setup, pinned to a commit.</h1></div>
+      <div><span class="spec">H2 28</span><h2>Every agent on one rail</h2></div>
+      <div><span class="spec">H3 21</span><h3>External skills wait 72 hours</h3></div>
+      <div><span class="spec">Lead 18</span><p style="font-size: var(--tr-fs-lead)">One <code>~/.agents</code> repo, synced into each agent's own config format.</p></div>
+      <div><span class="spec">Body 16</span><p>A new external skill pin is held until it is 72 hours old. <code>sync --allow-fresh</code> releases it early and records that you did.</p></div>
+      <div><span class="spec">Mono 14</span><code>code-review  pinned  a1f9c02  acme/agent-skills</code></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Nameplates</h2>
+    <p>Each harness hangs on the rail under its own plate. The plate is finished with the name alone; the key under it is what you type in <code>tackroom.yaml</code>.</p>
+    <div class="rail-group">
+      <h3>Harnesses, 15</h3>
+      <ul class="plates" id="harness-plates"></ul>
+    </div>
+    <div class="rail-group">
+      <h3>Terminals, 3</h3>
+      <ul class="plates" id="terminal-plates"></ul>
+    </div>
+    <div class="rail-group">
+      <h3>Optional vendor mark</h3>
+      <p class="note">One fixed slot, 24px, top right. A mark goes in unmodified, in its own colours, on the neutral backing that stays the same in light and dark. Left: no mark. Right: empty slot, outlined.</p>
+      <ul class="plates">
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Claude Code</span></div><span class="plate-key">claude</span><span class="plate-state ok"><span class="g">✓</span>synced</span></div></li>
+        <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Claude Code</span><span class="mark-slot empty" role="img" aria-label="Empty vendor mark slot"></span></div><span class="plate-key">claude</span><span class="plate-state ok"><span class="g">✓</span>synced</span></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Status vocabulary</h2>
+    <p>The glyph is the severity and matches the CLI: <span class="ok mono">✓</span> fine, <span class="warn mono">!</span> needs a look, <span class="bad mono">✗</span> broken. Pinned is the one state that carries the accent, because the pin is the product.</p>
+    <ul class="vocab">
+      <li><span><span class="tag t-ok"><span class="g">✓</span><span class="w">synced</span></span></span><p>The agent's native config matches the repo.</p></li>
+      <li><span><span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>a1f9c02</code></span></span></span><p>An external skill is locked to this commit in <code>tackroom.lock</code>.</p></li>
+      <li><span><span class="tag t-warn"><span class="g">!</span><span class="w">held <code>41h of 72h</code></span></span></span>
+        <div class="hold"><div class="hold-track" role="img" aria-label="41 of 72 hours elapsed"><i style="--p: 56.9%"></i><b></b><b></b><b></b></div><span class="hold-meta">31h left</span></div>
+        <p>A new pin is younger than 72 hours. It syncs on its own when the time runs out.</p></li>
+      <li><span><span class="tag t-ok"><span class="g">✓</span><span class="w">audit pass</span></span></span><p>No findings in the pinned content.</p></li>
+      <li><span><span class="tag t-warn"><span class="g">!</span><span class="w">audit finding <code>net-fetch</code></span></span></span><p>A finding is open. An unaccepted critical finding becomes <span class="bad mono">✗</span> blocked and the previous pin stays.</p></li>
+      <li><span><span class="tag t-warn"><span class="g">!</span><span class="w">drifted <code>2 files</code></span></span></span><p>Someone edited the agent's copy by hand. The next sync repairs it.</p></li>
+      <li><span><span class="tag t-bad"><span class="g">✗</span><span class="w">missing <code>skills/code-review</code></span></span></span><p>Something the repo declares is not in the agent's config.</p></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Site hero at phone width</h2>
+    <div class="frame">
+      <div class="frame-cap">site, 390px</div>
+      <div class="hero">
+        <div class="hero-nav"><svg aria-hidden="true"><use href="#mark"/></svg><span class="wm">tackroom</span><a href="#">GitHub</a></div>
+        <h1>Your agent setup, pinned to a commit.</h1>
+        <p class="line">One <code>~/.agents</code> repo for skills, MCP servers, hooks, roles and plugins, synced into 15 coding agents. Outside skills are pinned, audited and held 72 hours before any agent sees them.</p>
+        <div class="cmd"><code>brew install yourconscience/tap/tackroom</code><button type="button"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>Copy</button></div>
+        <div class="lockview">
+          <div class="lockview-head">tackroom.lock<span>4 external skills</span></div>
+          <ul class="locks">
+            <li><svg class="ico pin" aria-hidden="true"><use href="#i-pin"/></svg><div><div class="nm">code-review</div><div class="src">acme/agent-skills</div></div><div class="st"><span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>a1f9c02</code></span></span></div></li>
+            <li><svg class="ico pin" aria-hidden="true"><use href="#i-pin"/></svg><div><div class="nm">pr-shepherd</div><div class="src">acme/agent-skills</div></div><div class="st"><span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>7be4d10</code></span></span></div></li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-timer"/></svg><div><div class="nm">lint-guard</div><div class="src">example/lint-skills</div></div><div class="st"><span class="tag t-warn"><span class="g">!</span><span class="w">held <code>41h of 72h</code></span></span><div class="hold"><div class="hold-track" role="img" aria-label="41 of 72 hours elapsed"><i style="--p: 56.9%"></i><b></b><b></b><b></b></div><span class="hold-meta">31h left</span></div></div></li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg><div><div class="nm">shell-runner</div><div class="src">example/shell-kit</div></div><div class="st"><span class="tag t-warn"><span class="g">!</span><span class="w">audit finding <code>net-fetch</code></span></span></div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dashboard tile</h2>
+    <div class="tile">
+      <div class="tile-head"><h3>External skills</h3><span>checked 4 min ago</span></div>
+      <div class="seg-bar" role="img" aria-label="12 pinned, 1 held, 1 with a finding"><span style="flex: 12"></span><span class="w" style="flex: 1"></span><span class="w" style="flex: 1"></span></div>
+      <ul class="counts">
+        <li><b class="pin">12</b><span>pinned</span></li>
+        <li><b class="warn">1</b><span>held</span></li>
+        <li><b class="warn">1</b><span>finding</span></li>
+      </ul>
+      <ul class="locks">
+        <li><svg class="ico" aria-hidden="true"><use href="#i-timer"/></svg><div><div class="nm">lint-guard</div><div class="src">releases in 31h</div></div></li>
+        <li><svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg><div><div class="nm">shell-runner</div><div class="src">net-fetch in scripts/get.sh</div></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>CLI output</h2>
+    <p>ANSI green, yellow and red stay the source of truth in the terminal; the web colours above map onto them.</p>
+<pre class="term"><span class="d">$</span> tackroom status
+
+<b>repo</b>     <span class="o">✓</span> ~/.agents
+
+claude   <span class="o">✓</span> synced
+codex    <span class="o">✓</span> synced
+cursor   <span class="y">! drifted</span>   <span class="d">2 files edited outside tackroom</span>
+dsh      <span class="r">✗ missing</span>   <span class="d">skills/code-review</span>
+
+<b>external skills</b>  <span class="d">tackroom.lock</span>
+  code-review    <span class="o">✓</span> pinned  <span class="h">a1f9c02</span>
+  pr-shepherd    <span class="o">✓</span> pinned  <span class="h">7be4d10</span>
+  lint-guard     <span class="y">! held</span>    <span class="d">41h of 72h</span>
+  shell-runner   <span class="y">! audit</span>   <span class="d">net-fetch in scripts/get.sh</span>
+
+<b>needs attention</b>  cursor, dsh, lint-guard, shell-runner</pre>
+  </section>
+
+  <section>
+    <h2>README header</h2>
+    <div class="frame">
+      <div class="frame-cap">README.md on GitHub, 390px</div>
+      <div class="readme">
+        <svg class="lg" role="img" aria-label="tackroom logo"><use href="#mark"/></svg>
+        <h1>tackroom</h1>
+        <p>One <code>~/.agents</code> repo for every coding agent. Outside skills are pinned to a commit, audited, and held 72 hours.</p>
+        <pre>brew install yourconscience/tap/tackroom
+tackroom setup</pre>
+        <div class="links"><a href="#">Website</a><a href="#">Docs</a><a href="#">Releases</a></div>
+      </div>
+    </div>
+  </section>
+
+  <p class="footer">Demo content only: skill names, sources and hashes are invented. Vendor marks are not drawn here; the slot shows where a licensed one would go.</p>
+</main>
+
+<script>
+(function () {
+  var DATA = {"names":{"a":"Rail and plate","b":"Lavender unified"},"tokens":{"a-light":{"bg":"#f4f4f5","surface":"#ffffff","raised":"#eaeaed","line":"#dcdce0","line_strong":"#8e8f96","text":"#161618","muted":"#4f5056","faint":"#8e8f96","accent":"#b08a3f","accent_ink":"#17130a","accent_text":"#7a5a17","rail":"#9a7631","ok":"#1d7550","ok_bg":"#e5f1eb","warn":"#a84a0b","warn_bg":"#fbede2","bad":"#be2741","bad_bg":"#fbe7ea","pin":"#7a5a17","pin_bg":"#f4ecdc","focus":"#7a5a17","tile":"#212023","hook":"#f4f4f5","logo_rail":"#c9a45a","mark_bg":"#f4f4f6","mark_line":"#76777e","code_bg":"#18181b","code_text":"#e9e9ec","code_dim":"#a1a2a8","code_ok":"#5fc39c","code_warn":"#f29b55","code_bad":"#f3808f","code_pin":"#d6b46c"},"a-dark":{"bg":"#171719","surface":"#131217","raised":"#212023","line":"#2c2b31","line_strong":"#6b6b72","text":"#ffffff","muted":"#b4b4b8","faint":"#6b6b72","accent":"#c9a45a","accent_ink":"#17130a","accent_text":"#d8b56e","rail":"#b8944f","ok":"#5fc39c","ok_bg":"#1a2824","warn":"#f29b55","warn_bg":"#2d2117","bad":"#f3808f","bad_bg":"#2d1a20","pin":"#d8b56e","pin_bg":"#29231a","focus":"#d8b56e","tile":"#212023","hook":"#f4f4f5","logo_rail":"#c9a45a","mark_bg":"#f4f4f6","mark_line":"#76777e","code_bg":"#0e0e11","code_text":"#e9e9ec","code_dim":"#a1a2a8","code_ok":"#5fc39c","code_warn":"#f29b55","code_bad":"#f3808f","code_pin":"#d6b46c"},"b-light":{"bg":"#f4f4f8","surface":"#fbfbfd","raised":"#ebebf2","line":"#dcdce6","line_strong":"#8a8ca1","text":"#191924","muted":"#5b5d72","faint":"#8a8ca1","accent":"#4f56c9","accent_ink":"#fbfbfd","accent_text":"#4f56c9","rail":"#4f56c9","ok":"#2a7537","ok_bg":"#e6f2e8","warn":"#8f5a00","warn_bg":"#f8efdc","bad":"#bd2d55","bad_bg":"#f9e6ec","pin":"#4f56c9","pin_bg":"#e8e9fa","focus":"#4f56c9","tile":"#1c1c28","hook":"#e6e7f2","logo_rail":"#b4befe","mark_bg":"#f4f4f6","mark_line":"#76777e","code_bg":"#1b1b26","code_text":"#dcdeec","code_dim":"#9597b1","code_ok":"#a6e3a1","code_warn":"#f9e2af","code_bad":"#f38ba8","code_pin":"#b4befe"},"b-dark":{"bg":"#13131b","surface":"#1c1c28","raised":"#181822","line":"#2a2a39","line_strong":"#6f7189","text":"#e6e7f2","muted":"#a0a2b9","faint":"#6f7189","accent":"#b4befe","accent_ink":"#171725","accent_text":"#b4befe","rail":"#b4befe","ok":"#a6e3a1","ok_bg":"#1d2a25","warn":"#f9e2af","warn_bg":"#2b2620","bad":"#f38ba8","bad_bg":"#2d1d29","pin":"#b4befe","pin_bg":"#242640","focus":"#b4befe","tile":"#1c1c28","hook":"#e6e7f2","logo_rail":"#b4befe","mark_bg":"#f4f4f6","mark_line":"#76777e","code_bg":"#171721","code_text":"#dcdeec","code_dim":"#9597b1","code_ok":"#a6e3a1","code_warn":"#f9e2af","code_bad":"#f38ba8","code_pin":"#b4befe"}},"contrast":{"a-light":[{"fg":"text","bg":"bg","fgv":"#161618","bgv":"#f4f4f5","use":"body text on page","need":4.5,"r":16.44,"ok":true},{"fg":"text","bg":"surface","fgv":"#161618","bgv":"#ffffff","use":"body text on card","need":4.5,"r":18.07,"ok":true},{"fg":"text","bg":"raised","fgv":"#161618","bgv":"#eaeaed","use":"text on raised","need":4.5,"r":15.05,"ok":true},{"fg":"muted","bg":"bg","fgv":"#4f5056","bgv":"#f4f4f5","use":"secondary text on page","need":4.5,"r":7.31,"ok":true},{"fg":"muted","bg":"surface","fgv":"#4f5056","bgv":"#ffffff","use":"secondary text on card","need":4.5,"r":8.03,"ok":true},{"fg":"accent_text","bg":"bg","fgv":"#7a5a17","bgv":"#f4f4f5","use":"accent text / links","need":4.5,"r":5.79,"ok":true},{"fg":"accent_text","bg":"surface","fgv":"#7a5a17","bgv":"#ffffff","use":"accent text on card","need":4.5,"r":6.36,"ok":true},{"fg":"accent_ink","bg":"accent","fgv":"#17130a","bgv":"#b08a3f","use":"label on accent fill","need":4.5,"r":5.78,"ok":true},{"fg":"ok","bg":"surface","fgv":"#1d7550","bgv":"#ffffff","use":"synced / pass label","need":4.5,"r":5.66,"ok":true},{"fg":"ok","bg":"ok_bg","fgv":"#1d7550","bgv":"#e5f1eb","use":"ok tag","need":4.5,"r":4.88,"ok":true},{"fg":"warn","bg":"surface","fgv":"#a84a0b","bgv":"#ffffff","use":"caution label","need":4.5,"r":5.75,"ok":true},{"fg":"warn","bg":"warn_bg","fgv":"#a84a0b","bgv":"#fbede2","use":"caution tag","need":4.5,"r":5.02,"ok":true},{"fg":"bad","bg":"surface","fgv":"#be2741","bgv":"#ffffff","use":"missing label","need":4.5,"r":5.91,"ok":true},{"fg":"bad","bg":"bad_bg","fgv":"#be2741","bgv":"#fbe7ea","use":"missing tag","need":4.5,"r":4.98,"ok":true},{"fg":"pin","bg":"surface","fgv":"#7a5a17","bgv":"#ffffff","use":"pinned label","need":4.5,"r":6.36,"ok":true},{"fg":"pin","bg":"pin_bg","fgv":"#7a5a17","bgv":"#f4ecdc","use":"pinned tag","need":4.5,"r":5.41,"ok":true},{"fg":"ok","bg":"pin_bg","fgv":"#1d7550","bgv":"#f4ecdc","use":"pinned tag glyph","need":4.5,"r":4.82,"ok":true},{"fg":"text","bg":"pin_bg","fgv":"#161618","bgv":"#f4ecdc","use":"commit hash on pin plate","need":4.5,"r":15.38,"ok":true},{"fg":"ok","bg":"bg","fgv":"#1d7550","bgv":"#f4f4f5","use":"status tag on page","need":4.5,"r":5.15,"ok":true},{"fg":"warn","bg":"bg","fgv":"#a84a0b","bgv":"#f4f4f5","use":"status tag on page","need":4.5,"r":5.24,"ok":true},{"fg":"bad","bg":"bg","fgv":"#be2741","bgv":"#f4f4f5","use":"status tag on page","need":4.5,"r":5.37,"ok":true},{"fg":"pin","bg":"bg","fgv":"#7a5a17","bgv":"#f4f4f5","use":"pinned tag on page","need":4.5,"r":5.79,"ok":true},{"fg":"rail","bg":"bg","fgv":"#9a7631","bgv":"#f4f4f5","use":"rail (UI graphic)","need":3.0,"r":3.81,"ok":true},{"fg":"rail","bg":"surface","fgv":"#9a7631","bgv":"#ffffff","use":"rail on card (UI)","need":3.0,"r":4.19,"ok":true},{"fg":"line_strong","bg":"surface","fgv":"#8e8f96","bgv":"#ffffff","use":"plate border (UI)","need":3.0,"r":3.22,"ok":true},{"fg":"faint","bg":"surface","fgv":"#8e8f96","bgv":"#ffffff","use":"placeholder tile edge (UI)","need":3.0,"r":3.22,"ok":true},{"fg":"focus","bg":"bg","fgv":"#7a5a17","bgv":"#f4f4f5","use":"focus ring (UI)","need":3.0,"r":5.79,"ok":true},{"fg":"logo_rail","bg":"tile","fgv":"#c9a45a","bgv":"#212023","use":"logo rail on tile (graphic)","need":3.0,"r":6.9,"ok":true},{"fg":"hook","bg":"tile","fgv":"#f4f4f5","bgv":"#212023","use":"logo hook on tile (graphic)","need":3.0,"r":14.75,"ok":true},{"fg":"mark_line","bg":"mark_bg","fgv":"#76777e","bgv":"#f4f4f6","use":"empty mark slot outline (UI)","need":3.0,"r":4.06,"ok":true},{"fg":"code_text","bg":"code_bg","fgv":"#e9e9ec","bgv":"#18181b","use":"terminal text","need":4.5,"r":14.62,"ok":true},{"fg":"code_dim","bg":"code_bg","fgv":"#a1a2a8","bgv":"#18181b","use":"terminal dim","need":4.5,"r":6.96,"ok":true},{"fg":"code_ok","bg":"code_bg","fgv":"#5fc39c","bgv":"#18181b","use":"terminal ✓","need":4.5,"r":8.24,"ok":true},{"fg":"code_warn","bg":"code_bg","fgv":"#f29b55","bgv":"#18181b","use":"terminal !","need":4.5,"r":8.1,"ok":true},{"fg":"code_bad","bg":"code_bg","fgv":"#f3808f","bgv":"#18181b","use":"terminal ✗","need":4.5,"r":7.0,"ok":true},{"fg":"code_pin","bg":"code_bg","fgv":"#d6b46c","bgv":"#18181b","use":"terminal hash","need":4.5,"r":8.95,"ok":true}],"a-dark":[{"fg":"text","bg":"bg","fgv":"#ffffff","bgv":"#171719","use":"body text on page","need":4.5,"r":17.9,"ok":true},{"fg":"text","bg":"surface","fgv":"#ffffff","bgv":"#131217","use":"body text on card","need":4.5,"r":18.64,"ok":true},{"fg":"text","bg":"raised","fgv":"#ffffff","bgv":"#212023","use":"text on raised","need":4.5,"r":16.21,"ok":true},{"fg":"muted","bg":"bg","fgv":"#b4b4b8","bgv":"#171719","use":"secondary text on page","need":4.5,"r":8.66,"ok":true},{"fg":"muted","bg":"surface","fgv":"#b4b4b8","bgv":"#131217","use":"secondary text on card","need":4.5,"r":9.02,"ok":true},{"fg":"accent_text","bg":"bg","fgv":"#d8b56e","bgv":"#171719","use":"accent text / links","need":4.5,"r":9.17,"ok":true},{"fg":"accent_text","bg":"surface","fgv":"#d8b56e","bgv":"#131217","use":"accent text on card","need":4.5,"r":9.55,"ok":true},{"fg":"accent_ink","bg":"accent","fgv":"#17130a","bgv":"#c9a45a","use":"label on accent fill","need":4.5,"r":7.89,"ok":true},{"fg":"ok","bg":"surface","fgv":"#5fc39c","bgv":"#131217","use":"synced / pass label","need":4.5,"r":8.67,"ok":true},{"fg":"ok","bg":"ok_bg","fgv":"#5fc39c","bgv":"#1a2824","use":"ok tag","need":4.5,"r":7.12,"ok":true},{"fg":"warn","bg":"surface","fgv":"#f29b55","bgv":"#131217","use":"caution label","need":4.5,"r":8.52,"ok":true},{"fg":"warn","bg":"warn_bg","fgv":"#f29b55","bgv":"#2d2117","use":"caution tag","need":4.5,"r":7.15,"ok":true},{"fg":"bad","bg":"surface","fgv":"#f3808f","bgv":"#131217","use":"missing label","need":4.5,"r":7.36,"ok":true},{"fg":"bad","bg":"bad_bg","fgv":"#f3808f","bgv":"#2d1a20","use":"missing tag","need":4.5,"r":6.48,"ok":true},{"fg":"pin","bg":"surface","fgv":"#d8b56e","bgv":"#131217","use":"pinned label","need":4.5,"r":9.55,"ok":true},{"fg":"pin","bg":"pin_bg","fgv":"#d8b56e","bgv":"#29231a","use":"pinned tag","need":4.5,"r":7.97,"ok":true},{"fg":"ok","bg":"pin_bg","fgv":"#5fc39c","bgv":"#29231a","use":"pinned tag glyph","need":4.5,"r":7.24,"ok":true},{"fg":"text","bg":"pin_bg","fgv":"#ffffff","bgv":"#29231a","use":"commit hash on pin plate","need":4.5,"r":15.56,"ok":true},{"fg":"ok","bg":"bg","fgv":"#5fc39c","bgv":"#171719","use":"status tag on page","need":4.5,"r":8.33,"ok":true},{"fg":"warn","bg":"bg","fgv":"#f29b55","bgv":"#171719","use":"status tag on page","need":4.5,"r":8.18,"ok":true},{"fg":"bad","bg":"bg","fgv":"#f3808f","bgv":"#171719","use":"status tag on page","need":4.5,"r":7.07,"ok":true},{"fg":"pin","bg":"bg","fgv":"#d8b56e","bgv":"#171719","use":"pinned tag on page","need":4.5,"r":9.17,"ok":true},{"fg":"rail","bg":"bg","fgv":"#b8944f","bgv":"#171719","use":"rail (UI graphic)","need":3.0,"r":6.3,"ok":true},{"fg":"rail","bg":"surface","fgv":"#b8944f","bgv":"#131217","use":"rail on card (UI)","need":3.0,"r":6.56,"ok":true},{"fg":"line_strong","bg":"surface","fgv":"#6b6b72","bgv":"#131217","use":"plate border (UI)","need":3.0,"r":3.53,"ok":true},{"fg":"faint","bg":"surface","fgv":"#6b6b72","bgv":"#131217","use":"placeholder tile edge (UI)","need":3.0,"r":3.53,"ok":true},{"fg":"focus","bg":"bg","fgv":"#d8b56e","bgv":"#171719","use":"focus ring (UI)","need":3.0,"r":9.17,"ok":true},{"fg":"logo_rail","bg":"tile","fgv":"#c9a45a","bgv":"#212023","use":"logo rail on tile (graphic)","need":3.0,"r":6.9,"ok":true},{"fg":"hook","bg":"tile","fgv":"#f4f4f5","bgv":"#212023","use":"logo hook on tile (graphic)","need":3.0,"r":14.75,"ok":true},{"fg":"mark_line","bg":"mark_bg","fgv":"#76777e","bgv":"#f4f4f6","use":"empty mark slot outline (UI)","need":3.0,"r":4.06,"ok":true},{"fg":"code_text","bg":"code_bg","fgv":"#e9e9ec","bgv":"#0e0e11","use":"terminal text","need":4.5,"r":15.91,"ok":true},{"fg":"code_dim","bg":"code_bg","fgv":"#a1a2a8","bgv":"#0e0e11","use":"terminal dim","need":4.5,"r":7.57,"ok":true},{"fg":"code_ok","bg":"code_bg","fgv":"#5fc39c","bgv":"#0e0e11","use":"terminal ✓","need":4.5,"r":8.97,"ok":true},{"fg":"code_warn","bg":"code_bg","fgv":"#f29b55","bgv":"#0e0e11","use":"terminal !","need":4.5,"r":8.81,"ok":true},{"fg":"code_bad","bg":"code_bg","fgv":"#f3808f","bgv":"#0e0e11","use":"terminal ✗","need":4.5,"r":7.61,"ok":true},{"fg":"code_pin","bg":"code_bg","fgv":"#d6b46c","bgv":"#0e0e11","use":"terminal hash","need":4.5,"r":9.73,"ok":true}],"b-light":[{"fg":"text","bg":"bg","fgv":"#191924","bgv":"#f4f4f8","use":"body text on page","need":4.5,"r":15.87,"ok":true},{"fg":"text","bg":"surface","fgv":"#191924","bgv":"#fbfbfd","use":"body text on card","need":4.5,"r":16.85,"ok":true},{"fg":"text","bg":"raised","fgv":"#191924","bgv":"#ebebf2","use":"text on raised","need":4.5,"r":14.68,"ok":true},{"fg":"muted","bg":"bg","fgv":"#5b5d72","bgv":"#f4f4f8","use":"secondary text on page","need":4.5,"r":5.88,"ok":true},{"fg":"muted","bg":"surface","fgv":"#5b5d72","bgv":"#fbfbfd","use":"secondary text on card","need":4.5,"r":6.25,"ok":true},{"fg":"accent_text","bg":"bg","fgv":"#4f56c9","bgv":"#f4f4f8","use":"accent text / links","need":4.5,"r":5.46,"ok":true},{"fg":"accent_text","bg":"surface","fgv":"#4f56c9","bgv":"#fbfbfd","use":"accent text on card","need":4.5,"r":5.79,"ok":true},{"fg":"accent_ink","bg":"accent","fgv":"#fbfbfd","bgv":"#4f56c9","use":"label on accent fill","need":4.5,"r":5.79,"ok":true},{"fg":"ok","bg":"surface","fgv":"#2a7537","bgv":"#fbfbfd","use":"synced / pass label","need":4.5,"r":5.49,"ok":true},{"fg":"ok","bg":"ok_bg","fgv":"#2a7537","bgv":"#e6f2e8","use":"ok tag","need":4.5,"r":4.93,"ok":true},{"fg":"warn","bg":"surface","fgv":"#8f5a00","bgv":"#fbfbfd","use":"caution label","need":4.5,"r":5.6,"ok":true},{"fg":"warn","bg":"warn_bg","fgv":"#8f5a00","bgv":"#f8efdc","use":"caution tag","need":4.5,"r":5.06,"ok":true},{"fg":"bad","bg":"surface","fgv":"#bd2d55","bgv":"#fbfbfd","use":"missing label","need":4.5,"r":5.54,"ok":true},{"fg":"bad","bg":"bad_bg","fgv":"#bd2d55","bgv":"#f9e6ec","use":"missing tag","need":4.5,"r":4.78,"ok":true},{"fg":"pin","bg":"surface","fgv":"#4f56c9","bgv":"#fbfbfd","use":"pinned label","need":4.5,"r":5.79,"ok":true},{"fg":"pin","bg":"pin_bg","fgv":"#4f56c9","bgv":"#e8e9fa","use":"pinned tag","need":4.5,"r":4.98,"ok":true},{"fg":"ok","bg":"pin_bg","fgv":"#2a7537","bgv":"#e8e9fa","use":"pinned tag glyph","need":4.5,"r":4.72,"ok":true},{"fg":"text","bg":"pin_bg","fgv":"#191924","bgv":"#e8e9fa","use":"commit hash on pin plate","need":4.5,"r":14.49,"ok":true},{"fg":"ok","bg":"bg","fgv":"#2a7537","bgv":"#f4f4f8","use":"status tag on page","need":4.5,"r":5.18,"ok":true},{"fg":"warn","bg":"bg","fgv":"#8f5a00","bgv":"#f4f4f8","use":"status tag on page","need":4.5,"r":5.27,"ok":true},{"fg":"bad","bg":"bg","fgv":"#bd2d55","bgv":"#f4f4f8","use":"status tag on page","need":4.5,"r":5.22,"ok":true},{"fg":"pin","bg":"bg","fgv":"#4f56c9","bgv":"#f4f4f8","use":"pinned tag on page","need":4.5,"r":5.46,"ok":true},{"fg":"rail","bg":"bg","fgv":"#4f56c9","bgv":"#f4f4f8","use":"rail (UI graphic)","need":3.0,"r":5.46,"ok":true},{"fg":"rail","bg":"surface","fgv":"#4f56c9","bgv":"#fbfbfd","use":"rail on card (UI)","need":3.0,"r":5.79,"ok":true},{"fg":"line_strong","bg":"surface","fgv":"#8a8ca1","bgv":"#fbfbfd","use":"plate border (UI)","need":3.0,"r":3.2,"ok":true},{"fg":"faint","bg":"surface","fgv":"#8a8ca1","bgv":"#fbfbfd","use":"placeholder tile edge (UI)","need":3.0,"r":3.2,"ok":true},{"fg":"focus","bg":"bg","fgv":"#4f56c9","bgv":"#f4f4f8","use":"focus ring (UI)","need":3.0,"r":5.46,"ok":true},{"fg":"logo_rail","bg":"tile","fgv":"#b4befe","bgv":"#1c1c28","use":"logo rail on tile (graphic)","need":3.0,"r":9.42,"ok":true},{"fg":"hook","bg":"tile","fgv":"#e6e7f2","bgv":"#1c1c28","use":"logo hook on tile (graphic)","need":3.0,"r":13.7,"ok":true},{"fg":"mark_line","bg":"mark_bg","fgv":"#76777e","bgv":"#f4f4f6","use":"empty mark slot outline (UI)","need":3.0,"r":4.06,"ok":true},{"fg":"code_text","bg":"code_bg","fgv":"#dcdeec","bgv":"#1b1b26","use":"terminal text","need":4.5,"r":12.75,"ok":true},{"fg":"code_dim","bg":"code_bg","fgv":"#9597b1","bgv":"#1b1b26","use":"terminal dim","need":4.5,"r":5.96,"ok":true},{"fg":"code_ok","bg":"code_bg","fgv":"#a6e3a1","bgv":"#1b1b26","use":"terminal ✓","need":4.5,"r":11.47,"ok":true},{"fg":"code_warn","bg":"code_bg","fgv":"#f9e2af","bgv":"#1b1b26","use":"terminal !","need":4.5,"r":13.42,"ok":true},{"fg":"code_bad","bg":"code_bg","fgv":"#f38ba8","bgv":"#1b1b26","use":"terminal ✗","need":4.5,"r":7.37,"ok":true},{"fg":"code_pin","bg":"code_bg","fgv":"#b4befe","bgv":"#1b1b26","use":"terminal hash","need":4.5,"r":9.53,"ok":true}],"b-dark":[{"fg":"text","bg":"bg","fgv":"#e6e7f2","bgv":"#13131b","use":"body text on page","need":4.5,"r":15.02,"ok":true},{"fg":"text","bg":"surface","fgv":"#e6e7f2","bgv":"#1c1c28","use":"body text on card","need":4.5,"r":13.7,"ok":true},{"fg":"text","bg":"raised","fgv":"#e6e7f2","bgv":"#181822","use":"text on raised","need":4.5,"r":14.32,"ok":true},{"fg":"muted","bg":"bg","fgv":"#a0a2b9","bgv":"#13131b","use":"secondary text on page","need":4.5,"r":7.36,"ok":true},{"fg":"muted","bg":"surface","fgv":"#a0a2b9","bgv":"#1c1c28","use":"secondary text on card","need":4.5,"r":6.71,"ok":true},{"fg":"accent_text","bg":"bg","fgv":"#b4befe","bgv":"#13131b","use":"accent text / links","need":4.5,"r":10.33,"ok":true},{"fg":"accent_text","bg":"surface","fgv":"#b4befe","bgv":"#1c1c28","use":"accent text on card","need":4.5,"r":9.42,"ok":true},{"fg":"accent_ink","bg":"accent","fgv":"#171725","bgv":"#b4befe","use":"label on accent fill","need":4.5,"r":9.9,"ok":true},{"fg":"ok","bg":"surface","fgv":"#a6e3a1","bgv":"#1c1c28","use":"synced / pass label","need":4.5,"r":11.33,"ok":true},{"fg":"ok","bg":"ok_bg","fgv":"#a6e3a1","bgv":"#1d2a25","use":"ok tag","need":4.5,"r":10.02,"ok":true},{"fg":"warn","bg":"surface","fgv":"#f9e2af","bgv":"#1c1c28","use":"caution label","need":4.5,"r":13.26,"ok":true},{"fg":"warn","bg":"warn_bg","fgv":"#f9e2af","bgv":"#2b2620","use":"caution tag","need":4.5,"r":11.8,"ok":true},{"fg":"bad","bg":"surface","fgv":"#f38ba8","bgv":"#1c1c28","use":"missing label","need":4.5,"r":7.28,"ok":true},{"fg":"bad","bg":"bad_bg","fgv":"#f38ba8","bgv":"#2d1d29","use":"missing tag","need":4.5,"r":6.87,"ok":true},{"fg":"pin","bg":"surface","fgv":"#b4befe","bgv":"#1c1c28","use":"pinned label","need":4.5,"r":9.42,"ok":true},{"fg":"pin","bg":"pin_bg","fgv":"#b4befe","bgv":"#242640","use":"pinned tag","need":4.5,"r":8.23,"ok":true},{"fg":"ok","bg":"pin_bg","fgv":"#a6e3a1","bgv":"#242640","use":"pinned tag glyph","need":4.5,"r":9.9,"ok":true},{"fg":"text","bg":"pin_bg","fgv":"#e6e7f2","bgv":"#242640","use":"commit hash on pin plate","need":4.5,"r":11.97,"ok":true},{"fg":"ok","bg":"bg","fgv":"#a6e3a1","bgv":"#13131b","use":"status tag on page","need":4.5,"r":12.43,"ok":true},{"fg":"warn","bg":"bg","fgv":"#f9e2af","bgv":"#13131b","use":"status tag on page","need":4.5,"r":14.54,"ok":true},{"fg":"bad","bg":"bg","fgv":"#f38ba8","bgv":"#13131b","use":"status tag on page","need":4.5,"r":7.98,"ok":true},{"fg":"pin","bg":"bg","fgv":"#b4befe","bgv":"#13131b","use":"pinned tag on page","need":4.5,"r":10.33,"ok":true},{"fg":"rail","bg":"bg","fgv":"#b4befe","bgv":"#13131b","use":"rail (UI graphic)","need":3.0,"r":10.33,"ok":true},{"fg":"rail","bg":"surface","fgv":"#b4befe","bgv":"#1c1c28","use":"rail on card (UI)","need":3.0,"r":9.42,"ok":true},{"fg":"line_strong","bg":"surface","fgv":"#6f7189","bgv":"#1c1c28","use":"plate border (UI)","need":3.0,"r":3.53,"ok":true},{"fg":"faint","bg":"surface","fgv":"#6f7189","bgv":"#1c1c28","use":"placeholder tile edge (UI)","need":3.0,"r":3.53,"ok":true},{"fg":"focus","bg":"bg","fgv":"#b4befe","bgv":"#13131b","use":"focus ring (UI)","need":3.0,"r":10.33,"ok":true},{"fg":"logo_rail","bg":"tile","fgv":"#b4befe","bgv":"#1c1c28","use":"logo rail on tile (graphic)","need":3.0,"r":9.42,"ok":true},{"fg":"hook","bg":"tile","fgv":"#e6e7f2","bgv":"#1c1c28","use":"logo hook on tile (graphic)","need":3.0,"r":13.7,"ok":true},{"fg":"mark_line","bg":"mark_bg","fgv":"#76777e","bgv":"#f4f4f6","use":"empty mark slot outline (UI)","need":3.0,"r":4.06,"ok":true},{"fg":"code_text","bg":"code_bg","fgv":"#dcdeec","bgv":"#171721","use":"terminal text","need":4.5,"r":13.3,"ok":true},{"fg":"code_dim","bg":"code_bg","fgv":"#9597b1","bgv":"#171721","use":"terminal dim","need":4.5,"r":6.21,"ok":true},{"fg":"code_ok","bg":"code_bg","fgv":"#a6e3a1","bgv":"#171721","use":"terminal ✓","need":4.5,"r":11.96,"ok":true},{"fg":"code_warn","bg":"code_bg","fgv":"#f9e2af","bgv":"#171721","use":"terminal !","need":4.5,"r":13.99,"ok":true},{"fg":"code_bad","bg":"code_bg","fgv":"#f38ba8","bgv":"#171721","use":"terminal ✗","need":4.5,"r":7.68,"ok":true},{"fg":"code_pin","bg":"code_bg","fgv":"#b4befe","bgv":"#171721","use":"terminal hash","need":4.5,"r":9.94,"ok":true}]}};
+  var root = document.documentElement;
+  var HARNESSES = [
+    ['Claude Code', 'claude', 'ok'], ['Codex', 'codex', 'ok'], ['Factory Droid', 'droid', 'ok'],
+    ['OMP', 'omp', 'ok'], ['OpenCode', 'opencode', 'ok'], ['Pi', 'pi', 'ok'], ['Qwen Code', 'qwen-code', 'ok'],
+    ['Cursor', 'cursor', 'drift'], ['Gemini CLI', 'gemini', 'ok'], ['GitHub Copilot CLI', 'copilot', 'ok'],
+    ['Grok Build', 'grok', 'ok'], ['DeepSeek Harness', 'dsh', 'missing'], ['Antigravity CLI', 'agy', 'ok'],
+    ['Kimi Code', 'kimi', 'ok'], ['Amp', 'amp', 'ok']
+  ];
+  var TERMINALS = [['Herdr', 'panel'], ['Tern', 'workspace'], ['Rex', 'doctor check']];
+  var STATE = { ok: ['ok', '✓', 'synced'], drift: ['warn', '!', 'drifted'], missing: ['bad', '✗', 'missing'] };
+  var GROUPS = [
+    ['Neutrals', ['bg', 'surface', 'raised', 'line', 'line_strong', 'text', 'muted', 'faint']],
+    ['Accent and rail', ['accent', 'accent_ink', 'accent_text', 'rail', 'focus']],
+    ['Status', ['ok', 'ok_bg', 'warn', 'warn_bg', 'bad', 'bad_bg', 'pin', 'pin_bg']],
+    ['Logo and mark slot', ['tile', 'logo_rail', 'hook', 'mark_bg', 'mark_line']],
+    ['Terminal', ['code_bg', 'code_text', 'code_dim', 'code_ok', 'code_warn', 'code_bad', 'code_pin']]
+  ];
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  var HANGER = '<svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg>';
+  function plate(name, key, cls, glyph, word) {
+    var li = el('li'); li.innerHTML = HANGER;
+    var p = el('div', 'plate'), top = el('div', 'plate-top');
+    top.appendChild(el('span', 'plate-name', name)); p.appendChild(top);
+    p.appendChild(el('span', 'plate-key', key));
+    var st = el('span', 'plate-state' + (cls ? ' ' + cls : ''));
+    if (glyph) st.appendChild(el('span', 'g', glyph));
+    st.appendChild(document.createTextNode(word)); p.appendChild(st);
+    li.appendChild(p); return li;
+  }
+  var hp = document.getElementById('harness-plates');
+  HARNESSES.forEach(function (h) { var s = STATE[h[2]]; hp.appendChild(plate(h[0], h[1], s[0], s[1], s[2])); });
+  var tp = document.getElementById('terminal-plates');
+  TERMINALS.forEach(function (t) { tp.appendChild(plate(t[0], 'terminal', 'muted', '', t[1])); });
+
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  var mq = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  function theme() { return root.getAttribute('data-theme') || (mq && mq.matches ? 'dark' : 'light'); }
+  function dir() { return root.getAttribute('data-dir') === 'b' ? 'b' : 'a'; }
+
+  function render() {
+    var d = dir(), t = theme(), key = d + '-' + t, tok = DATA.tokens[key];
+    document.getElementById('dir-name').textContent = d.toUpperCase() + ', ' + DATA.names[d];
+    document.querySelectorAll('[data-set-dir]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-set-dir') === d)); });
+    document.querySelectorAll('[data-set-theme]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-set-theme') === t)); });
+    var sw = document.getElementById('swatches'); sw.textContent = '';
+    GROUPS.forEach(function (g) {
+      var wrap = el('div', 'swatch-group'); wrap.appendChild(el('h3', '', g[0]));
+      var ul = el('ul', 'swatches');
+      g[1].forEach(function (k) {
+        var li = el('li'), chip = el('i'); chip.style.background = tok[k];
+        li.appendChild(chip); li.appendChild(el('b', '', k.replace(/_/g, '-'))); li.appendChild(el('span', '', tok[k]));
+        ul.appendChild(li);
+      });
+      wrap.appendChild(ul); sw.appendChild(wrap);
+    });
+    var pairs = document.getElementById('pairs'); pairs.textContent = '';
+    DATA.contrast[key].forEach(function (r) {
+      var li = el('li'), aa = el('span', 'aa', 'Aa');
+      aa.style.background = r.bgv; aa.style.color = r.fgv; aa.setAttribute('aria-hidden', 'true');
+      var use = el('span', 'use', r.use); use.appendChild(el('span', '', r.fg.replace(/_/g, '-') + ' on ' + r.bg.replace(/_/g, '-')));
+      var rr = el('span', 'r', r.r.toFixed(2) + ':1'); rr.appendChild(el('span', '', (r.ok ? 'pass ' : 'fail ') + r.need + ':1'));
+      li.appendChild(aa); li.appendChild(use); li.appendChild(rr); pairs.appendChild(li);
+    });
+  }
+  document.querySelectorAll('[data-set-dir]').forEach(function (b) {
+    b.addEventListener('click', function () { var v = b.getAttribute('data-set-dir'); root.setAttribute('data-dir', v); store('tr-brand-dir', v); render(); });
+  });
+  document.querySelectorAll('[data-set-theme]').forEach(function (b) {
+    b.addEventListener('click', function () { var v = b.getAttribute('data-set-theme'); root.setAttribute('data-theme', v); store('tr-brand-theme', v); render(); });
+  });
+  if (mq && mq.addEventListener) mq.addEventListener('change', render);
+  var sd = load('tr-brand-dir'); if (sd === 'a' || sd === 'b') root.setAttribute('data-dir', sd);
+  var st = load('tr-brand-theme'); if (st === 'light' || st === 'dark') root.setAttribute('data-theme', st);
+  render();
+})();
+</script>
+</body>
+</html>

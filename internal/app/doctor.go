@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/yourconscience/tackroom/internal/agentrole"
+	"github.com/yourconscience/tackroom/internal/ui"
 	"gopkg.in/yaml.v3"
 )
 
@@ -91,18 +92,16 @@ func runDoctor(opts runOptions) error {
 		return printDoctorJSON(setupStreams(opts).out, repoRoot, results)
 	}
 
-	fmt.Println("checks:")
-	labelWidth := 0
+	out := ui.Writer(setupStreams(opts).out)
+	fmt.Fprintln(out, "checks:")
+	nameWidth := 0
 	for _, r := range results {
-		if len(r.name) > labelWidth {
-			labelWidth = len(r.name)
-		}
+		nameWidth = max(nameWidth, len(r.name))
 	}
 
 	passed, warned, failed := 0, 0, 0
 	for _, r := range results {
-		padding := strings.Repeat(".", labelWidth-len(r.name)+3)
-		fmt.Printf("  %s %s %s (%s)\n", r.name, padding, r.status, r.detail)
+		fmt.Fprintf(out, "  %s %-*s  %s\n", ui.Mark(checkMarkKind(r.status)), nameWidth, r.name, ui.Dim.Render(r.detail))
 		switch r.status {
 		case checkStatusPass:
 			passed++
@@ -113,7 +112,7 @@ func runDoctor(opts runOptions) error {
 		}
 	}
 
-	fmt.Printf("\n%d passed, %d warning, %d failed\n", passed, warned, failed)
+	fmt.Fprintf(out, "\n%d passed, %d warning, %d failed\n", passed, warned, failed)
 
 	// Context advisory notes are informational only. They are printed after the
 	// summary and MUST NOT influence the exit decision below.
