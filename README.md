@@ -33,6 +33,7 @@ tackroom setup
 tackroom sync     # write each agent's native config from the repo
 tackroom status   # what is synced, held or blocked
 tackroom doctor   # check skills, roles, pins, audits and hooks
+tackroom tui      # the same state in a full-screen terminal view, read-only
 ```
 
 ## What it syncs
@@ -55,11 +56,15 @@ Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GE
 
 Claude Code, Codex, Factory Droid, OMP, OpenCode, Pi, Qwen Code, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp. What each one gets is in the [capability matrix](https://yourconscience.github.io/tackroom/docs/harnesses/).
 
-Terminals: a Crons panel for [Herdr](https://yourconscience.github.io/tackroom/docs/herdr/), a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/tern/), and a `doctor` check for [Rex](https://yourconscience.github.io/tackroom/docs/rex/).
+Terminals: a Crons panel for [Herdr](https://yourconscience.github.io/tackroom/docs/herdr/), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/tern/), and a `doctor` check for [Rex](https://yourconscience.github.io/tackroom/docs/rex/).
 
 ## Docs
 
 - [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, the review screen, more machines, settings
+- [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
+- [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
+- [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
+- [TUI](https://yourconscience.github.io/tackroom/docs/tui/): the read-only terminal view
 - [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and holds
 - [Roles](https://yourconscience.github.io/tackroom/docs/roles/): role format, model tiers, per-agent output
 - [Memory](https://yourconscience.github.io/tackroom/docs/memory/): memory tiers and the `rem` workflow

