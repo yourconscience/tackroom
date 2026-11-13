@@ -22,6 +22,9 @@ local function host_name(h)
 	if h == "local" then
 		return "This Mac"
 	end
+	if h == nil or h == "" then
+		return "Unknown host"
+	end
 	return h
 end
 

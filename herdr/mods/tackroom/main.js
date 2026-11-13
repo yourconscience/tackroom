@@ -14,7 +14,7 @@ const OFF = ["disabled", "not_loaded"];
 const HEALTH = { fail: "Failing", warn: "Last run failed", idle: "No result", ok: "Healthy", paused: "Paused" };
 const ORDER = ["fail", "warn", "idle", "ok", "paused"];
 const DONE = { run: "Started", pause: "Paused", resume: "Resumed" };
-const hostName = (h) => (h === "local" ? "This Mac" : h);
+const hostName = (h) => (h === "local" ? "This Mac" : h || "Unknown host");
 
 function ago(iso) {
   const t = Date.parse(iso);
@@ -183,7 +183,7 @@ export default class Crons extends View {
       .on_click((_e, cx) => { if (this.open.has(k)) this.open.delete(k); else this.open.add(k); cx.notify(); })
       .child(div().w(8).h(8).flex_none().rounded(4).bg(tone(t, h)))
       .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(h === "paused" ? t.muted : t.foreground).child(j.short_name))
-      .child(div().flex_none().max_w(120).truncate().text_size(11).text_color(t.dim).child(inAttention ? hostName(j.host) : j.schedule_text))
+      .child(div().flex_none().max_w(120).truncate().text_size(11).text_color(t.dim).child(inAttention ? hostName(j.host) : j.schedule_text || j.schedule || (j.state === "missing" ? "missing" : "-")))
       .child(div().flex_none().w(66).text_size(11).text_color(t.dim).child(h === "paused" ? "paused" : j.last_run ? ago(j.last_run) : "-"));
     return open ? v_flex().gap(4).child(row).child(this.detail(j, t)) : row;
   }

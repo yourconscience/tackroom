@@ -680,7 +680,7 @@ function problemKind(job) {
   return ['i-warn', sentence(job.state), sentence(first)];
 }
 function cronKey(job) { return `cron:${job.host}/${job.source}/${job.id}`; }
-function hostName(host) { return host === 'local' ? 'This Mac' : host; }
+function hostName(host) { return host === 'local' ? 'This Mac' : host || 'Unknown host'; }
 function openCron(job) {
   store.cronFilter = 'all';
   store.openRows.add(cronKey(job));
@@ -791,7 +791,7 @@ function fireStrip(jobs, hosts) {
       many ? h('span', {class: 'strip-band alt', style: {left: at(fires[0]), right: '0'}}) : null,
       fires.length ? null : h('span', {class: 'strip-later', text: later ? `→ ${weekdayClock(later)}` : 'not this week'}));
     return h('div', {class: ['strip-row', (job.health === 'fail') && 'trouble', many && 'many'].filter(Boolean).join(' ')},
-      h('span', {class: 'strip-label', title: `${job.name || job.id} · ${hostName(job.host)} · ${job.schedule_text}`}, sourceIcon(job), h('span', {class: 'strip-name', text: job.short_name}), hosts.length > 1 ? h('span', {class: 'strip-host', text: hostName(job.host)}) : null),
+      h('span', {class: 'strip-label', title: [job.name || job.id, hostName(job.host), job.schedule_text].filter(Boolean).join(' · ')}, sourceIcon(job), h('span', {class: 'strip-name', text: job.short_name}), hosts.length > 1 ? h('span', {class: 'strip-host', text: hostName(job.host)}) : null),
       track);
   });
   return h('section', {class: 'block'},
@@ -826,7 +826,7 @@ function cronTable(rows, showHost) {
     const next = cronFires(job, now)?.fires?.[0];
     const health = job.health;
     const paused = health === 'paused';
-    const schedule = job.schedule_text;
+    const schedule = job.schedule_text || job.schedule || '-';
     const later = !paused && !next && job.state !== 'service' ? nextFire(job, now) : null;
     const nextText = paused ? 'Paused' : next ? until(next - now) : later ? weekdayClock(later) : '-';
     const lastText = job.last_run ? ago(job.last_run) : '-';
@@ -835,7 +835,7 @@ function cronTable(rows, showHost) {
       h('td', {class: 'status-cell', title: [HEALTH[health][1], result].filter(Boolean).join(' · ')}, icon(HEALTH[health][0], `health ${health}`), h('span', {class: 'sr', text: HEALTH[health][1]})),
       h('td', {class: 'ident'},
         h('span', {class: 'ident-name', title: job.name || job.id}, sourceIcon(job), h('span', {text: job.short_name})),
-        h('span', {class: 'ident-phone', text: `${schedule} · ${nextText === '-' ? `ran ${lastText}` : nextText}`})),
+        h('span', {class: 'ident-phone', text: [schedule !== '-' ? schedule : job.state === 'missing' ? 'Missing' : HEALTH[health][1], nextText !== '-' ? nextText : job.last_run ? `ran ${lastText}` : ''].filter(Boolean).join(' · ')})),
       showHost ? h('td', {class: 'muted nowrap', text: hostName(job.host)}) : null,
       h('td', {class: 'nowrap', title: job.schedule || '', text: schedule}),
       h('td', {class: paused ? 'faint nowrap fig' : 'nowrap fig', title: next ? new Date(next).toLocaleString() : '', text: nextText}),
