@@ -128,7 +128,7 @@ SOFTWARE.
 
 ## Agent marks
 
-The agent marks in `index.html` are the ones on the tackroom site (`docs/site/index.html`). The marks for Claude Code, Codex, Cursor, GitHub Copilot, Grok, Amp, Pi and Hermes come from lobehub/lobe-icons under the MIT License below. The marks for OpenCode, OMP, Qwen Code and Factory Droid come from each project's own repository or site. Product names and marks belong to their owners.
+The agent marks in `index.html` are the ones on the tackroom site (`docs/site/index.html`). The marks for Claude Code, Codex, Cursor, GitHub Copilot, Grok, DeepSeek, Amp and Pi come from lobehub/lobe-icons under the MIT License below. The marks for OpenCode, OMP, Qwen Code and Factory Droid come from each project's own repository or site. Product names and marks belong to their owners.
 
 ```text
 MIT License
