@@ -19,9 +19,11 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"text/tabwriter"
 	"time"
 
+	"charm.land/lipgloss/v2"
+	"charm.land/lipgloss/v2/table"
+	"github.com/yourconscience/tackroom/internal/ui"
 	"gopkg.in/yaml.v3"
 )
 
@@ -1343,8 +1345,22 @@ func frontmatterValue(body, key string) string {
 }
 
 func printCronsTable(result cronsScanResult) {
-	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "HOST\tSOURCE\tID\tSCHEDULE\tSTATE\tLAST RUN\tRESULT\tRUNS\tPROBLEMS")
+	out := ui.Writer(os.Stdout)
+	newTable := func(headers ...string) *table.Table {
+		return table.New().
+			Border(lipgloss.RoundedBorder()).
+			BorderStyle(ui.Dim).
+			Headers(headers...).
+			StyleFunc(func(row, col int) lipgloss.Style {
+				s := lipgloss.NewStyle().Padding(0, 1)
+				if row == table.HeaderRow {
+					return s.Inherit(ui.Bold)
+				}
+				return s
+			})
+	}
+
+	jobs := newTable("host", "source", "id", "schedule", "state", "last run", "result", "runs", "problems")
 	for _, j := range result.Jobs {
 		res := j.LastStatus
 		if j.LastExit != nil {
@@ -1358,16 +1374,17 @@ func printCronsTable(result cronsScanResult) {
 		if t, err := time.Parse(time.RFC3339, lastRun); err == nil {
 			lastRun = t.Local().Format("2006-01-02 15:04")
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n", j.Host, j.Source, truncate(j.ID, 40), truncate(j.Schedule, 28), j.State, lastRun, res, runs, len(j.Problems))
+		jobs.Row(j.Host, j.Source, truncate(j.ID, 40), truncate(j.Schedule, 28), j.State, lastRun, res, runs, strconv.Itoa(len(j.Problems)))
 	}
-	w.Flush()
-	fmt.Println()
-	w = tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "HOST\tSOURCE\tACCESS\tJOBS\tDETAIL")
+	fmt.Fprintln(out, jobs.String())
+	fmt.Fprintln(out)
+
+	access := newTable("host", "source", "access", "jobs", "detail")
 	for _, a := range result.Access {
-		fmt.Fprintf(w, "%s\t%s\t%s\t%d\t%s\n", a.Host, a.Source, a.State, a.Jobs, truncate(a.Detail, 90))
+		access.Row(a.Host, a.Source, a.State, strconv.Itoa(a.Jobs), truncate(a.Detail, 90))
 	}
-	w.Flush()
+	fmt.Fprintln(out, access.String())
+
 	var problems []string
 	for _, j := range result.Jobs {
 		for _, prob := range j.Problems {
@@ -1375,10 +1392,10 @@ func printCronsTable(result cronsScanResult) {
 		}
 	}
 	if len(problems) > 0 {
-		fmt.Println()
-		fmt.Println("Problems:")
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, "Problems:")
 		for _, prob := range problems {
-			fmt.Println("  " + prob)
+			fmt.Fprintln(out, "  "+prob)
 		}
 	}
 }
