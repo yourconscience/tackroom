@@ -12,7 +12,7 @@ tackroom sync --agents codex,gemini   # limit a run to some harnesses, by key
 | Harness | Skills | Roles | MCP | Hooks | Plugins | Root file | Settings |
 |---|---|---|---|---|---|---|---|
 | Claude Code | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Codex | ✓ | ✓ | ✓ | ✓ | - | ✓ | - |
+| Codex | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ |
 | Factory Droid | ✓ | ✓ | ~ | ✓ | - | ✓ | - |
 | OMP | ✓ | ✓ | ~ | ~ | - | ✓ | ✓ |
 | OpenCode | ✓ | ✓ | ~ | - | - | - | - |
@@ -37,7 +37,7 @@ What each `~` means:
 
 **Plugins** is `✓` only where tackroom registers a harness's own plugin format, which today is Claude Code ([plugins.md](plugins.md)). Skills and, with `mcp: true`, MCP servers from an agent-plugins-spec source reach every harness through the Skills and MCP columns.
 
-**Settings** means a `settings:` block under the agent entry is written into the harness's own settings file ([setup.md](setup.md#per-harness-settings)). Other harnesses report `settings unsupported` and ignore the block.
+**Settings** means a `settings:` block under the agent entry is written into the harness's own settings file ([setup.md](setup.md#per-harness-settings)). Supported: Claude Code, Codex, Pi and OMP; the files are in the table below. Other harnesses report `settings unsupported` and ignore the block.
 
 ## Config keys and detection
 
@@ -69,23 +69,23 @@ Claude Code is `claude`. The former key `claude-code` is still accepted and read
 
 Roles follow each harness's `agent_root`; the paths are in [roles.md](roles.md#where-each-harness-gets-its-role). Skills are linked into the skill root above. The other surfaces:
 
-| Harness | MCP servers | Hooks | Root file |
-|---|---|---|---|
-| Claude Code | `~/.claude.json` | `~/.claude/settings.json` | `~/.claude/CLAUDE.md` |
-| Codex | `~/.codex/config.toml` | `~/.codex/hooks.json` | `~/.codex/AGENTS.md` |
-| Factory Droid | `~/.factory/mcp.json` | `~/.factory/hooks.json` | `~/.factory/AGENTS.md` |
-| OMP | `~/.omp/agent/mcp.json` | `~/.omp/agent/hooks/post/tackroom-<name>.ts` | `~/.omp/agent/AGENTS.md` |
-| OpenCode | `~/.config/opencode/opencode.json` | none | none |
-| Pi | `~/.pi/agent/mcp.json` | `~/.pi/agent/extensions/tackroom-<name>.ts` | `~/.pi/agent/AGENTS.md` |
-| Qwen Code | `~/.qwen/settings.json` | `~/.qwen/settings.json` | `~/.qwen/QWEN.md` |
-| Cursor | `~/.cursor/mcp.json` | `~/.cursor/hooks.json` | none |
-| Gemini CLI | `~/.gemini/settings.json` | `~/.gemini/settings.json` | `~/.gemini/GEMINI.md` |
-| GitHub Copilot CLI | `~/.copilot/mcp-config.json` | `~/.copilot/hooks/tackroom.json` | `~/.copilot/copilot-instructions.md` |
-| Grok Build | `~/.grok/config.toml` | `~/.grok/hooks/tackroom.json` | `~/.grok/AGENTS.md` |
-| DeepSeek Harness | `~/.dsh/cordis.patch.yml` | none | `~/.dsh/AGENTS.md` |
-| Antigravity CLI | `~/.gemini/config/mcp_config.json` | `~/.gemini/config/hooks.json` | `~/.gemini/GEMINI.md` |
-| Kimi Code | `~/.kimi-code/mcp.json` | `~/.kimi-code/config.toml` | none |
-| Amp | `~/.config/amp/settings.json` | none | `~/.config/amp/AGENTS.md` |
+| Harness | MCP servers | Hooks | Root file | Settings |
+|---|---|---|---|---|
+| Claude Code | `~/.claude.json` | `~/.claude/settings.json` | `~/.claude/CLAUDE.md` | `~/.claude/settings.json` |
+| Codex | `~/.codex/config.toml` | `~/.codex/hooks.json` | `~/.codex/AGENTS.md` | `~/.codex/config.toml` |
+| Factory Droid | `~/.factory/mcp.json` | `~/.factory/hooks.json` | `~/.factory/AGENTS.md` | none |
+| OMP | `~/.omp/agent/mcp.json` | `~/.omp/agent/hooks/post/tackroom-<name>.ts` | `~/.omp/agent/AGENTS.md` | `~/.omp/agent/config.yml` |
+| OpenCode | `~/.config/opencode/opencode.json` | none | none | none |
+| Pi | `~/.pi/agent/mcp.json` | `~/.pi/agent/extensions/tackroom-<name>.ts` | `~/.pi/agent/AGENTS.md` | `~/.pi/agent/settings.json` |
+| Qwen Code | `~/.qwen/settings.json` | `~/.qwen/settings.json` | `~/.qwen/QWEN.md` | none |
+| Cursor | `~/.cursor/mcp.json` | `~/.cursor/hooks.json` | none | none |
+| Gemini CLI | `~/.gemini/settings.json` | `~/.gemini/settings.json` | `~/.gemini/GEMINI.md` | none |
+| GitHub Copilot CLI | `~/.copilot/mcp-config.json` | `~/.copilot/hooks/tackroom.json` | `~/.copilot/copilot-instructions.md` | none |
+| Grok Build | `~/.grok/config.toml` | `~/.grok/hooks/tackroom.json` | `~/.grok/AGENTS.md` | none |
+| DeepSeek Harness | `~/.dsh/cordis.patch.yml` | none | `~/.dsh/AGENTS.md` | none |
+| Antigravity CLI | `~/.gemini/config/mcp_config.json` | `~/.gemini/config/hooks.json` | `~/.gemini/GEMINI.md` | none |
+| Kimi Code | `~/.kimi-code/mcp.json` | `~/.kimi-code/config.toml` | none | none |
+| Amp | `~/.config/amp/settings.json` | none | `~/.config/amp/AGENTS.md` | none |
 
 Some folders move with an environment variable: `$COPILOT_HOME`, `$GROK_HOME`, `$DSH_HOME` and `$KIMI_CODE_HOME` replace the folder of their harness, and `$XDG_CONFIG_HOME/opencode` replaces `~/.config/opencode`.
 

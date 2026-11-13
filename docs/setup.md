@@ -51,7 +51,7 @@ The view is a local dashboard over your config with a per-harness sync plan. It 
 
 ## Per-harness settings
 
-`settings:` on an agent is a map of dotted key to value, written into that harness's own settings file. Supported: `claude` (`~/.claude/settings.json`), `pi` (`~/.pi/agent/settings.json`), `omp` (`~/.omp/agent/config.yml`). Other harnesses report `settings unsupported` and ignore the block.
+`settings:` on an agent is a map of dotted key to value, written into that harness's own settings file. Supported: `claude` (`~/.claude/settings.json`), `codex` (`~/.codex/config.toml`), `pi` (`~/.pi/agent/settings.json`), `omp` (`~/.omp/agent/config.yml`). Other harnesses report `settings unsupported` and ignore the block.
 
 ```yaml
 agents:
@@ -66,7 +66,9 @@ agents:
 - Only declared keys are written; every other key in the file is kept. Removing a key from `settings:` leaves the native value in place.
 - A key whose last segment ends in `token`, `secret`, `password`, `passwd`, `apikey`, `authorization` or `credential(s)` (any casing) must be a single `${VAR}` reference.
 - `${VAR}` expands at sync time. An unset variable fails that harness and writes nothing; expanded values never appear in output.
-- Keys tackroom manages through another surface are refused: Pi `packages`; Claude Code `hooks`, `enabledPlugins`, `extraKnownMarketplaces`, `mcpServers`.
+- Keys tackroom manages through another surface are refused: Pi `packages`; Claude Code `hooks`, `enabledPlugins`, `extraKnownMarketplaces`, `mcpServers`; Codex `mcp_servers`, `plugins`, `marketplaces`, `features.hooks`, `codex_hooks`.
+- Codex's `config.toml` is edited as text, so comments, key order and unrelated tables stay. A top-level key such as `model` is set above the first table, and `tui.notifications` goes under `[tui]`, which is added when missing. Sync refuses with an error and writes nothing when the file does not parse, when a key segment would need TOML quoting (`projects."/p"`), or when a declared key already exists as an inline table, dotted key, array of tables or multi-line value.
+- A model you pick in Codex's own picker is saved as `model` in `config.toml`, so with `model` declared the next sync overwrites that choice.
 - The file is backed up before the first modifying write; `tackroom restore` lists and restores it.
 
 ## Root instructions
