@@ -121,22 +121,11 @@ func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResul
 	var issues []string
 	pinned := 0
 	for _, src := range cfg.ExternalSkills {
-		name := sourceName(src)
-		if _, ok := held[name]; ok {
+		if _, ok := held[sourceName(src)]; ok {
 			continue // held or blocked: not an unpinned defect
 		}
-		pin := lockEntryFor(lock, src)
-		if pin == nil {
-			issues = append(issues, fmt.Sprintf("%s unpinned (run tackroom sync)", name))
-			continue
-		}
-		head := externalSkillCommitFull(filepath.Join(cacheRoot, name))
-		if head == "" {
-			issues = append(issues, fmt.Sprintf("%s not cloned", name))
-			continue
-		}
-		if head != pin.Commit {
-			issues = append(issues, fmt.Sprintf("%s cache at %s but lock pins %s", name, shortCommit(head), shortCommit(pin.Commit)))
+		if _, issue := sourcePinIssue(lock, src, cacheRoot); issue != "" {
+			issues = append(issues, sourceName(src)+" "+issue)
 			continue
 		}
 		pinned++
@@ -149,4 +138,22 @@ func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResul
 		detail += "; " + note
 	}
 	return checkResult{checkName, checkStatusPass, detail}
+}
+
+// sourcePinIssue says why a configured source is not cleanly pinned: no lock
+// pin, no clone, or a clone that moved off the pin. pin is nil only when the
+// source is unpinned; issue is empty when the clone sits on the pin.
+func sourcePinIssue(lock lockFile, src externalSkillSource, cacheRoot string) (pin *externalLockEntry, issue string) {
+	pin = lockEntryFor(lock, src)
+	if pin == nil {
+		return nil, "unpinned (run tackroom sync)"
+	}
+	head := externalSkillCommitFull(filepath.Join(cacheRoot, sourceName(src)))
+	if head == "" {
+		return pin, "not cloned"
+	}
+	if head != pin.Commit {
+		return pin, fmt.Sprintf("cache at %s but lock pins %s", shortCommit(head), shortCommit(pin.Commit))
+	}
+	return pin, ""
 }
