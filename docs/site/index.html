@@ -69,17 +69,12 @@
         <a class="second" href="#start">Other ways to install</a>
       </div>
       <figure class="term">
-        <figcaption>tackroom status, excerpt from a demo home</figcaption>
-<pre class="wrapping"><span class="p">$</span> tackroom status
-tackroom status
-
-<span class="d">...</span>
-sources
+        <figcaption>$ tackroom status (excerpt, demo home)</figcaption>
+<pre>sources
   agent-skills  <span class="o">✓</span> <span class="h">774ddc2</span>  https://github.com/acme/agent-skills
 
 claude   <span class="o">✓ synced</span>
-<span class="d">...</span>
-grok   <span class="o">✓ synced</span>
+  managed     3 skills · 6 agents · 1 mcp
 <span class="d">...</span>
 Everything is synced.
 
@@ -131,7 +126,21 @@ held or blocked (skipped by sync)
       </div>
       <div class="lock-grid">
         <figure class="term">
-          <figcaption>~/.agents/tackroom.lock</figcaption>
+          <figcaption>~/.agents/tackroom.lock (excerpt)</figcaption>
+<pre>external_skills:
+    - name: agent-skills
+      url: https://github.com/acme/agent-skills
+      branch: main
+      commit: <span class="h">774ddc2fe1f82fcbf5dee12c463fd3062006c5c0</span>
+<span class="d">      ...</span>
+holds:
+<span class="d">      ...</span>
+    - item: <span class="y">skill:lint-skills</span>
+      ref: git:https://github.com/example/lint-skills@d9eb44d8209b30dc27853d7d40ce2bc5a9de152f
+      published_at: "2026-11-11T22:31:37Z"
+      time_source: git-commit-date
+      hold_until: <span class="y">"2026-11-14T22:31:37Z"</span></pre>
+          <details class="full"><summary>Show the whole file</summary>
 <pre><span class="d"># Managed by tackroom sync / tackroom skill update. Pins commits and materialized skill ownership.</span>
 version: 1
 external_skills:
@@ -153,6 +162,7 @@ holds:
       published_at: "2026-11-11T22:31:37Z"
       time_source: git-commit-date
       hold_until: <span class="y">"2026-11-14T22:31:37Z"</span></pre>
+          </details>
         </figure>
         <ul class="states">
           <li>
@@ -196,7 +206,7 @@ holds:
           </li>
         </ul>
       </div>
-      <p class="lock-foot">New exact npm and PyPI versions in MCP servers and Pi packages get the same 72-hour hold. Your own skills, roles, hooks and MCP entries are reported, never blocked. Output from invented demo repos, captured 2026-11-13. <a href="docs/skills/">How it works</a></p>
+      <p class="lock-foot">New exact npm and PyPI versions in MCP servers and Pi packages get the same hold. Your own skills, roles, hooks and MCP entries are reported, never blocked. Demo output, captured 2026-11-13. <a href="docs/skills/">How it works</a></p>
     </div>
   </section>
 
@@ -232,10 +242,7 @@ holds:
             <figcaption>after adding three skill sources and one MCP server</figcaption>
 <pre><span class="p">$</span> tackroom sync
 tackroom sync  <span class="o">✓ synced</span>
-
-changes  +2 skills, +1 mcp (claude, codex, pi) · +2 skills (omp)
-sources  agent-skills  <span class="o">✓</span> <span class="h">774ddc2</span>  https://github.com/acme/agent-skills
-
+<span class="d">...</span>
 ╭─────────┬──────────┬────────┬────────┬─────┬───────┬─────────┬──────────╮
 │ harness │ state    │ skills │ agents │ mcp │ hooks │ plugins │ packages │
 ├─────────┼──────────┼────────┼────────┼─────┼───────┼─────────┼──────────┤
@@ -254,17 +261,12 @@ skipped 1 blocked and 1 held item(s); see tackroom status</pre>
         <li>
           <div class="say">
             <h3>Check</h3>
-            <p><code>tackroom status</code> shows what is synced, held or blocked, as at the top of this page. <code>tackroom doctor</code> checks skills, roles, pins, audits and hooks.</p>
+            <p><code>tackroom status</code> shows what is synced, held or blocked. <code>tackroom doctor</code> checks skills, roles, pins, audits and hooks. <code>tackroom view</code> opens a local dashboard over the same config.</p>
           </div>
         </li>
       </ol>
-      <figure class="shot">
-        <!-- SLOT: dashboard screenshot. Capture `tackroom view` (Overview) from the same demo home at 2880x1800 (16:10),
-             save as docs/site/dashboard.webp, and replace the empty div below with:
-             <img src="dashboard.webp" width="2880" height="1800" loading="lazy" decoding="async" alt="..."> inside .shot-frame -->
-        <div class="shot-frame"></div>
-        <figcaption>Prefer clicking to YAML? <code>tackroom view</code> opens a local dashboard over the same config, on 127.0.0.1 only.</figcaption>
-      </figure>
+      <!-- SLOT (not in this release): dashboard screenshot of `tackroom view` (Overview) from the demo home, 2880x1800 (16:10).
+           Add as <figure class="shot"><img src="dashboard.webp" width="2880" height="1800" loading="lazy" decoding="async" alt="..."><figcaption>...</figcaption></figure> -->
     </div>
   </section>
 
