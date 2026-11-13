@@ -139,6 +139,10 @@ func collectNativeHooks(home string, cfg config, selected []agentConfig) ([]nati
 			switch {
 			case name == agentPi || name == agentOMP:
 				found, err = readExtensionHook(name, path)
+			case name == agentAgy:
+				found, err = readAgyNativeHooks(name, path)
+			case name == agentKimi:
+				found, err = readKimiNativeHooks(name, path)
 			case simple:
 				found, err = readSimpleNativeHooks(name, path)
 			default:
@@ -179,6 +183,10 @@ func nativeHookConfigPaths(agent string, home string) ([]string, bool, bool) {
 		return []string{qwenSettingsPath(home)}, false, true
 	case agentGemini:
 		return []string{geminiSettingsPath(home)}, false, true
+	case agentAgy:
+		return []string{agyHooksConfigPath(home)}, false, true
+	case agentKimi:
+		return []string{kimiConfigPath(home)}, false, true
 	case agentCursor:
 		return []string{cursorHooksConfigPath(home)}, true, true
 	case agentCopilot:
@@ -337,6 +345,10 @@ func removeNativeHookEntries(entries []nativeHookEntry) (int, error) {
 			didChange = err == nil
 		case agentCursor, agentCopilot:
 			didChange, err = removeSimpleNativeHookEntries(path, pathEntries)
+		case agentAgy:
+			didChange, err = removeAgyNativeHookEntries(path, pathEntries)
+		case agentKimi:
+			didChange, err = removeKimiNativeHookEntries(path, pathEntries)
 		default:
 			didChange, err = removeGroupedNativeHookEntries(path, pathEntries)
 		}

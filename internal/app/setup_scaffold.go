@@ -166,6 +166,8 @@ func defaultAgentConfigs() []agentConfig {
 		{Name: agentCopilot, Enabled: true, SkillRoot: "~/.copilot/skills", AgentRoot: "~/.copilot/agents", Detect: "copilot"},
 		{Name: agentGrok, Enabled: true, SkillRoot: "~/.grok/skills", AgentRoot: "~/.grok/agents", Detect: "grok"},
 		{Name: agentDSH, Enabled: true, SkillRoot: "~/.dsh/skills", Detect: "dsh"},
+		{Name: agentAgy, Enabled: true, SkillRoot: "~/.gemini/antigravity-cli/skills", Detect: "agy"},
+		{Name: agentKimi, Enabled: true, SkillRoot: "~/.kimi-code/skills", AgentRoot: "~/.kimi-code/agents", Detect: "kimi"},
 	}
 }
 

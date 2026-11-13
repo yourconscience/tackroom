@@ -122,6 +122,7 @@ var renderers = map[string]Renderer{
 	"copilot":   renderer{extension: ".agent.md", render: renderCopilot},
 	"grok":      renderer{extension: ".md", render: renderGrok},
 	"gemini":    renderer{extension: ".md", render: renderGemini},
+	"kimi":      renderer{extension: ".md", render: renderKimi},
 }
 
 // Lookup returns the registered renderer for a harness name.
