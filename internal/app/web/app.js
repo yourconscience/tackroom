@@ -892,13 +892,43 @@ function cronTable(rows, showHost) {
         .filter(([, field]) => field);
       tbody.append(h('tr', {class: 'detail'}, h('td', {colspan: String(width)}, h('div', {class: 'detail-grid'},
         (job.problems || []).length ? h('ul', {class: 'problems'}, job.problems.map((problem) => h('li', {text: sentence(grouped(problem))}))) : null,
-        h('dl', {}, fields.flatMap(([label, field]) => [h('dt', {text: label}), h('dd', {class: ['ID', 'Command', 'Log', 'Schedule'].includes(label) ? 'code' : '', text: field})]))))));
+        h('dl', {}, fields.flatMap(([label, field]) => [h('dt', {text: label}), h('dd', {class: ['ID', 'Command', 'Log', 'Schedule'].includes(label) ? 'code' : '', text: field})])),
+        cronActions(job)))));
     }
   }
   if (!rows.length) tbody.append(h('tr', {}, h('td', {colspan: String(width), class: 'muted', text: 'No jobs match.'})));
   return h('div', {class: 'block-body'}, h('table', {class: 'grid-table jobs'},
     h('thead', {}, h('tr', {}, [['', 'status-cell'], ['Job', ''], showHost ? ['Host', ''] : null, ['Schedule', ''], ['Next run', ''], ['Last run', ''], ['Runs', 'num']].filter(Boolean).map(([label, cls]) => h('th', {scope: 'col', class: cls, text: label, 'aria-label': label || 'Status'})))),
     tbody));
+}
+
+// Run, pause and resume a launchd job; owned jobs on this machine also take a new schedule.
+function cronActions(job) {
+  if (job.source !== 'launchd' || !job.unit) return null;
+  const busy = Boolean(store.cronBusy) || store.cronsLoading;
+  const off = ['disabled', 'not_loaded'].includes(job.state);
+  const button = (label, action, cls) => h('button', {type: 'button', class: cls, disabled: busy || undefined, onclick: () => cronAction(job, action), text: label});
+  const input = job.owned && job.host === 'local' && job.state !== 'disabled'
+    ? h('input', {type: 'text', value: job.declared_schedule || '', placeholder: '0 9 * * *', 'aria-label': 'Schedule (cron expression)', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off'})
+    : null;
+  return h('div', {class: 'cron-actions'},
+    off ? button('Resume', 'resume', 'primary') : [button('Run now', 'run', 'primary'), button('Pause', 'pause')],
+    input ? h('form', {class: 'cron-schedule', onsubmit: (event) => { event.preventDefault(); cronAction(job, 'schedule', input.value); }},
+      input, h('button', {type: 'submit', disabled: busy || undefined, text: 'Save schedule'})) : null,
+    store.cronBusy === cronKey(job) ? h('span', {class: 'muted', text: 'Working…'}) : null);
+}
+async function cronAction(job, action, schedule) {
+  store.cronBusy = cronKey(job);
+  renderView();
+  const done = {run: 'Started', pause: 'Paused', resume: 'Resumed', schedule: 'New schedule applied to'}[action];
+  try {
+    await api('/api/crons/action', {method: 'POST', body: JSON.stringify({host: job.host, source: job.source, id: job.id, action, ...(action === 'schedule' ? {schedule} : {})})});
+    toast(`${done} ${shortName(job)}`);
+  } catch (error) {
+    toast(error.message, true);
+  }
+  store.cronBusy = '';
+  await loadCrons(true);
 }
 
 // ---------- config ----------

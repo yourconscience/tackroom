@@ -243,6 +243,9 @@ func run(args []string) error {
 		if len(args) > 1 && args[1] == "apply" {
 			return runCronApply(args[2:])
 		}
+		if len(args) > 1 && (args[1] == "run" || args[1] == "pause" || args[1] == "resume" || args[1] == "schedule") {
+			return runCronActionCommand(args[1], args[2:])
+		}
 		opts, err := parseCronFlags(args[1:])
 		if err != nil {
 			return err
@@ -566,6 +569,8 @@ var canonicalForms = []string{
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
 	"  tackroom cron collect [--hosts local,HOST...] [--table] [--config PATH]",
 	"  tackroom cron apply [--dry-run] [--config PATH]",
+	"  tackroom cron run|pause|resume [--host HOST] [--config PATH] ID",
+	"  tackroom cron schedule [--config PATH] ID \"MIN HOUR DOM MON DOW\"",
 }
 
 // printGroupUsage answers `tackroom <group> --help` with that group's forms.

@@ -1,6 +1,6 @@
 # Scheduled job inventory (`tackroom cron collect`)
 
-Status: `tackroom cron collect`, the Crons tab in `tackroom view`, `cron apply` (section 4) and the herdr-automations source (section 5) are built; Healthchecks sync follows.
+Status: `tackroom cron collect`, the Crons tab in `tackroom view` with its actions, `cron apply` (section 4) and the herdr-automations source (section 5) are built; Healthchecks sync follows.
 
 ## Problem
 
@@ -107,7 +107,21 @@ An empty job list means nothing on its own; only `empty` means "looked and there
 
 ## View
 
-`tackroom view` has a Crons tab with the same inventory. It runs the collector on first open, caches the result for a minute, and collects again on request. The tab lists the jobs that need attention first, then one table per host with an access chip per source, so an unreachable host or an unreadable source shows as such instead of as an empty list. A job needs attention when it has problems or is `dead` or `missing`; a disabled or paused job's old error does not count until the job is turned on again. Selecting a row shows its command, log, time zone, problems and manifest fields. The tab only reads; it has no actions that change a job.
+`tackroom view` has a Crons tab with the same inventory. It runs the collector on first open, caches the result for a minute, and collects again on request. The tab lists the jobs that need attention first, then one table per host with an access chip per source, so an unreachable host or an unreadable source shows as such instead of as an empty list. A job needs attention when it has problems or is `dead` or `missing`; a disabled or paused job's old error does not count until the job is turned on again. Selecting a row shows its command, log, time zone, problems and manifest fields, and the actions below.
+
+### View actions
+
+A launchd job's row offers **Run now**, **Pause** and **Resume**; an owned job on the machine the view runs on also takes a new **schedule**. The same actions are CLI verbs, for scripts and for other clients such as a Herdr mod:
+
+```
+tackroom cron run|pause|resume [--host HOST] [--config PATH] ID
+tackroom cron schedule [--config PATH] ID "MIN HOUR DOM MON DOW"
+```
+
+- An action addresses a job by host, source and id as the last scan reported it, and uses the label and plist path from that scan, never ones sent with the request. The view acts on its cached scan and answers `stale_crons` for a job that is not in it; the CLI collects the job's host first.
+- Run is `launchctl kickstart gui/$UID/<label>`. Pause is `launchctl disable` then `bootout`, so the job stays off across logins and `collect` reports it `disabled`. Resume is `launchctl enable` then `bootstrap` of the job's plist when it is not loaded; a plist with `RunAtLoad` runs once as it loads, and launchd's run count starts again. On another host the same script runs through `ssh -o BatchMode=yes HOST sh -s`, like the probe.
+- A schedule change rewrites `crons.jobs.<id>.schedule` in the file that declares the job (`tackroom.local.yaml` when it has the id, else the shared config), then runs `cron apply`, which replaces the unit. The expression is checked the way `apply` checks it before anything is written. A paused job must be resumed first, because `apply` cannot bootstrap a disabled label.
+- Only launchd jobs have actions so far. crontab, systemd timers and the harness schedulers stay read-only.
 
 ## 2. The `crons:` manifest
 
@@ -223,5 +237,5 @@ Version note: v0.11.1 to v0.11.3 all shipped on 2026-10-30, and `backend: hc` ar
 
 - tackroom runs no scheduler daemon. Owned jobs are native units that the host's scheduler fires (section 4).
 - Scheduled jobs are not a sixth sync surface. `cron collect` and `cron sync` read harness state and write only to the user's Healthchecks instance, and `cron apply` writes only units with its own prefix; none of them writes harness configuration, `automations.yaml` included.
-- Neither `cron collect` nor the view fixes, unloads or edits a job. They report.
+- `cron collect` never changes a job. The view and the action verbs change only a launchd job someone acts on, and never fix one by themselves.
 - No hosted monitoring service, and no job output leaving the user's own infrastructure.
