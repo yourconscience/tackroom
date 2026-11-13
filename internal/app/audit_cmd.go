@@ -378,7 +378,10 @@ func auditSkillMarkdown(skill, rel, path string) []auditFinding {
 	return findings
 }
 
-// auditScriptFile inspects a bundled script for shell/exfil patterns.
+// auditScriptFile inspects a bundled script for credential/network exfil.
+// Pipe-to-shell and base64-to-shell are covered by the rule audit's remote-exec
+// rule (HIGH), so they are not reported here: reporting them again as CRITICAL
+// would show one finding at two severities.
 func auditScriptFile(skill, rel, path string) []auditFinding {
 	text, ok := readAuditFile(path)
 	if !ok {
@@ -387,20 +390,7 @@ func auditScriptFile(skill, rel, path string) []auditFinding {
 		}
 		return nil
 	}
-	var findings []auditFinding
-
-	if rePipeToShell.MatchString(text) {
-		findings = append(findings, auditFinding{
-			auditCritical, skill, rel, "curl/wget output piped directly into a shell",
-		})
-	}
-	if reBase64ToShell.MatchString(text) {
-		findings = append(findings, auditFinding{
-			auditCritical, skill, rel, "base64-decoded payload piped into a shell",
-		})
-	}
-	findings = append(findings, credNetworkFindings(skill, rel, text)...)
-	return findings
+	return credNetworkFindings(skill, rel, text)
 }
 
 // auditGoFile inspects a bundled Go helper for the credential+network patterns.
