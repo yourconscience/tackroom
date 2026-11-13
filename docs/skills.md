@@ -1,51 +1,85 @@
 # Skills
 
-A skill is a directory under `~/.agents/skills/` containing a `SKILL.md` with name and description frontmatter ([agentskills.io](https://agentskills.io) convention). Create one and it appears in every configured harness:
+A skill is a directory under `~/.agents/skills/` with a `SKILL.md` that has `name` and `description` frontmatter ([agentskills.io](https://agentskills.io) convention). Skills you write sync everywhere; skills from other people's repos are treated as dependencies: pinned to a commit, audited and held until they are 72 hours old.
+
+## Write your own
 
 ```bash
 tackroom skill new review-checklist --description "Pre-merge review checklist"
 tackroom sync
+tackroom skill list          # per harness: managed links, foreign symlinks, drift, context cost
+tackroom skill info <name>   # one skill across harnesses
 ```
 
-## External skills: pinned, audited
+Harnesses that read `~/.agents/skills/` natively (OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, Kimi Code, DeepSeek Harness) get a mirror in their own skill root only when the config root is not `~/.agents`. Qwen Code and Amp read the canonical folder through their own settings (`skills.directories`, `amp.skills.path`), so no mirror is created.
 
-Pulling skills from other people's repos is installing prompt code from strangers — tackroom treats it like a dependency, not a download. Adding one is a separate step, never part of setup:
+## Add an external source
+
+Pulling skills from other people's repos is installing prompt code from strangers, so it is a separate step and never part of setup.
 
 ```bash
 tackroom skill sources                                # configured sources, plus ones installed outside tackroom
-tackroom skill sources search grill                   # find sources on skills.sh
-tackroom skill sources add mattpocock/skills --skills tdd,grill-me
-tackroom skill sources add obra/superpowers --all
-tackroom skill sources add cursor/plugins/pstack --skills how,why   # a path inside a repo
+tackroom skill sources search <query>                 # find sources on skills.sh
+tackroom skill sources add owner/repo --skills a,b    # pick skills
+tackroom skill sources add owner/repo --all
+tackroom skill sources add owner/repo/path/in/repo --skills a   # a folder inside a repo
 ```
 
-`add` pins the newest commit that is at least 3 days old (`--latest` pins the branch head), so a freshly pushed commit never reaches every agent the moment it lands. Pick skills with `--skills` or `--all`; an attended run without either shows a numbered list. `--all` keeps no allowlist, so skills upstream adds later in the same directories arrive on `skill update`; a skill in a new directory needs another `add` or a `skill_dirs` edit. If `~/.agents/skills/<name>` already exists, `add` adopts it only when it is identical to the source (as `npx skills add` leaves it) and stops otherwise. Then it syncs (`--no-sync` skips that).
+`add` pins the newest commit that is at least 3 days old; `--latest` pins the branch head instead. Without `--skills` or `--all`, an attended run shows a numbered list. Then it syncs; `--no-sync` skips that. Other flags: `--branch`, `--name`.
 
-`tackroom skill sources` also reads Claude Code's plugin registry and the `npx skills` lock. A source Claude Code already loads as a plugin (superpowers, say) is added with `exclude_agents: [claude]`, so the other agents get it and Claude does not see its skills twice.
+- `--all` keeps no allowlist, so skills upstream adds later in the same folders arrive on `skill update`. A skill in a new folder needs another `add` or a `skill_dirs` edit.
+- If `~/.agents/skills/<name>` already exists, `add` adopts it only when it is identical to the source (as `npx skills add` leaves it) and stops otherwise.
+- `skill sources` also reads Claude Code's plugin registry and the `npx skills` lock. A source Claude Code already loads as a plugin is added with `exclude_agents: [claude]`, so Claude Code does not see its skills twice.
 
-`add` writes an entry like this to `tackroom.yaml`; you can also write it by hand:
+## What `add` writes
 
 ```yaml
 external_skills:
-  - url: https://github.com/mattpocock/skills
+  - url: https://github.com/owner/repo
     branch: main
-    skill_dirs: [skills/productivity/grilling]
+    skill_dirs: [skills/review]
+    skills: [review-checklist]
     materialize: true
 ```
 
-- `name` is optional and defaults to the repo name. Two repos that share it (`mattpocock/skills`, `anthropics/skills`) need distinct names; `add` uses `<owner>-<repo>` for the second.
-- `exclude_agents: [claude]` keeps the source's skills away from the listed agents.
-- `tackroom.lock` pins the source to an exact commit; agents only ever see the pinned tree.
-- `materialize: true` copies the selected directories into `~/.agents/skills/<name>` so the content is versioned in your repo and diffable on update.
-- `tackroom skill update [name ...]` is the only thing that advances a pin; updates are deliberate, never implicit.
-- `tackroom doctor` scans external sources for risky patterns (exfiltration, shell abuse) and detects drift between the lock and the materialized copies.
+- `name` is optional and defaults to the repo name. Two repos with the same name need distinct names; `add` uses `<owner>-<repo>` for the second.
+- `exclude_agents: [claude]` keeps the source's skills away from the listed harnesses.
+- `materialize: true` copies the selected skills into `~/.agents/skills/`, so the content is versioned in your repo and diffable on update.
+- `tackroom.lock` pins the source to an exact commit. Harnesses only ever see the pinned tree.
+- `tackroom skill update [name ...]` is the only command that advances a pin. Updates are deliberate, never implicit.
+- `tackroom doctor` scans external sources for risky patterns and detects drift between the lock and the materialized copies.
 
-Two gates apply to outside content only. A new or changed reference to an exact npm or PyPI version (in an MCP server command or a Pi `packages` entry), or a new or changed external skill pin, is held until 72 hours after its publish time (npm `time[version]`, PyPI latest upload, git committer date); an unknown publish time means held. A held item is skipped and what is already in the harness stays. `sync --allow-fresh` (also `skill update --allow-fresh`) releases and records it, and `status` lists each held or blocked item with the reason, the hold end and the exact override command.
+## The 72 hour hold
 
-New or changed external content with an unaccepted CRITICAL finding is skipped by sync and the previous pin stays. `doctor audit` lists findings per item (`skill:`, `plugin:`, `role:`, `hook:`, `mcp:`, `package:`); `doctor audit accept <item> <rule> --reason "..."` records the decision in `tackroom.lock` under `accepted:`, and `revoke` removes one. Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing, and a git commit date counts as a weaker time source than a registry publish time.
+```bash
+tackroom status                              # lists each held item: reason, hold end, override command
+tackroom sync --allow-fresh                  # release all held items
+tackroom sync --allow-fresh=<item> --reason "checked the diff"
+tackroom skill update --allow-fresh
+```
+
+A new or changed external skill pin, and a new or changed reference to an exact npm or PyPI version (in an MCP server command or a Pi `packages` entry), is held until 72 hours after its publish time. The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means held.
+
+A held item is skipped and what is already in the harness stays. `--allow-fresh` releases it and records the decision in `tackroom.lock` under `holds:`.
+
+## The audit gate
+
+```bash
+tackroom doctor audit                                       # findings per item; exit 1 on an unaccepted CRITICAL in external content
+tackroom doctor audit accept skill:<name> <rule> --reason "..."
+tackroom doctor audit revoke skill:<name> <rule>
+```
+
+New or changed external content with an unaccepted CRITICAL finding is skipped by sync, and the previous pin stays. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
+
+Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing. A git commit date is a weaker time source than a registry publish time.
 
 ## Plugins
 
-External sources with an [agent-plugins-spec](https://agent-plugins.org) `plugin.json` get their skills and MCP servers discovered automatically. Native plugin projection (Codex `.codex-plugin/`) is planned.
+An external source with an [agent-plugins-spec](https://agent-plugins.org) `plugin.json` is audited as `plugin:<name>`, and its name and version are recorded in the lock. Set `mcp: true` on the source (and optionally `mcp_agents: [...]`) to register the MCP servers from the plugin's `mcp.json`.
 
-Qwen Code reads the canonical skill directory through `skills.directories` in `~/.qwen/settings.json`. This leaves its personal `~/.qwen/skills/` inventory untouched and avoids a duplicate symlink mirror.
+Claude Code plugins stay in Claude Code's native layout. Put each plugin under the config root and list it in `.claude-plugin/marketplace.json`. `sync` registers the config root as a directory marketplace in `~/.claude/settings.json` and enables each relative-path plugin.
+
+Claude Code reads the plugin in place, so there is no install step; run `/reload-plugins` after an edit. A plugin you turn off in `/plugin` stays off. Entries with `defaultEnabled: false`, entries that point at the config root itself and remote sources are left for you.
+
+Codex has no native plugin projection in tackroom yet: Codex loads plugins only from its own cache, filled by `codex plugin add`.
