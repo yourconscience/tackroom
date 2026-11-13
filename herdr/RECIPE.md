@@ -1,6 +1,6 @@
 # tackroom
 
-Herdr's main layout with tackroom's Crons panel on the right: every scheduled job on every host tackroom scans, with Run now, Pause and Resume, one click from the tab bar. Spaces, agents, tabs, panes, Files and Changes work as in main.
+Herdr's main layout with tackroom's Crons panel on the right: every scheduled job on every host tackroom scans, with Run now, Pause and Resume, and Add, Edit and Delete for jobs tackroom owns, one click from the tab bar. Spaces, agents, tabs, panes, Files and Changes work as in main.
 
 ## What you see
 
@@ -11,7 +11,7 @@ Herdr's main layout with tackroom's Crons panel on the right: every scheduled jo
 ## How it behaves
 
 - Crons opens the panel on the Crons view; clicking it again, or Files or Changes, hides it or switches the view, as main's buttons do.
-- The panel collects when it opens and every 5 minutes, and acts through `tackroom cron run|pause|resume`.
+- The panel collects when it opens and every 5 minutes, and acts through `tackroom cron run|pause|resume|add|edit|remove`.
 - Switching spaces restores that space's Files or Changes choice, as in main; Crons is not remembered per space.
 
 ## Built from
