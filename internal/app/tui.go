@@ -23,13 +23,6 @@ import (
 
 var tuiTabNames = []string{"Agents", "Lock", "Crons", "Doctor"}
 
-const (
-	tuiTabAgents = iota
-	tuiTabLock
-	tuiTabCrons
-	tuiTabDoctor
-)
-
 // tuiMinColumn is the narrowest a shrinking column gets before the line is cut.
 const tuiMinColumn = 8
 
