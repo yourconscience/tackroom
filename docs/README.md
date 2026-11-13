@@ -31,5 +31,5 @@ Guides and reference for the tackroom CLI, in reading order. Start with setup; t
 - [Philosophy](philosophy.md): what tackroom believes and refuses to do.
 - [Comparison](comparison.md): how tackroom differs from skillshare, rulesync, ruler and openskills.
 - [Migrating from skillshare](skillshare-migration.md): map a skillshare setup onto tackroom.
-- [Upgrading](upgrading.md): what changed in 2.0, and the rename from dotagents.
+- [Upgrading](upgrading.md): what changed in 2.1 and 2.0, and the rename from dotagents.
 - [Troubleshooting](troubleshooting.md): conflicts, held and blocked items, hooks, Pi, periodic sync.

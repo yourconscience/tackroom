@@ -6,6 +6,16 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## To 2.1
+
+Nothing to migrate: `tackroom.yaml` and `tackroom.lock` keep their formats.
+
+- A download piped into a shell (`curl ... | sh`, `wget ... | bash`, `base64 -d ... | sh`) in an external skill is now a CRITICAL audit finding. A new or changed pin with that pattern is skipped until you accept it with `tackroom doctor audit accept`. Pins already in the lock keep syncing, and your own skills are reported, never blocked.
+- The Hermes memory bridge is gone. The next `tackroom sync` deletes `memory/hooks/sync.sh`, `sync-memory-to-vault.sh`, `sync-vault-to-memory.sh` and `memory/lib/sync.py` from your config root if you never edited them. Edited copies are reported and left alone. `tackroom setup` removes the old sync hook commands from native configs.
+- `tackroom doctor` no longer fails because an external skill is held or blocked. It passes, counts them and says what to do next.
+- Install with Homebrew or npm. The install script is no longer offered.
+- New: `tackroom tui`, a read-only terminal view. See [tui.md](tui.md).
+
 ## To 2.0
 
 tackroom 2.0 removes the Hermes and OpenClaw harnesses (with their hooks, MCP adapters, setup defaults and doctor checks), the `hermes` and `openbot` cron sources, the `tackroom skill promote` command, the macOS app, the HarnessKit coexistence notes, and the legacy `tackroom view --port/--host/--no-token/--name` flags.
