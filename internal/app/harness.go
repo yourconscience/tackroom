@@ -396,6 +396,57 @@ func initHarnesses() {
 			IntegrationNote: "skills read natively from ~/.agents/skills; Grok also reads Claude Code's skills, roles, hooks and MCP and dedups them by name",
 		},
 
+		agentAgy: {
+			Skills: skillsSymlink,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentAgy,
+				configPath: agyMCPConfigPath,
+				inspect:    inspectJSONMCPServer,
+				patch:      patchJSONMCPServer,
+				remove:     removeJSONMCPServer,
+				read:       readJSONMCPServer,
+				rootKey:    "mcpServers",
+			}),
+			Hooks: &hookTarget{
+				agentName: agentAgy,
+				inspect:   inspectAgyHook,
+				patch:     patchAgyHook,
+			},
+			// ~/.gemini/GEMINI.md is Gemini CLI's file too; both adapters write
+			// the same link. ~/.gemini/AGENTS.md is not used: agy loads it next
+			// to GEMINI.md, so both would inject the same text.
+			RootInstructions: &rootInstructionsCapability{
+				Path:          func(home string) string { return filepath.Join(home, ".gemini", "GEMINI.md") },
+				Expected:      func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
+				NoSetupImport: true,
+			},
+			IntegrationNote: "skills go to ~/.gemini/antigravity-cli/skills (CLI only, not Gemini CLI's ~/.gemini/skills); MCP to ~/.gemini/config/mcp_config.json and hooks to ~/.gemini/config/hooks.json (Gemini CLI reads neither); no roles (tools default unverified); root file ~/.gemini/GEMINI.md is shared with Gemini CLI",
+			doctorChecks: []doctorCheck{
+				{Name: "agy duplicate skills", Run: checkAgyDuplicateSkills},
+			},
+		},
+
+		agentKimi: {
+			Skills:           skillsSymlink,
+			SkillsNativeRoot: readsAgentsSkillsRoot,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentKimi,
+				configPath: func(home string) string { return filepath.Join(kimiHome(home), "mcp.json") },
+				inspect:    inspectJSONMCPServer,
+				patch:      patchJSONMCPServer,
+				remove:     removeJSONMCPServer,
+				read:       readJSONMCPServer,
+				rootKey:    "mcpServers",
+			}),
+			roles: roleRenderer(agentKimi),
+			Hooks: &hookTarget{
+				agentName: agentKimi,
+				inspect:   inspectKimiHook,
+				patch:     patchKimiHook,
+			},
+			IntegrationNote: "skills, agents and AGENTS.md are read natively from ~/.agents; MCP goes to ~/.kimi-code/mcp.json and hooks to [[hooks]] in ~/.kimi-code/config.toml ($KIMI_CODE_HOME moves both)",
+		},
+
 		agentDSH: {
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: dshReadsAgentsSkills,

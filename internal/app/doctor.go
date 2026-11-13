@@ -32,6 +32,8 @@ const (
 	agentCopilot            = "copilot"
 	agentGrok               = "grok"
 	agentDSH                = "dsh"
+	agentAgy                = "agy"
+	agentKimi               = "kimi"
 	tackroomSkillsPathValue = "~/.agents/skills"
 )
 

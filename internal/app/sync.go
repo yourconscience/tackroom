@@ -227,10 +227,13 @@ func replaceAllConflicts(reports []agentReport, home string, streams setupIO, co
 }
 
 func applyAgentRootInstructionSync(reports []agentReport) error {
+	// Gemini CLI and Antigravity CLI share ~/.gemini/GEMINI.md: write it once.
+	written := map[string]bool{}
 	for _, report := range reports {
-		if !report.Detected || report.RootPath == "" {
+		if !report.Detected || report.RootPath == "" || written[report.RootPath] {
 			continue
 		}
+		written[report.RootPath] = true
 		switch report.RootState {
 		case stateSynced:
 			continue
