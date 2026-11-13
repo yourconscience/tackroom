@@ -492,6 +492,7 @@ func sortReportLists(report *agentReport) {
 	sort.Strings(report.MissingMCP)
 	sort.Strings(report.MissingHook)
 	sort.Strings(report.UnsupportedHook)
+	sort.Strings(report.UnsupportedSetting)
 	sort.Strings(report.UpdatesPackage)
 	sort.Strings(report.UpdatesSetting)
 	sort.Strings(report.RemovesPackage)
@@ -757,6 +758,7 @@ func driftBuckets(r agentReport) []driftBucket {
 		{"packages drifted", r.DriftedPackage, bucketDrift},
 		{"packages removed", r.RemovesPackage, bucketAction},
 		{"settings drifted", r.DriftedSetting, bucketDrift},
+		{"settings unsupported", r.UnsupportedSetting, bucketNotice},
 		{"plugins missing", r.MissingPlugin, bucketDrift},
 		{"plugins stale", r.StalePlugin, bucketDrift},
 		{"conflicts", r.Conflicts, bucketConflict},

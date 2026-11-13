@@ -154,6 +154,8 @@ type agentReport struct {
 	RemovesPackage []string
 	RemovesPlugin  []string
 	Synced         bool
+
+	UnsupportedSetting []string // a settings: block on a harness without settings support
 }
 
 // replaceableConflict is a native file or skill directory that sits where

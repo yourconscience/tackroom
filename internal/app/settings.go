@@ -47,8 +47,9 @@ var settingsManagedKeys = map[string][]string{
 }
 
 // secretKeySegment matches a key segment that must hold an environment
-// reference rather than a literal secret.
-var secretKeySegment = regexp.MustCompile(`(?i)^(token|secret|password|api.?key|authorization|credential)$`)
+// reference rather than a literal secret. It is a substring match so names such
+// as ANTHROPIC_AUTH_TOKEN or githubToken are caught too.
+var secretKeySegment = regexp.MustCompile(`(?i)(token|secret|password|api.?key|authorization|credential)`)
 
 // settingsValues resolves the declared values for one agent, expanding every
 // ${ENV} reference (a missing variable is an error, so a typo cannot write an
@@ -313,7 +314,7 @@ func applyYAMLSettingsSync(path string, values map[string]any) error {
 			return fmt.Errorf("%s: %w", key, err)
 		}
 	}
-	out, err := marshalSettingsYAML(doc)
+	out, err := marshalSettingsYAML(doc, yamlIndentOf(data))
 	if err != nil {
 		return fmt.Errorf("marshal %s: %w", path, err)
 	}
@@ -375,10 +376,25 @@ func yamlChild(mapping *yaml.Node, key string) *yaml.Node {
 	return nil
 }
 
-func marshalSettingsYAML(doc *yaml.Node) ([]byte, error) {
+// yamlIndentOf returns the indentation width of the first indented line, so a
+// rewrite keeps the file's own indent; 2 when the file has none.
+func yamlIndentOf(data []byte) int {
+	for _, line := range strings.Split(string(data), "\n") {
+		trimmed := strings.TrimLeft(line, " ")
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		if n := len(line) - len(trimmed); n >= 2 && n <= 8 {
+			return n
+		}
+	}
+	return 2
+}
+
+func marshalSettingsYAML(doc *yaml.Node, indent int) ([]byte, error) {
 	var b strings.Builder
 	encoder := yaml.NewEncoder(&b)
-	encoder.SetIndent(2)
+	encoder.SetIndent(indent)
 	if err := encoder.Encode(doc); err != nil {
 		return nil, err
 	}
@@ -405,6 +421,7 @@ func augmentSettingsReport(report *agentReport, agent agentConfig, home string) 
 	}
 	h := harnessFor(agent.Name)
 	if h == nil || h.Settings == nil {
+		report.UnsupportedSetting = append(report.UnsupportedSetting, sortedSettingKeys(agent.Settings)...)
 		return nil
 	}
 	values, err := settingsValues(agent)

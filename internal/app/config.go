@@ -586,17 +586,14 @@ func normalizeAgentName(name string) string {
 	return name
 }
 
-// validateAgentSettings checks a per-harness `settings:` block: only supported
-// harnesses may declare it, keys must be non-empty dotted paths, none may
-// collide with a key tackroom already manages, and no literal secret may be
-// declared where an ${ENV_VAR} reference is required.
+// validateAgentSettings checks a per-harness `settings:` block: keys must be
+// non-empty dotted paths, none may collide with a key tackroom already manages,
+// and no literal secret may be declared where an ${ENV_VAR} reference is
+// required. A harness without settings support is not an error here; sync
+// reports the block as unsupported and ignores it.
 func validateAgentSettings(agent agentConfig) error {
 	if len(agent.Settings) == 0 {
 		return fmt.Errorf("config agent %s has an empty settings block", agent.Name)
-	}
-	h := harnessFor(agent.Name)
-	if h == nil || h.Settings == nil {
-		return fmt.Errorf("config agent %s does not support settings", agent.Name)
 	}
 	for key := range agent.Settings {
 		if strings.TrimSpace(key) == "" || strings.HasPrefix(key, ".") || strings.HasSuffix(key, ".") || strings.Contains(key, "..") {
