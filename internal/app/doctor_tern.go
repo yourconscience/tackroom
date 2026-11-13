@@ -7,12 +7,13 @@ import (
 	"time"
 )
 
-// terminalVersion runs a terminal's version command and returns its first
-// line. The deadline keeps a hung binary from blocking `tackroom doctor`.
-func terminalVersion(bin string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	out, err := exec.CommandContext(ctx, bin, args...).Output()
+// terminalVersionTimeout keeps a hung terminal binary from blocking
+// `tackroom doctor`.
+const terminalVersionTimeout = 5 * time.Second
+
+// versionLine runs a version command and returns the first line it prints.
+func versionLine(cmd *exec.Cmd) (string, error) {
+	out, err := cmd.Output()
 	if err != nil {
 		return "", err
 	}
@@ -26,11 +27,12 @@ func terminalVersion(bin string, args ...string) (string, error) {
 // can tell a missing or broken terminal apart from a healthy one. Tern is
 // optional, so an absent binary is a pass, not a failure.
 func checkTern() checkResult {
-	tern, err := exec.LookPath("tern")
-	if err != nil {
+	if _, err := exec.LookPath("tern"); err != nil {
 		return checkResult{"tern", checkStatusPass, "tern not installed (optional terminal), skipped"}
 	}
-	version, err := terminalVersion(tern, "--version")
+	ctx, cancel := context.WithTimeout(context.Background(), terminalVersionTimeout)
+	defer cancel()
+	version, err := versionLine(exec.CommandContext(ctx, "tern", "--version"))
 	if err != nil {
 		return checkResult{"tern", checkStatusWarn, "tern present but not runnable"}
 	}

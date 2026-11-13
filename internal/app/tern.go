@@ -60,7 +60,7 @@ func runTernCommand(args []string) error {
 			fmt.Println(strings.Join(cmd, " "))
 			return placeholder, nil
 		}
-		out, err := exec.Command(cmd[0], cmd[1:]...).Output()
+		out, err := exec.Command("tern", args...).Output()
 		if err != nil {
 			var exit *exec.ExitError
 			if errors.As(err, &exit) {
