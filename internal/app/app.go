@@ -509,7 +509,7 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.Pull, "pull", false, "Pull the repo before syncing")
-	fs.BoolVar(&opts.DryRun, "dry-run", false, "Print the plan without writing anything or fetching external sources")
+	fs.BoolVar(&opts.DryRun, "dry-run", false, "Print the plan without writing anything, fetching external sources or querying registries")
 	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup and link them")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the resulting status as JSON instead of the text report")
 	addAllowFreshFlags(fs, &opts)

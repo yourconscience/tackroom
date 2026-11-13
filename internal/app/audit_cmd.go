@@ -79,6 +79,14 @@ func parseAuditFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print findings as JSON")
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage:")
+		fmt.Fprintln(os.Stderr, "  tackroom doctor audit [--json]")
+		fmt.Fprintln(os.Stderr, "  tackroom doctor audit accept <item> <rule> --reason \"...\"")
+		fmt.Fprintln(os.Stderr, "  tackroom doctor audit revoke <item> <rule>")
+		fmt.Fprintln(os.Stderr, "\nFlags:")
+		fs.PrintDefaults()
+	}
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
