@@ -28,6 +28,7 @@ tackroom doctor audit revoke <item> <rule>
 tackroom config validate
 tackroom config print
 tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]
+tackroom tui [--config PATH]                    # read-only terminal view of agents, lock, crons and doctor; needs a terminal
 tackroom skill new <name> [--description ...]
 tackroom skill list [--agents ...]
 tackroom skill info <name>

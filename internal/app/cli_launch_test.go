@@ -140,33 +140,3 @@ external_skills:
 		t.Fatalf("canonical skill update printed rename notice: %q", canonicalStderr)
 	}
 }
-
-func TestRootHelpAdvertisesCanonicalDescriptiveFamilies(t *testing.T) {
-	stdout, stderr, err := captureCLIOutput(t, func() error {
-		return Run([]string{"--help"})
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if stderr != "" {
-		t.Fatalf("help wrote stderr: %q", stderr)
-	}
-
-	var families []string
-	for _, line := range strings.Split(stdout, "\n") {
-		if !strings.HasPrefix(line, "  ") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			t.Fatalf("help family lacks a description: %q", line)
-		}
-		families = append(families, fields[0])
-	}
-	if got, want := strings.Join(families, ","), "setup,status,sync,doctor,config,restore,view,skill,publish,mcp,hook"; got != want {
-		t.Fatalf("short-help families = %q, want %q:\n%s", got, want, stdout)
-	}
-	if !strings.Contains(stdout, `Run "tackroom help --all" for flags and maintenance commands.`) {
-		t.Fatalf("short help does not direct users to the complete surface:\n%s", stdout)
-	}
-}

@@ -11,6 +11,7 @@ Guides for the tackroom CLI, in reading order. Start with setup; the rest stand 
 - [Skills](skills.md): write your own, add external sources, the 72 hour hold and the audit gate, plugins.
 - [Roles](roles.md): the role file format, where each harness gets it, model tiers and overrides.
 - [Scheduled jobs](crons.md): inventory every job on every host, run and pause launchd jobs, declare your own.
+- [Terminal view](tui.md): `tackroom tui`, a read-only full-screen view of agents, the lock, scheduled jobs and doctor checks.
 - [Memory](memory.md): the three tiers, the `rem` capture and review workflow, and why it is review-first.
 - [Herdr panel](herdr.md): the Crons tab as a native Herdr side panel.
 - [Tern](tern.md): a ready-made tackroom workspace in the Tern terminal.
