@@ -142,6 +142,14 @@ func validateSettingValue(key string, value any) error {
 				return err
 			}
 		}
+		return nil
+	}
+	if list, ok := value.([]any); ok {
+		for _, item := range list {
+			if err := validateSettingValue(key, item); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

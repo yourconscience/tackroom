@@ -57,6 +57,9 @@ func statusReport(opts runOptions) error {
 		if err := encodeJSON(setupStreams(opts).out, view); err != nil {
 			return err
 		}
+		if err := agentFailures(reports); err != nil {
+			return err
+		}
 		if !view.Synced {
 			return notSyncedError{"tackroom is not fully synced"}
 		}

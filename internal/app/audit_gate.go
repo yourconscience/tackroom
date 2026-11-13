@@ -144,7 +144,7 @@ func restoreHeldCaches(sources []externalSkillSource, home string, prev lockFile
 		if _, ok := held[sourceName(src)]; !ok {
 			continue
 		}
-		if e := findLockEntry(prev, sourceName(src)); e != nil && e.URL == src.URL && e.Branch == src.Branch {
+		if e := findLockEntry(prev, sourceName(src)); e != nil {
 			_ = gitCheckoutCommit(filepath.Join(externalCacheDir(home), sourceName(src)), e.Commit, src.Branch)
 		}
 	}

@@ -37,6 +37,7 @@ type kimiHookRule struct {
 	Event   string `toml:"event"`
 	Command string `toml:"command"`
 	Timeout int64  `toml:"timeout"`
+	Matcher string `toml:"matcher"`
 }
 
 type kimiHookDoc struct {
@@ -81,7 +82,7 @@ func inspectKimiHook(hook hookConfig, home string) (string, error) {
 		if !hookCommandMatches(rule.Command, hook.Command) {
 			continue
 		}
-		if rule.Event == event && rule.Timeout == int64(hook.Timeout) {
+		if rule.Event == event && rule.Timeout == int64(hook.Timeout) && rule.Matcher == "" {
 			return stateSynced, nil
 		}
 		state = stateDrifted
@@ -102,7 +103,9 @@ func patchKimiHook(hook hookConfig, home string) error {
 	if _, err := kimiHookRules(path, content); err != nil {
 		return err
 	}
-	content = removeKimiHookBlocks(content, func(command string) bool { return hookCommandMatches(command, hook.Command) })
+	content = removeKimiHookBlocks(content, func(rule kimiHookRule) bool {
+		return hookCommandMatches(rule.Command, hook.Command) && rule.Event == event
+	})
 	block := fmt.Sprintf("[[hooks]]\nevent = %q\ncommand = %q\n", event, hook.Command)
 	if hook.Timeout > 0 {
 		block += fmt.Sprintf("timeout = %d\n", hook.Timeout)
@@ -120,7 +123,7 @@ func patchKimiHook(hook hookConfig, home string) error {
 }
 
 // removeKimiHookBlocks drops each [[hooks]] table whose command matches.
-func removeKimiHookBlocks(content string, match func(command string) bool) string {
+func removeKimiHookBlocks(content string, match func(rule kimiHookRule) bool) string {
 	var out, block strings.Builder
 	inBlock := false
 	flush := func() {
@@ -128,7 +131,7 @@ func removeKimiHookBlocks(content string, match func(command string) bool) strin
 			return
 		}
 		var doc kimiHookDoc
-		if _, err := toml.Decode(block.String(), &doc); err != nil || len(doc.Hooks) != 1 || !match(doc.Hooks[0].Command) {
+		if _, err := toml.Decode(block.String(), &doc); err != nil || len(doc.Hooks) != 1 || !match(doc.Hooks[0]) {
 			out.WriteString(block.String())
 		}
 		block.Reset()
@@ -174,9 +177,9 @@ func removeKimiNativeHookEntries(path string, entries []nativeHookEntry) (bool, 
 	if err != nil {
 		return false, err
 	}
-	updated := removeKimiHookBlocks(content, func(command string) bool {
+	updated := removeKimiHookBlocks(content, func(rule kimiHookRule) bool {
 		for _, entry := range entries {
-			if hookCommandMatches(command, entry.Command) {
+			if rule.Event == entry.Event && hookCommandMatches(rule.Command, entry.Command) {
 				return true
 			}
 		}

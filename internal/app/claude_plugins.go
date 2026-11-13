@@ -374,7 +374,7 @@ func writeJSONConfig(path string, raw map[string]interface{}) error {
 	if real, err := filepath.EvalSymlinks(path); err == nil {
 		path = real
 	}
-	mode := fs.FileMode(0o644)
+	mode := fs.FileMode(0o600)
 	if info, err := os.Stat(path); err == nil {
 		mode = info.Mode().Perm()
 	}

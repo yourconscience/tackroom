@@ -207,14 +207,15 @@ func gateUpdatedSources(selected []externalSkillSource, home string, lock *lockF
 	// Present the candidates as unpinned so the sync gate evaluates them.
 	probe := *lock
 	probe.ExternalSkills = nil
-	for _, e := range lock.ExternalSkills {
-		isCandidate := false
-		for _, src := range candidates {
-			if sourceName(src) == e.Name {
-				isCandidate = true
-			}
+	candidateNames := make(map[string]bool, len(candidates))
+	for _, src := range candidates {
+		candidateNames[sourceName(src)] = true
+		if pin := lockEntryFor(*lock, src); pin != nil {
+			candidateNames[pin.Name] = true
 		}
-		if !isCandidate {
+	}
+	for _, e := range lock.ExternalSkills {
+		if !candidateNames[e.Name] {
 			probe.ExternalSkills = append(probe.ExternalSkills, e)
 		}
 	}

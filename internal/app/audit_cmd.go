@@ -102,11 +102,17 @@ func runAudit(opts runOptions) error {
 		return err
 	}
 
+	findings := auditRepo(repoRoot, home, cfg)
 	crit := 0
-	if !opts.JSONOutput {
+	if opts.JSONOutput {
+		for _, f := range findings {
+			if f.severity == auditCritical {
+				crit++
+			}
+		}
+	} else {
 		fmt.Println("tackroom audit")
 		fmt.Printf("repo: %s\n\n", repoRoot)
-		findings := auditRepo(repoRoot, home, cfg)
 		crit, _, _ = printAuditFindings(os.Stdout, findings)
 		fmt.Println()
 	}

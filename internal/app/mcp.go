@@ -53,6 +53,15 @@ func desiredMCPServersForAgent(cfg config, agentName string) []mcpServerConfig {
 		if server.URL != "" && !hasRemoteMCPSupport(agentName) {
 			continue
 		}
+		// Apply agent targeting before the freshness hold, so a held server is
+		// not retained for an agent that no longer targets it.
+		if len(server.Agents) == 0 {
+			if !hasMCPSupport(agentName) {
+				continue
+			}
+		} else if !stringInSlice(agentName, server.Agents) {
+			continue
+		}
 		if cfg.heldMCP[server.Name] {
 			// Inside its freshness hold: keep the entry the harness already has.
 			if existing, err := readNativeMCPServer(agentName, server.Name, cfg.heldHome); err == nil {
@@ -61,15 +70,7 @@ func desiredMCPServersForAgent(cfg config, agentName string) []mcpServerConfig {
 			}
 			continue
 		}
-		if len(server.Agents) == 0 {
-			if hasMCPSupport(agentName) {
-				servers = append(servers, server)
-			}
-			continue
-		}
-		if stringInSlice(agentName, server.Agents) {
-			servers = append(servers, server)
-		}
+		servers = append(servers, server)
 	}
 	return servers
 }

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -163,6 +164,11 @@ func runSetup(opts runOptions) error {
 		if err := setLocalPeriodicSync(configPath, home, false); err != nil {
 			fmt.Fprintf(streams.out, "warning: could not record periodic_sync: false: %v\n", err)
 		}
+		return nil
+	}
+	// A persisted periodic_sync: false (tackroom.yaml or the local overlay) is
+	// the same opt-out; setup must not reinstall the job and reverse it.
+	if effective, err := loadConfig(repoRoot, home, ""); err == nil && !periodicSyncEnabled(effective) {
 		return nil
 	}
 	// Setup is the one place besides `tackroom cron` that installs the job.
@@ -328,7 +334,11 @@ func runPull(opts runOptions) error {
 	// surface a machine that has stopped receiving updates.
 	if shouldPull(repoRoot) {
 		now := time.Now().UTC().Format(time.RFC3339)
-		out, err := exec.Command("git", "-C", repoRoot, "pull", "--ff-only").CombinedOutput()
+		ctx, cancel := context.WithTimeout(context.Background(), gitRemoteTimeout)
+		cmd := exec.CommandContext(ctx, "git", "-C", repoRoot, "pull", "--ff-only")
+		cmd.WaitDelay = 5 * time.Second
+		out, err := cmd.CombinedOutput()
+		cancel()
 
 		prev, _ := readPullState(home)
 		state := pullState{LastAttempt: now, LastSuccess: prev.LastSuccess}

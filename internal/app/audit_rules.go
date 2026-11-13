@@ -75,6 +75,23 @@ func lowerSeverity(sev string) string {
 	}
 }
 
+// severityRank orders findings so a duplicate with a higher severity replaces
+// a stored lower one.
+func severityRank(sev string) int {
+	switch sev {
+	case sevCritical:
+		return 4
+	case sevHigh:
+		return 3
+	case sevMedium:
+		return 2
+	case sevLow:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func auditEvidence(rule, file, match string) string {
 	norm := strings.Join(strings.Fields(match), " ")
 	sum := sha256.Sum256([]byte(rule + "|" + file + "|" + norm))
@@ -160,13 +177,17 @@ func loweredLines(file string, lines []string) []bool {
 // item, used for lowering decisions and the evidence hash.
 func scanText(file, text string) []ruleFinding {
 	var out []ruleFinding
-	seen := map[string]bool{}
+	seen := map[string]int{}
 	add := func(f ruleFinding) {
 		key := f.Rule + f.Evidence
-		if !seen[key] {
-			seen[key] = true
-			out = append(out, f)
+		if idx, ok := seen[key]; ok {
+			if severityRank(f.Severity) > severityRank(out[idx].Severity) {
+				out[idx] = f
+			}
+			return
 		}
+		seen[key] = len(out)
+		out = append(out, f)
 	}
 	lines := strings.Split(text, "\n")
 	lowered := loweredLines(file, lines)
