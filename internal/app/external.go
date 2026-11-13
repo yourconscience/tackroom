@@ -16,6 +16,22 @@ func externalCacheDir(home string) string {
 	return filepath.Join(home, ".agents", "external")
 }
 
+// externalCandidateHome is the staging home whose external cache holds
+// candidate checkouts. Candidates are cloned and audited there, never in the
+// shared cache that native skill symlinks point into, so unaudited content is
+// unreachable until the gate approves it. It lives under the shared cache root
+// because that root is machine-local state the config root already ignores.
+func externalCandidateHome(home string) string {
+	return filepath.Join(externalCacheDir(home), "candidates")
+}
+
+// externalCandidatePath is one source's staged candidate checkout. It is laid
+// out as a cache entry of externalCandidateHome so discovery and audit read it
+// through the same paths they use for the shared cache.
+func externalCandidatePath(home string, name string) string {
+	return filepath.Join(externalCacheDir(externalCandidateHome(home)), name)
+}
+
 // sourceName identifies an external source: its cache directory, lock entry
 // and `tackroom skill update` argument. It is the optional name, else the
 // repository basename, so two repos both called "skills" can coexist.
@@ -40,14 +56,22 @@ func repoName(url string) string {
 // newly configured sources, and refreshes materialized copies before harness
 // reconciliation can observe them.
 func syncExternalRepos(sources []externalSkillSource, home string, repoRoot string) error {
+	_, err := syncExternalReposGated(sources, home, repoRoot, nil)
+	return err
+}
+
+// syncExternalReposGated is syncExternalRepos plus the sync-time gate: when
+// gate is non-nil, a source whose pin is new and that has an unaccepted
+// CRITICAL finding (or is inside its freshness hold) is skipped and returned.
+func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot string, gate *gateOptions) (map[string]heldItem, error) {
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	cacheRoot := externalCacheDir(home)
 	if len(sources) > 0 {
 		if err := os.MkdirAll(cacheRoot, 0o755); err != nil {
-			return fmt.Errorf("create %s: %w", cacheRoot, err)
+			return nil, fmt.Errorf("create %s: %w", cacheRoot, err)
 		}
 	}
 	unavailable := make(map[string]bool)
@@ -60,20 +84,30 @@ func syncExternalRepos(sources []externalSkillSource, home string, repoRoot stri
 				unavailable[name] = true
 				continue
 			}
-			return err
+			return nil, err
 		}
 	}
-	plan, err := planMaterializedSkills(sources, home, repoRoot, lock, true, unavailable)
-	if err != nil {
-		return err
+	var held map[string]heldItem
+	original := lock
+	if gate != nil {
+		held = gateExternalSources(sources, home, &lock, *gate)
+		restoreHeldCaches(sources, home, original, held)
+		for name := range held {
+			unavailable[name] = true
+		}
 	}
-	if err := writeLockIfChanged(sources, home, repoRoot, lock); err != nil {
-		return err
+	active := filterHeldSources(sources, held)
+	plan, err := planMaterializedSkills(active, home, repoRoot, lock, true, unavailable)
+	if err != nil {
+		return nil, err
+	}
+	if err := writeLockIfChanged(active, home, repoRoot, lock, held); err != nil {
+		return nil, err
 	}
 	if err := applyMaterializedSkills(plan); err != nil {
-		return restoreMaterializationLock(repoRoot, lock, err)
+		return nil, restoreMaterializationLock(repoRoot, original, err)
 	}
-	return nil
+	return held, nil
 }
 
 // refreshExternalCache brings the local cache for src to its lock pin (or the
@@ -122,7 +156,7 @@ func committedMaterializationCurrent(src externalSkillSource, lock lockFile, rep
 
 // updateExternalRepos advances the named source pins (or all when names is
 // empty), writes the lock, then immediately refreshes their canonical copies.
-func updateExternalRepos(sources []externalSkillSource, home string, repoRoot string, names []string) error {
+func updateExternalRepos(sources []externalSkillSource, home string, repoRoot string, names []string, gate gateOptions) error {
 	selected, err := selectExternalSources(sources, names)
 	if err != nil {
 		return err
@@ -135,29 +169,132 @@ func updateExternalRepos(sources []externalSkillSource, home string, repoRoot st
 	if err := os.MkdirAll(cacheRoot, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", cacheRoot, err)
 	}
-	for _, src := range selected {
-		name := sourceName(src)
-		cachePath := filepath.Join(cacheRoot, name)
-		if !hasDir(filepath.Join(cachePath, ".git")) {
-			if err := gitClone(src.URL, src.Branch, cachePath); err != nil {
-				return fmt.Errorf("clone external %s: %w", name, err)
-			}
-		} else if err := gitFetchReset(cachePath, src.Branch); err != nil {
-			return fmt.Errorf("update external %s: %w", name, err)
-		}
-		fmt.Printf("updated %s -> %s\n", name, externalSkillCommit(cachePath))
-	}
-	plan, err := planMaterializedSkills(selected, home, repoRoot, lock, false, nil)
+	// Candidates are cloned beside the shared cache and published to it only
+	// after the gate approves them: native skill symlinks point into the shared
+	// cache, so an unaudited candidate must not be readable there.
+	staged, err := stageExternalCandidates(selected, home)
 	if err != nil {
 		return err
 	}
-	if err := writeLockAfterUpdate(sources, home, repoRoot, lock, selected); err != nil {
+	// The new pin is a candidate: an unaccepted CRITICAL finding or a freshness
+	// hold keeps the previous pin and skips the source.
+	original := lock
+	held := gateUpdatedSources(staged, home, &lock, gate)
+	restoreHeldCaches(selected, home, original, held)
+	var updated []externalSkillSource
+	for _, candidate := range staged {
+		name := sourceName(candidate.src)
+		if _, ok := held[name]; ok {
+			// Keep the rejected checkout so `tackroom doctor audit` can still
+			// inspect and accept its findings.
+			continue
+		}
+		cachePath := filepath.Join(cacheRoot, name)
+		if err := publishExternalCandidate(candidate.src, cachePath, candidate.commit); err != nil {
+			return err
+		}
+		_ = os.RemoveAll(candidate.path)
+		updated = append(updated, candidate.src)
+		fmt.Printf("updated %s -> %s\n", name, externalSkillCommit(cachePath))
+	}
+	for name, h := range held {
+		fmt.Printf("skipped %s: %s %s; %s\n", name, h.Kind, h.Reason, h.Command)
+	}
+	keep := make(map[string]bool, len(held))
+	for name := range held {
+		keep[name] = true
+	}
+	plan, err := planMaterializedSkills(updated, home, repoRoot, lock, false, keep)
+	if err != nil {
 		return err
 	}
+	if err := writeLockAfterUpdate(sources, home, repoRoot, lock, updated, held); err != nil {
+		return restoreMaterializationLock(repoRoot, original, err)
+	}
 	if err := applyMaterializedSkills(plan); err != nil {
-		return restoreMaterializationLock(repoRoot, lock, err)
+		return restoreMaterializationLock(repoRoot, original, err)
 	}
 	return nil
+}
+
+// externalCandidate is one selected source checked out at its candidate commit.
+type externalCandidate struct {
+	src    externalSkillSource
+	path   string
+	commit string
+}
+
+// stageExternalCandidates clones the branch head of every selected source into
+// a staging checkout outside the shared cache.
+func stageExternalCandidates(selected []externalSkillSource, home string) ([]externalCandidate, error) {
+	staged := make([]externalCandidate, 0, len(selected))
+	for _, src := range selected {
+		name := sourceName(src)
+		path := externalCandidatePath(home, name)
+		if err := os.RemoveAll(path); err != nil {
+			return nil, fmt.Errorf("reset candidate for external %s: %w", name, err)
+		}
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			return nil, fmt.Errorf("create %s: %w", filepath.Dir(path), err)
+		}
+		if err := gitClone(src.URL, src.Branch, path); err != nil {
+			return nil, fmt.Errorf("clone external %s: %w", name, err)
+		}
+		commit := externalSkillCommitFull(path)
+		if commit == "" {
+			return nil, fmt.Errorf("resolve candidate commit for external %s", name)
+		}
+		staged = append(staged, externalCandidate{src: src, path: path, commit: commit})
+	}
+	return staged, nil
+}
+
+// publishExternalCandidate moves the shared cache to an approved candidate
+// commit, so the symlinks reach exactly the content the gate audited.
+func publishExternalCandidate(src externalSkillSource, cachePath string, commit string) error {
+	name := sourceName(src)
+	if hasDir(filepath.Join(cachePath, ".git")) {
+		if err := gitFetchReset(cachePath, src.Branch); err != nil {
+			return fmt.Errorf("update external %s: %w", name, err)
+		}
+	} else if err := gitClone(src.URL, src.Branch, cachePath); err != nil {
+		return fmt.Errorf("clone external %s: %w", name, err)
+	}
+	if err := gitCheckoutCommit(cachePath, commit, src.Branch); err != nil {
+		return fmt.Errorf("pin external %s to %s: %w", name, commit, err)
+	}
+	return nil
+}
+
+// gateUpdatedSources gates the staged candidates whose commit moved off the
+// locked pin, or that are not pinned yet, reading each candidate from its
+// staging checkout.
+func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile, gate gateOptions) map[string]heldItem {
+	var candidates []externalSkillSource
+	for _, candidate := range staged {
+		pin := lockEntryFor(*lock, candidate.src)
+		if pin == nil || pin.Commit != candidate.commit {
+			candidates = append(candidates, candidate.src)
+		}
+	}
+	// Present the candidates as unpinned so the sync gate evaluates them.
+	probe := *lock
+	probe.ExternalSkills = nil
+	candidateNames := make(map[string]bool, len(candidates))
+	for _, src := range candidates {
+		candidateNames[sourceName(src)] = true
+		if pin := lockEntryFor(*lock, src); pin != nil {
+			candidateNames[pin.Name] = true
+		}
+	}
+	for _, e := range lock.ExternalSkills {
+		if !candidateNames[e.Name] {
+			probe.ExternalSkills = append(probe.ExternalSkills, e)
+		}
+	}
+	held := gateExternalSources(candidates, externalCandidateHome(home), &probe, gate)
+	lock.Holds = probe.Holds
+	return held
 }
 
 func selectExternalSources(sources []externalSkillSource, names []string) ([]externalSkillSource, error) {
@@ -187,16 +324,19 @@ func externalSourceNames(sources []externalSkillSource) []string {
 	return names
 }
 
-func writeLockIfChanged(sources []externalSkillSource, home string, repoRoot string, lock lockFile) error {
-	entries := rebuildLockEntries(sources, home, lock)
-	if lockEntriesEqual(lock.ExternalSkills, entries) {
+// writeLockIfChanged records the pins of active sources. A held source keeps
+// its previous entry (or none), so its candidate commit is never locked.
+func writeLockIfChanged(sources []externalSkillSource, home string, repoRoot string, lock lockFile, held map[string]heldItem) error {
+	previous := lock
+	entries := keepHeldLockEntries(rebuildLockEntries(sources, home, lock), previous, held)
+	if lockEntriesEqual(lock.ExternalSkills, entries) && !holdsChanged(repoRoot, lock) {
 		return nil
 	}
 	lock.ExternalSkills = entries
 	return writeLockFile(repoRoot, lock)
 }
 
-func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot string, lock lockFile, selected []externalSkillSource) error {
+func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot string, lock lockFile, selected []externalSkillSource, held map[string]heldItem) error {
 	selectedNames := make(map[string]bool, len(selected))
 	for _, src := range selected {
 		selectedNames[sourceName(src)] = true
@@ -217,7 +357,8 @@ func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot s
 			break
 		}
 	}
-	if lockEntriesEqual(lock.ExternalSkills, entries) {
+	entries = keepHeldLockEntries(entries, lock, held)
+	if lockEntriesEqual(lock.ExternalSkills, entries) && !holdsChanged(repoRoot, lock) {
 		return nil
 	}
 	lock.ExternalSkills = entries

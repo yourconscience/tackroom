@@ -12,13 +12,6 @@ Pick during `setup` (`--memory off|basic|memsearch`):
 | `basic` | appends a bounded digest of each session to `$KNOWLEDGE_DIR/sessions/YYYY-MM-DD.md` and injects recent digests as context at session start | Python 3 |
 | `memsearch` | full-text indexed search over the knowledge vault | `memsearch` on PATH (`uv tool install memsearch`) |
 
-On Hermes, the `memsearch` tier bridges all three stores rather than replacing
-Hermes memory: the vault is imported into `~/.hermes/memories/` at session
-start, the finalized session is captured into the vault, and Hermes durable
-memory is exported back to the vault at finalize. Hermes continues to use its
-built-in memory injector and memory tool; memsearch provides the larger indexed
-history. Run `tackroom doctor --e2e` and `hermes hooks doctor` after setup.
-
 Memory data lives in your knowledge directory (default `~/Workspace/knowledge`, configurable via `KNOWLEDGE_DIR`), never in the tool repository.
 
 ## Tools

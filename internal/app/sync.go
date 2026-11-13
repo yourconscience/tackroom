@@ -11,22 +11,48 @@ import (
 )
 
 func runStatus(opts runOptions) error {
+	err := statusReport(opts)
+	if !opts.ExitCode {
+		return err
+	}
+	return mapStatusExit(err)
+}
+
+func statusReport(opts runOptions) error {
 	repoRoot, home, cfg, selected, err := loadContext(opts)
 	if err != nil {
 		return err
 	}
+	statusLock, err := readLockFile(repoRoot)
+	if err != nil {
+		return err
+	}
+	sources := cfg.ExternalSkills
+	held := gateExternalSources(sources, home, &statusLock, gateOptions{now: timeNow()})
+	cfg.ExternalSkills = filterHeldSources(sources, held)
 	injectPluginMCPServers(&cfg, home)
+	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gateOptions{now: timeNow()}, false)
+	if err != nil {
+		return err
+	}
+	for k, v := range pkgHeld {
+		held["package-hold:"+k] = v
+	}
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
 	if err != nil {
 		return err
 	}
 
-	expected, err := expectedSkills(repoRoot, home, cfg)
+	inspectCfg, err := configForInspection(cfg, sources, held, repoRoot, home)
 	if err != nil {
 		return err
 	}
-	reports, err := inspectAgents(selected, expected, repoRoot, home, cfg)
+	expected, err := expectedSkills(repoRoot, home, inspectCfg)
+	if err != nil {
+		return err
+	}
+	reports, err := inspectAgents(selected, expected, repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
 	}
@@ -36,28 +62,108 @@ func runStatus(opts runOptions) error {
 		if err := encodeJSON(setupStreams(opts).out, view); err != nil {
 			return err
 		}
+		if err := agentFailures(reports); err != nil {
+			return err
+		}
 		if !view.Synced {
-			return errors.New("tackroom is not fully synced")
+			return notSyncedError{"tackroom is not fully synced"}
 		}
 		return nil
 	}
 	printStatusReport(setupStreams(opts).out, repoRoot, repoReport, reports, home, cfg, opts.Verbose)
+	printHeldSection(setupStreams(opts).out, held)
+	for _, problem := range periodicSyncProblems(repoRoot, home, cfg) {
+		fmt.Fprintln(setupStreams(opts).out, "warning: "+problem)
+	}
 	if err := agentFailures(reports); err != nil {
 		return err
 	}
 	if repoReport.State != stateSynced {
-		return errors.New("tackroom is not fully synced")
+		return notSyncedError{"tackroom is not fully synced"}
 	}
 	for _, report := range reports {
 		if report.Detected && !report.Synced {
-			return fmt.Errorf("%s is not synced", report.Name)
+			return notSyncedError{report.Name + " is not synced"}
 		}
 	}
 
 	return nil
 }
 
+// printHeldSection lists held and blocked items; status and sync --dry-run
+// share it so both show the same lines.
+func printHeldSection(w io.Writer, held map[string]heldItem) {
+	lines := heldLines(held)
+	if len(lines) == 0 {
+		return
+	}
+	fmt.Fprintln(w, "\nheld or blocked (skipped by sync)")
+	for _, line := range lines {
+		fmt.Fprintf(w, "  %s\n", line)
+	}
+}
+
+// printDryGateNotes reports what a dry run could not decide without a registry
+// lookup and what --allow-fresh would release.
+func printDryGateNotes(w io.Writer, notes *dryGateNotes) {
+	if len(notes.unchecked) > 0 {
+		fmt.Fprintln(w, "\nfreshness not checked (a dry run makes no registry lookup; a real sync may hold these)")
+		for _, item := range sortedKeys(notes.unchecked) {
+			fmt.Fprintf(w, "  %s %s\n", item, notes.unchecked[item])
+		}
+	}
+	if len(notes.released) > 0 {
+		fmt.Fprintln(w, "\nwould release with --allow-fresh (nothing recorded)")
+		for _, item := range sortedKeys(notes.released) {
+			fmt.Fprintf(w, "  %s %s\n", item, notes.released[item])
+		}
+	}
+}
+
+// notSyncedError marks status drift: the machine is out of sync but nothing
+// errored. `status --exit-code` maps it to exit code 1; any other failure is 2.
+type notSyncedError struct{ msg string }
+
+func (e notSyncedError) Error() string { return e.msg }
+
+// statusExitError carries the process exit code `status --exit-code` should
+// end with: 1 for drift, 2 for a genuine error.
+type statusExitError struct {
+	code int
+	err  error
+}
+
+func (e statusExitError) Error() string { return e.err.Error() }
+func (e statusExitError) Unwrap() error { return e.err }
+
+func mapStatusExit(err error) error {
+	if err == nil {
+		return nil
+	}
+	var drift notSyncedError
+	if errors.As(err, &drift) {
+		return statusExitError{code: 1, err: err}
+	}
+	return statusExitError{code: 2, err: err}
+}
+
+// ExitCode maps a command error to a process exit code: 0 for nil, the carried
+// code for a status --exit-code result, and 1 for any other error.
+func ExitCode(err error) int {
+	if err == nil {
+		return 0
+	}
+	var se statusExitError
+	if errors.As(err, &se) {
+		return se.code
+	}
+	return 1
+}
+
 func runSync(opts runOptions) error {
+	if opts.DryRun {
+		return runSyncDryRun(opts)
+	}
 	repoRoot, home, cfg, selected, err := loadContext(opts)
 	if err != nil {
 		return err
@@ -76,11 +182,21 @@ func runSync(opts runOptions) error {
 		return err
 	}
 
-	if err := syncExternalRepos(cfg.ExternalSkills, home, repoRoot); err != nil {
+	sources := cfg.ExternalSkills
+	held, err := syncExternalReposGated(sources, home, repoRoot, ptrGate(gateOptionsFor(opts)))
+	if err != nil {
 		return err
 	}
+	cfg.ExternalSkills = filterHeldSources(sources, held)
 	// Re-inject after clone so first sync picks up newly fetched plugins.
 	injectPluginMCPServers(&cfg, home)
+	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gateOptionsFor(opts), true)
+	if err != nil {
+		return err
+	}
+	for k, v := range pkgHeld {
+		held["package-hold:"+k] = v
+	}
 	if err := renderCommittedArtifacts(repoRoot); err != nil {
 		return err
 	}
@@ -105,11 +221,15 @@ func runSync(opts runOptions) error {
 		fmt.Fprintf(streams.out, "memory tools installed: %s\n", strings.Join(toolInstalls, ", "))
 	}
 
-	expected, err := expectedSkills(repoRoot, home, cfg)
+	inspectCfg, err := configForInspection(cfg, sources, held, repoRoot, home)
 	if err != nil {
 		return err
 	}
-	inspected, err := inspectAgents(selected, expected, repoRoot, home, cfg)
+	expected, err := expectedSkills(repoRoot, home, inspectCfg)
+	if err != nil {
+		return err
+	}
+	inspected, err := inspectAgents(selected, expected, repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
 	}
@@ -155,6 +275,9 @@ func runSync(opts runOptions) error {
 	if err := applyAgentPackageSync(reports, selected, home); err != nil {
 		return err
 	}
+	if err := applyAgentSettingsSync(reports, selected, home); err != nil {
+		return err
+	}
 	if err := applyClaudePluginSync(reports, repoRoot, home); err != nil {
 		return err
 	}
@@ -163,7 +286,7 @@ func runSync(opts runOptions) error {
 	if err != nil {
 		return err
 	}
-	reports, err = inspectAgents(selected, expected, repoRoot, home, cfg)
+	reports, err = inspectAgents(selected, expected, repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
 	}
@@ -171,6 +294,7 @@ func runSync(opts runOptions) error {
 	repoReport.Linked = linkingRepo && repoReport.State == stateSynced
 
 	printReport(streams.out, true, repoReport, reports, home, cfg)
+	printHeldSummary(streams.out, held)
 	if opts.JSONOutput {
 		view := buildStatusJSON(repoRoot, repoReport, reports)
 		for _, c := range conflicts {
@@ -189,6 +313,305 @@ func runSync(opts runOptions) error {
 			len(conflicts), strings.Join(conflicts, "; "), conflictHint(home))
 	}
 	return agentFailures(reports)
+}
+
+// runSyncDryRun computes the same plan a real sync would apply, through the
+// same inspection code, and prints it without writing anything or fetching
+// external sources.
+func runSyncDryRun(opts runOptions) error {
+	repoRoot, home, cfg, selected, err := loadContext(opts)
+	if err != nil {
+		return err
+	}
+
+	// A dry run never fetches or clones. External sources whose cache is
+	// absent are dropped from the plan and reported as "not fetched" below.
+	var notFetched []string
+	cfg, notFetched = withoutMissingSources(cfg, home)
+
+	// Held and blocked items come from the local cache and the lock only: a
+	// dry run reads the lock, never writes it, and makes no registry lookup.
+	lock, err := readLockFile(repoRoot)
+	if err != nil {
+		return err
+	}
+	gate := gateOptionsFor(opts)
+	gate.dry = newDryGateNotes()
+	sources := cfg.ExternalSkills
+	held := gateExternalSources(sources, home, &lock, gate)
+	cfg.ExternalSkills = filterHeldSources(sources, held)
+	injectPluginMCPServersMode(&cfg, home, false)
+	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gate, false)
+	if err != nil {
+		return err
+	}
+	for k, v := range pkgHeld {
+		held["package-hold:"+k] = v
+	}
+
+	repoReport, err := inspectRepoLink(repoRoot, home)
+	if err != nil {
+		return err
+	}
+	if repoReport.State == stateConflict {
+		if opts.JSONOutput {
+			// The reason rides on stderr; stdout stays one JSON document.
+			if err := encodeJSON(setupStreams(opts).out, buildStatusJSON(repoRoot, repoReport, nil)); err != nil {
+				return err
+			}
+		} else {
+			printReport(setupStreams(opts).out, false, repoReport, nil, home, cfg)
+		}
+		return fmt.Errorf("sync aborted due to conflicts: repo link: %s", repoReport.Path)
+	}
+
+	repoReport.Linked = repoReport.State != stateSynced
+
+	inspectCfg, err := configForInspection(cfg, sources, held, repoRoot, home)
+	if err != nil {
+		return err
+	}
+	expected, err := expectedSkills(repoRoot, home, inspectCfg)
+	if err != nil {
+		return err
+	}
+	reports, err := inspectAgents(selected, expected, repoRoot, home, inspectCfg)
+	if err != nil {
+		return err
+	}
+	for i := range reports {
+		// A real sync links or rewrites the root doc; say so in the plan headline.
+		r := &reports[i]
+		r.RootLinked = r.Detected && len(r.Conflicts) == 0 && r.RootPath != "" && (r.RootState == stateMissing || r.RootState == stateDrifted)
+	}
+
+	// Starter files a real sync would scaffold, refresh or retire.
+	starterPlan, err := previewStarterFiles(repoRoot)
+	if err != nil {
+		return err
+	}
+
+	changes, harnesses := countSyncChanges(repoReport, reports, opts.ReplaceConflicts)
+	changes += len(starterPlan.Scaffolded) + len(starterPlan.Updated) + len(starterPlan.Removed)
+
+	streams := setupStreams(opts)
+	if opts.JSONOutput {
+		// One JSON document replaces the report and every plan section.
+		var replaceable []string
+		if opts.ReplaceConflicts {
+			replaceable = replaceableConflictPaths(reports)
+		}
+		view := buildDryRunJSON(repoRoot, repoReport, reports, starterPlan, held, gate.dry, notFetched, replaceable, changes, harnesses)
+		return encodeJSON(streams.out, view)
+	}
+
+	starterPlan.report(streams.out)
+	printReport(streams.out, false, repoReport, reports, home, cfg)
+
+	printHeldSection(streams.out, held)
+	printDryGateNotes(streams.out, gate.dry)
+	for _, name := range notFetched {
+		fmt.Fprintf(streams.out, "not fetched: %s\n", name)
+	}
+	if opts.ReplaceConflicts {
+		listReplaceableConflicts(streams.out, reports, home)
+	}
+
+	fmt.Fprintf(streams.out, "\ndry run: %s across %s; nothing written\n", plural(changes, "change"), plural(harnesses, "harness"))
+	return nil
+}
+
+// syncDryRunJSON is the `sync --dry-run --json` document: the status view plus
+// what only a plan computes.
+type syncDryRunJSON struct {
+	ConfigRoot         string            `json:"config_root"`
+	DryRun             bool              `json:"dry_run"`
+	Synced             bool              `json:"synced"`
+	RepoLink           string            `json:"repo_link"`
+	Changes            int               `json:"changes"`
+	Harnesses          int               `json:"harnesses"`
+	Agents             []agentStatusJSON `json:"agents"`
+	StarterFiles       starterPlanJSON   `json:"starter_files"`
+	Held               []heldItemJSON    `json:"held"`
+	NotFetched         []string          `json:"not_fetched"`
+	FreshnessUnchecked map[string]string `json:"freshness_unchecked,omitempty"`
+	WouldRelease       map[string]string `json:"would_release_with_allow_fresh,omitempty"`
+	Replaceable        []string          `json:"replaceable_conflicts"`
+}
+
+type starterPlanJSON struct {
+	Scaffolded   []string `json:"scaffolded"`
+	Updated      []string `json:"updated"`
+	Removed      []string `json:"removed"`
+	KeptModified []string `json:"kept_modified"`
+}
+
+type heldItemJSON struct {
+	Item    string `json:"item"`
+	Kind    string `json:"kind"`
+	Reason  string `json:"reason"`
+	Until   string `json:"until,omitempty"`
+	Command string `json:"command"`
+}
+
+func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agentReport, starter starterChanges, held map[string]heldItem, notes *dryGateNotes, notFetched []string, replaceable []string, changes, harnesses int) syncDryRunJSON {
+	status := buildStatusJSON(repoRoot, repoReport, reports)
+	out := syncDryRunJSON{
+		ConfigRoot: status.ConfigRoot,
+		DryRun:     true,
+		Synced:     status.Synced,
+		RepoLink:   status.RepoLink,
+		Changes:    changes,
+		Harnesses:  harnesses,
+		Agents:     status.Agents,
+		StarterFiles: starterPlanJSON{
+			Scaffolded:   nonNil(starter.Scaffolded),
+			Updated:      nonNil(starter.Updated),
+			Removed:      nonNil(starter.Removed),
+			KeptModified: nonNil(starter.KeptModified),
+		},
+		Held:        []heldItemJSON{},
+		NotFetched:  nonNil(notFetched),
+		Replaceable: nonNil(replaceable),
+	}
+	for _, name := range sortedKeysNative(held) {
+		h := held[name]
+		out.Held = append(out.Held, heldItemJSON(h))
+	}
+	if len(notes.unchecked) > 0 {
+		out.FreshnessUnchecked = notes.unchecked
+	}
+	if len(notes.released) > 0 {
+		out.WouldRelease = notes.released
+	}
+	return out
+}
+
+// configForInspection returns cfg with the previously pinned held sources put
+// back for the inspection pass. Their caches were restored to the previous
+// pin, so their skills stay in the desired set; without them an installed link
+// would look stale and sync would remove it even though the held copy is what
+// got synced. A source that was never pinned installs nothing and stays out,
+// and the write path keeps the filtered config: a held source contributes no
+// new content.
+func configForInspection(cfg config, sources []externalSkillSource, held map[string]heldItem, repoRoot string, home string) (config, error) {
+	if len(held) == 0 {
+		return cfg, nil
+	}
+	lock, err := readLockFile(repoRoot)
+	if err != nil {
+		return cfg, err
+	}
+	out := cfg
+	out.ExternalSkills = append(make([]externalSkillSource, 0, len(cfg.ExternalSkills)+len(held)), cfg.ExternalSkills...)
+	for _, src := range sources {
+		if _, ok := held[sourceName(src)]; !ok {
+			continue
+		}
+		if findLockEntry(lock, sourceName(src)) == nil {
+			continue
+		}
+		if !src.Materialize {
+			// A held source whose restored cache still cannot be read keeps
+			// its skills out of the plan rather than failing the whole run.
+			if _, err := discoverExternalSourceSkills(src, home); err != nil {
+				continue
+			}
+		}
+		out.ExternalSkills = append(out.ExternalSkills, src)
+	}
+	return out, nil
+}
+
+// withoutMissingSources drops non-materialized external sources whose cache is
+// absent (a real sync would clone them) and returns their names. Materialized
+// sources' skills are committed in the repo, so they stay in the plan.
+func withoutMissingSources(cfg config, home string) (config, []string) {
+	var missing []string
+	kept := make([]externalSkillSource, 0, len(cfg.ExternalSkills))
+	for _, src := range cfg.ExternalSkills {
+		if !src.Materialize && !hasDir(filepath.Join(externalCacheDir(home), sourceName(src), ".git")) {
+			missing = append(missing, sourceName(src))
+			continue
+		}
+		kept = append(kept, src)
+	}
+	cfg.ExternalSkills = kept
+	return cfg, missing
+}
+
+// replaceableConflictPaths lists the native paths --replace-conflicts would
+// move into a backup.
+func replaceableConflictPaths(reports []agentReport) []string {
+	var paths []string
+	for _, report := range reports {
+		for _, item := range report.Replaceable {
+			paths = append(paths, item.Path)
+		}
+	}
+	return paths
+}
+
+// listReplaceableConflicts prints what `sync --replace-conflicts` would move
+// into a backup, without moving anything.
+func listReplaceableConflicts(w io.Writer, reports []agentReport, home string) {
+	paths := replaceableConflictPaths(reports)
+	if len(paths) == 0 {
+		return
+	}
+	backupDir := newConflictBackupDir(home)
+	fmt.Fprintf(w, "\n%d existing file(s) differ from the shared copy and would be moved to %s and replaced with links:\n", len(paths), backupDir)
+	for _, path := range paths {
+		fmt.Fprintf(w, "  %s\n", path)
+	}
+}
+
+// plural renders "1 change" or "2 changes"; "harness" takes "es".
+func plural(n int, noun string) string {
+	if n == 1 {
+		return fmt.Sprintf("1 %s", noun)
+	}
+	if strings.HasSuffix(noun, "s") || strings.HasSuffix(noun, "h") {
+		return fmt.Sprintf("%d %ses", n, noun)
+	}
+	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// countSyncChanges tallies the individual changes a sync would apply, and the
+// number of harnesses they touch. A harness with conflicts is left untouched by
+// a real sync, so it counts nothing; with replaceConflicts, replaceable
+// conflicts become links and count as changes. Other conflicts are reported
+// separately by the plan.
+func countSyncChanges(repoReport repoLinkReport, reports []agentReport, replaceConflicts bool) (changes, harnesses int) {
+	if repoReport.State != stateSynced {
+		changes++
+	}
+	for _, report := range reports {
+		if report.Error != "" || !report.Detected {
+			continue
+		}
+		replaced := 0
+		if len(report.Conflicts) > 0 {
+			if !replaceConflicts || len(report.Replaceable) != len(report.Conflicts) {
+				continue
+			}
+			replaced = len(report.Replaceable)
+		}
+		n := replaced + len(report.Adds) + len(report.Updates) + len(report.Removes) +
+			len(report.AddsAgent) + len(report.UpdatesAgent) + len(report.RemovesAgent) +
+			len(report.AddsMCP) + len(report.UpdatesMCP) + len(report.RemovesMCP) +
+			len(report.AddsHook) + len(report.UpdatesHook) +
+			len(report.UpdatesPackage) + len(report.RemovesPackage) + len(report.UpdatesSetting) +
+			len(report.AddsPlugin) + len(report.RemovesPlugin)
+		if report.RootState == stateMissing || report.RootState == stateDrifted {
+			n++
+		}
+		changes += n
+		if n > 0 {
+			harnesses++
+		}
+	}
+	return changes, harnesses
 }
 
 // replaceAllConflicts backs up and clears every replaceable conflict. When
@@ -227,10 +650,13 @@ func replaceAllConflicts(reports []agentReport, home string, streams setupIO, co
 }
 
 func applyAgentRootInstructionSync(reports []agentReport) error {
+	// Gemini CLI and Antigravity CLI share ~/.gemini/GEMINI.md: write it once.
+	written := map[string]bool{}
 	for _, report := range reports {
-		if !report.Detected || report.RootPath == "" {
+		if !report.Detected || report.RootPath == "" || written[report.RootPath] {
 			continue
 		}
+		written[report.RootPath] = true
 		switch report.RootState {
 		case stateSynced:
 			continue
@@ -362,3 +788,5 @@ func applyConfigDrivenSkillDrift(report agentReport, h *harness, cfg config, rep
 
 	return nil
 }
+
+func ptrGate(g gateOptions) *gateOptions { return &g }

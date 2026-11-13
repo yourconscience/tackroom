@@ -62,6 +62,9 @@ func mergeConfig(base *config, overlay config) {
 	if overlay.ContextNoteTokens != nil {
 		base.ContextNoteTokens = overlay.ContextNoteTokens
 	}
+	if overlay.PeriodicSync != nil {
+		base.PeriodicSync = overlay.PeriodicSync
+	}
 	if overlay.Instructions != nil {
 		base.Instructions = append([]string(nil), overlay.Instructions...)
 	}
@@ -134,6 +137,12 @@ func validateConfig(cfg *config, home string, expand bool) error {
 			cfg.Agents[i].Packages = &packages
 			if cfg.Agents[i].Name != agentPi {
 				return fmt.Errorf("config agent %s does not support packages", cfg.Agents[i].Name)
+			}
+		}
+
+		if cfg.Agents[i].Settings != nil {
+			if err := validateAgentSettings(cfg.Agents[i]); err != nil {
+				return err
 			}
 		}
 	}
@@ -520,6 +529,9 @@ func expandPath(path string, home string) string {
 	switch {
 	case path == "~":
 		return home
+	case strings.HasPrefix(path, "~/.kimi-code/") && strings.TrimSpace(os.Getenv("KIMI_CODE_HOME")) != "":
+		// Kimi Code moves its skills and agents directories with $KIMI_CODE_HOME.
+		return filepath.Join(kimiHome(home), strings.TrimPrefix(path, "~/.kimi-code/"))
 	case strings.HasPrefix(path, "~/"):
 		return filepath.Join(home, strings.TrimPrefix(path, "~/"))
 	default:
@@ -578,4 +590,31 @@ func normalizeAgentName(name string) string {
 		return current
 	}
 	return name
+}
+
+// validateAgentSettings checks a per-harness `settings:` block: keys must be
+// non-empty dotted paths, none may collide with a key tackroom already manages,
+// and no literal secret may be declared where an ${ENV_VAR} reference is
+// required. A harness without settings support is not an error here; sync
+// reports the block as unsupported and ignores it.
+func validateAgentSettings(agent agentConfig) error {
+	if len(agent.Settings) == 0 {
+		return fmt.Errorf("config agent %s has an empty settings block", agent.Name)
+	}
+	for key := range agent.Settings {
+		if strings.TrimSpace(key) == "" || strings.HasPrefix(key, ".") || strings.HasSuffix(key, ".") || strings.Contains(key, "..") {
+			return fmt.Errorf("config agent %s has an empty settings key %q", agent.Name, key)
+		}
+	}
+	for _, reserved := range settingsManagedKeys[normalizeAgentName(agent.Name)] {
+		for key := range agent.Settings {
+			if key == reserved || strings.HasPrefix(key, reserved+".") {
+				return fmt.Errorf("config agent %s settings key %q is managed by tackroom via another surface (%s)", agent.Name, key, reserved)
+			}
+		}
+	}
+	if err := validateSettingsSecrets(agent.Settings); err != nil {
+		return fmt.Errorf("config agent %s: %w", agent.Name, err)
+	}
+	return nil
 }

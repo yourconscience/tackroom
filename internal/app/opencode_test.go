@@ -71,7 +71,10 @@ func TestOpenCodeRoleRenderDefaultMode(t *testing.T) {
 		Instructions: "Compare the sources.",
 		Source:       "agents/researcher.md",
 	}
-	content := roleRenderer(agentOpenCode).Render(role)
+	content, err := roleRenderer(agentOpenCode).Render(role)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if strings.Contains(content, "name:") {
 		t.Fatalf("opencode role should not emit a name field (filename is the name):\n%s", content)
@@ -100,7 +103,10 @@ func TestOpenCodeRoleRenderHonorsOverride(t *testing.T) {
 		Instructions: "Review carefully.",
 		Opencode:     agentrole.OpenCodeOptions{Model: "anthropic/claude-sonnet-4", Temperature: "0.1", Mode: "primary"},
 	}
-	content := roleRenderer(agentOpenCode).Render(role)
+	content, err := roleRenderer(agentOpenCode).Render(role)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(content, "mode: primary") {
 		t.Fatalf("opencode override mode not applied:\n%s", content)
 	}
@@ -396,7 +402,10 @@ func TestOpenCodeRoleRenderUsesConfiguredModel(t *testing.T) {
 		Model:        "openai/gpt-5.6",
 		Instructions: "Implement.",
 	}
-	content := roleRenderer(agentOpenCode).Render(role)
+	content, err := roleRenderer(agentOpenCode).Render(role)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !strings.Contains(content, "model: \"openai/gpt-5.6\"") {
 		t.Fatalf("configured role_model not applied to OpenCode role:\n%s", content)
 	}

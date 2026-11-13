@@ -22,10 +22,20 @@ type config struct {
 	// profile kept elsewhere) that every agent's root doc carries after
 	// AGENTS.md, in order. Relative paths resolve against the config root.
 	Instructions []string `yaml:"instructions,omitempty"`
+
+	// heldMCP names MCP servers whose package version is inside its freshness
+	// hold. desiredMCPServersForAgent keeps what each harness already has for
+	// them and writes nothing new. Set by gatePackages; never from YAML.
+	heldMCP  map[string]bool
+	heldHome string
 	// ContextNoteTokens is the estimated skill-listing token threshold above
 	// which `tackroom doctor` prints a soft context advisory note. Absent
 	// (nil) uses contextNoteTokensDefault; 0 (or negative) disables the note.
 	ContextNoteTokens *int `yaml:"context_note_tokens,omitempty"`
+	// PeriodicSync opts out of the periodic `tackroom pull` job. Absent (nil)
+	// defaults to true; only an explicit false disables it and silences the
+	// "periodic sync is off" warning. The per-machine local overlay wins.
+	PeriodicSync *bool `yaml:"periodic_sync,omitempty"`
 }
 
 type uiConfig struct {
@@ -53,13 +63,14 @@ type externalSkillSource struct {
 }
 
 type agentConfig struct {
-	Name      string    `yaml:"name"`
-	Enabled   bool      `yaml:"enabled"`
-	SkillRoot string    `yaml:"skill_root"`
-	AgentRoot string    `yaml:"agent_root,omitempty"`
-	Detect    string    `yaml:"detect,omitempty"`
-	RoleModel string    `yaml:"role_model,omitempty"`
-	Packages  *[]string `yaml:"packages,omitempty"`
+	Name      string         `yaml:"name"`
+	Enabled   bool           `yaml:"enabled"`
+	SkillRoot string         `yaml:"skill_root"`
+	AgentRoot string         `yaml:"agent_root,omitempty"`
+	Detect    string         `yaml:"detect,omitempty"`
+	RoleModel string         `yaml:"role_model,omitempty"`
+	Packages  *[]string      `yaml:"packages,omitempty"`
+	Settings  map[string]any `yaml:"settings,omitempty"`
 }
 
 // publishTarget declares a remote skill registry to push canonical skills to.
@@ -113,12 +124,14 @@ type agentReport struct {
 	ManagedMCP      []string
 	ManagedHook     []string
 	ManagedPackage  []string
+	ManagedSetting  []string
 	ManagedPlugin   []string
 	Drifted         []string
 	DriftedAgent    []string
 	DriftedMCP      []string
 	DriftedHook     []string
 	DriftedPackage  []string
+	DriftedSetting  []string
 	Missing         []string
 	MissingAgent    []string
 	MissingMCP      []string
@@ -144,12 +157,15 @@ type agentReport struct {
 	UpdatesMCP     []string
 	UpdatesHook    []string
 	UpdatesPackage []string
+	UpdatesSetting []string
 	Removes        []string
 	RemovesAgent   []string
 	RemovesMCP     []string
 	RemovesPackage []string
 	RemovesPlugin  []string
 	Synced         bool
+
+	UnsupportedSetting []string // a settings: block on a harness without settings support
 }
 
 // replaceableConflict is a native file or skill directory that sits where
@@ -196,6 +212,15 @@ type runOptions struct {
 	// Verbose expands `status` back to the full per-surface managed and
 	// external skill lists and native root paths instead of the concise view.
 	Verbose bool
+	// NoCron makes setup skip installing the periodic sync job.
+	NoCron bool
+	// ExitCode makes `status` map drift to exit 1 and errors to exit 2
+	// (instead of the default 1 for any failure).
+	ExitCode bool
+	// AllowFresh* release items held for freshness (sync --allow-fresh).
+	AllowFreshAll    bool
+	AllowFreshItems  []string
+	AllowFreshReason string
 }
 
 func Run(args []string) error {
@@ -328,6 +353,7 @@ func parseStatusFlags(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.Verbose, "verbose", false, "Show full managed/external skill lists and native root paths")
 	fs.BoolVar(&opts.Verbose, "v", false, "Show full managed/external skill lists and native root paths")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the status as JSON (exit code 1 when anything is out of sync)")
+	fs.BoolVar(&opts.ExitCode, "exit-code", false, "Exit 0 when in sync, 1 when anything is pending, 2 on error")
 
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
@@ -353,6 +379,9 @@ func runSyncCommand(args []string) error {
 	if err != nil {
 		return err
 	}
+	if opts.DryRun && opts.Pull {
+		return errors.New("sync --dry-run cannot be combined with --pull")
+	}
 	if opts.Pull {
 		opts.Pull = false
 		return runPull(opts)
@@ -364,7 +393,13 @@ func runDoctorCommand(args []string) error {
 	if len(args) > 0 {
 		switch args[0] {
 		case "audit":
-			opts, err := parseSubcommandFlags("doctor audit", args[1:])
+			if len(args) > 1 && args[1] == "accept" {
+				return runAuditAccept(args[2:])
+			}
+			if len(args) > 1 && args[1] == "revoke" {
+				return runAuditRevoke(args[2:])
+			}
+			opts, err := parseAuditFlags(args[1:])
 			if err != nil {
 				return err
 			}
@@ -390,7 +425,7 @@ func runDoctorCommand(args []string) error {
 
 func runSkillCommand(args []string) error {
 	if len(args) == 0 {
-		return errors.New("skill requires subcommand: new, list, info, sources, update, promote")
+		return errors.New("skill requires subcommand: new, list, info, sources, update")
 	}
 	if isHelpArg(args[0]) {
 		printGroupUsage("skill")
@@ -407,8 +442,6 @@ func runSkillCommand(args []string) error {
 		return runSkillList(args[1:])
 	case "info":
 		return runSkillInfo(args[1:])
-	case "promote":
-		return runPromote(args[1:])
 	default:
 		return fmt.Errorf("unknown skill subcommand %q", args[0])
 	}
@@ -463,6 +496,7 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Emit detection result as JSON and exit")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Show detected import candidates and exit without changes (overrides --yes)")
 	fs.BoolVar(&opts.AssumeYes, "yes", false, "Answer every prompt with its default, never read stdin: import everything, initialize git, back up and replace conflicting files")
+	fs.BoolVar(&opts.NoCron, "no-cron", false, "Do not install the periodic sync job (tackroom pull every 15m)")
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
@@ -479,8 +513,10 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.Pull, "pull", false, "Pull the repo before syncing")
+	fs.BoolVar(&opts.DryRun, "dry-run", false, "Print the plan without writing anything, fetching external sources or querying registries")
 	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup and link them")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the resulting status as JSON instead of the text report")
+	addAllowFreshFlags(fs, &opts)
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
@@ -517,7 +553,7 @@ func parseCronFlags(args []string) (cronOptions, error) {
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names")
 	fs.BoolVar(&opts.Remove, "remove", false, "Remove the cron entry instead of installing")
 	fs.BoolVar(&opts.Deps, "deps", false, "Install dependency maintenance cron instead of auto-pull")
-	fs.StringVar(&opts.Interval, "interval", cronIntervalDefault, "Pull interval: 5m, 15m, 30m, 1h, 6h, 12h, daily, weekly")
+	fs.StringVar(&opts.Interval, "interval", "", "Pull interval: 5m, 15m, 30m, 1h, 6h, 12h, daily, weekly (default 15m; weekly with --deps)")
 
 	if err := fs.Parse(args); err != nil {
 		return cronOptions{}, err
@@ -538,7 +574,7 @@ func printUsage() {
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
 	fmt.Println()
 	fmt.Println("Command groups:")
-	fmt.Println("  skill    Inspect, create, update, and promote skills")
+	fmt.Println("  skill    Inspect, create, and update skills")
 	fmt.Println("  publish  Push canonical skills to a remote skill registry")
 	fmt.Println("  mcp      Manage MCP servers")
 	fmt.Println("  hook     Review and remove native hook registrations")
@@ -548,10 +584,13 @@ func printUsage() {
 
 // canonicalForms is the full command reference; group --help prints its lines.
 var canonicalForms = []string{
-	"  tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--dry-run] [--json]",
-	"  tackroom status [--verbose] [--agents ...]",
-	"  tackroom sync [--pull] [--agents ...]",
+	"  tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--no-cron] [--dry-run] [--json]",
+	"  tackroom status [--verbose] [--exit-code] [--agents ...]",
+	"  tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]",
 	"  tackroom doctor [--e2e] [--agents ...]",
+	"  tackroom doctor audit [--json]            # findings per item; exit 1 on an unaccepted CRITICAL in external content",
+	"  tackroom doctor audit accept <item> <rule> --reason \"...\"   # item is kind:name, e.g. skill:foo",
+	"  tackroom doctor audit revoke <item> <rule>",
 	"  tackroom config <validate|print> [--config PATH]",
 	"  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
 	"  tackroom skill new <name> [--description ...]",
@@ -560,8 +599,7 @@ var canonicalForms = []string{
 	"  tackroom skill sources [--json]           # external sources: configured and installed elsewhere",
 	"  tackroom skill sources search <query>     # find sources on skills.sh",
 	"  tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync]",
-	"  tackroom skill update [name ...]",
-	"  tackroom skill promote <name-or-path> [--dry-run]",
+	"  tackroom skill update [name ...] [--allow-fresh[=item,...]]",
 	"  tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]",
 	"  tackroom mcp <list|add|import|remove> [options]   # add: --command ... or --url ... [--header 'Name: value']",
 	"  tackroom restore [<backup> | latest] [--dry-run]",
@@ -595,8 +633,8 @@ func printAllUsage() {
 	}
 	fmt.Println()
 	fmt.Println("Maintenance:")
-	fmt.Println("  tackroom cron [--interval 30m|--deps|--remove]")
-	fmt.Println("  tackroom pull [options]          # git pull --ff-only, then sync; what cron runs")
+	fmt.Println("  tackroom cron [--interval 15m|--deps|--remove]   # periodic sync job, installed by setup; default 15m")
+	fmt.Println("  tackroom pull [options]          # git pull --ff-only (a failure only warns), then sync; what the job runs")
 	fmt.Println("  tackroom doctor <audit|deps> [options]")
 	fmt.Println("  tackroom sync deps [options]")
 	fmt.Println("  tackroom memsearch <setup|status> [options]")

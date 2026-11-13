@@ -23,7 +23,6 @@ const (
 	agentClaudeCode         = "claude"
 	agentCodex              = "codex"
 	agentDroid              = "droid"
-	agentHermes             = "hermes"
 	agentOpenCode           = "opencode"
 	agentPi                 = "pi"
 	agentOMP                = "omp"
@@ -32,8 +31,9 @@ const (
 	agentGemini             = "gemini"
 	agentCopilot            = "copilot"
 	agentGrok               = "grok"
-	agentOpenClaw           = "openclaw"
 	agentDSH                = "dsh"
+	agentAgy                = "agy"
+	agentKimi               = "kimi"
 	tackroomSkillsPathValue = "~/.agents/skills"
 )
 
@@ -83,6 +83,7 @@ func runDoctor(opts runOptions) error {
 	results = append(results, checkExternalSkillLock(repoRoot, cfg, home))
 	results = append(results, checkExternalSkillAudit(cfg, home))
 	results = append(results, checkNativeHookHealth(home, cfg, selected))
+	results = append(results, checkPeriodicSync(repoRoot, home, cfg))
 
 	if opts.JSONOutput {
 		return printDoctorJSON(setupStreams(opts).out, repoRoot, results)
@@ -271,49 +272,6 @@ func isAgentDetected(cfg config, name string) bool {
 		}
 	}
 	return false
-}
-
-func checkHermesDirectMirrors(repoRoot string, home string, cfg config) checkResult {
-	hermesDetected := isAgentDetected(cfg, agentHermes)
-
-	if !hermesDetected {
-		return checkResult{"hermes direct mirrors", checkStatusPass, agentHermes + " not detected, skipped"}
-	}
-
-	hermesSkillsDir := filepath.Join(home, ".hermes", "skills")
-	hermesSkills, err := collectDirectSkillNames(hermesSkillsDir)
-	if err != nil {
-		return checkResult{"hermes direct mirrors", checkStatusPass, "hermes skills dir unreadable, skipped"}
-	}
-
-	skillsDir := filepath.Join(repoRoot, "skills")
-	entries, err := os.ReadDir(skillsDir)
-	if err != nil {
-		return checkResult{"hermes direct mirrors", checkStatusFail, fmt.Sprintf("cannot read skills/: %s", err)}
-	}
-
-	var mirrors []string
-	for _, entry := range entries {
-		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
-			continue
-		}
-		skillMD := filepath.Join(skillsDir, entry.Name(), "SKILL.md")
-		if !hasFile(skillMD) {
-			continue
-		}
-		fm, err := parseSkillFrontmatter(skillMD)
-		if err != nil || fm.Name == "" {
-			continue
-		}
-		if hermesPath, ok := hermesSkills[fm.Name]; ok {
-			mirrors = append(mirrors, fmt.Sprintf("%s has direct hermes mirror %s at %s", entry.Name(), fm.Name, hermesPath))
-		}
-	}
-
-	if len(mirrors) > 0 {
-		return checkResult{"hermes direct mirrors", checkStatusWarn, strings.Join(mirrors, "; ")}
-	}
-	return checkResult{"hermes direct mirrors", checkStatusPass, "no direct mirrors"}
 }
 
 func collectDirectSkillNames(root string) (map[string]string, error) {
@@ -547,50 +505,6 @@ func parseMemsearchChunks(statsOutput string) (int, bool) {
 	return n, true
 }
 
-func checkHermesHooks(home string, cfg config) checkResult {
-	if !isAgentDetected(cfg, agentHermes) {
-		return checkResult{"hermes hooks", checkStatusPass, agentHermes + " not detected, skipped"}
-	}
-
-	configPath := filepath.Join(home, ".hermes", "config.yaml")
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return checkResult{"hermes hooks", checkStatusWarn, "config.yaml not readable"}
-	}
-
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return checkResult{"hermes hooks", checkStatusWarn, "config.yaml parse error"}
-	}
-
-	// Without a tackroom hook targeting Hermes, no native hooks is fine.
-	if hooks, _ := desiredHooksForAgent(cfg, agentHermes); len(hooks) == 0 {
-		return checkResult{"hermes hooks", checkStatusPass, "no tackroom hooks target hermes"}
-	}
-	hooksRaw, ok := raw["hooks"]
-	if !ok {
-		return checkResult{"hermes hooks", checkStatusWarn, "no hooks section configured"}
-	}
-
-	// Count hooks if it's a list or map
-	count := 0
-	switch v := hooksRaw.(type) {
-	case []interface{}:
-		count = len(v)
-	case map[string]interface{}:
-		count = len(v)
-	default:
-		if hooksRaw != nil {
-			count = 1
-		}
-	}
-
-	if count == 0 {
-		return checkResult{"hermes hooks", checkStatusWarn, "hooks section present but empty"}
-	}
-	return checkResult{"hermes hooks", checkStatusPass, fmt.Sprintf("%d hook configured", count)}
-}
-
 func checkExternalSkillSources(cfg config, home string) checkResult {
 	if len(cfg.ExternalSkills) == 0 {
 		return checkResult{"external skills", checkStatusPass, "none configured"}
@@ -620,20 +534,15 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 	checked := 0
 	currentNames := make(map[string]bool)
 	lockedNames := make(map[string]bool)
-	var materializedCacheRoots []string
 	for _, entry := range lock.ExternalSkills {
 		for _, name := range entry.Materialized.Values() {
 			lockedNames[name] = true
-		}
-		if entry.Materialized != "" {
-			materializedCacheRoots = append(materializedCacheRoots, filepath.Join(externalCacheDir(home), entry.Name))
 		}
 	}
 	for _, src := range cfg.ExternalSkills {
 		if !src.Materialize {
 			continue
 		}
-		materializedCacheRoots = append(materializedCacheRoots, filepath.Join(externalCacheDir(home), sourceName(src)))
 		pin := lockEntryFor(lock, src)
 		if pin == nil {
 			issues = append(issues, fmt.Sprintf("%s has no matching lock pin", sourceName(src)))
@@ -700,14 +609,6 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 			}
 		}
 	}
-	for _, dir := range hermesConfiguredExternalDirs(home) {
-		for _, root := range materializedCacheRoots {
-			if pathIsWithin(dir, root) {
-				issues = append(issues, fmt.Sprintf("hermes skills.external_dirs links materialized skills directly from %s", dir))
-				break
-			}
-		}
-	}
 	if len(issues) > 0 {
 		sort.Strings(issues)
 		return checkResult{"materialized external skills", checkStatusFail, strings.Join(issues, "; ")}
@@ -716,36 +617,4 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 		return checkResult{"materialized external skills", checkStatusPass, "none configured"}
 	}
 	return checkResult{"materialized external skills", checkStatusPass, fmt.Sprintf("%d canonical copies match lock", checked)}
-}
-
-func hermesConfiguredExternalDirs(home string) []string {
-	data, err := os.ReadFile(filepath.Join(home, ".hermes", "config.yaml"))
-	if err != nil {
-		return nil
-	}
-	var raw struct {
-		Skills struct {
-			ExternalDirs []string `yaml:"external_dirs"`
-		} `yaml:"skills"`
-	}
-	if yaml.Unmarshal(data, &raw) != nil {
-		return nil
-	}
-	dirs := make([]string, 0, len(raw.Skills.ExternalDirs))
-	for _, dir := range raw.Skills.ExternalDirs {
-		dirs = append(dirs, expandPath(strings.TrimSpace(dir), home))
-	}
-	return dirs
-}
-
-func pathIsWithin(path string, root string) bool {
-	if path == root || strings.HasPrefix(path, root+string(os.PathSeparator)) {
-		return true
-	}
-	resolvedPath, pathErr := filepath.EvalSymlinks(path)
-	resolvedRoot, rootErr := filepath.EvalSymlinks(root)
-	if pathErr != nil || rootErr != nil {
-		return false
-	}
-	return resolvedPath == resolvedRoot || strings.HasPrefix(resolvedPath, resolvedRoot+string(os.PathSeparator))
 }

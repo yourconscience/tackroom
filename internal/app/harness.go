@@ -18,7 +18,7 @@ const (
 	// skillsSymlink means tackroom creates symlinks in the agent's skill root.
 	skillsSymlink skillsKind = iota
 	// skillsConfigDriven means the agent reads skills from a config-driven
-	// shared path (e.g. Amp's amp.skills.path or Hermes' skills.external_dirs).
+	// shared path (e.g. Amp's amp.skills.path).
 	// Inspect and setup are handled by custom functions on the harness.
 	skillsConfigDriven
 )
@@ -77,6 +77,10 @@ type harness struct {
 	roles agentrole.Renderer
 	// Hooks holds the hook config target. nil = no hook support.
 	Hooks *hookTarget
+
+	// Settings holds a native settings file tackroom patches key by key.
+	// nil = no settings support.
+	Settings *settingsTarget
 
 	// RootInstructions describes a root instructions symlink. nil = none.
 	RootInstructions *rootInstructionsCapability
@@ -144,6 +148,10 @@ func initHarnesses() {
 				inspect:   inspectClaudeHook,
 				patch:     patchClaudeHook,
 			},
+			Settings: &settingsTarget{
+				configPath: claudeHooksConfigPath,
+				format:     settingsJSON,
+			},
 			RootInstructions: &rootInstructionsCapability{
 				Path:     func(home string) string { return filepath.Join(home, ".claude", "CLAUDE.md") },
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
@@ -206,45 +214,6 @@ func initHarnesses() {
 			TrailerExample: "Co-authored-by: factory-droid[bot] <factory-droid[bot]@users.noreply.github.com>",
 		},
 
-		"hermes": {
-			Skills: skillsConfigDriven,
-			InspectSkills: func(agent agentConfig, expected map[string]string, agentsSkillRoot string, cfg config, home string) (agentReport, error) {
-				return inspectHermesAgent(agent, expected, agentsSkillRoot, cfg, home)
-			},
-			Setup: func(home string, repoRoot string, cfg config) (bool, error) {
-				return patchHermesConfig(home, repoRoot, cfg)
-			},
-			MCP: mcpTargetPtr(mcpTarget{
-				agentName:  "hermes",
-				configPath: func(home string) string { return filepath.Join(home, ".hermes", "config.yaml") },
-				inspect:    inspectYAMLMCPServer,
-				patch:      patchYAMLMCPServer,
-				remove:     removeYAMLMCPServer,
-				read:       readYAMLMCPServer,
-				rootKey:    "mcp_servers",
-			}),
-			Hooks: &hookTarget{
-				agentName: "hermes",
-				inspect:   inspectHermesHook,
-				patch:     patchHermesHook,
-			},
-			// Hermes has no global AGENTS.md; SOUL.md in HERMES_HOME is its
-			// one always-loaded file. Hermes seeds a default there.
-			RootInstructions: &rootInstructionsCapability{
-				Path:          func(home string) string { return filepath.Join(home, ".hermes", "SOUL.md") },
-				Expected:      func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
-				NoSetupImport: true,
-			},
-			IntegrationNote: "config-driven via ~/.hermes/config.yaml -> skills.external_dirs",
-			doctorChecks: []doctorCheck{
-				{Name: "hermes direct mirrors", Run: checkHermesDirectMirrors},
-				{Name: "hermes hooks", Run: func(_, home string, cfg config) checkResult {
-					return checkHermesHooks(home, cfg)
-				}},
-			},
-			TrailerExample: "Co-Authored-By: hermes[bot] <hermes[bot]@users.noreply.github.com>",
-		},
-
 		agentOpenCode: {
 			Skills:           skillsSymlink,
 			SkillsNativeRoot: readsAgentsSkillsRoot,
@@ -279,6 +248,10 @@ func initHarnesses() {
 			}),
 			roles: roleRenderer(agentPi),
 			Hooks: extensionHookTarget(agentPi, piExtensionHookDir),
+			Settings: &settingsTarget{
+				configPath: piSettingsPath,
+				format:     settingsJSON,
+			},
 			RootInstructions: &rootInstructionsCapability{
 				Path:     func(home string) string { return filepath.Join(home, ".pi", "agent", "AGENTS.md") },
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
@@ -300,6 +273,10 @@ func initHarnesses() {
 			}),
 			roles: roleRenderer(agentOMP),
 			Hooks: extensionHookTarget(agentOMP, ompExtensionHookDir),
+			Settings: &settingsTarget{
+				configPath: ompConfigPath,
+				format:     settingsYAML,
+			},
 			// OMP falls back to ~/.agents/AGENTS.md; its own file wins when
 			// present, so composed instructions and other config roots land here.
 			RootInstructions: &rootInstructionsCapability{
@@ -435,20 +412,55 @@ func initHarnesses() {
 			IntegrationNote: "skills read natively from ~/.agents/skills; Grok also reads Claude Code's skills, roles, hooks and MCP and dedups them by name",
 		},
 
-		agentOpenClaw: {
-			Skills:           skillsSymlink,
-			SkillsNativeRoot: openClawReadsAgentsSkills,
+		agentAgy: {
+			Skills: skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
-				agentName:  agentOpenClaw,
-				configPath: openClawConfigPath,
+				agentName:  agentAgy,
+				configPath: agyMCPConfigPath,
 				inspect:    inspectJSONMCPServer,
 				patch:      patchJSONMCPServer,
 				remove:     removeJSONMCPServer,
 				read:       readJSONMCPServer,
-				parentKey:  "mcp",
-				rootKey:    "servers",
+				rootKey:    "mcpServers",
 			}),
-			IntegrationNote: "skills read natively from ~/.agents/skills; MCP goes to openclaw.json mcp.servers (run `openclaw mcp reload` for a running Gateway)",
+			Hooks: &hookTarget{
+				agentName: agentAgy,
+				inspect:   inspectAgyHook,
+				patch:     patchAgyHook,
+			},
+			// ~/.gemini/GEMINI.md is Gemini CLI's file too; both adapters write
+			// the same link. ~/.gemini/AGENTS.md is not used: agy loads it next
+			// to GEMINI.md, so both would inject the same text.
+			RootInstructions: &rootInstructionsCapability{
+				Path:          func(home string) string { return filepath.Join(home, ".gemini", "GEMINI.md") },
+				Expected:      func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
+				NoSetupImport: true,
+			},
+			IntegrationNote: "skills go to ~/.gemini/antigravity-cli/skills (CLI only, not Gemini CLI's ~/.gemini/skills); MCP to ~/.gemini/config/mcp_config.json and hooks to ~/.gemini/config/hooks.json (Gemini CLI reads neither); roles are not rendered yet (agy supports custom agents in ~/.gemini/config/agents, but its tool-name mapping is unverified and `tools` defaults to empty); root file ~/.gemini/GEMINI.md is shared with Gemini CLI",
+			doctorChecks: []doctorCheck{
+				{Name: "agy duplicate skills", Run: checkAgyDuplicateSkills},
+			},
+		},
+
+		agentKimi: {
+			Skills:           skillsSymlink,
+			SkillsNativeRoot: readsAgentsSkillsRoot,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentKimi,
+				configPath: func(home string) string { return filepath.Join(kimiHome(home), "mcp.json") },
+				inspect:    inspectJSONMCPServer,
+				patch:      patchJSONMCPServer,
+				remove:     removeJSONMCPServer,
+				read:       readJSONMCPServer,
+				rootKey:    "mcpServers",
+			}),
+			roles: roleRenderer(agentKimi),
+			Hooks: &hookTarget{
+				agentName: agentKimi,
+				inspect:   inspectKimiHook,
+				patch:     patchKimiHook,
+			},
+			IntegrationNote: "skills, agents and AGENTS.md are read natively from ~/.agents; MCP goes to ~/.kimi-code/mcp.json and hooks to [[hooks]] in ~/.kimi-code/config.toml ($KIMI_CODE_HOME moves both)",
 		},
 
 		agentDSH: {

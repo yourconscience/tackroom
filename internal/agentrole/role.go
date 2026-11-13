@@ -99,16 +99,16 @@ type GeminiOptions struct {
 // Renderer is a harness projection of a canonical role.
 type Renderer interface {
 	Extension() string
-	Render(Role) string
+	Render(Role) (string, error)
 }
 
 type renderer struct {
 	extension string
-	render    func(Role) string
+	render    func(Role) (string, error)
 }
 
-func (r renderer) Extension() string       { return r.extension }
-func (r renderer) Render(role Role) string { return r.render(role) }
+func (r renderer) Extension() string                { return r.extension }
+func (r renderer) Render(role Role) (string, error) { return r.render(role) }
 
 var renderers = map[string]Renderer{
 	"claude":    renderer{extension: ".md", render: renderClaude},
@@ -122,6 +122,7 @@ var renderers = map[string]Renderer{
 	"copilot":   renderer{extension: ".agent.md", render: renderCopilot},
 	"grok":      renderer{extension: ".md", render: renderGrok},
 	"gemini":    renderer{extension: ".md", render: renderGemini},
+	"kimi":      renderer{extension: ".md", render: renderKimi},
 }
 
 // Lookup returns the registered renderer for a harness name.

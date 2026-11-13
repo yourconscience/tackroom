@@ -34,38 +34,16 @@ var openInBrowser = func(url string) error {
 	return nil
 }
 
-// legacyInspectFlags are the HarnessKit-only flags that `tackroom view`
-// forwarded to `hk serve` before the cutover. They no longer control `view`
-// (which now opens the config UI); using one prints concise rename guidance
-// pointing at HarnessKit itself instead of silently launching a browser.
-var legacyInspectFlags = []string{"--port", "--host", "--no-token", "--name"}
-
 // runView launches the canonical tackroom configuration experience: the
 // loopback-only web UI for authoring the canonical YAML (shared/local layers,
 // read-only effective view, revision-guarded saves, explicit sync preview and
 // confirmation). It is the only interactive config editor.
 func runView(args []string) error {
-	if flag := firstLegacyInspectFlag(args); flag != "" {
-		return fmt.Errorf("tackroom view no longer launches HarnessKit, so %s is not a view flag; run HarnessKit directly (\"hk serve --port N\") for the harness inspector. \"tackroom view\" now opens the config UI — set its loopback bind with --addr", flag)
-	}
 	opts, err := parseViewFlags(args)
 	if err != nil {
 		return err
 	}
 	return runConfigServe(opts)
-}
-
-// firstLegacyInspectFlag returns the first HarnessKit-era flag in args, matching
-// both `--flag` and `--flag=value` forms, or "" when none is present.
-func firstLegacyInspectFlag(args []string) string {
-	for _, arg := range args {
-		for _, legacy := range legacyInspectFlags {
-			if arg == legacy || strings.HasPrefix(arg, legacy+"=") {
-				return legacy
-			}
-		}
-	}
-	return ""
 }
 
 // parseViewFlags parses the flags for `tackroom view`. It serves the config

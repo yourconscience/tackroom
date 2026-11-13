@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"encoding/binary"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
@@ -70,19 +71,61 @@ var auditScriptExtensions = map[string]bool{
 	".rb": true, ".pl": true,
 }
 
+func parseAuditFlags(args []string) (runOptions, error) {
+	fs := flag.NewFlagSet("doctor audit", flag.ContinueOnError)
+	fs.SetOutput(os.Stderr)
+	var opts runOptions
+	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
+	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
+	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
+	fs.BoolVar(&opts.JSONOutput, "json", false, "Print findings as JSON")
+	fs.Usage = func() {
+		fmt.Fprintln(os.Stderr, "Usage:")
+		fmt.Fprintln(os.Stderr, "  tackroom doctor audit [--json]")
+		fmt.Fprintln(os.Stderr, "  tackroom doctor audit accept <item> <rule> --reason \"...\"")
+		fmt.Fprintln(os.Stderr, "  tackroom doctor audit revoke <item> <rule>")
+		fmt.Fprintln(os.Stderr, "\nFlags:")
+		fs.PrintDefaults()
+	}
+	if err := fs.Parse(args); err != nil {
+		return runOptions{}, err
+	}
+	if fs.NArg() != 0 {
+		return runOptions{}, fmt.Errorf("doctor audit does not accept positional arguments")
+	}
+	return opts, nil
+}
+
 func runAudit(opts runOptions) error {
 	repoRoot, home, cfg, _, err := loadContext(opts)
 	if err != nil {
 		return err
 	}
 
-	fmt.Println("tackroom audit")
-	fmt.Printf("repo: %s\n\n", repoRoot)
-
 	findings := auditRepo(repoRoot, home, cfg)
-	crit, _, _ := printAuditFindings(os.Stdout, findings)
+	crit := 0
+	if opts.JSONOutput {
+		for _, f := range findings {
+			if f.severity == auditCritical {
+				crit++
+			}
+		}
+	} else {
+		fmt.Println("tackroom audit")
+		fmt.Printf("repo: %s\n\n", repoRoot)
+		crit, _, _ = printAuditFindings(os.Stdout, findings)
+		fmt.Println()
+	}
+
+	lock, _ := readLockFile(repoRoot)
+	items := acceptAuditItems(repoRoot, home, cfg)
+	markAccepted(items, lock)
+	blocked := printRuleFindings(os.Stdout, items, lock, opts.JSONOutput)
 	if crit > 0 {
 		return fmt.Errorf("%d critical finding(s)", crit)
+	}
+	if blocked > 0 {
+		return fmt.Errorf("%d unaccepted CRITICAL finding(s) on external items", blocked)
 	}
 	return nil
 }

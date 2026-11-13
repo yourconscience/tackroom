@@ -46,6 +46,9 @@ type ownedCronJob struct {
 	ID       string
 	Schedule string
 	Command  []string // absolute executable, expanded paths
+	// Path is the PATH the unit runs with. Schedulers start jobs with a
+	// minimal one that cannot find harness executables; empty keeps theirs.
+	Path string
 }
 
 type ownedCronUnit struct {
@@ -337,7 +340,11 @@ func renderOwnedCron(job ownedCronJob, backend, home string) (string, error) {
 		for i, arg := range job.Command {
 			quoted[i] = quote(arg)
 		}
-		return fmt.Sprintf("%s %s >> %s 2>&1 %s%s", job.Schedule, strings.Join(quoted, " "), quote(cronLogPath(home, job.ID)), ownedCrontabMarker, job.ID), nil
+		env := ""
+		if job.Path != "" {
+			env = "PATH=" + quote(job.Path) + " "
+		}
+		return fmt.Sprintf("%s %s%s >> %s 2>&1 %s%s", job.Schedule, env, strings.Join(quoted, " "), quote(cronLogPath(home, job.ID)), ownedCrontabMarker, job.ID), nil
 	}
 	return "", fmt.Errorf("unknown backend %q", backend)
 }
@@ -448,7 +455,11 @@ func renderLaunchdPlist(job ownedCronJob, home string) (string, error) {
 	for _, arg := range job.Command {
 		fmt.Fprintf(&b, "\t\t<string>%s</string>\n", xmlEscape(arg))
 	}
-	b.WriteString("\t</array>\n\t<key>StartCalendarInterval</key>\n\t<array>\n")
+	b.WriteString("\t</array>\n")
+	if job.Path != "" {
+		fmt.Fprintf(&b, "\t<key>EnvironmentVariables</key>\n\t<dict>\n\t\t<key>PATH</key>\n\t\t<string>%s</string>\n\t</dict>\n", xmlEscape(job.Path))
+	}
+	b.WriteString("\t<key>StartCalendarInterval</key>\n\t<array>\n")
 	for _, dict := range dicts {
 		b.WriteString("\t\t<dict>\n")
 		for _, key := range []string{"Minute", "Hour", "Day", "Month", "Weekday"} {
@@ -477,7 +488,12 @@ func renderSystemdService(job ownedCronJob) string {
 	for i, arg := range job.Command {
 		quoted[i] = systemdQuote(arg)
 	}
-	return fmt.Sprintf("[Unit]\nDescription=tackroom cron %s\n\n[Service]\nType=oneshot\nExecStart=%s\n", job.ID, strings.Join(quoted, " "))
+	env := ""
+	if job.Path != "" {
+		// Environment= takes quoted assignments; only % is a specifier there.
+		env = `Environment="PATH=` + strings.NewReplacer(`\`, `\\`, `"`, `\"`, "%", "%%").Replace(job.Path) + `"` + "\n"
+	}
+	return fmt.Sprintf("[Unit]\nDescription=tackroom cron %s\n\n[Service]\nType=oneshot\n%sExecStart=%s\n", job.ID, env, strings.Join(quoted, " "))
 }
 
 // runCronPlan prints the plan and, unless dryRun, executes it. legacy are

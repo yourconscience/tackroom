@@ -100,7 +100,7 @@ type cronManifestJob struct {
 	Command  []string `yaml:"command"`
 }
 
-var cronSources = []string{"launchd", "crontab", "systemd", "hermes", "codex", "claude-desktop", "herdr-automations", "claude-cloud", "openbot"}
+var cronSources = []string{"launchd", "crontab", "systemd", "codex", "claude-desktop", "herdr-automations", "claude-cloud"}
 
 func runCronCollect(args []string) error {
 	fs := flag.NewFlagSet("cron collect", flag.ContinueOnError)
@@ -351,7 +351,7 @@ type hostScan struct {
 
 func scanCronHost(host string) hostScan {
 	scan := hostScan{host: host}
-	sections, err := runCronProbe(host)
+	sections, err := runCronProbe(host, "")
 	if err != nil {
 		for _, source := range cronSources {
 			scan.access = append(scan.access, cronAccess{Host: host, Source: source, State: "not_scanned", Detail: err.Error()})
@@ -374,7 +374,9 @@ func scanCronHost(host string) hostScan {
 	return scan
 }
 
-func runCronProbe(host string) ([]probeSection, error) {
+// runCronProbe reads scheduler state on host. only, an owned unit id, limits
+// the probe to what can hold that unit.
+func runCronProbe(host, only string) ([]probeSection, error) {
 	tokenBytes := make([]byte, 12)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return nil, err
@@ -384,9 +386,9 @@ func runCronProbe(host string) ([]probeSection, error) {
 	defer cancel()
 	var cmd *exec.Cmd
 	if host == "local" {
-		cmd = exec.CommandContext(ctx, "sh", "-s", "--", token)
+		cmd = exec.CommandContext(ctx, "sh", "-s", "--", token, only)
 	} else {
-		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "sh -s -- "+token)
+		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "sh -s -- "+shellJoin([]string{token, only}))
 	}
 	cmd.Stdin = strings.NewReader(cronsProbeScript)
 	var stderr strings.Builder
@@ -508,8 +510,6 @@ func (p *probeData) collect(source string) ([]cronJob, cronAccess) {
 			return nil, cronAccess{State: "not_scanned", Detail: "Linux only"}
 		}
 		return p.systemd()
-	case "hermes":
-		return p.hermes()
 	case "codex":
 		return p.codex()
 	case "claude-desktop":
@@ -521,8 +521,6 @@ func (p *probeData) collect(source string) ([]cronJob, cronAccess) {
 		return p.herdrAutomations()
 	case "claude-cloud":
 		return nil, cronAccess{State: "not_scanned", Detail: "cloud routines have no on-disk state; list them from a Claude session"}
-	case "openbot":
-		return nil, cronAccess{State: "not_scanned", Detail: "routines are not readable from disk"}
 	}
 	return nil, cronAccess{State: "not_scanned"}
 }
@@ -533,18 +531,6 @@ func (p *probeData) newJob(source, id string) cronJob {
 		job.Inferred = append(job.Inferred, "tz")
 	}
 	return job
-}
-
-func ageString(sec int64) string {
-	switch {
-	case sec < 120:
-		return fmt.Sprintf("%ds", sec)
-	case sec < 7200:
-		return fmt.Sprintf("%dm", sec/60)
-	case sec < 172800:
-		return fmt.Sprintf("%dh", sec/3600)
-	}
-	return fmt.Sprintf("%dd", sec/86400)
 }
 
 func unixString(sec int64) string {
@@ -1094,103 +1080,6 @@ func epochString(v any) string {
 		sec /= 1000
 	}
 	return unixString(sec)
-}
-
-// hermes
-
-func (p *probeData) hermes() ([]cronJob, cronAccess) {
-	s, ok := p.one("hermes-jobs", "")
-	if !ok {
-		return nil, cronAccess{Detail: "no Hermes cron jobs file"}
-	}
-	var doc struct {
-		Jobs []map[string]any `json:"jobs"`
-	}
-	if s.RC != 0 || json.Unmarshal([]byte(s.Body), &doc) != nil {
-		return nil, cronAccess{State: "unreadable", Detail: "jobs.json: " + firstLine(s.Body)}
-	}
-
-	var details []string
-	alive := true
-	if hb, ok := p.one("hermes-heartbeat", ""); ok && hb.RC == 0 {
-		beat, _ := strconv.ParseFloat(first(strings.Fields(hb.Body)), 64)
-		age := p.now - int64(beat)
-		alive = beat > 0 && age <= 600
-		details = append(details, "scheduler heartbeat "+ageString(age)+" ago")
-	} else {
-		details = append(details, "no scheduler heartbeat; liveness unknown")
-	}
-
-	runs := map[string]int{}
-	if len(p.find("hermes-db")) > 0 {
-		rows, err := p.querySQLite("hermes-db", "executions.db", "select job_id, count(*) as runs from executions group by job_id")
-		if err != nil {
-			details = append(details, "executions.db unreadable: "+err.Error())
-		}
-		for _, row := range rows {
-			n, _ := asInt(row["runs"])
-			runs[asString(row["job_id"])] = n
-		}
-	}
-
-	var jobs []cronJob
-	for _, j := range doc.Jobs {
-		job := p.newJob("hermes", asString(j["id"]))
-		if name := asString(j["name"]); name != "" {
-			job.Name = name
-		}
-		if sched, ok := j["schedule"].(map[string]any); ok {
-			job.Schedule = asString(sched["expr"])
-			if job.Schedule == "" {
-				job.Schedule = asString(sched["display"])
-			}
-		}
-		if next, err := time.Parse(time.RFC3339, asString(j["next_run_at"])); err == nil {
-			job.TZ = next.Format("-07:00")
-		}
-		switch {
-		case asString(j["script"]) != "":
-			job.Command = asString(j["script"])
-		case asString(j["skill"]) != "":
-			job.Command = "skill " + asString(j["skill"])
-		default:
-			job.Command = "prompt: " + truncate(asString(j["prompt"]), 60)
-		}
-		job.LastRun = asString(j["last_run_at"])
-		job.LastStatus = asString(j["last_status"])
-		if n, ok := runs[job.ID]; ok {
-			job.Runs = &n
-		} else if repeat, ok := j["repeat"].(map[string]any); ok {
-			if n, ok := asInt(repeat["completed"]); ok {
-				job.Runs = &n
-			}
-		}
-		if e := asString(j["last_error"]); e != "" {
-			job.Problems = append(job.Problems, "last error: "+truncate(e, 160))
-		}
-		deliver := asString(j["deliver"])
-		if origin, ok := j["origin"].(map[string]any); ok && deliver == "origin" {
-			deliver = asString(origin["platform"])
-		}
-		if platform, _, _ := strings.Cut(deliver, ":"); platform != "" && platform != "local" {
-			job.Connectors = []string{platform}
-			job.Inferred = append(job.Inferred, "connectors")
-		}
-		enabled, _ := j["enabled"].(bool)
-		switch {
-		case !enabled:
-			job.State = "disabled"
-		case j["paused_at"] != nil || asString(j["state"]) == "paused":
-			job.State = "paused"
-		case !alive:
-			job.State = "dead"
-			job.Problems = append(job.Problems, "enabled, but the Hermes scheduler is not running on this host")
-		}
-		job.Inferred = append(job.Inferred, "state")
-		missedRuns(&job, time.Unix(p.now, 0))
-		jobs = append(jobs, job)
-	}
-	return jobs, cronAccess{Detail: strings.Join(details, "; ")}
 }
 
 // codex

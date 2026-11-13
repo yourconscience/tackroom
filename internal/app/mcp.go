@@ -36,7 +36,6 @@ type mcpTarget struct {
 	remove     func(mcpTarget, string, string) error
 	rootKey    string
 	// parentKey, when set, names the top-level object that holds rootKey
-	// (OpenClaw keeps servers under "mcp" -> "servers").
 	parentKey string
 	defaults  map[string]interface{}
 	remote    *remoteMCP
@@ -54,15 +53,24 @@ func desiredMCPServersForAgent(cfg config, agentName string) []mcpServerConfig {
 		if server.URL != "" && !hasRemoteMCPSupport(agentName) {
 			continue
 		}
+		// Apply agent targeting before the freshness hold, so a held server is
+		// not retained for an agent that no longer targets it.
 		if len(server.Agents) == 0 {
-			if hasMCPSupport(agentName) {
-				servers = append(servers, server)
+			if !hasMCPSupport(agentName) {
+				continue
+			}
+		} else if !stringInSlice(agentName, server.Agents) {
+			continue
+		}
+		if cfg.heldMCP[server.Name] {
+			// Inside its freshness hold: keep the entry the harness already has.
+			if existing, err := readNativeMCPServer(agentName, server.Name, cfg.heldHome); err == nil {
+				existing.Enabled, existing.Agents = true, server.Agents
+				servers = append(servers, existing)
 			}
 			continue
 		}
-		if stringInSlice(agentName, server.Agents) {
-			servers = append(servers, server)
-		}
+		servers = append(servers, server)
 	}
 	return servers
 }
@@ -349,67 +357,6 @@ func claudeMCPJSONEntry(name string, cwd string) (map[string]interface{}, bool, 
 		}
 		dir = parent
 	}
-}
-
-func inspectYAMLMCPServer(target mcpTarget, server mcpServerConfig, home string) (string, error) {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return stateMissing, nil
-		}
-		return stateMissing, fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return stateMissing, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	return inspectMapMCPServer(raw, target, server), nil
-}
-
-func patchYAMLMCPServer(target mcpTarget, server mcpServerConfig, home string) error {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	if err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var doc yaml.Node
-	if err == nil {
-		if err := yaml.Unmarshal(data, &doc); err != nil {
-			return fmt.Errorf("parse %s: %w", configPath, err)
-		}
-	}
-	if err := upsertYAMLMCPNode(&doc, target.rootKey, server, target.defaults); err != nil {
-		return fmt.Errorf("update %s: %w", configPath, err)
-	}
-	out, err := marshalYAMLNode(&doc)
-	if err != nil {
-		return fmt.Errorf("marshal %s: %w", configPath, err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(configPath), err)
-	}
-	if err := os.WriteFile(configPath, out, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return nil
-}
-
-func readYAMLMCPServer(target mcpTarget, name string, home string) (mcpServerConfig, error) {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return mcpServerConfig{}, fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return mcpServerConfig{}, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	entry, ok := mapMCPEntry(raw, target.rootKey, name)
-	if !ok {
-		return mcpServerConfig{}, fmt.Errorf("MCP server %q not found in %s", name, target.agentName)
-	}
-	return mcpServerFromMap(name, entry)
 }
 
 func inspectMapMCPServer(raw map[string]interface{}, target mcpTarget, server mcpServerConfig) string {
@@ -1375,49 +1322,6 @@ func stringSlicesEqual(a []string, b []string) bool {
 	return true
 }
 
-func upsertYAMLMCPNode(doc *yaml.Node, rootKey string, server mcpServerConfig, defaults map[string]interface{}) error {
-	root := doc
-	if root.Kind == 0 {
-		root.Kind = yaml.DocumentNode
-	}
-	if root.Kind != yaml.DocumentNode {
-		return fmt.Errorf("unexpected YAML root kind %d", root.Kind)
-	}
-	if len(root.Content) == 0 {
-		root.Content = []*yaml.Node{{Kind: yaml.MappingNode, Tag: yamlMapTag}}
-	}
-	mapping := root.Content[0]
-	if mapping.Kind != yaml.MappingNode {
-		return fmt.Errorf("top-level YAML node is not a mapping")
-	}
-
-	serversNode := ensureMappingValue(mapping, rootKey)
-	entryNode := ensureMappingValue(serversNode, server.Name)
-	setMappingString(entryNode, "command", server.Command)
-	setMappingStringSlice(entryNode, "args", server.Args)
-	if len(server.Env) > 0 {
-		envNode := ensureMappingValue(entryNode, "env")
-		setMappingStringMap(envNode, mergeManagedEnv(yamlStringMap(envNode), server.Env))
-	}
-	for key, value := range defaults {
-		setMappingScalar(entryNode, key, value)
-	}
-	return nil
-}
-
-func marshalYAMLNode(doc *yaml.Node) ([]byte, error) {
-	var builder strings.Builder
-	encoder := yaml.NewEncoder(&builder)
-	encoder.SetIndent(4)
-	if err := encoder.Encode(doc); err != nil {
-		return nil, err
-	}
-	if err := encoder.Close(); err != nil {
-		return nil, err
-	}
-	return []byte(builder.String()), nil
-}
-
 func ensureMappingValue(mapping *yaml.Node, key string) *yaml.Node {
 	if mapping.Kind != yaml.MappingNode {
 		mapping.Kind = yaml.MappingNode
@@ -1443,17 +1347,6 @@ func ensureMappingValue(mapping *yaml.Node, key string) *yaml.Node {
 
 func setMappingString(mapping *yaml.Node, key string, value string) {
 	setMappingNode(mapping, key, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: value})
-}
-
-func setMappingScalar(mapping *yaml.Node, key string, value interface{}) {
-	switch t := value.(type) {
-	case bool:
-		setMappingNode(mapping, key, &yaml.Node{Kind: yaml.ScalarNode, Tag: "!!bool", Value: strconv.FormatBool(t)})
-	case string:
-		setMappingString(mapping, key, t)
-	default:
-		setMappingString(mapping, key, fmt.Sprint(t))
-	}
 }
 
 func setMappingStringSlice(mapping *yaml.Node, key string, values []string) {

@@ -10,7 +10,7 @@ var copilotToolMapping = map[string]string{
 	"websearch": "web", "task": "agent", "todowrite": "todo",
 }
 
-func renderCopilot(role Role) string {
+func renderCopilot(role Role) (string, error) {
 	model := strings.TrimSpace(role.Copilot.Model)
 	if model == "" {
 		if generic := strings.TrimSpace(role.Model); generic != "" && !canonicalModelTier(generic) {
@@ -30,5 +30,5 @@ func renderCopilot(role Role) string {
 		}
 	}
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }

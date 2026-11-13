@@ -2,7 +2,7 @@ package agentrole
 
 import "strings"
 
-func renderCursor(role Role) string {
+func renderCursor(role Role) (string, error) {
 	model := strings.TrimSpace(role.Cursor.Model)
 	if model == "" {
 		if generic := strings.TrimSpace(role.Model); generic != "" && !canonicalModelTier(generic) {
@@ -20,5 +20,5 @@ func renderCursor(role Role) string {
 		b.WriteString("readonly: true\n")
 	}
 	writeGeneratedMarkdownBody(&b, role)
-	return b.String()
+	return b.String(), nil
 }

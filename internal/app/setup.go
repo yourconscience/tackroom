@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,8 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
+	"time"
 )
 
 func runSetup(opts runOptions) error {
@@ -48,6 +48,7 @@ func runSetup(opts runOptions) error {
 		if err != nil {
 			return err
 		}
+		detection.PlannedActions = setupPlannedActions(opts)
 		enc := json.NewEncoder(streams.out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(detection)
@@ -59,6 +60,9 @@ func runSetup(opts runOptions) error {
 			return err
 		}
 		fmt.Fprint(streams.out, renderDetectionSummary(detection))
+		for _, action := range setupPlannedActions(opts) {
+			fmt.Fprintf(streams.out, "\nplanned: %s\n", action)
+		}
 		if sources := rootInstructionSources(repoRoot, detected, home); len(sources) > 0 {
 			fmt.Fprintln(streams.out, "\nroot instructions to import into AGENTS.md (originals are backed up, then linked):")
 			for _, src := range sources {
@@ -151,7 +155,32 @@ func runSetup(opts runOptions) error {
 	// Setup adopts this machine: native files that differ from the shared
 	// copy are backed up and linked (after a prompt; --yes accepts).
 	syncOpts.ReplaceConflicts = true
-	return runSync(syncOpts)
+	if err := runSync(syncOpts); err != nil {
+		return err
+	}
+	if opts.NoCron {
+		// --no-cron is an explicit opt-out, recorded so doctor does not warn
+		// about a job the user chose not to install.
+		if err := setLocalPeriodicSync(configPath, home, false); err != nil {
+			fmt.Fprintf(streams.out, "warning: could not record periodic_sync: false: %v\n", err)
+		}
+		return nil
+	}
+	// A persisted periodic_sync: false (tackroom.yaml or the local overlay) is
+	// the same opt-out; setup must not reinstall the job and reverse it.
+	if effective, err := loadConfig(repoRoot, home, ""); err == nil && !periodicSyncEnabled(effective) {
+		return nil
+	}
+	// Setup is the one place besides `tackroom cron` that installs the job.
+	// A scheduler that cannot take it must not fail the setup. An installed
+	// job is left alone, so a chosen --interval survives.
+	if job, _ := readPeriodicSync(); job != nil {
+		return nil
+	}
+	if err := installPeriodicSync(cronOptions{runOptions: syncOpts}); err != nil {
+		fmt.Fprintf(streams.out, "warning: periodic sync not installed: %v\nfix and retry: tackroom cron\n", err)
+	}
+	return nil
 }
 
 // offerGitInit proposes versioning a fresh config root. Skipped when the root
@@ -212,7 +241,7 @@ func patchAmpConfig(home string, repoRoot string) (bool, error) {
 	if ampSkillsPathConfigured(current, home, target) {
 		return false, nil
 	}
-	raw["amp.skills.path"] = appendAmpSkillsPath(current, hermesExternalDirValue(home, target))
+	raw["amp.skills.path"] = appendAmpSkillsPath(current, configSkillsDirValue(home, target))
 
 	out, err := json.MarshalIndent(raw, "", "  ")
 	if err != nil {
@@ -284,78 +313,7 @@ func appendAmpSkillsPath(raw string, target string) string {
 	return strings.TrimRight(raw, ":") + ":" + target
 }
 
-func patchHermesConfig(home string, repoRoot string, _ config) (bool, error) {
-	configPath := filepath.Join(home, ".hermes", "config.yaml")
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return false, fmt.Errorf("read %s: %w", configPath, err)
-		}
-		data = []byte("{}\n")
-	}
-
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return false, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-
-	skillsRaw, ok := raw["skills"]
-	if !ok {
-		skillsRaw = map[string]interface{}{}
-		raw["skills"] = skillsRaw
-	}
-	skills, ok := skillsRaw.(map[string]interface{})
-	if !ok {
-		return false, fmt.Errorf("skills key in %s is not a map", configPath)
-	}
-
-	targets := []string{filepath.Join(repoRoot, "skills")}
-
-	targetSet := make(map[string]bool, len(targets))
-	for _, target := range targets {
-		targetSet[target] = true
-	}
-	existing := make(map[string]bool)
-	dirsRaw, ok := skills["external_dirs"]
-	var dirs []interface{}
-	changed := !ok
-	if ok {
-		if existingDirs, ok := dirsRaw.([]interface{}); ok {
-			for _, d := range existingDirs {
-				if s, isStr := d.(string); isStr {
-					expanded := expandPath(strings.TrimSpace(s), home)
-					existing[expanded] = true
-				}
-				dirs = append(dirs, d)
-			}
-		}
-	}
-	for _, target := range targets {
-		if existing[target] {
-			continue
-		}
-		dirs = append(dirs, hermesExternalDirValue(home, target))
-		changed = true
-	}
-	if !changed {
-		return false, nil
-	}
-	skills["external_dirs"] = dirs
-
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return false, fmt.Errorf("marshal: %w", err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		return false, fmt.Errorf("create %s: %w", filepath.Dir(configPath), err)
-	}
-	if err := os.WriteFile(configPath, out, 0o644); err != nil {
-		return false, fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return true, nil
-}
-
-func hermesExternalDirValue(home string, target string) string {
+func configSkillsDirValue(home string, target string) string {
 	if target == filepath.Join(home, ".agents", "skills") {
 		return tackroomSkillsPathValue
 	}
@@ -363,16 +321,42 @@ func hermesExternalDirValue(home string, target string) string {
 }
 
 func runPull(opts runOptions) error {
-	repoRoot, _, _, _, err := loadContext(opts)
+	repoRoot, home, _, _, err := loadContext(opts)
 	if err != nil {
 		return err
 	}
 
-	cmd := exec.Command("git", "-C", repoRoot, "pull", "--ff-only")
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("git pull: %w", err)
+	// The git step is skipped quietly when it cannot do anything: no git
+	// repository, no remote, or no upstream. A pull that cannot fast-forward
+	// (offline, diverged, dirty tree) must still not stop the sync: the local
+	// copy has to reach the harnesses, and the exit code reflects the sync
+	// only. Either way the outcome is recorded so status and doctor can
+	// surface a machine that has stopped receiving updates.
+	if shouldPull(repoRoot) {
+		now := time.Now().UTC().Format(time.RFC3339)
+		ctx, cancel := context.WithTimeout(context.Background(), gitRemoteTimeout)
+		cmd := exec.CommandContext(ctx, "git", "-C", repoRoot, "pull", "--ff-only")
+		cmd.WaitDelay = 5 * time.Second
+		out, err := cmd.CombinedOutput()
+		cancel()
+
+		prev, _ := readPullState(home)
+		state := pullState{LastAttempt: now, LastSuccess: prev.LastSuccess}
+		if err != nil {
+			state.Failed = true
+			state.Error = gitErrorLine(string(out))
+			if state.Error == "" {
+				state.Error = err.Error()
+			}
+			fmt.Fprintf(os.Stderr, "warning: git pull --ff-only failed, syncing the local copy: %s\n", state.Error)
+		} else {
+			state.Failed = false
+			state.Error = ""
+			state.LastSuccess = now
+			os.Stdout.Write(out)
+		}
+		// A failed state write must not fail the pull.
+		_ = writePullState(home, state)
 	}
 
 	return runSync(opts)
@@ -386,7 +370,7 @@ type cronOptions struct {
 }
 
 const (
-	cronIntervalDefault = "30m"
+	cronIntervalDefault = "15m"
 	cronIntervalWeekly  = "weekly"
 )
 
@@ -420,10 +404,10 @@ func runCron(opts cronOptions) error {
 	if opts.ConfigPath, err = filepath.Abs(configPath); err != nil {
 		return err
 	}
-	cronCmd, interval := cronCommandForOptions(binaryPath, opts)
-	id, mode := "tackroom-pull", "pull"
+	job := cronJobForOptions(binaryPath, opts)
+	id, mode := job.ID, "pull"
 	if opts.Deps {
-		id, mode = "tackroom-deps", "sync deps"
+		mode = "sync deps"
 	}
 	manifest, err := loadCronsManifest(opts.ConfigPath)
 	if err != nil {
@@ -435,7 +419,7 @@ func runCron(opts cronOptions) error {
 	}
 	var desired []ownedCronJob
 	if !opts.Remove {
-		desired = append(desired, ownedCronJob{ID: id, Schedule: intervalToSchedule(interval), Command: []string{"/bin/sh", "-c", cronCmd}})
+		desired = append(desired, job)
 	}
 	installed, err := readOwnedCronUnits(home)
 	if err != nil {
@@ -449,26 +433,39 @@ func runCron(opts cronOptions) error {
 	if err != nil {
 		return err
 	}
-	return runCronPlan(plan, backend, home, legacy, false)
+	if err := runCronPlan(plan, backend, home, legacy, false); err != nil {
+		return err
+	}
+	if !opts.Remove && !opts.Deps {
+		// Installing the pull job opts back into periodic sync: drop an
+		// earlier `periodic_sync: false` in the local overlay so the default
+		// (true) applies again.
+		if err := setLocalPeriodicSync(configPath, home, true); err != nil {
+			return fmt.Errorf("re-enable periodic sync in %s: %w", filepath.Join(filepath.Dir(configPath), "tackroom.local.yaml"), err)
+		}
+	}
+	return nil
 }
 
-func cronCommandForOptions(binaryPath string, opts cronOptions) (string, string) {
-	mode := "pull"
-	interval := opts.Interval
+// cronJobForOptions is the built-in job. It runs the tackroom binary directly
+// with the installing shell's PATH, so harness executables are found without
+// a shell and without sourcing a profile.
+func cronJobForOptions(binaryPath string, opts cronOptions) ownedCronJob {
+	id, args, interval := "tackroom-pull", []string{"pull"}, opts.Interval
 	if opts.Deps {
-		mode = "sync deps"
-		if interval == "" || interval == cronIntervalDefault {
+		id, args = "tackroom-deps", []string{"sync", "deps"}
+		if interval == "" {
 			interval = cronIntervalWeekly
 		}
 	}
 	if interval == "" {
 		interval = cronIntervalDefault
 	}
-	command := fmt.Sprintf(". \"$HOME/.profile\" 2>/dev/null; %q %s", binaryPath, mode)
+	command := append([]string{binaryPath}, args...)
 	if opts.ConfigPath != "" {
-		command += fmt.Sprintf(" --config %q", opts.ConfigPath)
+		command = append(command, "--config", opts.ConfigPath)
 	}
-	return command, interval
+	return ownedCronJob{ID: id, Schedule: intervalToSchedule(interval), Command: command, Path: os.Getenv("PATH")}
 }
 
 func intervalToSchedule(interval string) string {
@@ -477,7 +474,7 @@ func intervalToSchedule(interval string) string {
 		return "*/5 * * * *"
 	case "15m":
 		return "*/15 * * * *"
-	case cronIntervalDefault:
+	case "30m":
 		return "*/30 * * * *"
 	case "1h", "hourly":
 		return "0 * * * *"
@@ -490,6 +487,6 @@ func intervalToSchedule(interval string) string {
 	case cronIntervalWeekly:
 		return "0 4 * * 1"
 	default:
-		return "*/30 * * * *"
+		return "*/15 * * * *"
 	}
 }

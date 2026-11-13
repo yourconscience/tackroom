@@ -8,34 +8,6 @@ import (
 	"testing"
 )
 
-func TestRemoveMCPServerLeavesOtherServersInEveryFormat(t *testing.T) {
-	for _, agent := range []string{agentClaudeCode, agentCodex, agentOpenCode, agentHermes, agentDSH, agentOpenClaw} {
-		t.Run(agent, func(t *testing.T) {
-			home := t.TempDir()
-			keep := mcpServerConfig{Name: "keep", Command: "keep-mcp", Args: []string{"-x"}}
-			gone := mcpServerConfig{Name: "gone", Command: "gone-mcp", Env: map[string]string{"TOKEN": "${TOKEN}"}}
-			for _, server := range []mcpServerConfig{keep, gone} {
-				if err := patchMCPServer(agent, server, home); err != nil {
-					t.Fatal(err)
-				}
-			}
-			if err := removeMCPServer(agent, "gone", home); err != nil {
-				t.Fatal(err)
-			}
-			if state, err := inspectMCPServer(agent, mcpServerConfig{Name: "gone"}, home); err != nil || state != stateMissing {
-				t.Fatalf("gone = %s, %v; want missing", state, err)
-			}
-			if state, err := inspectMCPServer(agent, keep, home); err != nil || state != stateSynced {
-				t.Fatalf("keep = %s, %v; want synced", state, err)
-			}
-			// Removing an absent server is a no-op.
-			if err := removeMCPServer(agent, "gone", home); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
 func TestRemoveCodexMCPServerLeavesABrokenFileAlone(t *testing.T) {
 	home := t.TempDir()
 	configPath := filepath.Join(home, ".codex", "config.toml")
@@ -124,47 +96,6 @@ func TestSyncRemovesMCPServersDroppedFromTackroomYAML(t *testing.T) {
 	}
 	if err := runStatus(runOptions{ConfigPath: configPath, Stdout: &bytes.Buffer{}}); err != nil {
 		t.Fatalf("status after cleanup: %v", err)
-	}
-}
-
-func TestSyncKeepsReferencedSecretsInEveryFormat(t *testing.T) {
-	for _, agent := range []string{agentOpenCode, agentHermes, agentDSH} {
-		t.Run(agent, func(t *testing.T) {
-			home := t.TempDir()
-			real := mcpServerConfig{Name: "linear", Command: "linear-mcp", Env: map[string]string{"API_KEY": "real-secret"}}
-			if err := patchMCPServer(agent, real, home); err != nil {
-				t.Fatal(err)
-			}
-			canonical := mcpServerConfig{Name: "linear", Command: "linear-mcp", Env: map[string]string{"API_KEY": "${API_KEY}"}}
-			if state, err := inspectMCPServer(agent, canonical, home); err != nil || state != stateSynced {
-				t.Fatalf("a real value satisfies a reference: %s, %v", state, err)
-			}
-			if err := patchMCPServer(agent, canonical, home); err != nil {
-				t.Fatal(err)
-			}
-			target, _ := mcpTargetForHarness(agent)
-			if data, _ := os.ReadFile(target.configPath(home)); !strings.Contains(string(data), "real-secret") {
-				t.Fatalf("the secret was replaced with a reference:\n%s", data)
-			}
-		})
-	}
-}
-
-func TestDoctorHermesHooksPassesWithoutHermesHooks(t *testing.T) {
-	home := t.TempDir()
-	fakePath(t, "hermes")
-	writeSyncTestFile(t, filepath.Join(home, ".hermes", "config.yaml"), []byte("model: x\n"))
-	cfg := config{Agents: []agentConfig{{Name: agentHermes, Enabled: true}}}
-	if got := checkHermesHooks(home, cfg); got.status != checkStatusPass {
-		t.Fatalf("got %#v, want pass when no hooks target hermes", got)
-	}
-	writeSyncTestFile(t, filepath.Join(home, ".hermes", "config.yaml"), []byte("model: x\nhooks: {}\n"))
-	if got := checkHermesHooks(home, cfg); got.status != checkStatusPass {
-		t.Fatalf("got %#v, want pass for an empty hooks section with no hermes hooks", got)
-	}
-	cfg.Hooks = []hookConfig{{Name: "h", Enabled: true}}
-	if got := checkHermesHooks(home, cfg); got.status != checkStatusWarn {
-		t.Fatalf("got %#v, want warn when a hook targets hermes but none is configured", got)
 	}
 }
 

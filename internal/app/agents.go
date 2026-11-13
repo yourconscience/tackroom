@@ -31,7 +31,10 @@ func expectedAgentRoles(repoRoot string, agent agentConfig) (map[string]rendered
 
 	rendered := make(map[string]renderedAgentRole)
 	for _, role := range roles {
-		target, content, ok := renderAgentRole(role, agent)
+		target, content, ok, err := renderAgentRole(role, agent)
+		if err != nil {
+			return nil, err
+		}
 		if !ok {
 			continue
 		}
@@ -45,16 +48,20 @@ func expectedAgentRoles(repoRoot string, agent agentConfig) (map[string]rendered
 	return rendered, nil
 }
 
-func renderAgentRole(role agentrole.Role, agent agentConfig) (string, string, bool) {
+func renderAgentRole(role agentrole.Role, agent agentConfig) (string, string, bool, error) {
 	h := harnessFor(agent.Name)
 	if h == nil || h.roles == nil {
-		return "", "", false
+		return "", "", false, nil
 	}
 	if role.Model == "" && agent.RoleModel != "" {
 		role.Model = agent.RoleModel
 	}
 	target := filepath.Join(agent.AgentRoot, role.Name+h.roles.Extension())
-	return target, h.roles.Render(role), true
+	content, err := h.roles.Render(role)
+	if err != nil {
+		return "", "", false, err
+	}
+	return target, content, true, nil
 }
 
 func inspectAgentRoles(report *agentReport, repoRoot string, agent agentConfig) error {

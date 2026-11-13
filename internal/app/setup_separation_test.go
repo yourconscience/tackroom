@@ -148,40 +148,6 @@ func TestDetectDefaultAgentsFromPATH(t *testing.T) {
 	}
 }
 
-func TestMemoryTierDefinitionsAndMemsearchDependency(t *testing.T) {
-	home := t.TempDir()
-	root := filepath.Join(home, ".agents")
-	cfg := config{Version: 1, Agents: []agentConfig{
-		{Name: agentClaudeCode, Enabled: true, SkillRoot: filepath.Join(home, ".claude", "skills")},
-		{Name: agentCodex, Enabled: true, SkillRoot: filepath.Join(home, ".codex", "skills")},
-		{Name: agentDroid, Enabled: true, SkillRoot: filepath.Join(home, ".factory", "skills")},
-		{Name: agentHermes, Enabled: true, SkillRoot: filepath.Join(home, ".hermes", "skills")},
-	}, Hooks: []hookConfig{{Name: "memory-stop", Event: "Stop", Command: "old", Agents: []string{agentClaudeCode}}, {Name: "keep", Event: "SessionStart", Command: "custom", Agents: []string{agentCodex}}}}
-	if err := applyMemoryTier(&cfg, memoryTierOff, root, home); err != nil {
-		t.Fatal(err)
-	}
-	if len(cfg.Hooks) != 1 || cfg.Hooks[0].Name != "keep" {
-		t.Fatalf("off hooks = %#v, want only custom hook", cfg.Hooks)
-	}
-	if err := applyMemoryTier(&cfg, memoryTierBasic, root, home); err != nil {
-		t.Fatal(err)
-	}
-	if len(cfg.Hooks) != 3 || cfg.Hooks[1].Event != "SessionStart" || cfg.Hooks[1].Command != "~/.agents/memory/hooks/basic-session-start.py" || !stringSlicesEqual(cfg.Hooks[1].Agents, []string{agentClaudeCode, agentCodex, agentDroid, agentHermes}) || cfg.Hooks[2].Event != "SessionEnd" || !stringSlicesEqual(cfg.Hooks[2].Agents, []string{agentClaudeCode, agentCodex, agentDroid, agentHermes}) || strings.Contains(strings.Join([]string{cfg.Hooks[1].Command, cfg.Hooks[2].Command}, " "), "stop.sh") {
-		t.Fatalf("basic hooks = %#v", cfg.Hooks)
-	}
-	fakePath(t)
-	if err := applyMemoryTier(&cfg, memoryTierMemsearch, root, home); err == nil || !strings.Contains(err.Error(), "requires the memsearch binary") {
-		t.Fatalf("memsearch without binary error = %v", err)
-	}
-	fakePath(t, "memsearch")
-	if err := applyMemoryTier(&cfg, memoryTierMemsearch, root, home); err != nil {
-		t.Fatal(err)
-	}
-	if len(cfg.Hooks) != 6 || cfg.Hooks[1].Command != "~/.agents/memory/hooks/session-start.sh" || !stringSlicesEqual(cfg.Hooks[1].Agents, []string{agentClaudeCode, agentCodex, agentDroid}) || cfg.Hooks[2].Command != "~/.agents/memory/hooks/stop.sh" || !stringSlicesEqual(cfg.Hooks[2].Agents, []string{agentClaudeCode, agentCodex, agentDroid}) || cfg.Hooks[3].Command != "~/.agents/memory/hooks/session-end.sh" || !stringSlicesEqual(cfg.Hooks[3].Agents, []string{agentClaudeCode, agentCodex, agentDroid, agentHermes}) || cfg.Hooks[4].Name != "memory-hermes-vault-to-memory" || cfg.Hooks[4].Command != "~/.agents/memory/hooks/sync-vault-to-memory.sh" || !stringSlicesEqual(cfg.Hooks[4].Agents, []string{agentHermes}) || cfg.Hooks[5].Name != "memory-hermes-memory-to-vault" || cfg.Hooks[5].Command != "~/.agents/memory/hooks/sync-memory-to-vault.sh" || !stringSlicesEqual(cfg.Hooks[5].Agents, []string{agentHermes}) {
-		t.Fatalf("memsearch hooks = %#v", cfg.Hooks)
-	}
-}
-
 func TestNativeImportSkillCopyRoleConversionMCPRedactionConflictAndPreservesNativeInputs(t *testing.T) {
 	home := t.TempDir()
 	root := t.TempDir()

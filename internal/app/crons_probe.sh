@@ -3,6 +3,9 @@
 # line. It only lists, reads and prints; it never writes on the host. tackroom
 # parses the sections locally.
 T="$1"
+# Optional $2: an owned unit id. Then only the scheduler state that can hold
+# that unit is read, which keeps `tackroom status` cheap.
+only="$2"
 sec() { printf '\n%s %s\t%s\n' "$T" "$1" "$2"; }
 run() { kind=$1; key=$2; shift 2; sec "$kind" "$key"; "$@" 2>&1; rc=$?; sec rc "$rc"; }
 mtime() { stat -c %Y "$1" 2>/dev/null || stat -f %m "$1"; }
@@ -31,7 +34,9 @@ uid=$(id -u)
 
 if [ "$os" = Darwin ]; then
 	run launchd-disabled "" launchctl print-disabled "gui/$uid"
-	for f in "$HOME"/Library/LaunchAgents/*.plist; do
+	pat="*"
+	[ -n "$only" ] && pat="dev.tackroom.$only"
+	for f in "$HOME"/Library/LaunchAgents/$pat.plist; do
 		[ -e "$f" ] || continue
 		run plist "$f" plutil -convert json -o - "$f"
 		label=$(plutil -extract Label raw -o - "$f" 2>/dev/null)
@@ -47,21 +52,16 @@ fi
 
 if [ "$os" = Linux ] && command -v systemctl >/dev/null 2>&1; then
 	run timers "" systemctl --user list-timers --all --output=json
-	for t in $(systemctl --user list-units --type=timer --all --no-legend --plain 2>/dev/null | awk '{print $1}'); do
+	timers=$(systemctl --user list-units --type=timer --all --no-legend --plain 2>/dev/null | awk '{print $1}')
+	[ -n "$only" ] && timers=$(printf '%s\n' "$timers" | grep -x "tackroom-$only.timer")
+	for t in $timers; do
 		run timer "$t" systemctl --user show "$t" -p Id -p TimersCalendar -p TimersMonotonic -p Triggers -p ActiveState -p FragmentPath
 		svc=$(systemctl --user show "$t" -p Triggers --value 2>/dev/null)
 		[ -n "$svc" ] && run service "$t" systemctl --user show "$svc" -p ExecStart -p ExecMainStatus -p ExecMainStartTimestamp -p Result -p StandardOutput
 	done
 fi
 
-h="$HOME/.hermes/cron"
-if [ -e "$h/jobs.json" ]; then
-	run hermes-jobs "" cat "$h/jobs.json"
-	for f in executions.db executions.db-wal; do
-		[ -e "$h/$f" ] && run hermes-db "$f" b64 "$h/$f"
-	done
-	[ -e "$h/ticker_heartbeat" ] && run hermes-heartbeat "" cat "$h/ticker_heartbeat"
-fi
+[ -n "$only" ] && exit 0
 
 c="$HOME/.codex/sqlite"
 if [ -e "$c/codex-dev.db" ]; then

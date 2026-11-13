@@ -80,7 +80,7 @@ func ownerRepo(url string) string {
 }
 
 // integrationMissing returns report.Missing entries that are integration-level
-// messages rather than skill names. Config-driven harnesses (Amp, Hermes,
+// messages rather than skill names. Config-driven harnesses (Amp,
 // Qwen) record these when their skills configuration is absent, while still
 // listing every expected skill as managed.
 func integrationMissing(report agentReport) []string {

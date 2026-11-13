@@ -564,6 +564,33 @@ func saveConfigDocument(path string, home string, cfg config) error {
 	}
 }
 
+// setLocalPeriodicSync records the periodic_sync choice in tackroom.local.yaml,
+// the per-machine overlay. false disables the job and its "off" warning; true
+// removes the key so the default (true) applies again. Only that key changes:
+// every other field and comment in the local file is preserved, and the file is
+// created when missing. The local overlay wins over tackroom.yaml.
+func setLocalPeriodicSync(configPath, home string, enabled bool) error {
+	doc, err := newConfigDocument(configPath, home)
+	if err != nil {
+		return err
+	}
+	var op configOperation
+	if enabled {
+		node, err := doc.layerNode(configLayerLocal)
+		if err != nil {
+			return err
+		}
+		if mappingValue(rootMapping(&node), "periodic_sync") == nil {
+			return nil
+		}
+		op = configOperation{Op: "remove", Path: "/periodic_sync"}
+	} else {
+		op = configOperation{Op: "set", Path: "/periodic_sync", Value: json.RawMessage("false")}
+	}
+	_, err = doc.applyOperations(configLayerLocal, doc.revision(configLayerLocal), []configOperation{op})
+	return err
+}
+
 func rootMapping(node *yaml.Node) *yaml.Node {
 	if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
 		return node.Content[0]

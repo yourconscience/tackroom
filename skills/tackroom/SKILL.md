@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, OpenClaw, DeepSeek Harness (dsh), Hermes, Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Droid, OpenCode, Qwen Code, Pi, and OMP. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
 ---
 
 # tackroom
@@ -18,24 +18,28 @@ Never infer configuration from the current project. Never replace a user's confi
 ## Commands
 
 ```bash
-tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--dry-run] [--json]
-tackroom status [--verbose] [--agents ...]
-tackroom sync [--pull] [--agents ...]
+tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--no-cron] [--dry-run] [--json]
+tackroom status [--verbose] [--exit-code] [--agents ...]
+tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]
 tackroom doctor [--e2e] [--agents ...]
+tackroom doctor audit [--json]                  # findings per item; exit 1 on an unaccepted CRITICAL in external content
+tackroom doctor audit accept <item> <rule> --reason "..."   # record an audit decision; item is kind:name, e.g. skill:foo
+tackroom doctor audit revoke <item> <rule>
 tackroom config validate
 tackroom config print
-tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host]
+tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]
 tackroom skill new <name> [--description ...]
 tackroom skill list [--agents ...]
 tackroom skill info <name>
 tackroom skill sources [--json]
 tackroom skill sources search <query> [--json]
 tackroom skill sources add <owner/repo[/path] | git URL> [--skills a,b | --all] [--latest] [--name N] [--no-sync]
-tackroom skill update [name ...]
-tackroom skill promote <name-or-path> [--dry-run]
+tackroom skill update [name ...] [--allow-fresh[=item,...]]
 tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]
 tackroom mcp <list|add|import|remove> [options]
 tackroom restore [<backup> | latest] [--dry-run]
+tackroom pull [options]        # git pull --ff-only, then sync; what the periodic job runs
+tackroom cron [--interval 15m|--deps|--remove]   # periodic sync job, installed by setup; default 15m
 tackroom cron collect [--hosts local,HOST...] [--table] # read-only scheduled-job inventory
 tackroom cron apply [--dry-run]       # install crons.jobs entries with schedule+command as launchd, systemd or crontab units
 tackroom cron run|pause|resume [--host HOST] ID   # act on a launchd job, here or over SSH
@@ -50,8 +54,8 @@ unmanaged items in agent folders, and a YAML editor. It edits shared YAML or the
 machine-local overlay; effective configuration is read-only. Each toggle
 applies immediately, and `view` never runs `sync` implicitly. It binds only to
 loopback and uses a session cookie plus CSRF and origin protection. `config`
-validates or prints the result. HarnessKit (`hk serve`) and AgentsView
-(`agentsview serve`) are optional companion tools that you run on their own.
+validates or prints the result. AgentsView (`agentsview serve`) is an optional
+companion tool that you run on its own.
 
 Run `tackroom help --all` for maintenance commands.
 
@@ -66,8 +70,9 @@ First-run setup:
 5. Shows an interactive review screen: share, keep harness-specific, or skip per item; items identical across harnesses are shared automatically. Imports are copy or conversion only; originals remain untouched.
 6. In non-interactive runs it falls back to sequential prompts; `--yes` answers every prompt with its default and never reads stdin, `--dry-run` prints candidates and exits without changes, `--json` emits the detection result and exits.
 7. Registers the chosen memory tier.
-8. Patches only the required native harness settings.
-9. Runs the first sync.
+8. Installs the periodic sync job (`tackroom pull` every 15 minutes), unless `--no-cron`.
+9. Patches only the required native harness settings.
+10. Runs the first sync.
 
 Setup also imports existing instructions files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, ...) into `~/.agents/AGENTS.md`, then backs up the originals to `~/.local/state/tackroom/backups/<time>/` and links them.
 
@@ -91,17 +96,7 @@ Memory tiers:
 - `basic` (default): Python-3-only bounded Markdown digests under `$KNOWLEDGE_DIR/sessions/` plus recent context at session start.
 - `memsearch`: the indexed SessionStart, Stop, and SessionEnd pipeline; requires `memsearch` on `PATH`.
 
-For Hermes, the `memsearch` tier also keeps the built-in memory files and the
-knowledge vault in sync: `sync-vault-to-memory.sh` runs at session start,
-`session-end.sh` captures the session digest at finalize, and
-`sync-memory-to-vault.sh` exports durable memory at finalize. The generic
-`session-start.sh` is not registered for Hermes because its Claude-style
-context response is not consumed by Hermes; Hermes injects the synchronized
-built-in memory natively instead.
-
-Verify the complete setup with `tackroom doctor --e2e`, then run
-`hermes hooks doctor`. Hermes hook approval is host-local and may require one
-interactive approval after setup.
+Verify the complete setup with `tackroom doctor --e2e`.
 
 ## status
 
@@ -112,13 +107,13 @@ Reports each configured harness as detected or not detected and compares the fou
 - hooks
 - agent roles
 
-Missing, drifted, conflicting, stale managed, and unrelated external entries are reported separately.
+Missing, drifted, conflicting, stale managed, and unrelated external entries are reported separately. `--exit-code` exits 0 in sync, 1 on drift, 2 on error; held and blocked items do not count as drift.
 
 ## sync
 
 Reconciles only configured managed entries. Unrelated native content remains untouched.
 
-For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Hermes uses `skills.external_dirs: ["~/.agents/skills"]`; Qwen Code uses `skills.directories: ["~/.agents/skills"]`. Both consume the canonical tree without creating a duplicate mirror. OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, OpenClaw and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
+For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Qwen Code uses `skills.directories: ["~/.agents/skills"]` and consumes the canonical tree without creating a duplicate mirror. OpenCode, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
 
 Agent roles are canonical Markdown files under `~/.agents/agents/` and render to:
 
@@ -138,11 +133,13 @@ Pi always has managed skills. With `pi-subagents` installed, tackroom renders ca
 
 For MCP servers, sync patches only named canonical entries and preserves unrelated native servers. A server sync wrote earlier and that is no longer wanted for an agent (removed from `tackroom.yaml`, disabled, or dropped from its `agents`) shows as `mcp stale` in `status` and is removed by the next `sync`, after the native config file is copied to `~/.local/state/tackroom/backups/<time>/`. Sync never claims an entry the agent already had; `mcp remove` also claims native entries that still match the definition it removes. Import redacts literal environment values to `${KEY}` references and names the redacted keys; the source agent keeps its values. Other target agents get the literal `${KEY}`, which they may not expand: put the real value in their native config (sync never replaces a value with a reference) or import with `--agents <source>`. List output never prints values.
 
-For hooks, sync registers only declared entries on harnesses with verified hook support. Host-local review and approval state remains outside tackroom; Hermes keys first-use consent by the exact event and command and reports script mtime drift through `hermes hooks doctor`.
+For hooks, sync registers only declared entries on harnesses with verified hook support. Host-local review and approval state remains outside tackroom.
 
 Claude Code plugins (mods, workflows, monitors, output styles, LSP, `bin/`) stay in Claude's native layout under the config root, listed in `<config-root>/.claude-plugin/marketplace.json`. `sync` registers that directory as a marketplace in `~/.claude/settings.json` (`extraKnownMarketplaces`) and enables each relative-path entry (`enabledPlugins`). Claude Code reads it in place: edit, then `/reload-plugins`. User disables (kept across a marketplace rename) and `defaultEnabled: false` are respected; stale enable keys are pruned and removing the marketplace file removes the registration. A name already registered with another source, or a malformed file, is a conflict and nothing is written. `doctor` runs `claude plugin validate` on it when Claude Code is detected.
 
 `sync --pull` runs `git pull --ff-only` in the private canonical repository before reconciliation.
+
+`sync --dry-run` prints the plan a real sync would apply, including held and blocked items, and writes nothing (it fetches nothing and makes no registry lookups). `sync --allow-fresh` releases held fresh items, all or a comma list with `--allow-fresh=item,...`, optionally recording `--reason "..."`; held and blocked items do not count as drift.
 
 ## External skills
 
@@ -181,7 +178,7 @@ publish_targets:
 tackroom mcp list
 tackroom mcp add local --command uvx --arg pkg@1.2.3 --env KEY=value
 tackroom mcp add docs --url https://mcp.example.com/mcp --header 'Authorization: Bearer ${DOCS_TOKEN}'  # remote: Claude Code, Codex, Pi, Grok, Cursor, Gemini CLI
-tackroom mcp import claude local --agents=codex,hermes,droid,pi,omp
+tackroom mcp import claude local --agents=codex,droid,pi,omp
 tackroom sync
 tackroom mcp remove local
 tackroom sync                     # removes it from agents where tackroom wrote it or it still matches
@@ -197,9 +194,11 @@ Runs sync, status, and doctor as one health check. It fails on drift, conflicts,
 tackroom doctor --e2e
 ```
 
+`doctor audit` lists findings per item (`skill:`, `plugin:`, `role:`, `hook:`, `mcp:`, `package:`) and exits 1 when an external item has an unaccepted CRITICAL finding. Use `doctor audit accept <item> <rule> --reason "..."` to record a decision (stored in `tackroom.lock` under `accepted:`) and `doctor audit revoke <item> <rule>` to undo one.
+
 ## view
 
-Opens the canonical config UI in your browser: the review-first authoring surface, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no HarnessKit, Node, or separate daemon). Views: Overview (agent cards with sync state, counts and estimated skill-listing tokens), Skills and Roles (matrices of what is on disk per agent), MCP & hooks (toggle an entry or the agents it targets), Unmanaged (foreign skills, conflicts, stale links with the next command), Crons (scheduled jobs and failing services on the hosts in `crons.hosts`, the same data as `tackroom cron collect`, with Run now, Pause and Resume for launchd jobs and a schedule field for owned ones), and Config (edit, check and save the YAML). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step in which every destructive item must be ticked. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
+Opens the canonical config UI in your browser: the review-first authoring surface, served over a loopback-only HTTP listener embedded in the `tackroom` binary (no Node or separate daemon). Views: Overview (agent cards with sync state, counts and estimated skill-listing tokens), Skills and Roles (matrices of what is on disk per agent), MCP & hooks (toggle an entry or the agents it targets), Unmanaged (foreign skills, conflicts, stale links with the next command), Crons (scheduled jobs and failing services on the hosts in `crons.hosts`, the same data as `tackroom cron collect`, with Run now, Pause and Resume for launchd jobs and a schedule field for owned ones), and Config (edit, check and save the YAML). It authors the shared YAML and the machine-local overlay, shows a read-only effective merge, guards saves by revision, and keeps sync as a separate preview/confirm step in which every destructive item must be ticked. Loopback-only bind, tokenized startup URL bootstrapped into an `HttpOnly`, `SameSite=Strict` session cookie, plus CSRF and origin checks on mutations.
 
 It prints the tokenized URL on its own line and, when running locally, opens it in your default browser. `--no-open` suppresses the browser launch. `--addr` sets the loopback bind (default `127.0.0.1:8765`). `--secure-cookie` serves an HTTPS proxy such as `tailscale serve`: requests through it get `Secure` cookies and https origin checks, while direct loopback requests keep working over http. The token is kept in `view.token` under `$XDG_STATE_HOME/tackroom` (`~/.local/state/tackroom`) or `--token-file`, so the URL survives restarts; `tackroom view` opens an already running view instead of starting another (it finds one at the last recorded address unless `--addr` is given), and a long-running view restarts itself when the `tackroom` binary is upgraded. On a remote host, pass `--ssh-host user@host` (or run inside an SSH session, where it derives the host from `SSH_CONNECTION`) to print a ready `ssh -L` tunnel command instead of auto-opening.
 
@@ -209,7 +208,6 @@ tackroom view --no-open --addr 127.0.0.1:8765        # print the URL, do not ope
 tackroom view --ssh-host me@box                      # remote: print an ssh -L tunnel command
 ```
 
-Legacy HarnessKit flags on `view` (`--port`, `--host`, `--no-token`) are rejected with a one-line pointer to running HarnessKit itself (`hk serve`); they do not launch it.
 
 ## Capability matrix
 
@@ -218,16 +216,16 @@ Legacy HarnessKit flags on `view` (`--port`, `--host`, `--no-token`) are rejecte
 | Claude Code | yes | yes | yes | yes |
 | Codex | yes | yes | yes | yes |
 | Factory Droid | yes | yes | yes | yes |
-| Hermes | yes, config-driven | no | yes | yes |
 | OpenCode | yes | yes | yes | no |
 | Pi | yes | yes, via `pi-subagents` | yes, native since Pi 1.0 | no |
 | OMP | yes | yes | yes | no |
 | Qwen Code | yes, config-driven | yes | yes | yes |
 | Cursor | yes | yes | yes, `~/.cursor/mcp.json` | yes, `~/.cursor/hooks.json` |
 | GitHub Copilot CLI | yes | yes | yes, `~/.copilot/mcp-config.json` | yes, `~/.copilot/hooks/tackroom.json` |
+| Kimi Code | yes | yes | yes, `~/.kimi-code/mcp.json` | yes, `~/.kimi-code/config.toml` |
 | Grok Build | yes | yes | yes, `~/.grok/config.toml` | yes, `~/.grok/hooks/tackroom.json` |
 | Gemini CLI | yes | yes | yes, `~/.gemini/settings.json` | yes, `~/.gemini/settings.json` |
-| OpenClaw | yes | no | yes, `~/.openclaw/openclaw.json` `mcp.servers` | no |
+| Antigravity CLI | yes | no | yes, `~/.gemini/config/mcp_config.json` | yes, `~/.gemini/config/hooks.json` |
 | DeepSeek Harness | yes | no | yes, `tackroom-mcp-*` rows in `~/.dsh/cordis.patch.yml` | no |
 
 Do not add a surface without a verified native adapter and focused tests.

@@ -10,7 +10,6 @@ import (
 	"sort"
 
 	"github.com/BurntSushi/toml"
-	"gopkg.in/yaml.v3"
 )
 
 // mcpOwnership is the machine-local record of the MCP servers sync wrote into
@@ -224,32 +223,6 @@ func removeCodexMCPServer(target mcpTarget, name string, home string) error {
 	return nil
 }
 
-func removeYAMLMCPServer(target mcpTarget, name string, home string) error {
-	configPath := target.configPath(home)
-	data, err := os.ReadFile(configPath)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var doc yaml.Node
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	if len(doc.Content) == 0 || !deleteMappingKey(dshMappingValue(doc.Content[0], target.rootKey), name) {
-		return nil
-	}
-	out, err := marshalYAMLNode(&doc)
-	if err != nil {
-		return fmt.Errorf("marshal %s: %w", configPath, err)
-	}
-	if err := os.WriteFile(configPath, out, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return nil
-}
-
 func removeDSHMCPServer(_ mcpTarget, name string, home string) error {
 	path := dshPatchPath(home)
 	doc, err := loadDSHPatch(path)
@@ -262,19 +235,4 @@ func removeDSHMCPServer(_ mcpTarget, name string, home string) error {
 	}
 	list.Content = append(list.Content[:index], list.Content[index+1:]...)
 	return writeDSHPatch(path, doc)
-}
-
-// deleteMappingKey removes key from a YAML mapping node and reports whether
-// it was there.
-func deleteMappingKey(mapping *yaml.Node, key string) bool {
-	if mapping == nil || mapping.Kind != yaml.MappingNode {
-		return false
-	}
-	for i := 0; i+1 < len(mapping.Content); i += 2 {
-		if mapping.Content[i].Value == key {
-			mapping.Content = append(mapping.Content[:i], mapping.Content[i+2:]...)
-			return true
-		}
-	}
-	return false
 }

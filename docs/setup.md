@@ -8,6 +8,7 @@
 4. Imports the instructions you already have (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and so on) into `~/.agents/AGENTS.md`: one file is copied as is, several different ones are kept in full under a heading each for you to merge. Without any, no `AGENTS.md` is created and every agent keeps its own file.
 5. Before its first sync touches a harness that already has content, shows exactly what would be removed or overwritten there and asks per harness. Declining keeps that harness's files. Native files that differ from the shared copy (your old instructions, a skill imported from another agent) are listed and, once you agree, moved to `~/.local/state/tackroom/backups/<time>/` and linked.
 6. Offers to `git init` the new repository, and runs the first sync.
+7. Installs the periodic sync job (`tackroom pull` every 15 minutes). Pass `--no-cron` to skip it; `tackroom cron` installs or removes it later, and `status` and `doctor` warn while it is missing or off.
 
 `--yes` answers every prompt with its default and never reads stdin, so an agent or script can run setup unattended: it imports everything, initializes git, backs up and links differing files, and keeps existing content wherever the safe answer is no.
 
@@ -61,6 +62,22 @@ tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765
 tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
 ```
 
+## Per-harness settings
+
+Per-harness settings are declared under `settings:` on each agent, a map of dotted key to value written into that harness's own settings file. Supported: `claude` (`~/.claude/settings.json`), `pi` (`~/.pi/agent/settings.json`), `omp` (`~/.omp/agent/config.yml`). Other harnesses report `settings unsupported` and ignore the block.
+
+```yaml
+agents:
+  - name: claude
+    enabled: true
+    detect: claude
+    settings:
+      model: opus
+      api_token: ${API_TOKEN}   # must be a single ${VAR} reference
+```
+
+Only declared keys are written; every other key in the file is preserved. A key whose last segment is a secret word (token, secret, password, apikey, authorization, credential, in any casing) must be a single `${VAR}` reference; `${VAR}` expands at sync time, an unset variable fails that harness and writes nothing, and expanded values never appear in output. Keys tackroom manages elsewhere (Pi `packages`; Claude `hooks`, `enabledPlugins`, `extraKnownMarketplaces`, `mcpServers`) are refused. The file is backed up before the first modifying write, and `tackroom restore` lists and restores it. Removing a key from `settings:` leaves the native value in place.
+
 ## Managed starter files
 
 `setup` copies the starter content into the config root once. The memory code layer under `memory/hooks/` and `memory/lib/` stays managed afterwards: on every `sync`, tackroom
@@ -90,9 +107,13 @@ tackroom setup --memory memsearch
 | `basic` | appends a bounded digest of each session to `$KNOWLEDGE_DIR/sessions/YYYY-MM-DD.md` and injects recent digests as context at session start | Python 3 |
 | `memsearch` | full-text indexed search over the knowledge vault | `memsearch` on PATH (`uv tool install memsearch`) |
 
+## Periodic sync
+
+`setup` installs an owned job, `tackroom-pull`, that runs `tackroom pull` every 15 minutes: `git pull --ff-only`, then `sync`. A pull failure prints one warning and the sync still runs. Pass `--no-cron` to skip installing it, and `tackroom cron` installs, changes or removes it later (`tackroom cron --interval 15m`, `--deps`, `--remove`). Re-run `tackroom cron` after a PATH change, since the job runs the tackroom binary with the PATH of the shell that installed it. While the job is missing, paused, broken, or its last run failed, `status` prints a warning line and `doctor` has a "periodic sync" check. Without it, edited root instruction files reach the harnesses that read `AGENTS.md` natively only on a manual `tackroom sync`.
+
 ## Root instructions
 
-`~/.agents/AGENTS.md` is your single root instruction file. During sync, tackroom links it into each harness's native memory path — `~/.config/amp/AGENTS.md` for Amp, `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex, `~/.factory/AGENTS.md` for Droid, `~/.pi/agent/AGENTS.md` for Pi, `~/.omp/agent/AGENTS.md` for OMP, `~/.hermes/SOUL.md` for Hermes (its only always-loaded file; Hermes seeds a default there, so the first sync reports it as a conflict), `~/.qwen/QWEN.md` for Qwen Code, `~/.copilot/copilot-instructions.md` for GitHub Copilot CLI, `~/.grok/AGENTS.md` for Grok Build, `~/.gemini/GEMINI.md` for Gemini CLI, and `~/.dsh/AGENTS.md` for DeepSeek Harness (Cursor has no global instructions file, and OpenClaw's workspace `AGENTS.md` is its assistant persona, so tackroom leaves it alone; `$COPILOT_HOME`, `$GROK_HOME` and `$DSH_HOME` replace `~/.copilot`, `~/.grok` and `~/.dsh` when set) — so an edit in one place reaches every agent. Without `~/.agents/AGENTS.md`, tackroom leaves every agent's instructions file alone. `tackroom status` reports drift; a real file with different content is never replaced without your confirmation, and then only after a backup (`setup`, or `sync --replace-conflicts`). An identical copy is simply relinked.
+`~/.agents/AGENTS.md` is your single root instruction file. During sync, tackroom links it into each harness's native memory path: `~/.config/amp/AGENTS.md` for Amp, `~/.claude/CLAUDE.md` for Claude Code, `~/.codex/AGENTS.md` for Codex, `~/.factory/AGENTS.md` for Droid, `~/.pi/agent/AGENTS.md` for Pi, `~/.omp/agent/AGENTS.md` for OMP, `~/.qwen/QWEN.md` for Qwen Code, `~/.copilot/copilot-instructions.md` for GitHub Copilot CLI, `~/.grok/AGENTS.md` for Grok Build, `~/.gemini/GEMINI.md` for Gemini CLI and Antigravity CLI, and `~/.dsh/AGENTS.md` for DeepSeek Harness. Cursor has no global instructions file, and Kimi Code reads `~/.agents/AGENTS.md` natively, so no root file is written for it; `$COPILOT_HOME`, `$GROK_HOME` and `$DSH_HOME` replace `~/.copilot`, `~/.grok` and `~/.dsh` when set. So an edit in one place reaches every agent. Without `~/.agents/AGENTS.md`, tackroom leaves every agent's instructions file alone. `tackroom status` reports drift; a real file with different content is never replaced without your confirmation, and then only after a backup (`setup`, or `sync --replace-conflicts`). An identical copy is simply relinked.
 
 ### Extra instruction files
 

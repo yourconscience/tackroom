@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/BurntSushi/toml"
-	"gopkg.in/yaml.v3"
 )
 
 type hookConfig struct {
@@ -28,7 +27,6 @@ type hookTarget struct {
 
 const (
 	codexSessionEndMaxTimeout = 3
-	hermesMaxHookTimeout      = 300
 )
 
 func desiredHooksForAgent(cfg config, agentName string) ([]hookConfig, bool) {
@@ -156,66 +154,6 @@ func patchClaudeHook(hook hookConfig, home string) error {
 	return nil
 }
 
-func inspectHermesHook(hook hookConfig, home string) (string, error) {
-	nativeEvent, ok := hermesHookEvent(hook.Event)
-	if !ok {
-		return stateUnsupported, nil
-	}
-	hook = nativeHermesHook(hook)
-	configPath := filepath.Join(home, ".hermes", "config.yaml")
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return stateMissing, nil
-		}
-		return stateMissing, fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return stateMissing, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	return inspectSimpleHookMap(raw, "hooks", nativeEvent, hook), nil
-}
-
-func patchHermesHook(hook hookConfig, home string) error {
-	nativeEvent, ok := hermesHookEvent(hook.Event)
-	if !ok {
-		return fmt.Errorf("unsupported hermes hook event %q for %s", hook.Event, hook.Name)
-	}
-	hook = nativeHermesHook(hook)
-	configPath := filepath.Join(home, ".hermes", "config.yaml")
-	data, err := os.ReadFile(configPath)
-	raw := map[string]interface{}{}
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("read %s: %w", configPath, err)
-		}
-	} else if err := yaml.Unmarshal(data, &raw); err != nil {
-		return fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	if err := upsertSimpleHookMap(raw, "hooks", nativeEvent, hook); err != nil {
-		return fmt.Errorf("patch %s: %w", configPath, err)
-	}
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshal %s: %w", configPath, err)
-	}
-	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", filepath.Dir(configPath), err)
-	}
-	if err := os.WriteFile(configPath, out, 0o644); err != nil {
-		return fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return nil
-}
-
-func nativeHermesHook(hook hookConfig) hookConfig {
-	if hook.Timeout > hermesMaxHookTimeout {
-		hook.Timeout = hermesMaxHookTimeout
-	}
-	return hook
-}
-
 func inspectCodexHook(hook hookConfig, home string) (string, error) {
 	state, err := inspectNestedJSONHook(codexHooksConfigPath(home), nativeCodexHook(hook))
 	if err != nil || state != stateSynced {
@@ -291,9 +229,6 @@ func removeNativeManagedMemoryHooks(home string, root string, prior config, curr
 		func(home string, commands []string) (bool, error) {
 			return removeGroupedJSONHookCommands(qwenSettingsPath(home), commands)
 		},
-		func(home string, commands []string) (bool, error) {
-			return removeSimpleYAMLHookCommands(filepath.Join(home, ".hermes", "config.yaml"), commands)
-		},
 	}
 	for _, remove := range removers {
 		didChange, err := remove(home, commands)
@@ -304,8 +239,35 @@ func removeNativeManagedMemoryHooks(home string, root string, prior config, curr
 			changed++
 		}
 	}
+	entryRemovers := []struct {
+		path   string
+		agent  string
+		remove func(string, []nativeHookEntry) (bool, error)
+	}{
+		{agyHooksConfigPath(home), agentAgy, removeAgyNativeHookEntries},
+		{kimiConfigPath(home), agentKimi, removeKimiNativeHookEntries},
+	}
+	for _, target := range entryRemovers {
+		var entries []nativeHookEntry
+		for _, event := range memoryHookEvents {
+			for _, command := range commands {
+				entries = append(entries, nativeHookEntry{Agent: target.agent, Event: event, Command: command, ConfigPath: target.path})
+			}
+		}
+		didChange, err := target.remove(target.path, entries)
+		if err != nil {
+			return changed, err
+		}
+		if didChange {
+			changed++
+		}
+	}
 	return changed, nil
 }
+
+// memoryHookEvents are the events the managed memory hooks register, used to
+// match per-entry adapters that key removal on event plus command.
+var memoryHookEvents = []string{"SessionStart", "Stop", "SessionEnd"}
 
 func managedMemoryNativeCommands(home string, root string, cfgs ...config) []string {
 	seen := make(map[string]struct{})
@@ -356,31 +318,6 @@ func removeGroupedJSONHookCommands(configPath string, commands []string) (bool, 
 		return false, fmt.Errorf("marshal %s: %w", configPath, err)
 	}
 	out = append(out, '\n')
-	if err := os.WriteFile(configPath, out, 0o644); err != nil {
-		return false, fmt.Errorf("write %s: %w", configPath, err)
-	}
-	return true, nil
-}
-
-func removeSimpleYAMLHookCommands(configPath string, commands []string) (bool, error) {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("read %s: %w", configPath, err)
-	}
-	var raw map[string]interface{}
-	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return false, fmt.Errorf("parse %s: %w", configPath, err)
-	}
-	if !removeSimpleHookCommands(raw, "hooks", commands) {
-		return false, nil
-	}
-	out, err := yaml.Marshal(raw)
-	if err != nil {
-		return false, fmt.Errorf("marshal %s: %w", configPath, err)
-	}
 	if err := os.WriteFile(configPath, out, 0o644); err != nil {
 		return false, fmt.Errorf("write %s: %w", configPath, err)
 	}
@@ -719,34 +656,6 @@ func removeGroupedHookCommands(raw map[string]interface{}, commands []string) bo
 	return changed
 }
 
-func removeSimpleHookCommands(raw map[string]interface{}, rootKey string, commands []string) bool {
-	root, ok := raw[rootKey].(map[string]interface{})
-	if !ok {
-		return false
-	}
-	changed := false
-	for event, itemsRaw := range root {
-		items, ok := itemsRaw.([]interface{})
-		if !ok {
-			continue
-		}
-		filtered, removed := removeHookCommands(items, commands)
-		if !removed {
-			continue
-		}
-		changed = true
-		if len(filtered) == 0 {
-			delete(root, event)
-			continue
-		}
-		root[event] = filtered
-	}
-	if len(root) == 0 {
-		delete(raw, rootKey)
-	}
-	return changed
-}
-
 func hookCommandMatchesAny(actual interface{}, commands []string) bool {
 	for _, command := range commands {
 		if hookCommandMatches(actual, command) {
@@ -810,34 +719,6 @@ func hookTimeoutMatches(item map[string]interface{}, timeout int) bool {
 	}
 }
 
-func hermesHookEvent(event string) (string, bool) {
-	switch event {
-	case "SessionStart":
-		return "on_session_start", true
-	case "SessionEnd":
-		return "on_session_finalize", true
-	case "on_session_start",
-		"pre_llm_call",
-		"post_llm_call",
-		"pre_verify",
-		"pre_approval_request",
-		"post_approval_response",
-		"on_session_end",
-		"on_session_finalize",
-		"on_session_reset",
-		"subagent_start",
-		"subagent_stop",
-		"pre_gateway_dispatch",
-		"pre_tool_call",
-		"post_tool_call",
-		"transform_tool_result",
-		"transform_terminal_output",
-		"transform_llm_output":
-		return event, true
-	default:
-		return "", false
-	}
-}
 func codexHooksFeatureEnabled(home string) bool {
 	data, err := os.ReadFile(filepath.Join(home, ".codex", "config.toml"))
 	if err != nil {

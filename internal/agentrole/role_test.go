@@ -48,7 +48,11 @@ func TestRendererRegistryByteStableOutputs(t *testing.T) {
 			if got := renderer.Extension(); got != test.extension {
 				t.Fatalf("extension = %q, want %q", got, test.extension)
 			}
-			if got := renderer.Render(role); got != test.want {
+			got, err := renderer.Render(role)
+			if err != nil {
+				t.Fatalf("render %s: %v", harness, err)
+			}
+			if got != test.want {
 				t.Fatalf("rendered bytes differ\n--- got ---\n%s--- want ---\n%s", got, test.want)
 			}
 		})
@@ -99,7 +103,10 @@ func TestRendererModelFallbackRules(t *testing.T) {
 	for harness, assertions := range tests {
 		t.Run(harness, func(t *testing.T) {
 			renderer, _ := Lookup(harness)
-			got := renderer.Render(base)
+			got, err := renderer.Render(base)
+			if err != nil {
+				t.Fatalf("render %s: %v", harness, err)
+			}
 			for _, assertion := range assertions {
 				if strings.HasPrefix(assertion, "!") {
 					if strings.Contains(got, strings.TrimPrefix(assertion, "!")) {
@@ -142,24 +149,39 @@ func TestNewHarnessRenderersHonorOverrides(t *testing.T) {
 		if !ok {
 			t.Fatalf("no renderer for %s", harness)
 		}
-		got := renderer.Render(role)
+		got, err := renderer.Render(role)
+		if err != nil {
+			t.Fatalf("render %s: %v", harness, err)
+		}
 		for _, want := range wants {
 			if !strings.Contains(got, want) {
 				t.Errorf("%s render missing %q:\n%s", harness, want, got)
 			}
 		}
 	}
-	if got, _ := Lookup("grok"); strings.Contains(got.Render(role), "effort") {
+	grokRenderer, _ := Lookup("grok")
+	grokContent, err := grokRenderer.Render(role)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(grokContent, "effort") {
 		t.Error("grok must drop effort values it does not accept")
 	}
 	generic, _ := Lookup("cursor")
-	if !strings.Contains(generic.Render(Role{Name: "x", Model: "gpt-5.5"}), "model: \"gpt-5.5\"") {
+	genericContent, err := generic.Render(Role{Name: "x", Model: "gpt-5.5"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(genericContent, "model: \"gpt-5.5\"") {
 		t.Error("cursor should pass through a non-tier generic model")
 	}
 }
 
 func TestRenderGeminiLocalSubagent(t *testing.T) {
-	out := renderGemini(Role{Name: "reviewer", Description: "Review code", Tools: []string{"Read", "Grep", "WebSearch"}, Instructions: "Review carefully."})
+	out, err := renderGemini(Role{Name: "reviewer", Description: "Review code", Tools: []string{"Read", "Grep", "WebSearch"}, Instructions: "Review carefully."})
+	if err != nil {
+		t.Fatal(err)
+	}
 	for _, want := range []string{`name: "reviewer"`, "kind: local\n", `- "read_file"`, `- "grep_search"`, `- "google_web_search"`, "Review carefully."} {
 		if !strings.Contains(out, want) {
 			t.Fatalf("missing %q in:\n%s", want, out)

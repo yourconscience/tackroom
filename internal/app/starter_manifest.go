@@ -233,6 +233,20 @@ func reconcileStarterFiles(root string, streams setupIO, confirm bool) (starterC
 }
 
 func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[string][]string, streams setupIO, confirm bool) (starterChanges, error) {
+	return reconcileStarterSetMode(root, shipped, legacy, streams, confirm, false)
+}
+
+// previewStarterFiles reports what reconcileStarterFiles would change without
+// writing, removing or saving anything.
+func previewStarterFiles(root string) (starterChanges, error) {
+	shipped, err := shippedStarterFiles()
+	if err != nil {
+		return starterChanges{}, err
+	}
+	return reconcileStarterSetMode(root, shipped, legacyStarterHashes, setupIO{}, false, true)
+}
+
+func reconcileStarterSetMode(root string, shipped map[string][]byte, legacy map[string][]string, streams setupIO, confirm bool, dryRun bool) (starterChanges, error) {
 	var changes starterChanges
 	manifest, _, err := loadStarterManifest(root)
 	if err != nil {
@@ -247,8 +261,10 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 		disk, err := os.ReadFile(target)
 		switch {
 		case errors.Is(err, fs.ErrNotExist):
-			if err := writeStarterFile(root, path, data); err != nil {
-				return changes, err
+			if !dryRun {
+				if err := writeStarterFile(root, path, data); err != nil {
+					return changes, err
+				}
 			}
 			changes.Scaffolded = append(changes.Scaffolded, path)
 			next[path] = shippedHash
@@ -263,8 +279,10 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 			case (tracked && diskHash == recorded) || hashIn(legacy[path], diskHash):
 				// Untouched content tackroom wrote in this or an earlier
 				// release: safe to refresh.
-				if err := writeStarterFile(root, path, data); err != nil {
-					return changes, err
+				if !dryRun {
+					if err := writeStarterFile(root, path, data); err != nil {
+						return changes, err
+					}
 				}
 				changes.Updated = append(changes.Updated, path)
 				next[path] = shippedHash
@@ -284,7 +302,7 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 		if _, stillShipped := shipped[path]; stillShipped {
 			continue
 		}
-		removed, kept, err := retireStarterFile(root, path, manifest.Files[path], legacy[path], streams, confirm)
+		removed, kept, err := retireStarterFile(root, path, manifest.Files[path], legacy[path], streams, confirm, dryRun)
 		if err != nil {
 			return changes, err
 		}
@@ -303,7 +321,7 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 		if _, tracked := manifest.Files[path]; tracked {
 			continue
 		}
-		removed, kept, err := retireStarterFile(root, path, "", legacy[path], streams, confirm)
+		removed, kept, err := retireStarterFile(root, path, "", legacy[path], streams, confirm, dryRun)
 		if err != nil {
 			return changes, err
 		}
@@ -315,6 +333,9 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 		}
 	}
 
+	if dryRun {
+		return changes, nil
+	}
 	manifest.Files = next
 	if err := saveStarterManifest(root, manifest); err != nil {
 		return changes, err
@@ -324,7 +345,7 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 
 // retireStarterFile removes a managed file that is no longer shipped while its
 // content is still one tackroom wrote, and keeps it otherwise.
-func retireStarterFile(root, path, recorded string, legacy []string, streams setupIO, confirm bool) (bool, bool, error) {
+func retireStarterFile(root, path, recorded string, legacy []string, streams setupIO, confirm bool, dryRun bool) (bool, bool, error) {
 	target := filepath.Join(root, filepath.FromSlash(path))
 	disk, err := os.ReadFile(target)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -339,6 +360,9 @@ func retireStarterFile(root, path, recorded string, legacy []string, streams set
 	}
 	if confirm && !promptYesNoDefaultNo(streams, fmt.Sprintf("remove retired starter file %s?", path)) {
 		return false, true, nil
+	}
+	if dryRun {
+		return true, false, nil
 	}
 	if err := os.Remove(target); err != nil {
 		return false, false, fmt.Errorf("remove %s: %w", path, err)

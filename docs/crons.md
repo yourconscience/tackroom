@@ -12,7 +12,7 @@ Existing tools cover one slice each:
 | --- | --- |
 | Cronicle, Dkron, Windmill | Replace the scheduler; every job has to move inside them. |
 | LaunchControl, Cockpit, crontab-ui | One host and one scheduler. |
-| Harness dashboards (for example Hermes) | Only that harness's jobs. |
+| Harness dashboards (for example Codex automations) | Only that harness's jobs. |
 | Cronitor | Free tier is 5 monitors, and job output leaves the machine. |
 | Uptime Kuma (push monitors) | Heartbeat only; does not understand schedules. |
 | Healthchecks | Sees only jobs that ping it, but has history, alerts, tags and an upsert API. |
@@ -36,7 +36,6 @@ Hosts come from `--hosts`, else `crons.hosts` in `tackroom.local.yaml`, else `cr
 | `launchd` | `~/Library/LaunchAgents/*.plist` via `plutil -convert json -o -` (to stdout, so the file is never rewritten), state via `launchctl print gui/$UID/<label>` | `StartCalendarInterval` or `StartInterval` jobs. `KeepAlive`, `RunAtLoad` and other on-demand agents are services, not schedules; they appear only when their last exit is non-zero, with `state: service`. |
 | `crontab` | `crontab -l` | Every schedule line; `@reboot` is a boot hook and is left out. |
 | `systemd` | `systemctl --user list-timers --all --output=json`, `systemctl --user show` on each timer and its unit | User timers that systemd has loaded. A timer unit file that was installed but never loaded is not listed. |
-| `hermes` | `~/.hermes/cron/jobs.json`, `executions.db`, `ticker_heartbeat` | Every job. An enabled job whose scheduler heartbeat is older than 10 minutes is reported `dead`. |
 | `codex` | `~/.codex/sqlite/codex-dev.db`, tables `automations` and `automation_runs` | Every automation. |
 | `claude-desktop` | `scheduled-tasks.json` under the Claude desktop app's `claude-code-sessions` directory, prompts in `~/.claude/scheduled-tasks/<id>/SKILL.md`, runs from session files that carry `scheduledTaskId` | Every task. |
 | `herdr-automations` | `automations.yaml` in `$HERDR_PLUGIN_CONFIG_DIR`, else `~/.config/herdr/plugins/config/dnzzl.automations/`; `history.jsonl` in `$HERDR_PLUGIN_STATE_DIR`, else `~/.local/state/herdr/plugins/dnzzl.automations/`; `daemon.pid` in the same state folder | Every automation. `id` is its `name`; `command` is `agent` and `model` plus the first prompt line; `disabled: true` or a top-level `paused: true` gives `disabled`/`paused`. `last_status` and `last_run` come from the last terminal history event (`done`, `failed`, `missed`, `skipped`, `cancelled`, `invalid`); `failed`, `missed` and `invalid` are problems. When the pid in `daemon.pid` is not a live `herdr-automations` process, every enabled automation is `dead`. |
@@ -46,7 +45,6 @@ Scope is the user tackroom runs as (or the SSH user): their LaunchAgents, cronta
 Documented gaps, reported as `not_scanned` rather than silently absent:
 
 - Claude cloud routines: no on-disk state; listable only from inside a Claude session.
-- OpenBot routines: the database does not open from an SSH session.
 - Login items an app registers through `SMAppService` (`launchctl print` shows them as submitted by `smd`): there is no plist in `~/Library/LaunchAgents` to read.
 
 ### launchd checks
@@ -63,7 +61,7 @@ For a service, a `KeepAlive` agent with 10 or more runs and a non-zero last exit
 
 ### Missed runs
 
-A scheduled job whose recorded last run is older than the two most recent times its cron expression should have fired is flagged as "enabled, but has not run". The check runs only where the scheduler records its own last run (Hermes, Claude desktop). A last run inferred from a log mtime is skipped, because a job that runs but writes nothing would look stale.
+A scheduled job whose recorded last run is older than the two most recent times its cron expression should have fired is flagged as "enabled, but has not run". The check runs only where the scheduler records its own last run (Claude desktop). A last run inferred from a log mtime is skipped, because a job that runs but writes nothing would look stale.
 
 ### Record
 
@@ -72,11 +70,11 @@ Every job becomes one JSON record:
 | Field | Meaning | Provenance |
 | --- | --- | --- |
 | `host` | Host alias as scanned | declared (by the scan target) |
-| `source` | `launchd`, `crontab`, `systemd`, `hermes`, `codex`, `claude-desktop` | declared |
+| `source` | `launchd`, `crontab`, `systemd`, `codex`, `claude-desktop`, `herdr-automations` | declared |
 | `id` | Scheduler-native id: launchd label, timer unit, harness job id; for crontab, `crontab-` plus a short hash of the line, so it survives reordering | declared |
 | `name` | Human name where the scheduler has one, else `id` | declared |
 | `schedule` | Cron expression, interval, `OnCalendar`, or RRULE as the scheduler stores it | declared |
-| `tz` | Host time zone from `/etc/localtime`; `CRON_TZ` for crontab; the UTC offset of Hermes `next_run_at` | inferred |
+| `tz` | Host time zone from `/etc/localtime`; `CRON_TZ` for crontab | inferred |
 | `command` | Program and arguments, script, or prompt reference | declared |
 | `log` | `StandardOutPath`, a `>>` redirect in a crontab line, the journal, or a harness output directory | declared or inferred |
 | `runs` | Run count (launchd `runs` since load; harness run tables) | declared |
@@ -219,7 +217,9 @@ tackroom writes every plist key itself, so the case-sensitive key trap in sectio
 
 ### tackroom's own entries
 
-The two jobs plain `tackroom cron` installs today become built-in owned jobs on the selected backend: `tackroom-pull` (every 30 minutes by default) and, with `--deps`, `tackroom-deps` (weekly). `tackroom cron [--interval] [--deps] [--remove]` installs, replaces or removes that one built-in job through the same planner as `apply`, on the selected backend and off every other; it no longer writes crontab directly, so the self-update cannot end up installed twice. `apply` never prunes the built-in ids, and the manifest cannot declare them. The first plain `tackroom cron` lists the old crontab lines in its plan and removes them as it installs the built-in job; `apply` leaves them, so the self-update is never removed without a replacement. A line counts as old when its command, after an optional `. "$HOME/.profile" 2>/dev/null;` prefix, is any executable whose base name is `tackroom` (quoted or not), followed by `pull`, `sync deps` or the legacy `deps update`, and an optional `--config <path>`. The match is on that whole shape, not a substring of today's resolved command, so a line with another binary path or `--config` value is found too, and a different command that merely contains it is not.
+The two jobs plain `tackroom cron` installs today become built-in owned jobs on the selected backend: `tackroom-pull` (every 15 minutes by default) and, with `--deps`, `tackroom-deps` (weekly). `tackroom cron [--interval] [--deps] [--remove]` installs, replaces or removes that one built-in job through the same planner as `apply`, on the selected backend and off every other; it no longer writes crontab directly, so the self-update cannot end up installed twice. `apply` never prunes the built-in ids, and the manifest cannot declare them. The first plain `tackroom cron` lists the old crontab lines in its plan and removes them as it installs the built-in job; `apply` leaves them, so the self-update is never removed without a replacement. A line counts as old when its command, after an optional `. "$HOME/.profile" 2>/dev/null;` prefix, is any executable whose base name is `tackroom` (quoted or not), followed by `pull`, `sync deps` or the legacy `deps update`, and an optional `--config <path>`. The match is on that whole shape, not a substring of today's resolved command, so a line with another binary path or `--config` value is found too, and a different command that merely contains it is not.
+
+`setup` installs `tackroom-pull` by default; `--no-cron` skips it. While that job is missing, paused, broken, or its last run failed, `tackroom status` prints a warning line and `tackroom doctor` reports it under a "periodic sync" check.
 
 ## 5. herdr-automations
 
