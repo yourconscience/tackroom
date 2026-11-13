@@ -45,6 +45,9 @@ tackroom cron collect [--hosts local,HOST...] [--table] # read-only scheduled-jo
 tackroom cron apply [--dry-run]       # install crons.jobs entries with schedule+command as launchd, systemd or crontab units
 tackroom cron run|pause|resume [--host HOST] ID   # act on a launchd job, here or over SSH
 tackroom cron schedule ID "MIN HOUR DOM MON DOW"    # new schedule for an owned job on this machine
+tackroom cron add ID --schedule "MIN HOUR DOM MON DOW" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--local] [--dry-run] [--no-apply]   # declare an owned job, then apply
+tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--dry-run] [--no-apply]   # change fields of an owned job
+tackroom cron remove ID [--dry-run] [--no-apply]    # delete an owned job's declaration and unit
 ```
 
 `sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` stays compact; `--verbose` adds the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.

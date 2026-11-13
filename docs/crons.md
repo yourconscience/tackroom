@@ -7,6 +7,7 @@ tackroom cron collect [--hosts local,HOST...] [--table]   # read-only inventory,
 tackroom cron run|pause|resume [--host HOST] ID           # act on a launchd job, here or over SSH
 tackroom cron schedule ID "MIN HOUR DOM MON DOW"          # new schedule for a job tackroom owns here
 tackroom cron apply [--dry-run]                           # install, replace or remove declared jobs
+tackroom cron add|edit|remove ID [flags]                  # declare, change or delete an owned job, then apply
 tackroom cron [--interval 15m] [--deps] [--remove]        # tackroom's own sync job
 ```
 
@@ -136,6 +137,26 @@ The schedule is a 5-field cron expression and is translated, never passed throug
 
 `collect` maps an owned unit back to its manifest id by the prefix and marks it `created_by: tackroom` unless the manifest says otherwise.
 
+## Add, edit and remove owned jobs
+
+```bash
+tackroom cron add ID --schedule "MIN HOUR DOM MON DOW" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--local]
+tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT]
+tackroom cron remove ID
+```
+
+All three take `--dry-run`, `--no-apply` and `--config PATH`, and the id comes first. `--dry-run` prints the YAML change and the `apply` plan and writes nothing. Without `--no-apply` each runs `cron apply` after writing, which stays the only writer of native units.
+
+- A command is `--command` plus one `--arg` per argument, in order, stored as a YAML list: `--command /usr/bin/git --arg -C --arg /srv/notes --arg pull` becomes `command: [/usr/bin/git, -C, /srv/notes, pull]`. `edit --command` replaces the whole list.
+- `add` writes `crons.jobs.<id>` to `tackroom.yaml`, or to `tackroom.local.yaml` with `--local`. `edit` changes only the fields you pass, in the file that declares the job (`tackroom.local.yaml` when it has the id). `--host ""` and `--effect ""` remove the field. `remove` deletes the declaration, from both files when both declare it, with the comment lines directly above it.
+- Only the lines of the touched entry are rewritten. Every other byte of the file stays as it was, and comments inside the touched entry are kept but may be re-spaced. A file whose `crons` section is in flow style, or has no block `jobs` mapping to extend, is re-encoded whole instead. The write is atomic and keeps the file's mode. No backup copy is made, the same as for a schedule change; the config root is meant to be in git.
+- Refused before anything is written: an invalid or reserved id, a schedule the `apply` parser rejects, an empty command, a command not found on `PATH` here (when this machine will install it and `--no-apply` is not given), a `host` while `crons.self` is unset, `add` of an id that exists, `edit` or `remove` of an id that is not declared, and an id that is declared without both `schedule` and `command`. The last kind are inventory annotations; edit them by hand.
+- If `apply` fails after the write, the declaration stays saved and the error says so; fix the cause and run `tackroom cron apply`.
+
+tackroom creates, changes and deletes only jobs it owns. Any launchd, systemd, crontab or other job without tackroom's prefix is never touched by these commands, and an id that `collect` reports but that is not declared is refused with an error that says so.
+
+The view serves the same operations as `POST /api/crons/jobs`, with the token, origin and CSRF checks of `/api/crons/action`. The body is JSON: `action` (`add`, `edit` or `remove`) and `id`, plus `schedule`, `command` (a list, executable first), `host`, `effect`, `local`, `dry_run` and `no_apply` as above; unknown fields are refused. The answer carries `files` (the YAML files written), `diff`, `plan` (the lines `apply` printed) and `job`, the job's fresh record from a scan of this machine so a client can refresh one row (`null` after a removal or a dry run). Errors use the usual `{"error": {"code", "message"}}` shape: `invalid_request` (400) for a malformed body, `cron_action_failed` (422) for a refusal or a failed apply. A job for another host is refused with a message to edit `tackroom.yaml` and let that machine run `cron apply`.
+
 ## Built-in jobs
 
 `tackroom cron` with no subcommand installs the job `setup` installs:
@@ -160,5 +181,5 @@ While the pull job is missing, paused, broken or its last run failed, `status` p
 
 - It runs no scheduler daemon. Owned jobs are native units that the host's scheduler fires.
 - Scheduled jobs are not a sixth sync surface. `collect` reads state; `apply` writes only units with tackroom's prefix; neither writes harness configuration.
-- `collect` never changes a job. The view and the action verbs change only a launchd job someone acts on.
+- `collect` never changes a job. The view and the action verbs change only a launchd job someone acts on, and `add`, `edit` and `remove` change only the declaration of an owned job.
 - It does not ship job output or history anywhere. Everything stays on your machines.

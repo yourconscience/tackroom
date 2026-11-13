@@ -59,8 +59,11 @@ tackroom <command> --help            # flags of one command (exit code 0)
 - `tackroom cron apply [--dry-run]` installs, replaces or removes the jobs declared under `crons.jobs`.
 - `tackroom cron run|pause|resume [--host HOST] ID` acts on a launchd job.
 - `tackroom cron schedule ID "MIN HOUR DOM MON DOW"` sets a new schedule for a job tackroom owns on this machine.
+- `tackroom cron add ID --schedule "MIN HOUR DOM MON DOW" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--local] [--dry-run] [--no-apply]` declares an owned job and applies it.
+- `tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--dry-run] [--no-apply]` changes the given fields of an owned job.
+- `tackroom cron remove ID [--dry-run] [--no-apply]` deletes the declaration and the unit.
 
-All four are in [crons.md](crons.md).
+All seven are in [crons.md](crons.md).
 
 ## Terminals
 
