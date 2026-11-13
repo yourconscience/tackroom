@@ -380,8 +380,8 @@ func auditSkillMarkdown(skill, rel, path string) []auditFinding {
 
 // auditScriptFile inspects a bundled script for credential/network exfil.
 // Pipe-to-shell and base64-to-shell are covered by the rule audit's remote-exec
-// rule (HIGH), so they are not reported here: reporting them again as CRITICAL
-// would show one finding at two severities.
+// rule (CRITICAL), so they are not reported here: reporting them twice would
+// show one finding as two.
 func auditScriptFile(skill, rel, path string) []auditFinding {
 	text, ok := readAuditFile(path)
 	if !ok {

@@ -79,7 +79,7 @@ async function install(options = {}) {
   const target = platformTarget(options.platform, options.arch);
   if (!target) {
     throw new Error(
-      `tackroom has no prebuilt binary for ${options.platform || process.platform}/${options.arch || process.arch}; use brew or scripts/install.sh instead`,
+      `tackroom has no prebuilt binary for ${options.platform || process.platform}/${options.arch || process.arch}; use brew install yourconscience/tap/tackroom instead`,
     );
   }
 
@@ -125,7 +125,7 @@ if (require.main === module) {
     })
     .catch((error) => {
       console.error(`tackroom postinstall failed: ${error.message}`);
-      console.error("The CLI still works via brew or scripts/install.sh; see the README.");
+      console.error("Install with brew install yourconscience/tap/tackroom instead; see the README.");
       process.exit(1);
     });
 }
