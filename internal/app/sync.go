@@ -22,6 +22,13 @@ func runStatus(opts runOptions) error {
 	held := gateExternalSources(cfg.ExternalSkills, home, &statusLock, gateOptions{now: timeNow()})
 	cfg.ExternalSkills = filterHeldSources(cfg.ExternalSkills, held)
 	injectPluginMCPServers(&cfg, home)
+	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gateOptions{now: timeNow()}, false)
+	if err != nil {
+		return err
+	}
+	for k, v := range pkgHeld {
+		held["package-hold:"+k] = v
+	}
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
 	if err != nil {
@@ -95,6 +102,13 @@ func runSync(opts runOptions) error {
 	cfg.ExternalSkills = filterHeldSources(cfg.ExternalSkills, held)
 	// Re-inject after clone so first sync picks up newly fetched plugins.
 	injectPluginMCPServers(&cfg, home)
+	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gateOptionsFor(opts), true)
+	if err != nil {
+		return err
+	}
+	for k, v := range pkgHeld {
+		held["package-hold:"+k] = v
+	}
 	if err := renderCommittedArtifacts(repoRoot); err != nil {
 		return err
 	}

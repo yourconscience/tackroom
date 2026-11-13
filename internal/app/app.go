@@ -22,6 +22,12 @@ type config struct {
 	// profile kept elsewhere) that every agent's root doc carries after
 	// AGENTS.md, in order. Relative paths resolve against the config root.
 	Instructions []string `yaml:"instructions,omitempty"`
+
+	// heldMCP names MCP servers whose package version is inside its freshness
+	// hold. desiredMCPServersForAgent keeps what each harness already has for
+	// them and writes nothing new. Set by gatePackages; never from YAML.
+	heldMCP  map[string]bool
+	heldHome string
 	// ContextNoteTokens is the estimated skill-listing token threshold above
 	// which `tackroom doctor` prints a soft context advisory note. Absent
 	// (nil) uses contextNoteTokensDefault; 0 (or negative) disables the note.
