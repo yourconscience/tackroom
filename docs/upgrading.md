@@ -6,6 +6,10 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## Unreleased
+
+- The Herdr panel moved to `herdr/tackroom/`, a package Herdr's mod gallery can list, with a recipe that adds the button and the panel to the layout you use. The `tackroom` layout in `herdr/layouts/` is gone; if you copied it, it keeps working. To update the panel, copy the two mods from `herdr/tackroom/mods/`, or paste the gallery line in [herdr.md](herdr.md#install) to your agent. Where the notes below say to copy `herdr/mods/tackroom`, copy `herdr/tackroom/mods/tackroom` instead.
+
 ## To 2.5
 
 `tackroom.yaml` and `tackroom.lock` keep their formats. Scripts that run `tackroom setup --yes` keep working.
