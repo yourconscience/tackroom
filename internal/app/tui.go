@@ -5,8 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -408,44 +406,27 @@ func tuiLockTable(opts runOptions) (tuiTable, error) {
 		empty:   "no external skills: add one with tackroom skill sources add",
 	}
 	now := timeNow()
-	cacheRoot := externalCacheDir(g.home)
-	for _, src := range g.sources {
-		name := sourceName(src)
-		cachePath := filepath.Join(cacheRoot, name)
-		cloned := hasDir(filepath.Join(cachePath, ".git"))
-		pin, issue := sourcePinIssue(g.lock, src, cacheRoot)
-		commit := ui.Dim.Render("-")
-		switch {
-		case pin != nil:
-			commit = shortCommit(pin.Commit)
-		case cloned:
-			commit = ui.Dim.Render(externalSkillCommit(cachePath))
+	for _, row := range lockRows(g) {
+		source, commit, audit := ui.Dim.Render(strings.TrimPrefix(row.Source, "https://")), ui.Dim.Render("-"), ui.Dim.Render("-")
+		if row.Source == "" {
+			source = ui.Dim.Render(oneLine(row.Reason)) // a held package
 		}
-		var state string
-		if h, ok := g.held[name]; ok {
-			state = tuiHeldState(h, now)
-		} else if issue != "" {
-			word, _, _ := strings.Cut(issue, " (")
-			state = tuiState("warn", word)
-		} else {
-			state = tuiState("ok", "pinned")
+		if row.Commit != "" {
+			commit = row.Commit
+			if !row.Pinned {
+				commit = ui.Dim.Render(commit)
+			}
 		}
-		audit := ui.Dim.Render("-")
-		if cloned {
-			audit = tuiAuditCell(externalSourceItem(src, g.home), g.lock)
+		if row.Audited {
+			audit = tuiAuditCell(row.Findings, row.Critical)
 		}
-		t.rows = append(t.rows, []string{ui.Bold.Render(name), ui.Dim.Render(strings.TrimPrefix(src.URL, "https://")), commit, state, audit})
-	}
-	var packages []string
-	for key := range g.held {
-		if strings.HasPrefix(key, "package-hold:") {
-			packages = append(packages, key)
+		state := tuiState("ok", "pinned")
+		if row.State == "held" || row.State == "blocked" {
+			state = tuiHeldState(heldItem{Kind: row.State, Until: row.Until}, now)
+		} else if row.State != "pinned" {
+			state = tuiState("warn", row.State)
 		}
-	}
-	sort.Strings(packages)
-	for _, key := range packages {
-		h := g.held[key]
-		t.rows = append(t.rows, []string{ui.Bold.Render(h.Item), ui.Dim.Render(oneLine(h.Reason)), ui.Dim.Render("-"), tuiHeldState(h, now), ui.Dim.Render("-")})
+		t.rows = append(t.rows, []string{ui.Bold.Render(row.Name), source, commit, state, audit})
 	}
 	return t, nil
 }
@@ -464,19 +445,9 @@ func tuiHeldState(h heldItem, now time.Time) string {
 	return tuiState("warn", fmt.Sprintf("held %dh of %dh", int(age.Hours()), int(defaultPackageAgeMinimum.Hours())))
 }
 
-// tuiAuditCell counts the findings `doctor audit` lists for an item that the
+// tuiAuditCell words the findings `doctor audit` lists for an item that the
 // lock does not accept.
-func tuiAuditCell(item auditItem, lock lockFile) string {
-	open, critical := 0, 0
-	for _, f := range item.Findings {
-		if isAccepted(lock, item.ID(), f) {
-			continue
-		}
-		open++
-		if f.Severity == sevCritical {
-			critical++
-		}
-	}
+func tuiAuditCell(open, critical int) string {
 	switch {
 	case critical > 0:
 		return tuiState("fail", fmt.Sprintf("%d critical", critical))

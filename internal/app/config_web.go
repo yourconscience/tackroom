@@ -26,7 +26,7 @@ import (
 // Separate assets keep the Go server small and make the browser surface easy to
 // review without introducing a JavaScript build or runtime dependency.
 //
-//go:embed web/index.html web/style.css web/app.js web/fonts
+//go:embed web/index.html web/signin.html web/style.css web/app.js web/fonts web/manifest.webmanifest web/icons
 var configWebAssets embed.FS
 
 type configWebServer struct {
@@ -232,7 +232,7 @@ func (s *configWebServer) handler() http.Handler {
 		switch r.URL.Path {
 		case "/":
 			s.handleIndex(w, r)
-		case "/style.css", "/app.js":
+		case "/style.css", "/app.js", "/manifest.webmanifest":
 			s.handleAsset(w, r)
 		case "/api/state":
 			s.handleState(w, r)
@@ -257,9 +257,11 @@ func (s *configWebServer) handler() http.Handler {
 		case "/api/crons/jobs":
 			s.handleCronJobs(w, r)
 		default:
-			if strings.HasPrefix(r.URL.Path, "/fonts/") && strings.HasSuffix(r.URL.Path, ".woff2") && !strings.Contains(r.URL.Path[len("/fonts/"):], "/") {
-				s.handleAsset(w, r)
-				return
+			for _, dir := range []struct{ prefix, ext string }{{"/fonts/", ".woff2"}, {"/icons/", ".png"}} {
+				if strings.HasPrefix(r.URL.Path, dir.prefix) && strings.HasSuffix(r.URL.Path, dir.ext) && !strings.Contains(r.URL.Path[len(dir.prefix):], "/") {
+					s.handleAsset(w, r)
+					return
+				}
 			}
 			http.NotFound(w, r)
 		}
@@ -275,17 +277,26 @@ func (s *configWebServer) securityHeaders(w http.ResponseWriter) {
 }
 
 func (s *configWebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if token := r.URL.Query().Get("token"); token != "" {
-		if token != s.token {
-			writeAPIError(w, http.StatusUnauthorized, "invalid_config", "invalid startup token")
-			return
-		}
+	token := r.URL.Query().Get("token")
+	if token != "" && token == s.token {
 		s.setSessionCookies(w, r)
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		// Relative, so a view served under a path (tailscale serve --set-path)
+		// lands on its own page and not on the proxy's root.
+		w.Header().Set("Location", "./")
+		w.WriteHeader(http.StatusSeeOther)
 		return
 	}
-	if !s.authenticated(r) {
-		writeAPIError(w, http.StatusUnauthorized, "invalid_config", "open the tokenized startup URL")
+	if token != "" || !s.authenticated(r) {
+		// A page, not an error body: a home screen app has no address bar to
+		// fix the URL in, so it asks for the token.
+		data, err := configWebAssets.ReadFile("web/signin.html")
+		if err != nil {
+			http.Error(w, "asset unavailable", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write(data)
 		return
 	}
 	// A restarted server keeps the session token (--token-file) but mints a new
@@ -300,12 +311,17 @@ func (s *configWebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
+// handleAsset serves the view's static files. Only app.js needs the session:
+// the manifest, icons, stylesheet and fonts hold no config data and are fetched
+// where there is no session. A browser fetches the manifest without cookies, a
+// phone fetches its home screen icon itself, and the sign-in page needs the
+// stylesheet. Every API route still needs the session.
 func (s *configWebServer) handleAsset(w http.ResponseWriter, r *http.Request) {
-	if !s.authenticated(r) {
+	name := strings.TrimPrefix(r.URL.Path, "/")
+	if name == "app.js" && !s.authenticated(r) {
 		writeAPIError(w, http.StatusUnauthorized, "invalid_config", "session required")
 		return
 	}
-	name := strings.TrimPrefix(r.URL.Path, "/")
 	data, err := configWebAssets.ReadFile("web/" + name)
 	if err != nil {
 		http.NotFound(w, r)
@@ -316,6 +332,10 @@ func (s *configWebServer) handleAsset(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	case strings.HasSuffix(name, ".woff2"):
 		w.Header().Set("Content-Type", "font/woff2")
+	case strings.HasSuffix(name, ".png"):
+		w.Header().Set("Content-Type", "image/png")
+	case strings.HasSuffix(name, ".webmanifest"):
+		w.Header().Set("Content-Type", "application/manifest+json")
 	default:
 		w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
 	}
@@ -629,16 +649,13 @@ func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) 
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}
-	repo, err := inspectRepoLink(snapshot.repoRoot, snapshot.home)
+	// Inspect through the status gates, so the plan leaves out what sync will
+	// skip; sync itself gets the config as written and gates it again.
+	g, err := applyStatusGates(snapshot.repoRoot, snapshot.home, cfg, selected, true)
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}
-	expected, err := expectedSkills(snapshot.repoRoot, snapshot.home, cfg)
-	if err != nil {
-		return syncPlan{}, config{}, "", err
-	}
-	injectPluginMCPServers(&cfg, snapshot.home)
-	reports, err := inspectAgents(selected, expected, snapshot.repoRoot, snapshot.home, cfg)
+	repo, reports, err := inspectStatus(g)
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}

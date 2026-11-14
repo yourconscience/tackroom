@@ -35,6 +35,7 @@ type viewInventory struct {
 	MCP       []viewWired     `json:"mcp"`
 	Hooks     []viewWired     `json:"hooks"`
 	Unmanaged []viewUnmanaged `json:"unmanaged"`
+	Lock      []lockRow       `json:"lock"`
 }
 
 type viewAgent struct {
@@ -102,7 +103,7 @@ func assembleInventory(cfg config, reports []agentReport, skills map[string]skil
 	for _, report := range reports {
 		byName[report.Name] = report
 	}
-	inv := viewInventory{Skills: []viewSkill{}, Roles: []viewRole{}, MCP: []viewWired{}, Hooks: []viewWired{}, Unmanaged: []viewUnmanaged{}}
+	inv := viewInventory{Agents: []viewAgent{}, Skills: []viewSkill{}, Roles: []viewRole{}, MCP: []viewWired{}, Hooks: []viewWired{}, Unmanaged: []viewUnmanaged{}}
 	var columns []string
 	for _, agent := range cfg.Agents {
 		_, hooks := hookTargetForHarness(agent.Name)
@@ -373,21 +374,29 @@ func buildViewInventory(doc *configDocument) (viewInventory, error) {
 	if err != nil {
 		return viewInventory{}, err
 	}
-	cfg := snapshot.cfg
-	injectPluginMCPServers(&cfg, snapshot.home)
-	expected, err := expectedSkills(snapshot.repoRoot, snapshot.home, cfg)
-	if err != nil {
-		return viewInventory{}, err
-	}
 	var selected []agentConfig
-	for _, agent := range cfg.Agents {
+	for _, agent := range snapshot.cfg.Agents {
 		if agent.Enabled {
 			selected = append(selected, agent)
 		}
 	}
+	// The same gates as status: a held or blocked source is not missing from
+	// the agents, it is waiting in the lock.
+	g, err := applyStatusGates(snapshot.repoRoot, snapshot.home, snapshot.cfg, selected, true)
+	if err != nil {
+		return viewInventory{}, err
+	}
+	cfg, err := configForInspection(g.cfg, g.sources, g.held, g.repoRoot, g.home)
+	if err != nil {
+		return viewInventory{}, err
+	}
+	expected, err := expectedSkills(snapshot.repoRoot, snapshot.home, cfg)
+	if err != nil {
+		return viewInventory{}, err
+	}
 	var reports []agentReport
-	if len(selected) > 0 {
-		reports, err = inspectAgents(selected, expected, snapshot.repoRoot, snapshot.home, cfg)
+	if len(g.selected) > 0 {
+		reports, err = inspectAgents(g.selected, expected, snapshot.repoRoot, snapshot.home, cfg)
 		if err != nil {
 			return viewInventory{}, err
 		}
@@ -419,6 +428,7 @@ func buildViewInventory(doc *configDocument) (viewInventory, error) {
 	})
 	inv.Revision = snapshot.revision
 	inv.Home = snapshot.home
+	inv.Lock = lockRows(g)
 	if repo, repoErr := inspectRepoLink(snapshot.repoRoot, snapshot.home); repoErr == nil {
 		inv.RepoState = repo.State
 	}

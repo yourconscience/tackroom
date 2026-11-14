@@ -370,6 +370,74 @@ func printRuleFindings(w io.Writer, items []auditItem, lock lockFile, asJSON boo
 	return blocked
 }
 
+// lockRow is one line of the lock as the TUI and the view show it: an external
+// source with its pin, gate state and audit, or a held package.
+type lockRow struct {
+	Name     string `json:"name"`
+	Source   string `json:"source,omitempty"` // the source URL; empty for a held package
+	Commit   string `json:"commit,omitempty"` // the short pin, or the cloned head while unpinned
+	Pinned   bool   `json:"pinned"`
+	State    string `json:"state"`            // pinned, held, blocked, or a pin issue such as "unpinned"
+	Reason   string `json:"reason,omitempty"` // why it is held or blocked, or the whole pin issue
+	Until    string `json:"until,omitempty"`  // hold end, RFC 3339
+	Command  string `json:"command,omitempty"`
+	Audited  bool   `json:"audited"` // false until the source is cloned
+	Findings int    `json:"findings"`
+	Critical int    `json:"critical"`
+}
+
+// lockRows lists every configured external source, then every held package,
+// with what status settled for each: no registry lookup, no write.
+func lockRows(g statusGates) []lockRow {
+	rows := []lockRow{}
+	cacheRoot := externalCacheDir(g.home)
+	for _, src := range g.sources {
+		name := sourceName(src)
+		cachePath := filepath.Join(cacheRoot, name)
+		row := lockRow{Name: name, Source: src.URL, State: "pinned"}
+		pin, issue := sourcePinIssue(g.lock, src, cacheRoot)
+		cloned := hasDir(filepath.Join(cachePath, ".git"))
+		switch {
+		case pin != nil:
+			row.Commit, row.Pinned = shortCommit(pin.Commit), true
+		case cloned:
+			row.Commit = externalSkillCommit(cachePath)
+		}
+		if h, ok := g.held[name]; ok {
+			row.State, row.Reason, row.Until, row.Command = h.Kind, h.Reason, h.Until, h.Command
+		} else if issue != "" {
+			row.State, _, _ = strings.Cut(issue, " (")
+			row.Reason, row.Command = issue, "tackroom sync"
+		}
+		if cloned {
+			item := externalSourceItem(src, g.home)
+			row.Audited = true
+			for _, f := range item.Findings {
+				if isAccepted(g.lock, item.ID(), f) {
+					continue
+				}
+				row.Findings++
+				if f.Severity == sevCritical {
+					row.Critical++
+				}
+			}
+		}
+		rows = append(rows, row)
+	}
+	var packages []string
+	for key := range g.held {
+		if strings.HasPrefix(key, "package-hold:") {
+			packages = append(packages, key)
+		}
+	}
+	sort.Strings(packages)
+	for _, key := range packages {
+		h := g.held[key]
+		rows = append(rows, lockRow{Name: h.Item, State: h.Kind, Reason: h.Reason, Until: h.Until, Command: h.Command})
+	}
+	return rows
+}
+
 // heldLines renders one status line per held or blocked item.
 func heldLines(held map[string]heldItem) []string {
 	var lines []string

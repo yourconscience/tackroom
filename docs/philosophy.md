@@ -34,10 +34,10 @@ Capture and de-duplication are machine jobs. Promoting a fact into your instruct
 
 Check: captured candidates sit inert in `$KNOWLEDGE_DIR/ai/` until you act on the report in `$KNOWLEDGE_DIR/reviews/`. See [memory.md](memory.md).
 
-## The CLI is the product
-The web view, the Herdr panel and the Claude Code and Pi plugins call the same commands. None has data or an action the CLI lacks, and saving in the view never runs a sync.
+## You work in the view; the CLI is the engine
+Day to day you look and act in `tackroom view`: on a desktop, on a phone over your tailnet, or in a narrow pane beside your agents. The CLI is the engine and the surface for scripts and SSH. The view, `tackroom tui`, the Herdr panel and the Claude Code and Pi plugins call the same commands; none has data or an action the CLI lacks, and saving in the view never runs a sync.
 
-Check: `tackroom cron collect` is the JSON they all draw; the panels act through `tackroom cron run|pause|resume`.
+Check: the view's Overview lists the same held and blocked sources as `tackroom status`; its Crons tab draws `tackroom cron collect`; after a save in the view, `tackroom status` reports the change as not synced until you apply Sync.
 
 ## A small, fixed scope
 tackroom syncs five surfaces: skills, MCP servers, hooks, roles and plugins. It also manages root instruction files, Pi packages and the settings keys you declare. Scheduled jobs are inventoried, and jobs you declare become native units, but they are not a sixth surface.

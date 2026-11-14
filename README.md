@@ -26,9 +26,10 @@ Pick one. Both install the same checksum-verified binary for macOS or Linux, arm
 tackroom setup
 ```
 
-`setup` creates `~/.agents`, finds the agents you have, copies in their skills, MCP servers and roles after you review each item, and runs the first sync. Originals stay where they are. After that:
+`setup` creates `~/.agents`, finds the agents you have, copies in their skills, MCP servers and roles after you review each item, and runs the first sync. Originals stay where they are. After that, you work in the view; the commands do the same from a shell or a script:
 
 ```bash
+tackroom view     # the dashboard: sync state, pins, holds, crons; desktop or phone
 tackroom sync     # write each agent's native config from the repo
 tackroom status   # what is synced, held or blocked
 tackroom doctor   # check skills, roles, pins, audits and hooks
@@ -63,6 +64,7 @@ Terminals: a Crons panel for [Herdr](https://yourconscience.github.io/tackroom/d
 - [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
 - [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
 - [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
+- [Web view](https://yourconscience.github.io/tackroom/docs/view/): the dashboard, on a desktop or a phone
 - [TUI](https://yourconscience.github.io/tackroom/docs/tui/): the read-only terminal view
 - [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and holds
 - [Roles](https://yourconscience.github.io/tackroom/docs/roles/): role format, model tiers, per-agent output
