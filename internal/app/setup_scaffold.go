@@ -409,11 +409,12 @@ func scanNativeImports(cfg config, detected []agentConfig, root string, home str
 			}
 			roles = append(roles, found...)
 		}
+		// A harness config tackroom cannot read leaves its MCP servers out of
+		// the import instead of stopping setup; runDetection names the file.
 		foundMCP, err := scanNativeMCP(agent, cfg, home)
-		if err != nil {
-			return nil, nil, nil, err
+		if err == nil {
+			servers = append(servers, foundMCP...)
 		}
-		servers = append(servers, foundMCP...)
 	}
 	return skills, roles, servers, nil
 }
@@ -593,7 +594,8 @@ func nativeMCPServerNames(agentName string, home string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read %s: %w", path, err)
 	}
-	if agentName == agentCodex {
+	// Codex and Grok Build keep MCP servers in TOML ([mcp_servers.<name>]).
+	if strings.HasSuffix(path, ".toml") {
 		return codexMCPServerNames(string(data)), nil
 	}
 	if agentName == agentDSH {

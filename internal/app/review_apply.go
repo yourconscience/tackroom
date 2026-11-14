@@ -3,6 +3,7 @@ package app
 import (
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -102,8 +103,18 @@ func applyReviewDecisions(root string, cfg *config, decisions []reviewDecision, 
 }
 
 // renderDetectionSummary is the plain-text detection view used by --dry-run.
+// printDetectionWarnings lists harness configs setup could not read.
+func printDetectionWarnings(w io.Writer, detection *detectionResult) {
+	for _, warning := range detection.Warnings {
+		fmt.Fprintln(w, "warning: "+warning)
+	}
+}
+
 func renderDetectionSummary(detection *detectionResult) string {
 	var b strings.Builder
+	for _, w := range detection.Warnings {
+		b.WriteString("warning: " + w + "\n")
+	}
 	if len(detection.Items) == 0 && len(detection.Resolved) == 0 {
 		b.WriteString("no import candidates detected\n")
 		return b.String()
