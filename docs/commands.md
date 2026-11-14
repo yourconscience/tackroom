@@ -69,6 +69,7 @@ All seven are in [crons.md](crons.md).
 ## Terminals
 
 - `tackroom tern [--config PATH] [--dry-run]` opens a tackroom workspace in the Tern terminal. See [tern.md](tern.md).
+- `tackroom rex [--config PATH] [--dry-run]` opens a tackroom workspace in the Rex terminal. See [rex.md](rex.md).
 
 ## Other
 

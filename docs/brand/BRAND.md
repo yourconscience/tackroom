@@ -93,7 +93,7 @@ Use these exact names in every surface. The CLI prints the key.
 | Kimi Code | `kimi` |
 | Amp | `amp` |
 
-Terminals: Herdr (panel), Tern (workspace), Rex (doctor check). They sit in their own row and are never counted among the 15 harnesses.
+Terminals: Herdr (panel), Tern (workspace), Rex (workspace). They sit in their own row and are never counted among the 15 harnesses.
 
 ## Icons
 

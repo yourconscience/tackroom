@@ -269,6 +269,8 @@ func run(args []string) error {
 		return runHookCommand(args[1:])
 	case "tern":
 		return runTernCommand(args[1:])
+	case "rex":
+		return runRexCommand(args[1:])
 	case "cron":
 		if len(args) > 1 && args[1] == "collect" {
 			return runCronCollect(args[2:])
@@ -618,6 +620,7 @@ var canonicalForms = []string{
 	"  tackroom hook list [--agents ...] [query]",
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
+	"  tackroom rex [--config PATH] [--dry-run]          # open a tackroom workspace in the Rex terminal",
 	"  tackroom cron collect [--hosts local,HOST...] [--table] [--config PATH]",
 	"  tackroom cron apply [--dry-run] [--config PATH]",
 	"  tackroom cron run|pause|resume [--host HOST] [--config PATH] ID",
