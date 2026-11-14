@@ -82,7 +82,11 @@ func decodeTools(node *yaml.Node) ([]string, error) {
 		}
 		return tools, nil
 	case yaml.ScalarNode:
-		var tools []string
+		if node.Tag == "!!null" {
+			return nil, nil
+		}
+		// `tools: ""` grants no tools, as Claude Code reads it.
+		tools := []string{}
 		for _, part := range strings.Split(node.Value, ",") {
 			if tool := strings.TrimSpace(part); tool != "" {
 				tools = append(tools, tool)
@@ -165,7 +169,7 @@ func RenderCanonical(role Role) ([]byte, error) {
 		Description string          `yaml:"description"`
 		Model       string          `yaml:"model,omitempty"`
 		Effort      string          `yaml:"effort,omitempty"`
-		Tools       []string        `yaml:"tools,omitempty"`
+		Tools       *[]string       `yaml:"tools,omitempty"`
 		Color       string          `yaml:"color,omitempty"`
 		Claude      ClaudeOptions   `yaml:"claude,omitempty"`
 		Codex       CodexOptions    `yaml:"codex,omitempty"`
@@ -175,8 +179,12 @@ func RenderCanonical(role Role) ([]byte, error) {
 		Pi          PiOptions       `yaml:"pi,omitempty"`
 	}{
 		Name: role.Name, Description: role.Description, Model: role.Model, Effort: role.Effort,
-		Tools: role.Tools, Color: role.Color, Claude: role.Claude, Codex: role.Codex,
+		Color: role.Color, Claude: role.Claude, Codex: role.Codex,
 		Droid: role.Droid, OpenCode: role.Opencode, OMP: role.OMP, Pi: role.Pi,
+	}
+	if role.Tools != nil {
+		// Keep `tools: []`: dropping it would grant every tool.
+		front.Tools = &role.Tools
 	}
 	meta, err := yaml.Marshal(front)
 	if err != nil {

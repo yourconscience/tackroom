@@ -20,10 +20,12 @@ const (
 
 // Role is the canonical representation shared by every harness renderer.
 type Role struct {
-	Name         string          `yaml:"name"`
-	Description  string          `yaml:"description"`
-	Model        string          `yaml:"model"`
-	Effort       string          `yaml:"effort"`
+	Name        string `yaml:"name"`
+	Description string `yaml:"description"`
+	Model       string `yaml:"model"`
+	Effort      string `yaml:"effort"`
+	// Tools is nil when the role sets none (the harness default, usually
+	// every tool) and empty when it sets `tools: []` (no tools at all).
 	Tools        []string        `yaml:"tools"`
 	Color        string          `yaml:"color"`
 	Instructions string          `yaml:"-"`
@@ -186,6 +188,12 @@ func canonicalModelTier(model string) bool {
 		return true
 	}
 	return false
+}
+
+// noTools reports a role that grants no tools, as opposed to one that leaves
+// tools unset.
+func noTools(role Role) bool {
+	return role.Tools != nil && len(role.Tools) == 0
 }
 
 func mappedTools(tools []string, mapping map[string]string) []string {
