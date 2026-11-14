@@ -1,7 +1,7 @@
 -- tackroom crons block: run `tackroom cron collect`, render host health and
 -- per-host jobs, and act through `tackroom cron run|pause|resume`.
 --
--- Mirrors the Herdr mod (herdr/mods/tackroom) over the same JSON contract and
+-- Mirrors the Herdr mod (herdr/tackroom/mods/tackroom) over the same JSON contract and
 -- CLI verbs, so the web view, the Herdr panel and this block agree.
 
 local ui = tern.ui

@@ -2,7 +2,7 @@ import { View, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { run, theme, layout } from "herdr";
 
-// The tackroom button of the tackroom layout. Herdr main's tab bar opens Files and
+// The tackroom button, beside Herdr main's tab bar. That tab bar opens Files and
 // Changes in the "panel-body" stack; this block sits right of it and opens the
 // tackroom panel in the same stack, drawn like those two buttons.
 function find(node, id) {

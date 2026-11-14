@@ -51,7 +51,7 @@ Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GE
 
 Claude Code, Codex, Factory Droid, OMP, OpenCode, Pi, Qwen Code, Cursor, Gemini CLI, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp. What each one gets is in the [capability matrix](https://yourconscience.github.io/tackroom/docs/harnesses/).
 
-Terminals: a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/herdr/), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/tern/), and a `tackroom rex` workspace and palette actions for [Rex](https://yourconscience.github.io/tackroom/docs/rex/).
+Terminals: a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/herdr/) (one line to your agent from Herdr's mod gallery), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/tern/), and a `tackroom rex` workspace and palette actions for [Rex](https://yourconscience.github.io/tackroom/docs/rex/).
 
 ## Docs
 
