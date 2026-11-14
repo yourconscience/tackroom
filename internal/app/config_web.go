@@ -252,6 +252,8 @@ func (s *configWebServer) handler() http.Handler {
 			s.handleInventory(w, r)
 		case "/api/crons":
 			s.handleCrons(w, r)
+		case "/api/hosts":
+			s.handleHosts(w, r)
 		case "/api/crons/action":
 			s.handleCronAction(w, r)
 		case "/api/crons/jobs":

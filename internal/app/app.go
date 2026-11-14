@@ -271,6 +271,8 @@ func run(args []string) error {
 		return runTernCommand(args[1:])
 	case "rex":
 		return runRexCommand(args[1:])
+	case "hosts":
+		return runHostsCommand(args[1:])
 	case "cron":
 		if len(args) > 1 && args[1] == "collect" {
 			return runCronCollect(args[2:])
@@ -585,6 +587,7 @@ func printUsage() {
 	fmt.Println("  config   Validate or print the canonical YAML")
 	fmt.Println("  restore  List backups or put backed-up native files back")
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
+	fmt.Println("  hosts    Show tackroom on every machine in crons.hosts")
 	fmt.Println()
 	fmt.Println("Command groups:")
 	fmt.Println("  skill    Inspect, create, and update skills")
@@ -621,6 +624,7 @@ var canonicalForms = []string{
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
 	"  tackroom rex [--config PATH] [--dry-run]          # open a tackroom workspace in the Rex terminal",
+	"  tackroom hosts [HOST...] [--json] [--config PATH]   # tackroom on each machine in crons.hosts: version, sync state, config commit",
 	"  tackroom cron collect [--hosts local,HOST...] [--table] [--config PATH]",
 	"  tackroom cron apply [--dry-run] [--config PATH]",
 	"  tackroom cron run|pause|resume [--host HOST] [--config PATH] ID",

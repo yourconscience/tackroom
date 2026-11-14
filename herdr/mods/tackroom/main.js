@@ -5,7 +5,8 @@ import JobForm, { runTackroom } from "./form.js";
 
 // tackroom inside Herdr, one tab for each tab of the web view. Every tab draws
 // the JSON of a tackroom command, the same data the web view draws:
-//   Overview    `sync --dry-run --json`  harness state, held and blocked items
+//   Overview    `sync --dry-run --json`  harness state, held and blocked items,
+//               and `hosts --json`  tackroom on each machine in crons.hosts
 //   Skills, Roles, MCP & hooks   `config inventory`  what /api/inventory serves
 //   Crons       `cron collect`  and acts through `cron run|pause|resume`
 // Add, Edit and Delete on a cron open form.js as a dialog of this same mod.
@@ -16,6 +17,7 @@ const SOURCES = {
   plan: { args: ["sync", "--dry-run", "--json"], timeout: 120000 },
   inventory: { args: ["config", "inventory"], timeout: 120000 },
   crons: { args: ["cron", "collect"], timeout: 300000 },
+  hosts: { args: ["hosts", "--json"], timeout: 300000 },
 };
 // web is the tab of the web view the Web button opens.
 const TABS = [
@@ -31,6 +33,7 @@ const OFF = ["disabled", "not_loaded"];
 const HEALTH = { fail: "Failing", warn: "Last run failed", idle: "No result", ok: "Healthy", paused: "Paused" };
 const ORDER = ["fail", "warn", "idle", "ok", "paused"];
 const DONE = { run: "Started", pause: "Paused", resume: "Resumed" };
+const MACHINE = { ok: "healthy", warn: "needs attention", fail: "failing" };
 // What a matrix cell of the inventory says, in the web view's words, and the tone it takes.
 const CELL = {
   ok: ["in place", "ok"], drift: ["drifted", "warn"], missing: ["missing", "warn"], conflict: ["conflict", "fail"],
@@ -260,8 +263,12 @@ export default class Tackroom extends View {
           .child(this.dot(d.synced ? t.ansi2 : t.ansi3)).child(headline))
         .when(!d.synced, (el) => el.child(this.note("Run tackroom sync to apply it, or tackroom sync --dry-run for the plan.", t)))
         .when(d.repo_link !== "synced", (el) => el.child(this.note(`The config root link is ${d.repo_link}.`, t))),
-      this.section("Harnesses", d.agents.map((a) => this.harnessRow(a, t)), t),
     ];
+    // Machines come before this machine's harnesses, as in the web view, and
+    // only with more than one host in crons.hosts.
+    const m = this.src.hosts.data;
+    if (m && m.hosts.length > 1) out.push(this.section("Machines", m.hosts.map((x) => this.machineRow(x, t)), t));
+    out.push(this.section("Harnesses", d.agents.map((a) => this.harnessRow(a, t)), t));
     if (d.held.length) {
       out.push(this.section("Held or blocked", d.held.map((h) => this.fold(`x:${h.item}`,
         [this.dot(h.kind === "blocked" ? t.ansi1 : t.ansi3),
@@ -283,6 +290,17 @@ export default class Tackroom extends View {
         .child(div().text_size(11).text_color(t.dim).child(failing ? `${failing} failing of ${c.jobs.length}` : plural(c.jobs.length, "job"))));
     }
     return out;
+  }
+
+  // One machine of `tackroom hosts`: its name, health, summary and the command that fixes it.
+  machineRow(m, t) {
+    return h_flex().gap(10).px(6).py(4).items_center().text_size(12)
+      .child(div().w(84).flex_none().truncate().font_semibold().child(hostName(m.host)))
+      .child(this.dot(tone(t, m.health)))
+      .child(v_flex().flex_1().min_w(0).gap(2)
+        .child(div().text_color(t.muted).child(m.summary))
+        .when(Boolean(m.fix), (el) => el.child(div().text_size(11).text_color(t.dim).child(`Fix: ${m.fix}`))))
+      .child(div().flex_none().text_size(11).text_color(tone(t, m.health)).child(MACHINE[m.health] ?? m.health));
   }
 
   harnessRow(a, t) {

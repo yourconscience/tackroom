@@ -329,6 +329,8 @@ button.danger:hover:not(:disabled) { background: var(--pill-negative-bg); }
 /* ---------- pills, tags ---------- */
 .pill { display: inline-flex; flex: none; align-items: center; gap: 6px; height: 22px; padding: 0 8px; border-radius: var(--radius-chip); background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); font-size: var(--fs-small); font-weight: 500; white-space: nowrap; }
 .pill.bad { background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
+.pill.ok { background: var(--pill-positive-bg); color: var(--pill-positive-ink); }
+.pill.warn { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
 .tag { display: inline-flex; align-items: center; gap: 4px; flex: none; padding: 0 6px; border: 1px solid var(--border); border-radius: var(--radius-chip); color: var(--muted); font-size: var(--fs-small); font-weight: 400; line-height: 20px; white-space: nowrap; }
 .tag svg { width: 12px; height: 12px; }
 .tag.local { color: var(--text); border-color: var(--control); }
@@ -494,6 +496,7 @@ button.cell:disabled { cursor: default; }
   .field input { min-height: 44px; }
   .lock-meta { padding-left: 0; }
   .lock-list .note, .lock-list .command { margin-left: 0; }
+  .machines .lock-name, .machines .note, .machines .lock-meta, .machines .command code { font-size: 16px; }
   /* Plex Mono advances 0.6em, so "Mon 09:00" at 15px is 81px wide. */
   .upnext-list li { grid-template-columns: 96px auto minmax(0, 1fr) auto; }
   .segmented, .segmented button, .chip-button { min-height: 44px; }

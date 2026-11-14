@@ -25,6 +25,8 @@ tackroom <command> --help            # flags of one command (exit code 0)
 - `tackroom doctor deps` checks the age of exact npm and PyPI versions your config references.
 - `tackroom sync deps` updates patch-level dependencies in the config root (Go modules, pnpm, uv), then runs the age check.
 
+- `tackroom hosts [HOST...] [--json]` shows tackroom on each machine in `crons.hosts`, or on the hosts you name; with neither, only `local`, this machine. It probes every host at once, over SSH as `cron collect` does, and reports each one's tackroom version, whether it is set up and synced, and its config root's commit against this machine's: the same, behind, ahead, diverged, or unknown when this machine's git does not have it, plus uncommitted changes. Each machine is `fail` when it cannot be reached, has no tackroom, its `status` fails (for example, no `tackroom.yaml`) or it runs a tackroom a major version behind this machine's; `warn` when its `tackroom.yaml` is not committed (so no other machine can pull it), it is out of sync, behind or diverged, has uncommitted changes or runs an older tackroom than this machine; `ok` otherwise. It prints a table with the command that fixes each problem, or JSON with `--json`. It exits 0 whatever the machines report.
+
 `status`, `doctor`, `pull`, `doctor deps` and `sync deps` take `--skip-package-age`, which skips the registry lookups for package age. The audit gate is in [skills.md](skills.md#the-audit-gate).
 
 ## Skills
@@ -64,7 +66,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 - `tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--dry-run] [--no-apply]` changes the given fields of an owned job.
 - `tackroom cron remove ID [--dry-run] [--no-apply]` deletes the declaration and the unit.
 
-All seven are in [crons.md](crons.md).
+All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the machines `tackroom hosts` reports on ([Check health](#check-health)).
 
 ## Terminals
 
@@ -99,6 +101,7 @@ The config root cannot be, or sit inside, a linked git worktree. Machine-local s
 | `sync --dry-run` | Always, whatever it plans | An error |
 | `doctor` | Every check passed | Any failed check or any warning |
 | `doctor audit` | No unaccepted CRITICAL finding | An unaccepted CRITICAL finding in external content |
+| `hosts` | Always, whatever the machines report | An unreadable config or another error |
 
 `status --exit-code` is the only form that returns 2: 0 when in sync, 1 on drift, 2 on any other error, such as a missing config. It does not count held or blocked items, hooks reported as unsupported, or the periodic sync warning as drift. `--help` exits 0.
 
@@ -106,11 +109,11 @@ A real `sync` still syncs the other harnesses when one has a conflict, and then 
 
 ## Output
 
-`status`, `sync`, `doctor` and `cron collect --table` use color for the status marks and bold and dim for structure when they write to a terminal. When the output goes to a pipe or a file there are no escape codes at all, and reports wrap at 100 columns instead of the terminal width. Other commands, such as `skill list`, `mcp list` and `hook list`, always print plain text.
+`status`, `sync`, `doctor`, `hosts` and `cron collect --table` use color for the status marks and bold and dim for structure when they write to a terminal. When the output goes to a pipe or a file there are no escape codes at all, and reports wrap at 100 columns instead of the terminal width. Other commands, such as `skill list`, `mcp list` and `hook list`, always print plain text.
 
 - `NO_COLOR` set to any non-empty value drops the color on a terminal; bold and dim stay. `CLICOLOR_FORCE=1` keeps the styling in a pipe.
 - `sync` prints a summary of what the run changed, with harnesses that changed alike grouped, then a table with one row per harness and the managed items per harness. `status` stays compact and `--verbose` adds the full lists and native paths.
-- `--json` on `status`, `sync`, `doctor`, `doctor audit`, `setup`, `publish` and `skill sources` prints one JSON document on stdout. `cron collect` and `config inventory` print JSON by default. `hook list` prints tab-separated lines.
+- `--json` on `status`, `sync`, `doctor`, `doctor audit`, `setup`, `publish`, `hosts` and `skill sources` prints one JSON document on stdout. `cron collect` and `config inventory` print JSON by default. `hook list` prints tab-separated lines.
 - Warnings and notes go to stderr, so a pipe sees only the report.
 
 ## Related tools
