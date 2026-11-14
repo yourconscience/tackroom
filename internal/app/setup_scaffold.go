@@ -160,8 +160,21 @@ func loadSetupConfig(configPath string, home string) (config, error) {
 	return cfg, nil
 }
 
+// writeSetupConfig saves the config setup built into tackroom.yaml. It opens
+// that file without the machine-local overlay: the starter lists no agents
+// yet, and merged with a tackroom.local.yaml that names one (an agent turned
+// off on this machine, say) its memory hooks would target an unknown agent
+// before setup fills the agents in. The sync setup runs next checks the merge.
 func writeSetupConfig(configPath string, cfg config, home string) error {
-	return saveConfigDocument(configPath, home, cfg)
+	if _, err := os.Stat(configPath); err != nil {
+		return saveConfigDocument(configPath, home, cfg)
+	}
+	doc := &configDocument{home: home, sharedPath: configPath}
+	if err := doc.reload(); err != nil {
+		return err
+	}
+	_, err := doc.replaceTyped(configLayerShared, doc.revision(configLayerShared), cfg)
+	return err
 }
 
 func defaultAgentConfigs() []agentConfig {
