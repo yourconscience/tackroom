@@ -6,7 +6,9 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
-## Unreleased
+## To 2.4
+
+Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats. If your periodic sync job dates from before 2.0, run `tackroom cron` once (below).
 
 - New: `tackroom hosts` shows tackroom on every machine in `crons.hosts`: its version, whether it is set up and synced, and its config commit against this machine's, with the command that fixes what is wrong. With more than one host, the view's Overview and the Herdr panel's Overview show the same as a Machines block. Copy `herdr/mods/tackroom` again to get it in the panel. See [commands.md](commands.md#check-health).
 - Fixed: `tackroom setup` stopped with `config hook memory-session-start targets unknown agent "claude"` when `tackroom.local.yaml` listed an agent, for example one turned off on that machine. It also stopped on any machine with Grok Build installed, reading `~/.grok/config.toml` as JSON. Both now set up; a harness config tackroom cannot read is reported as a warning and its MCP servers are left out of the import.
