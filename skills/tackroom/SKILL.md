@@ -29,7 +29,7 @@ tackroom config validate
 tackroom config print
 tackroom config inventory                       # the web view's inventory as JSON: harnesses, skills, roles, MCP servers, hooks
 tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]
-tackroom tui [--config PATH]                    # read-only terminal view of agents, lock, crons and doctor; needs a terminal
+tackroom tui [--config PATH]                    # deprecated, removed in 3.0; do not recommend it: use view, status or cron collect --table
 tackroom skill new <name> [--description ...]
 tackroom skill list [--agents ...]
 tackroom skill info <name>

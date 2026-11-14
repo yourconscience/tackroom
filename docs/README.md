@@ -18,7 +18,7 @@ Guides and reference for the tackroom CLI, in reading order. Start with setup; t
 - [Memory](memory.md): the three tiers, the `rem` capture and review workflow, and why it is review-first.
 - [Scheduled jobs](crons.md): inventory every job on every host, run and pause launchd jobs, declare your own.
 - [Web view](view.md): the loopback dashboard, its token, remote access and what it can change.
-- [Terminal view](tui.md): `tackroom tui`, a read-only full-screen view of agents, the lock, scheduled jobs and doctor checks.
+- [Terminal view](tui.md): `tackroom tui`, deprecated and removed in 3.0; use the web view.
 
 ## Terminals
 

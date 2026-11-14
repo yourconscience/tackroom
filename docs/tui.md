@@ -1,5 +1,7 @@
 # Terminal view
 
+> **Deprecated.** `tackroom tui` prints a notice on every run and will be removed in 3.0. Use [`tackroom view`](view.md), which works on a desktop, on a phone and in a side panel, or the [Herdr panel](herdr.md). In a terminal or over SSH, `tackroom status`, `tackroom cron collect --table` and `tackroom doctor` print the same facts.
+
 `tackroom tui` is a full-screen, read-only view of what `status`, the lock, `cron collect` and `doctor` already report. It changes nothing, so it is safe to leave open while you work.
 
 ```bash

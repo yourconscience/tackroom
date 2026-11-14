@@ -24,6 +24,10 @@ var tuiTabNames = []string{"Agents", "Lock", "Crons", "Doctor"}
 // tuiMinColumn is the narrowest a shrinking column gets before the line is cut.
 const tuiMinColumn = 8
 
+// tuiDeprecated is printed by every run of `tackroom tui`. The web view, the
+// harness panels, the CLI and the skill carry the same state.
+const tuiDeprecated = "tackroom tui is deprecated and will be removed in 3.0. Use tackroom view, or tackroom status, tackroom cron collect --table and tackroom doctor in a terminal."
+
 func runTUICommand(args []string) error {
 	fs := flag.NewFlagSet("tui", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -35,6 +39,7 @@ func runTUICommand(args []string) error {
 	if fs.NArg() != 0 {
 		return errors.New("tui does not accept positional arguments")
 	}
+	fmt.Fprintln(os.Stderr, tuiDeprecated)
 	if !term.IsTerminal(os.Stdin.Fd()) || !term.IsTerminal(os.Stdout.Fd()) {
 		return errors.New("tackroom tui needs a terminal; use tackroom status")
 	}

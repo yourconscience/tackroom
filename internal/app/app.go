@@ -583,7 +583,6 @@ func printUsage() {
 	fmt.Println("  config   Validate or print the canonical YAML")
 	fmt.Println("  restore  List backups or put backed-up native files back")
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
-	fmt.Println("  tui      Browse agents, lock, crons and doctor in the terminal (read-only)")
 	fmt.Println()
 	fmt.Println("Command groups:")
 	fmt.Println("  skill    Inspect, create, and update skills")
@@ -605,7 +604,7 @@ var canonicalForms = []string{
 	"  tackroom doctor audit revoke <item> <rule>",
 	"  tackroom config <validate|print|inventory> [--config PATH]   # inventory prints the web view's inventory as JSON",
 	"  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
-	"  tackroom tui [--config PATH]               # read-only terminal view of agents, lock, crons and doctor",
+	"  tackroom tui [--config PATH]               # deprecated, removed in 3.0: use tackroom view",
 	"  tackroom skill new <name> [--description ...]",
 	"  tackroom skill list [--agents ...]",
 	"  tackroom skill info <name>",

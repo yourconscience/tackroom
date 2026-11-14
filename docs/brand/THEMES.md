@@ -35,7 +35,7 @@ Contrast: 290 text and UI pairs across five themes and two modes; all candidate 
 
 ## UI first
 
-The web view (`tackroom view`) becomes the primary surface; `tackroom tui` and the CLI are the same state for scripts and SSH.
+The web view (`tackroom view`) becomes the primary surface; the CLI is the same state for scripts and SSH.
 
 - **Site and README (restyle plus new assets).** Hero: headline, install command, a desktop frame of the view with the phone view overlapping it (real screenshots from the demo home, the slot already marked in `docs/site/index.html`). Order: hero, the lock as UI components, the agents rail (one rail, vertical on phones), first five minutes ending in `tackroom view`, one compact terminal block without box-drawing tables, comparison, name, FAQ. README's first screen swaps its status block for the view screenshot; `docs/brand/BRAND.md` "Do" needs the same edit.
 - **Dashboard restyle.** Map `internal/app/web/style.css` variables (`--ground`, `--surface`, `--primary`, `--focus`, pills) onto `--tr-*`, add the light theme and the prefers-color-scheme guards, raise body text from 13px to 14px and controls from 34px to 44px on touch.
