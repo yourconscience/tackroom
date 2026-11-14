@@ -207,31 +207,45 @@ func nativeQwenHook(hook hookConfig) hookConfig {
 	return hook
 }
 
-func removeNativeManagedMemoryHooks(home string, root string, prior config, current config) (int, error) {
+// removeNativeManagedMemoryHooks removes managed memory hook commands from
+// native configs, except the ones keep (the config sync applies next)
+// registers for that agent: removing those would only have sync add them back.
+func removeNativeManagedMemoryHooks(home string, root string, prior config, current config, keep config) (int, error) {
 	commands := managedMemoryNativeCommands(home, root, prior, current)
 	if len(commands) == 0 {
 		return 0, nil
 	}
-	changed := 0
-	removers := []func(string, []string) (bool, error){
-		func(home string, commands []string) (bool, error) {
-			return removeGroupedJSONHookCommands(claudeHooksConfigPath(home), commands)
-		},
-		func(home string, commands []string) (bool, error) {
-			return removeGroupedJSONHookCommands(codexHooksConfigPath(home), commands)
-		},
-		func(home string, commands []string) (bool, error) {
-			return removeGroupedJSONHookCommands(droidHooksConfigPath(home), commands)
-		},
-		func(home string, commands []string) (bool, error) {
-			return removeGroupedJSONHookCommands(droidLegacyHooksConfigPath(home), commands)
-		},
-		func(home string, commands []string) (bool, error) {
-			return removeGroupedJSONHookCommands(qwenSettingsPath(home), commands)
-		},
+	without := func(agent string) []string {
+		kept := map[string]bool{}
+		for _, a := range keep.Agents {
+			if normalizeAgentName(a.Name) == agent && a.Enabled {
+				desired, _ := desiredHooksForAgent(keep, agent)
+				for _, hook := range desired {
+					kept[strings.TrimSpace(hook.Command)] = true
+				}
+			}
+		}
+		var out []string
+		for _, command := range commands {
+			if !kept[command] {
+				out = append(out, command)
+			}
+		}
+		return out
 	}
-	for _, remove := range removers {
-		didChange, err := remove(home, commands)
+	changed := 0
+	removers := []struct {
+		agent string
+		path  string
+	}{
+		{agentClaudeCode, claudeHooksConfigPath(home)},
+		{agentCodex, codexHooksConfigPath(home)},
+		{agentDroid, droidHooksConfigPath(home)},
+		{agentDroid, droidLegacyHooksConfigPath(home)},
+		{agentQwenCode, qwenSettingsPath(home)},
+	}
+	for _, target := range removers {
+		didChange, err := removeGroupedJSONHookCommands(target.path, without(target.agent))
 		if err != nil {
 			return changed, err
 		}
@@ -250,7 +264,7 @@ func removeNativeManagedMemoryHooks(home string, root string, prior config, curr
 	for _, target := range entryRemovers {
 		var entries []nativeHookEntry
 		for _, event := range memoryHookEvents {
-			for _, command := range commands {
+			for _, command := range without(target.agent) {
 				entries = append(entries, nativeHookEntry{Agent: target.agent, Event: event, Command: command, ConfigPath: target.path})
 			}
 		}

@@ -313,9 +313,11 @@ func inspectAgent(agent agentConfig, expected map[string]string, repoRoot string
 				}
 				if matches {
 					// An identical copy (often left by setup's import) is
-					// replaced with a link so later edits reach this agent.
+					// backed up and replaced with a link so later edits
+					// reach this agent.
 					report.Drifted = append(report.Drifted, name)
 					report.Updates = append(report.Updates, name)
+					report.IdenticalCopies = append(report.IdenticalCopies, linkPath)
 					continue
 				}
 				msg := fmt.Sprintf("%s exists but differs from canonical content and is not a symlink", linkPath)
@@ -532,9 +534,10 @@ func inspectRootInstructions(report *agentReport, ri *rootInstructionsCapability
 			report.RootState = stateDrifted
 			report.RootActual = "stale generated file"
 		case same:
-			// Identical content: relinking loses nothing.
+			// Identical content: it is backed up, then linked.
 			report.RootState = stateDrifted
 			report.RootActual = "identical copy"
+			report.IdenticalCopies = append(report.IdenticalCopies, linkPath)
 		default:
 			report.RootState = stateConflict
 			report.RootActual = "non-symlink path exists"

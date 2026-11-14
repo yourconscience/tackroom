@@ -1,14 +1,15 @@
 # Setup
 
-`tackroom setup` creates your config repo, imports what your harnesses already have, runs the first sync and installs the periodic sync job. This page also covers multi-machine use, the web view in brief, per-harness settings and root instructions.
+`tackroom setup` sets up a machine in one step and asks nothing. It creates your config repo, imports what your harnesses already have, runs the first sync and installs the periodic sync job. This page also covers multi-machine use, the web view in brief, per-harness settings and root instructions.
 
 ```bash
-tackroom setup                        # detect harnesses, review imports, first sync
-tackroom setup --dry-run              # print import candidates, change nothing
-tackroom setup --yes --no-cron        # unattended: default answer to every prompt, no periodic job
+tackroom setup                        # first machine: no questions, reasonable defaults
+tackroom setup --from <git url>       # another machine: clone your config repo, then set up
+tackroom setup --review               # review imports and confirm each step instead
+tackroom setup --dry-run              # what the run would import, whose copy it keeps; changes nothing
 ```
 
-Other flags: `--memory off|basic|memsearch` (default `basic`, see [memory.md](memory.md)), `--agents a,b` to limit the run to named harnesses, `--json` for the detection result, `--config PATH`.
+Other flags: `--memory off|basic|memsearch` (default `basic` on a new config; an existing config keeps its tier, see [memory.md](memory.md)), `--agents a,b` to limit the run to named harnesses, `--no-cron` to skip the periodic job, `--verbose` for every step and the full sync report, `--json` for the detection result, `--config PATH`. `--yes` is still accepted and does nothing: it is the default now.
 
 Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agents:` lists: Claude Code `claude`, Codex `codex`, Factory Droid `droid`, OMP `omp`, OpenCode `opencode`, Pi `pi`, Qwen Code `qwen-code`, Cursor `cursor`, Gemini CLI `gemini`, GitHub Copilot CLI `copilot`, Grok Build `grok`, DeepSeek Harness `dsh`, Antigravity CLI `agy`, Kimi Code `kimi`, Amp `amp`. The former key `claude-code` still works. What each harness gets, and the executable that detects it, is in [harnesses.md](harnesses.md).
 
@@ -16,28 +17,43 @@ Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agen
 
 1. Creates the config root and copies in the starter content once: the `tackroom` skill, six roles, `tackroom.yaml`, `tackroom.lock`, `.gitignore`, `plugin.json`, `.agnix.toml` and the memory code layer under `memory/`. No instructions file and no third-party skills ship. `--memory off` leaves out the Go sources under `memory/tools/` and registers no memory hooks.
 2. Detects harnesses by their executable on `PATH` and records them in `tackroom.yaml`. Amp is not auto-detected; add it with `--agents amp`.
-3. Scans each harness for skills, roles and MCP servers you already have and shows a review screen. Import is copy-only; originals stay where they are.
-4. Imports existing root instructions into `AGENTS.md`: one file is copied as is, several different ones are kept in full under a heading each for you to merge. With none, no `AGENTS.md` is created and every harness keeps its own file.
-5. Before the first sync touches a harness that already has content, shows what would be removed or overwritten and asks per harness `[y/N]`. Declining, or `--yes`, keeps that harness's files.
-6. Offers `git init` for a new config root, then runs the first sync. Native files that differ from the shared copy are moved to a backup and linked, after you agree.
+3. Copies every skill, role and MCP server your harnesses already have into the config root. When two harnesses have different copies of a skill, the first detected harness's copy is kept and the summary says which. A role is shared only when every harness's copy would come back unchanged from the shared one: same fields, same values, same instructions, nothing added. A role with a field tackroom cannot write (for example `permissionMode` or `sandbox_mode`), without the frontmatter a shared role needs, with different copies in different harnesses, or that is a link to a file elsewhere stays each harness's own, and no starter role of that name is added. Import is copy-only and adds nothing to what it copies; nothing is moved yet.
+4. Imports existing root instructions into `AGENTS.md`: one file is copied as is, several different ones are kept in full under a `## From <agent> (<file>)` heading each. Every agent then reads all of them, so each `setup` run lists them under what needs your attention until you merge them and delete those headings. With none, no `AGENTS.md` is created and every harness keeps its own file.
+5. Runs the first sync. Every native file or skill folder it replaces, identical to the shared copy or not, is first moved to a backup under `~/.local/state/tackroom/backups/`, so `tackroom restore latest` puts them all back. A role is replaced only when the rewritten role is the same role, and never when it is a link; otherwise that one role file is left in place and listed as needing attention, and everything else still syncs into that harness. Removing or overwriting content an earlier tackroom run wrote is left for `tackroom sync`: the summary lists it per harness with that command.
+6. Initializes git and makes the first commit on a first setup: no `tackroom.yaml` before this run and the folder not already under git. A config that already has `tackroom.yaml` and no git (for example after you declined git with `--review`) is left without it.
 7. Installs the periodic sync job unless you pass `--no-cron` (see [Periodic sync](#periodic-sync)).
+
+It ends with a short summary: the agents it found, what it imported, which copy it kept where copies differed, where the backups are, and either `Everything is synced.` or what needs you, each with the command that fixes it. Running `setup` again on a machine that is set up prints `Already set up; everything is synced.` or what changed. Setup exits 1 when anything needs your attention; by then the sync, the first commit and the periodic job may already be done, so fix the listed items and run `setup` again.
 
 The config root is `--config`'s folder, else `$TACKROOM_HOME`, else `~/.agents`. The checkout of tackroom itself is never your config.
 
-`--yes` answers every prompt with its default and never reads stdin, so a script can run setup: it imports everything, initializes git, backs up and links differing files, and keeps existing content wherever the safe answer is no.
+## Review instead of defaults
+
+`setup --review` shows the review screen for imports, then asks before initializing git, before replacing differing native files, and before removing or overwriting what a harness already has (`[y/N]` per harness; declining keeps that harness's files). Without a terminal it falls back to sequential prompts that show `[y/N]`: only a typed `y` counts as yes.
 
 ## The review screen
 
-Each row is one skill, role or MCP server found in a harness. Items identical across harnesses are shared automatically. For the rest, `space` cycles share, keep or skip; `←` and `→` pick which harness's copy becomes canonical when copies differ; `a` shares all, `s` skips all, `enter` applies and `q` aborts. Non-interactive runs fall back to sequential prompts.
+Each row is one skill, role or MCP server found in a harness. Items identical across harnesses are shared automatically. For the rest, `space` cycles share, keep or skip; `←` and `→` pick which harness's copy becomes canonical when copies differ; `a` shares all, `s` skips all, `enter` applies and `q` aborts.
 
 ## Multi-machine
+
+On the first machine, push the config root to a private repository:
 
 ```bash
 cd ~/.agents
 git remote add origin <your-private-repository>
 git push -u origin main
-# on the next machine: clone it to ~/.agents, install tackroom, run tackroom setup
 ```
+
+On the next machine, install tackroom and run:
+
+```bash
+tackroom setup --from <your-private-repository>
+```
+
+`--from` clones the repository into the config root when that folder is missing or empty, or runs `git pull --ff-only` when it is already a clone of the same repository (ssh and https forms of one repository match, and so do `url.<base>.insteadOf` aliases), then sets up from it: its `tackroom.yaml` is used as it is and no starter files are added. A folder with other content, or a clone of another repository, is refused and left untouched. A git repository with no origin is refused too, with the two commands that connect it if it is a copy of that repository. A repository without `tackroom.yaml` is set up like a first machine, and the summary says so. What this machine's harnesses already have is imported as on a first machine; an item the repository already has keeps the repository's copy.
+
+Setup never changes the memory tier of an existing `tackroom.yaml` unless you pass `--memory`. When the shared tier is `memsearch` and this machine has no `memsearch`, setup leaves the memory hooks as they are, sets up everything else and lists the install command.
 
 `tackroom sync --pull` pulls the repo first, then reconciles. List the machines under `crons.hosts` in `tackroom.local.yaml` (SSH aliases, plus `local` for this one) and `tackroom hosts` shows each one's tackroom version, sync state and config commit, with the command that fixes what is wrong. Machines without a Go toolchain skip building the memory tools; everything else syncs normally.
 
@@ -81,7 +97,7 @@ agents:
 - Gemini CLI and Antigravity CLI share `~/.gemini/GEMINI.md`
 - Cursor and OpenCode get no root file from tackroom. Kimi Code reads `~/.agents/AGENTS.md` itself, so none is written for it either
 
-Without `AGENTS.md`, tackroom leaves every harness's instructions file alone. `tackroom status` reports drift. A real file with different content is never replaced without your confirmation, and then only after a backup (`setup`, or `sync --replace-conflicts`). An identical copy is relinked.
+Without `AGENTS.md`, tackroom leaves every harness's instructions file alone. `tackroom status` reports drift. A real file with different content is replaced only by `setup` or `sync --replace-conflicts`, and only after a backup. An identical copy is backed up, then linked.
 
 ### Extra instruction files
 

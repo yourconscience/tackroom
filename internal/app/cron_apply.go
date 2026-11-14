@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -115,7 +116,7 @@ func runCronApply(args []string) error {
 	if err != nil {
 		return err
 	}
-	return runCronPlan(plan, backend, home, nil, *dryRun)
+	return runCronPlan(os.Stdout, plan, backend, home, nil, *dryRun)
 }
 
 // ownedCronJobs returns the manifest jobs this machine should run.
@@ -498,7 +499,7 @@ func renderSystemdService(job ownedCronJob) string {
 
 // runCronPlan prints the plan and, unless dryRun, executes it. legacy are
 // crontab lines to drop in the same crontab write.
-func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dryRun bool) error {
+func runCronPlan(out io.Writer, plan []cronPlanStep, backend, home string, legacy []string, dryRun bool) error {
 	changes := 0
 	for _, step := range plan {
 		mark := map[string]string{"install": "+", "replace": "~", "remove": "-", "keep": "="}[step.Op]
@@ -506,22 +507,22 @@ func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dry
 		if step.Op != "remove" {
 			line += fmt.Sprintf("  %s  %s", step.Job.Schedule, shellJoin(step.Job.Command))
 		}
-		fmt.Println(line)
+		fmt.Fprintln(out, line)
 		if step.Op != "keep" {
 			changes++
 		}
 		if dryRun && (step.Op == "install" || step.Op == "replace") {
 			for _, l := range strings.Split(strings.TrimSuffix(step.Content, "\n"), "\n") {
-				fmt.Println("    " + l)
+				fmt.Fprintln(out, "    "+l)
 			}
 		}
 	}
 	for _, line := range legacy {
-		fmt.Printf("- legacy  crontab  %s\n", line)
+		fmt.Fprintf(out, "- legacy  crontab  %s\n", line)
 		changes++
 	}
 	if changes == 0 {
-		fmt.Println("owned cron jobs are up to date")
+		fmt.Fprintln(out, "owned cron jobs are up to date")
 		return nil
 	}
 	if dryRun {
@@ -529,7 +530,7 @@ func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dry
 	}
 	if backend == cronBackendSystemd {
 		if out, err := exec.Command("loginctl", "show-user", os.Getenv("USER"), "-p", "Linger", "--value").Output(); err == nil && strings.TrimSpace(string(out)) != "yes" {
-			fmt.Println("warning: lingering is off, so systemd user timers stop at logout; enable with: loginctl enable-linger $USER")
+			fmt.Fprintln(os.Stderr, "warning: lingering is off, so systemd user timers stop at logout; enable with: loginctl enable-linger $USER")
 		}
 	}
 	if err := os.MkdirAll(filepath.Dir(cronLogPath(home, "x")), 0o755); err != nil {
@@ -647,7 +648,7 @@ func runCronPlan(plan []cronPlanStep, backend, home string, legacy []string, dry
 	if len(errs) > 0 {
 		return fmt.Errorf("cron apply did not finish; check `tackroom cron collect`:\n  %s", strings.Join(errs, "\n  "))
 	}
-	fmt.Printf("applied %d change(s)\n", changes)
+	fmt.Fprintf(out, "applied %d change(s)\n", changes)
 	return nil
 }
 

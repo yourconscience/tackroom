@@ -18,7 +18,7 @@ Never infer configuration from the current project. Never replace a user's confi
 ## Commands
 
 ```bash
-tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--no-cron] [--dry-run] [--json]
+tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]
 tackroom status [--verbose] [--exit-code] [--agents ...]
 tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]
 tackroom doctor [--e2e] [--agents ...]
@@ -71,20 +71,24 @@ Run `tackroom help --all` for maintenance commands.
 
 ## setup
 
-First-run setup:
+`tackroom setup` asks nothing and never reads stdin. It:
 
 1. Creates the canonical config root when absent.
 2. Extracts missing public starter assets without overwriting user files.
 3. Detects supported harness binaries.
-4. Scans native skill, role, and MCP locations.
-5. Shows an interactive review screen: share, keep harness-specific, or skip per item; items identical across harnesses are shared automatically. Imports are copy or conversion only; originals remain untouched.
-6. In non-interactive runs it falls back to sequential prompts; `--yes` answers every prompt with its default and never reads stdin, `--dry-run` prints candidates and exits without changes, `--json` emits the detection result and exits.
-7. Registers the chosen memory tier.
-8. Installs the periodic sync job (`tackroom pull` every 15 minutes), unless `--no-cron`.
-9. Patches only the required native harness settings.
-10. Runs the first sync.
+4. Copies every native skill, role, and MCP server into the config root. Where harnesses have different copies of a skill, the first detected harness's copy is kept. A role is shared only when every harness's copy would come back unchanged from the shared one (same fields and values, same instructions, nothing added); a role with a field tackroom cannot write, without frontmatter, with differing copies, or that is a symlink stays each harness's own, and no starter role of that name is added. Imports are copy or conversion only and add no fields.
+5. Registers the memory tier (`basic` on a new config; an existing config keeps its tier unless `--memory` is given).
+6. Patches only the required native harness settings.
+7. Runs the first sync: every native file or skill folder it replaces, identical or not, is backed up to `~/.local/state/tackroom/backups/<time>/` first, so `tackroom restore latest` undoes it; a native role is replaced only when the rewritten role is the same role, never a symlinked one, and a role conflict leaves only that file alone while the rest of the harness syncs. Removals or overwrites of content an earlier tackroom run wrote are left for `tackroom sync`. Instructions merged from several agents are listed as needing attention.
+8. Initializes and commits git on a first setup (no `tackroom.yaml` before, not already under git).
+9. Installs the periodic sync job (`tackroom pull` every 15 minutes), unless `--no-cron`.
+10. Prints a short summary ending in `Everything is synced.` or a list of what needs the user, each with its fix command, and then exits 1 (the sync, commit and job may already be done). A rerun on a set-up machine prints `Already set up; everything is synced.` or what changed.
 
-Setup also imports existing instructions files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, ...) into `~/.agents/AGENTS.md`, then backs up the originals to `~/.local/state/tackroom/backups/<time>/` and links them.
+`--review` brings back the interactive review screen (share, keep harness-specific, or skip per item) and a prompt before git init, conflict replacement and destructive changes; without a terminal it falls back to sequential `[y/N]` prompts. `--verbose` prints every step and the full sync report. `--dry-run` prints what the run would import, whose copy it keeps and which roles stay each harness's own, and changes nothing; `--json` emits the detection result and exits. `--yes` is accepted as a no-op.
+
+On another machine, `tackroom setup --from <git url>` clones the user's config repository into the config root when it is missing or empty, or pulls it with `git pull --ff-only` when it is already a clone of that URL, then sets up from its `tackroom.yaml` without adding starter files. A root with other content, another origin, or no origin is refused unchanged. Without `--memory`, setup never changes an existing config's memory tier; a memsearch config on a machine without `memsearch` keeps its hooks and the summary lists the install command.
+
+Setup also imports existing instructions files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, ...) into `~/.agents/AGENTS.md`, then backs up the originals to `~/.local/state/tackroom/backups/<time>/` and links them; several different ones are merged under a `## From <agent> (<file>)` heading each, and every `setup` run lists them as needing attention until the user merges them and deletes those headings.
 
 Extra always-on files (voice, user profile) go under `instructions:` in `tackroom.yaml`, never pasted into `AGENTS.md`. Every managed root doc then carries `AGENTS.md` plus those files: Claude Code via `@` imports, the others as a generated copy marked `Generated by tackroom`. Edit the sources, then run `tackroom sync`; status shows a stale copy as drifted.
 
@@ -92,7 +96,7 @@ Extra always-on files (voice, user profile) go under `instructions:` in `tackroo
 
 ```bash
 tackroom setup --dry-run            # show what would be imported; changes nothing
-tackroom setup --yes --memory basic # unattended: imports, git init, backs up and links differing files
+tackroom setup                      # imports, git init, backs up and replaces differing files; no prompts
 tackroom status --json              # verify; exit 0 = everything synced
 ```
 

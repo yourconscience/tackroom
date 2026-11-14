@@ -11,22 +11,17 @@ tackroom syncs one `~/.agents` repo into 15 coding agents and pins every outside
 
 [Website](https://yourconscience.github.io/tackroom/) · [Docs](https://yourconscience.github.io/tackroom/docs/) · [Releases](https://github.com/yourconscience/tackroom/releases)
 
-## Install
+## Install and set up
 
 ```bash
-brew install yourconscience/tap/tackroom
-npm install -g tackroom
+brew install yourconscience/tap/tackroom && tackroom setup
 ```
 
-Pick one. Both install the same checksum-verified binary for macOS or Linux, arm64 or x86-64.
+With npm: `npm install -g tackroom && tackroom setup`. Both install the same checksum-verified binary for macOS or Linux, arm64 or x86-64.
 
-## Set up
+`setup` asks nothing. It creates `~/.agents`, finds the agents you have, copies in their skills, MCP servers and roles, runs the first sync and prints a short summary. A native file that differs from the shared copy is backed up before it is replaced. `tackroom setup --review` asks before each step instead. On another machine, run `tackroom setup --from <your config repo url>`.
 
-```bash
-tackroom setup
-```
-
-`setup` creates `~/.agents`, finds the agents you have, copies in their skills, MCP servers and roles after you review each item, and runs the first sync. Originals stay where they are. After that, you work in the view; the commands do the same from a shell or a script:
+After that, you work in the view; the commands do the same from a shell or a script:
 
 ```bash
 tackroom view     # the dashboard: sync state, pins, holds, crons; desktop or phone
@@ -60,7 +55,7 @@ Terminals: a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/he
 
 ## Docs
 
-- [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, the review screen, more machines, settings
+- [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from`, settings
 - [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
 - [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
 - [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)

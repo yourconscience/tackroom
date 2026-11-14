@@ -31,7 +31,7 @@ go build -o "$TMP_HOME/tackroom" ./cmd/tackroom
   set -e
   export HOME="$TMP_HOME"
   unset TACKROOM_HOME XDG_CONFIG_HOME XDG_STATE_HOME CODEX_HOME
-  "$HOME/tackroom" setup --agents codex --memory off --yes
+  "$HOME/tackroom" setup --agents codex --memory off --no-cron
   codex mcp list
 )
 ```

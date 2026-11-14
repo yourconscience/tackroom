@@ -595,7 +595,8 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 	}
 	flush()
 
-	var drifted, failed []string
+	var drifted, failed, roleHeld []string
+	fixable := false
 	for _, report := range reports {
 		fmt.Fprintln(&b)
 		writeHarnessStatus(&b, report, repoRoot, home, cfg, verbose, width)
@@ -605,6 +606,13 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 			failed = append(failed, report.Name)
 		case report.Detected && !report.Synced:
 			drifted = append(drifted, report.Name)
+			if len(report.RoleConflicts) > 0 {
+				roleHeld = append(roleHeld, report.Name)
+			}
+			// Without its role conflicts, is anything left that sync fixes?
+			rest := report
+			rest.Conflicts = blockingConflicts(report)
+			fixable = fixable || !isReportSynced(rest)
 		}
 	}
 
@@ -639,7 +647,13 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 	if len(drifted) > 0 {
 		fmt.Fprintf(&b, "%s %s\n", ui.Yellow.Render("drifted:"), strings.Join(drifted, ", "))
 	}
-	fmt.Fprintf(&b, "run %s to reconcile.\n", ui.Bold.Render("tackroom sync"))
+	if len(roleHeld) > 0 {
+		// Sync never replaces these; only the user can resolve them.
+		fmt.Fprintf(&b, "role files sync leaves in place (%s): rename each to keep it, or move it out of the agent's folder to use the shared role; the conflicts above name them.\n", strings.Join(roleHeld, ", "))
+	}
+	if fixable || repoReport.State != stateSynced {
+		fmt.Fprintf(&b, "run %s to reconcile.\n", ui.Bold.Render("tackroom sync"))
+	}
 }
 
 // checkMarkKind maps a checkResult status to a ui.Mark kind.

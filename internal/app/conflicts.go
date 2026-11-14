@@ -54,21 +54,69 @@ func replaceConflicts(report *agentReport, backupDir string, home string) ([]str
 		moved = append(moved, item.Path)
 		dests = append(dests, dest)
 		resolved[item.Message] = true
-		if item.Skill == "" {
+		switch {
+		case item.Skill != "":
+			report.Adds = append(report.Adds, item.Skill)
+		case item.Role != "":
+			report.AddsAgent = append(report.AddsAgent, item.Role)
+		default:
 			report.RootState = stateMissing
-			continue
 		}
-		report.Adds = append(report.Adds, item.Skill)
 	}
-	var remaining []string
+	var remaining, roleRemaining []string
 	for _, conflict := range report.Conflicts {
 		if !resolved[conflict] {
 			remaining = append(remaining, conflict)
 		}
 	}
+	for _, conflict := range report.RoleConflicts {
+		if !resolved[conflict] {
+			roleRemaining = append(roleRemaining, conflict)
+		}
+	}
 	report.Conflicts = remaining
+	report.RoleConflicts = roleRemaining
 	report.Replaceable = nil
 	return moved, nil
+}
+
+// backupIdenticalCopies moves every native copy that matches the shared one
+// into backupDir before sync links it, so `tackroom restore` can put the
+// machine back exactly. A path two agents share (Gemini CLI and Antigravity
+// CLI's GEMINI.md) is moved once.
+func backupIdenticalCopies(reports []agentReport, backupDir string, home string) ([]string, error) {
+	var moved []string
+	done := map[string]bool{}
+	for i := range reports {
+		r := &reports[i]
+		for _, path := range r.IdenticalCopies {
+			if !done[path] {
+				if err := moveToBackup(path, backupPathFor(path, backupDir, home)); err != nil {
+					return moved, fmt.Errorf("%s: back up %s: %w", r.Name, path, err)
+				}
+				done[path] = true
+				moved = append(moved, path)
+			}
+			if path == r.RootPath {
+				r.RootState = stateMissing
+			}
+		}
+		r.IdenticalCopies = nil
+	}
+	return moved, nil
+}
+
+// blockingConflicts are the conflicts that keep sync away from the whole
+// agent. A role conflict is not one of them: sync leaves that role file in
+// place and syncs the rest.
+func blockingConflicts(report agentReport) []string {
+	var out []string
+	for _, conflict := range report.Conflicts {
+		if !stringInSlice(conflict, report.RoleConflicts) {
+			out = append(out, conflict)
+		}
+	}
+	return out
 }
 
 func backupPathFor(path string, backupDir string, home string) string {
@@ -160,5 +208,5 @@ func filesEqual(left string, right string) (bool, error) {
 
 // conflictHint is the next step printed when sync leaves conflicts in place.
 func conflictHint(home string) string {
-	return fmt.Sprintf("run `tackroom sync --replace-conflicts` to move these into %s and link the shared copies, or delete them yourself", conflictBackupRoot(home))
+	return fmt.Sprintf("run `tackroom sync --replace-conflicts` to move these into %s and put the shared copies in their place, or delete them yourself", conflictBackupRoot(home))
 }

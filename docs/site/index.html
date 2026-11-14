@@ -64,7 +64,7 @@
         <h1 id="hero-title">Set up your coding agents once.</h1>
         <p class="lead">tackroom syncs one <code>~/.agents</code> repo into 15 coding agents and pins every outside skill to a commit.</p>
         <div class="cmd">
-          <code id="install-cmd">brew install yourconscience/tap/tackroom</code>
+          <code id="install-cmd">brew install yourconscience/tap/tackroom &amp;&amp; tackroom setup</code>
           <button class="copy" type="button" data-copy="install-cmd" aria-label="Copy install command" hidden><svg class="ico cp-i" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ico ok-i" aria-hidden="true"><use href="#i-ok"/></svg><span class="lbl nl">Copy</span></button>
         </div>
         <a class="second" href="#start">Other ways to install</a>
@@ -254,7 +254,7 @@ holds:
         <li>
           <div class="say">
             <h3>Set up</h3>
-            <p><code>tackroom setup</code> creates <code>~/.agents</code>, finds your agents, copies in what they already have after you review each item, and runs the first sync. Originals stay where they are.</p>
+            <p><code>tackroom setup</code> asks nothing. It creates <code>~/.agents</code>, finds your agents, copies in what they already have, runs the first sync and prints a short summary. A file that differs from the shared copy is backed up before it is replaced. <code>--review</code> asks before each step instead.</p>
           </div>
         </li>
         <li>
@@ -343,9 +343,9 @@ held or blocked (skipped by sync)
         <h2 id="faq-title">Before you install</h2>
       </div>
       <div class="faq">
-        <details><summary>Will it overwrite what my agents already have?</summary><p>No. <code>setup</code> copies existing skills, MCP servers and roles into <code>~/.agents</code> after you review each one, and <code>sync</code> only touches entries tackroom manages. A file that differs is moved to a backup only after you agree, and <code>tackroom restore</code> puts it back.</p></details>
+        <details><summary>Will it overwrite what my agents already have?</summary><p>Not without a backup. <code>setup</code> copies existing skills, MCP servers and roles into <code>~/.agents</code>, and <code>sync</code> only touches entries tackroom manages. A file that differs from the shared copy is moved to a backup before it is replaced, and <code>tackroom restore</code> puts it back. Run <code>tackroom setup --review</code> to decide each item yourself.</p></details>
         <details><summary>Do I have to use every surface?</summary><p>No. Start with skills. MCP servers, hooks and roles are separate sections of <code>tackroom.yaml</code>, and an agent you switch off is left alone.</p></details>
-        <details><summary>How do I get the same setup on another machine?</summary><p><code>~/.agents</code> is a git repo. Push it to a private remote, clone it on the next machine, and run <code>tackroom setup</code>. <code>setup</code> also installs a job that pulls and syncs every 15 minutes; <code>--no-cron</code> skips it.</p></details>
+        <details><summary>How do I get the same setup on another machine?</summary><p><code>~/.agents</code> is a git repo. Push it to a private remote, then on the next machine run <code>tackroom setup --from &lt;repository url&gt;</code>: it clones the repo into <code>~/.agents</code> and sets up from it. <code>setup</code> also installs a job that pulls and syncs every 15 minutes; <code>--no-cron</code> skips it.</p></details>
         <details><summary>Can someone use one of my skills without tackroom?</summary><p>Yes. Any skill in your repo installs with <code>npx skills add you/agents -s name --copy</code>.</p></details>
       </div>
     </div>

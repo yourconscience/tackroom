@@ -4,7 +4,7 @@ Guides and reference for the tackroom CLI, in reading order. Start with setup; t
 
 ## Start here
 
-- [Setup](setup.md): first run, the review screen, multiple machines, settings and root instructions.
+- [Setup](setup.md): first run, `--review`, more machines with `--from`, settings and root instructions.
 - [Commands](commands.md): every command by task, exit codes, config lookup order and output rules.
 - [Harnesses](harnesses.md): what each of the 15 agents gets, the key that names it and where its files land.
 

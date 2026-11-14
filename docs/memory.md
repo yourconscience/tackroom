@@ -8,6 +8,8 @@ tackroom setup --memory off
 tackroom setup --memory memsearch    # needs memsearch on PATH (uv tool install memsearch)
 ```
 
+Without `--memory`, setup uses `basic` on a new config and keeps the tier an existing config already uses.
+
 ## Tiers
 
 | Tier | What it does | Needs |

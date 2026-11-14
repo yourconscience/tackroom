@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -106,6 +107,30 @@ func importRootInstructions(repoRoot string, detected []agentConfig, home string
 	}
 	fmt.Fprintln(streams.out)
 	return nil
+}
+
+// importedSectionHeading matches the heading importRootInstructions writes
+// above each agent's instructions when it merges several into AGENTS.md.
+var importedSectionHeading = regexp.MustCompile(`^## From [a-z0-9-]+ \((.+)\)$`)
+
+// unmergedInstructionSources names the files whose imported sections are
+// still separate in AGENTS.md: two or more of the headings setup wrote. Once
+// the user merges them and drops those headings, it returns nothing.
+func unmergedInstructionSources(repoRoot string) []string {
+	data, err := os.ReadFile(filepath.Join(repoRoot, "AGENTS.md"))
+	if err != nil {
+		return nil
+	}
+	var paths []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if m := importedSectionHeading.FindStringSubmatch(strings.TrimRight(line, "\r")); m != nil {
+			paths = append(paths, m[1])
+		}
+	}
+	if len(paths) < 2 {
+		return nil
+	}
+	return paths
 }
 
 // linkMatchesExpected reports whether path is a symlink to expected.
