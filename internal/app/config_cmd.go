@@ -52,6 +52,12 @@ func runConfigCommand(args []string) error {
 			return err
 		}
 		return runConfigPrint(opts)
+	case "inventory":
+		opts, err := parseConfigFlags(args[1:])
+		if err != nil {
+			return err
+		}
+		return runConfigInventory(opts)
 	default:
 		return fmt.Errorf("unknown config subcommand %q: use validate or print (edit the config with `tackroom view`)", args[0])
 	}
@@ -117,6 +123,20 @@ func runConfigPrint(opts configCommandOptions) error {
 	}
 	_, err = os.Stdout.Write(data)
 	return err
+}
+
+// runConfigInventory prints, as JSON, what the web view's Overview, Skills,
+// Roles and MCP & hooks tabs draw: the document behind /api/inventory.
+func runConfigInventory(opts configCommandOptions) error {
+	doc, _, err := openConfigDocument(opts)
+	if err != nil {
+		return err
+	}
+	inv, err := buildViewInventory(doc)
+	if err != nil {
+		return err
+	}
+	return encodeJSON(os.Stdout, inv)
 }
 
 func yamlMarshalConfig(cfg config) ([]byte, error) {

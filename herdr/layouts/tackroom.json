@@ -114,7 +114,7 @@
               "id": "crons-toggle",
               "type": "block",
               "size": {
-                "px": 84
+                "px": 104
               },
               "window_drag": true,
               "content": {

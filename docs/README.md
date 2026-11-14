@@ -22,7 +22,7 @@ Guides and reference for the tackroom CLI, in reading order. Start with setup; t
 
 ## Terminals
 
-- [Herdr panel](herdr.md): the Crons tab as a native Herdr side panel.
+- [Herdr panel](herdr.md): Overview, Skills, Roles, MCP & hooks and Crons as a native Herdr side panel.
 - [Tern](tern.md): a ready-made tackroom workspace in the Tern terminal.
 - [Rex](rex.md): the `doctor` check for Rex, and what is not built.
 

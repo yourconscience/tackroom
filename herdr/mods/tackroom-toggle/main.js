@@ -2,7 +2,7 @@ import { View, svg } from "gpui-kit";
 import { h_flex } from "gpui-base";
 import { run, theme, layout } from "herdr";
 
-// The Crons button of the tackroom layout. Herdr main's tab bar opens Files and
+// The tackroom button of the tackroom layout. Herdr main's tab bar opens Files and
 // Changes in the "panel-body" stack; this block sits right of it and opens the
 // tackroom panel in the same stack, drawn like those two buttons.
 function find(node, id) {
@@ -29,6 +29,6 @@ export default class CronsToggle extends View {
           if (on) run("layout.hide", { id: "panel" });
           else { run("layout.select", { stack: "panel-body", child: "tackroom" }); run("layout.show", { id: "panel" }); }
         })
-        .child(svg("mods/tackroom/crons.svg").size(14)).child("Crons"));
+        .child(svg("mods/tackroom/tackroom.svg").size(14)).child("tackroom"));
   }
 }
