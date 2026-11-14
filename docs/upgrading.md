@@ -8,6 +8,7 @@ tackroom version
 
 ## Unreleased
 
+- New: `tackroom hosts` shows tackroom on every machine in `crons.hosts`: its version, whether it is set up and synced, and its config commit against this machine's, with the command that fixes what is wrong. With more than one host, the view's Overview and the Herdr panel's Overview show the same as a Machines block. Copy `herdr/mods/tackroom` again to get it in the panel. See [commands.md](commands.md#check-health).
 - Deprecated: `tackroom tui`. It still runs, with a notice, and will be removed in 3.0. Use `tackroom view` (on a desktop, a phone or in a side panel) or the [Herdr panel](herdr.md); in a terminal, `tackroom status`, `tackroom cron collect --table` and `tackroom doctor` print the same facts.
 
 ## To 2.3

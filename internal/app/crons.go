@@ -385,20 +385,27 @@ func scanCronHost(host string) hostScan {
 // runCronProbe reads scheduler state on host. only, an owned unit id, limits
 // the probe to what can hold that unit.
 func runCronProbe(host, only string) ([]probeSection, error) {
+	return runHostProbe(host, cronsProbeScript, only)
+}
+
+// runHostProbe runs script under `sh -s -- TOKEN args...` on host, here for
+// "local" and over SSH otherwise, and parses the sections it prints.
+func runHostProbe(host, script string, args ...string) ([]probeSection, error) {
 	tokenBytes := make([]byte, 12)
 	if _, err := rand.Read(tokenBytes); err != nil {
 		return nil, err
 	}
 	token := "@@" + hex.EncodeToString(tokenBytes)
+	argv := append([]string{token}, args...)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	var cmd *exec.Cmd
 	if host == "local" {
-		cmd = exec.CommandContext(ctx, "sh", "-s", "--", token, only)
+		cmd = exec.CommandContext(ctx, "sh", append([]string{"-s", "--"}, argv...)...)
 	} else {
-		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "sh -s -- "+shellJoin([]string{token, only}))
+		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, "sh -s -- "+shellJoin(argv))
 	}
-	cmd.Stdin = strings.NewReader(cronsProbeScript)
+	cmd.Stdin = strings.NewReader(script)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
 	out, err := cmd.Output()

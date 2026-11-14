@@ -39,6 +39,7 @@ const store = {
   cronsLoading: false,
   cronFilter: 'all',
   cronPatches: [],
+  hosts: null,
 };
 
 // ---------- helpers ----------
@@ -332,7 +333,34 @@ function renderOverview(root) {
     h('div', {class: 'hero-grid'}, [...new Set(cronJobs.map((job) => job.host))].map((host) => hostCard(host, store.crons)), upNextCard(cronJobs))) : null;
   // With no agents, saying so comes first: nothing else on the page can change until there are some.
   const agents = inv.agents.length ? h('div', {class: 'cards'}, inv.agents.map(agentCard)) : null;
-  mount(root, tiles, attention, agents ? null : noAgents(), lockBlock(inv.lock), agents, crons);
+  // Machines come right after what needs attention here: a machine that fell behind is news on a phone.
+  mount(root, tiles, attention, machinesBlock(), agents ? null : noAgents(), lockBlock(inv.lock), agents, crons);
+}
+
+// tackroom on each machine in crons.hosts, in the words of `tackroom hosts`. Only with more than one
+// host, so one machine sees no change; nothing shows until the probe answers.
+const MACHINE_HEALTH = {ok: ['ok', 'healthy'], warn: ['warn', 'needs attention'], fail: ['bad', 'failing']};
+function machinesBlock() {
+  const hosts = store.hosts?.hosts || [];
+  if (hosts.length < 2) return null;
+  const failing = hosts.filter((host) => host.health === 'fail').length;
+  const help = 'tackroom on each machine in crons.hosts: its version, whether it is set up and synced, and its config commit against this machine\'s. The CLI shows the same: tackroom hosts.';
+  return h('section', {class: 'block machines'},
+    h('div', {class: 'block-title'}, icon('i-laptop'), h('h2', {text: 'Machines'}),
+      h('span', {class: failing ? 'count-chip bad' : 'count-chip', text: String(hosts.length)}),
+      h('span', {class: 'help', tabindex: '0', role: 'note', 'aria-label': help, dataset: {tip: help}}, icon('i-info'))),
+    h('ul', {class: 'lock-list'}, hosts.map(machineItem)));
+}
+function machineItem(host) {
+  const [kind, word] = MACHINE_HEALTH[host.health] || MACHINE_HEALTH.fail;
+  return h('li', {},
+    h('div', {class: 'lock-head'}, icon('i-laptop', `health ${host.health}`), h('span', {class: 'lock-name', text: hostName(host.host)}), h('span', {class: `pill ${kind}`, text: word})),
+    h('p', {class: 'note', text: host.summary}),
+    host.version || host.commit ? h('div', {class: 'lock-meta'},
+      host.version ? h('span', {text: `tackroom ${host.version}`}) : null,
+      host.commit ? h('span', {class: 'fig', title: host.commit, text: host.commit.slice(0, 7)}) : null,
+      host.relation_text ? h('span', {text: host.relation_text}) : null) : null,
+    host.fix ? command(host.fix) : null);
 }
 
 // Outside sources: each pin, and what sync holds or blocks with the command that releases it.
@@ -600,6 +628,14 @@ async function loadCrons(refresh = false) {
   store.cronsLoading = false;
   renderChrome();
   if (store.view === 'crons' || store.view === 'overview') renderView();
+}
+async function loadHosts(refresh = false) {
+  try {
+    store.hosts = await api(`/api/hosts${refresh ? '?refresh=1' : ''}`);
+  } catch {
+    return;
+  }
+  if (store.view === 'overview') renderView();
 }
 function ago(iso) {
   const time = Date.parse(iso);
@@ -1203,6 +1239,7 @@ async function applySync() {
     document.getElementById('sync-panel').close();
     toast('Synced to your agents.');
     await refresh();
+    loadHosts(true);
   } catch (error) {
     if (error.code === 'sync_plan_changed' || error.code === 'stale_revision') {
       await openSync();
@@ -1234,3 +1271,4 @@ window.addEventListener('hashchange', route);
 route();
 refresh();
 loadCrons();
+loadHosts();

@@ -39,7 +39,7 @@ git push -u origin main
 # on the next machine: clone it to ~/.agents, install tackroom, run tackroom setup
 ```
 
-`tackroom sync --pull` pulls the repo first, then reconciles. Machines without a Go toolchain skip building the memory tools; everything else syncs normally.
+`tackroom sync --pull` pulls the repo first, then reconciles. List the machines under `crons.hosts` in `tackroom.local.yaml` (SSH aliases, plus `local` for this one) and `tackroom hosts` shows each one's tackroom version, sync state and config commit, with the command that fixes what is wrong. Machines without a Go toolchain skip building the memory tools; everything else syncs normally.
 
 ## The web view
 

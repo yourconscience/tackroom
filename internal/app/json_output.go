@@ -110,6 +110,57 @@ func encodeJSON(w io.Writer, v any) error {
 	return enc.Encode(v)
 }
 
+// hostsJSON is `tackroom hosts --json` and the view's /api/hosts: tackroom
+// itself on every machine in crons.hosts. Version and Commit are this machine's.
+type hostsJSON struct {
+	CheckedAt string     `json:"checked_at"`
+	Version   string     `json:"version"`
+	Commit    string     `json:"commit,omitempty"`
+	Hosts     []hostJSON `json:"hosts"`
+}
+
+type hostJSON struct {
+	Host      string `json:"host"`
+	Reachable bool   `json:"reachable"`
+	Version   string `json:"version,omitempty"`
+	// ConfigRoot, Commit, CommittedAt and Dirty describe the host's config root:
+	// its git HEAD, the time of that commit and the count of uncommitted changes.
+	ConfigRoot  string `json:"config_root,omitempty"`
+	Commit      string `json:"commit,omitempty"`
+	CommittedAt string `json:"committed_at,omitempty"`
+	Dirty       int    `json:"dirty"`
+	// ConfigUncommitted: tackroom.yaml is in a git config root but was never
+	// committed, so no other machine can pull it.
+	ConfigUncommitted bool `json:"config_uncommitted,omitempty"`
+	// Relation places Commit against this machine's config commit: same,
+	// behind, ahead, diverged, or unknown when this machine's git does not
+	// have it. Ahead and Behind count the commits.
+	Relation     string          `json:"relation,omitempty"`
+	Ahead        int             `json:"ahead,omitempty"`
+	Behind       int             `json:"behind,omitempty"`
+	RelationText string          `json:"relation_text,omitempty"`
+	Synced       bool            `json:"synced"`
+	OutOfSync    []hostAgentJSON `json:"out_of_sync"`
+	Error        string          `json:"error,omitempty"`
+	// Health (ok, warn or fail), Summary and Fix are what both views draw
+	// (hosts_words.go). Fix is a command to run on this machine.
+	Health  string `json:"health"`
+	Summary string `json:"summary"`
+	Fix     string `json:"fix,omitempty"`
+
+	bin      string // the tackroom the probe ran
+	onPath   bool   // found on the host's non-login PATH
+	repoLink string // status repo_link
+	hasLock  bool   // tackroom.lock exists beside an uncommitted tackroom.yaml
+}
+
+// hostAgentJSON is one harness a host's status reports out of sync, with what
+// is pending there.
+type hostAgentJSON struct {
+	Name    string   `json:"name"`
+	Pending []string `json:"pending"`
+}
+
 type doctorCheckJSON struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`

@@ -33,6 +33,7 @@ tackroom view     # the dashboard: sync state, pins, holds, crons; desktop or ph
 tackroom sync     # write each agent's native config from the repo
 tackroom status   # what is synced, held or blocked
 tackroom doctor   # check skills, roles, pins, audits and hooks
+tackroom hosts    # every machine in crons.hosts: version, sync state, config commit
 ```
 
 ## What it syncs
