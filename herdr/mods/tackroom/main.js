@@ -399,7 +399,7 @@ export default class Tackroom extends View {
 
   detail(j, t) {
     const result = j.last_exit != null ? `exit ${j.last_exit}` : j.last_status;
-    const fields = [["Health", HEALTH[j.health]], ["ID", j.id], ["Command", j.command], ["Log", j.log],
+    const fields = [["Health", HEALTH[j.health]], ["ID", j.id], ["Command", j.command], ["Effect", j.effect], ["Log", j.log],
       ["Schedule", j.declared_schedule || j.schedule], ["Last run", j.last_run], ["Result", result]].filter(([, v]) => v);
     const busy = this.busy === key(j) || this.busy !== "" || this.src.crons.loading;
     const acts = j.source === "launchd" && j.unit

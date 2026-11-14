@@ -37,17 +37,19 @@ export default class JobForm {
     this.busy = false;
     this.handle = cx.focus_handle();
 
-    const field = (value, placeholder) => {
-      const state = InputState.new({ value: value ?? "", placeholder });
+    // No placeholders: Herdr draws them nearly as bright as typed text, so an
+    // empty form looked filled in. The labels carry the examples instead.
+    const field = (value) => {
+      const state = InputState.new({ value: value ?? "" });
       state.on("submit", (_e, cx) => this.submit(cx));
       return state;
     };
     const [exe = "", ...args] = this.job?.declared_command ?? [];
-    this.id = field(this.job?.id, "nightly-backup");
-    this.schedule = field(this.job?.declared_schedule, "0 9 * * 1-5");
-    this.exe = field(exe, "/usr/bin/git");
-    this.args = (args.length ? args : [""]).map((a) => field(a, "argument"));
-    this.effect = field(this.job?.effect, "what it changes");
+    this.id = field(this.job?.id);
+    this.schedule = field(this.job?.declared_schedule);
+    this.exe = field(exe);
+    this.args = (args.length ? args : [""]).map((a) => field(a));
+    this.effect = field(this.job?.effect);
     this.field = field;
 
     if (this.mode === "delete") this.handle.focus();
@@ -110,7 +112,10 @@ export default class JobForm {
 
   render(cx) {
     const t = theme();
-    const label = (text) => div().pt(12).pb(6).text_size(11.5).text_color(t.dim).child(text);
+    // The example stays on one line: it wraps below the label as a whole.
+    const label = (text, example) => h_flex().flex_wrap().gap_x(6).pt(12).pb(6).text_size(11.5).text_color(t.dim)
+      .child(div().child(text))
+      .when(Boolean(example), (el) => el.child(div().whitespace_nowrap().child(`for example ${example}`)));
     const input = (state) => Input.new(state).h(34).px(10).rounded(8).border_1().border_color(t.input).bg(t.background).text_size(12.5).text_color(t.foreground);
     const button = (id, text, kind, action) => h_flex().id(id).h(32).px(14).items_center().rounded(8).border_1()
       .border_color(kind === "primary" ? t.solid : kind === "danger" ? t.ansi1 : t.input)
@@ -132,21 +137,21 @@ export default class JobForm {
         .children([this.job.declared_schedule, command].filter(Boolean).map((line) => div().text_color(t.dim).truncate().child(line)));
     } else {
       body = v_flex().max_h(380).overflow_y_scrollbar()
-        .when(this.mode === "add", (el) => el.child(label("Name")).child(input(this.id)))
-        .child(label("Schedule (minute hour day-of-month month weekday)")).child(input(this.schedule))
-        .child(label("Command (a name on PATH or an absolute path)")).child(input(this.exe))
+        .when(this.mode === "add", (el) => el.child(label("Name", "nightly-backup")).child(input(this.id)))
+        .child(label("Schedule (minute hour day-of-month month weekday)", "0 9 * * 1-5")).child(input(this.schedule))
+        .child(label("Command (a name on PATH or an absolute path)", "/usr/bin/git")).child(input(this.exe))
         .child(label("Arguments, one per box"))
         .children(this.args.map((state, i) => h_flex().id(`arg-${i}`).gap(6).pb(6).items_center()
           .child(div().flex_1().min_w(0).child(input(state)))
           .child(h_flex().id(`arg-rm-${i}`).w(28).h(28).flex_none().items_center().justify_center().rounded(6).cursor_pointer().text_color(t.dim)
             .hover((s) => s.bg(t.hover))
-            .on_click((_e, cx) => { this.args.splice(i, 1); if (!this.args.length) this.args.push(this.field("", "argument")); cx.notify(); })
+            .on_click((_e, cx) => { this.args.splice(i, 1); if (!this.args.length) this.args.push(this.field("")); cx.notify(); })
             .child("−"))))
         .child(h_flex().id("arg-add").h(26).px(8).items_center().rounded(6).cursor_pointer().text_size(12).text_color(t.muted)
           .hover((s) => s.bg(t.hover))
-          .on_click((_e, cx) => { const s = this.field("", "argument"); this.args.push(s); s.focus(); cx.notify(); })
+          .on_click((_e, cx) => { const s = this.field(""); this.args.push(s); s.focus(); cx.notify(); })
           .child("+ Add argument"))
-        .child(label("Effect (optional)")).child(input(this.effect));
+        .child(label("Effect (optional): what it changes")).child(input(this.effect));
     }
 
     return v_flex().id("tackroom-form").track_focus(this.handle)
