@@ -6,6 +6,15 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## To 2.3
+
+Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats.
+
+- `tackroom view` works on a phone and in a narrow side panel: larger text and tap targets, matrices that stack into rows, a web app manifest so it can go on a home screen, and a page that asks for the token when a phone opens it without one. See [On a phone](view.md#on-a-phone).
+- The view's Overview lists outside sources as pinned, held or blocked, with the reason and the command that overrides it. The view now applies the freshness hold and the audit gate the way `tackroom status` does, so it no longer offers a sync for a skill that sync would skip.
+- New: `tackroom config inventory` prints the view's inventory as JSON.
+- The Herdr panel is now a `tackroom` panel with Overview, Skills, Roles, MCP & hooks and Crons tabs. Copy `herdr/mods/tackroom` and the `tackroom` layout again to get it; the old `crons.svg` icon is replaced by `tackroom.svg`. See [herdr.md](herdr.md).
+
 ## To 2.2
 
 Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats. One thing moves on its own, for Codex users with plugin sources (below).
