@@ -88,6 +88,7 @@ func runSetup(opts runOptions) error {
 		if err != nil {
 			return err
 		}
+		printDetectionWarnings(streams.out, detection)
 		shared, err := applyReviewDecisions(repoRoot, &cfg, shareAllDecisions(detection), skills, roles, mcps)
 		if err != nil {
 			return err
@@ -100,6 +101,7 @@ func runSetup(opts runOptions) error {
 		if err != nil {
 			return err
 		}
+		printDetectionWarnings(streams.out, detection)
 		if err := runReviewImport(repoRoot, &cfg, detection, skills, roles, mcps, streams); err != nil {
 			if !errors.Is(err, errReviewAborted) {
 				return err

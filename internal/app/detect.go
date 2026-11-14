@@ -41,6 +41,9 @@ type detectionResult struct {
 	AutoResolved int            `json:"auto_resolved"`
 	// PlannedActions are the non-import steps setup would take.
 	PlannedActions []string `json:"planned_actions,omitempty"`
+	// Warnings name harness configs setup could not read; what they hold is
+	// left out of the import, and setup goes on with the rest.
+	Warnings []string `json:"warnings,omitempty"`
 }
 
 // runDetection scans all detected harnesses for non-managed skills, roles, and
@@ -100,7 +103,9 @@ func runDetection(cfg config, detected []agentConfig, repoRoot string, home stri
 
 		mcps, err := detectNativeMCPServers(agent, cfg, home)
 		if err != nil {
-			return nil, fmt.Errorf("detect MCP for %s: %w", agent.Name, err)
+			// One harness config tackroom cannot read must not stop setup.
+			result.Warnings = append(result.Warnings, fmt.Sprintf("%s: MCP servers not imported: %v", agent.Name, err))
+			mcps = nil
 		}
 		for _, m := range mcps {
 			k := key("mcp", m.Name)
