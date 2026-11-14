@@ -4,18 +4,31 @@ The [Herdr](https://herdr.dev) app can show tackroom as a native side panel with
 
 ## Install
 
-Copy the folders from the [`herdr/` directory](https://github.com/yourconscience/tackroom/tree/main/herdr) of the repository into Herdr's config folder, which `herdr/` mirrors:
+The panel is two Herdr mods, `tackroom` and `tackroom-toggle`, in [`herdr/tackroom/`](https://github.com/yourconscience/tackroom/tree/main/herdr/tackroom), with a [recipe](https://github.com/yourconscience/tackroom/blob/main/herdr/tackroom/RECIPE.md) that adds them to the layout you already use: a tackroom button after Files and Changes, and the panel in the right column. It needs tackroom 2.4 or newer on the PATH Herdr runs programs with; otherwise set the block's `tackroom` prop to its path.
 
-```bash
-cp -R herdr/mods/tackroom herdr/mods/tackroom-toggle ~/.config/herdr-app/mods/
-cp herdr/layouts/tackroom.* ~/.config/herdr-app/layouts/
+From Herdr's mod gallery, paste this line to the agent you use in Herdr:
+
+```
+Read ~/.config/herdr-app/AGENTS.md, then add this mod: herdr.dev/mods/yourconscience/tackroom--herdr--tackroom
 ```
 
-Then switch Herdr to the `tackroom` layout: Herdr's main layout (cloned from main 0.1.15) with the panel in the right column and a tackroom button after Files and Changes.
+The agent reads the recipe and both mods, tells you what they run, copies them into Herdr's `mods/` folder, adds the button and the panel to your layout (cloning it first when it is one of Herdr's own layouts, which are read-only) and runs `herdr-app check`. The listing appears on [herdr.dev/mods](https://herdr.dev/mods) once the repository has the `herdr-mod` topic.
 
-To add the panel to a layout of your own, copy only `mods/tackroom` and add its block to that layout's `panel-body` stack. The recipes are [`herdr/RECIPE.md`](https://github.com/yourconscience/tackroom/blob/main/herdr/RECIPE.md) and [`herdr/mods/tackroom/RECIPE.md`](https://github.com/yourconscience/tackroom/blob/main/herdr/mods/tackroom/RECIPE.md).
+By hand, from a checkout of this repository:
+
+```bash
+cp -R herdr/tackroom/mods/* ~/.config/herdr-app/mods/
+```
+
+Then follow "Add to your window" in the recipe: put the `tabs` block in a row with a `tackroom-toggle` block, and add a `tackroom` block to the `panel-body` stack. Use `$HERDR_APP_HOME` in place of `~/.config/herdr-app` if you set it.
 
 tackroom never edits Herdr layouts or key bindings for you.
+
+## Update
+
+Paste the same line to your agent again, or copy the mods again from an updated checkout with the `cp` above. The layout edit is one-time: an update replaces only the two mod folders. The gallery serves the repository's `main` branch; Herdr pins no version.
+
+If you copied the `tackroom` layout that earlier releases shipped in `herdr/layouts/`, it keeps working, since it already has the button and the panel. To update, copy only the mods.
 
 ## What the panel shows
 
