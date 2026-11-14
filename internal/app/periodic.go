@@ -92,6 +92,11 @@ func periodicSyncMessage(job *cronJob, enabled bool) string {
 		return "periodic sync is paused or disabled. Fix: systemctl --user enable --now " + ownedSystemdPrefix + periodicSyncID + ".timer"
 	case job.Health == "paused":
 		return "periodic sync is paused or disabled. Fix: tackroom cron resume " + periodicSyncID
+	case (job.Health == "warn" || job.Health == "fail") && strings.Contains(job.Command, "/.profile"):
+		// tackroom before 2.0 wrote `. "$HOME/.profile"; tackroom pull`. A missing
+		// or failing ~/.profile stops /bin/sh before tackroom starts, so the job
+		// fails with an empty log and `tackroom pull` by hand works.
+		return "periodic sync job comes from a tackroom before 2.0 and sources ~/.profile, which stops it before tackroom starts. Fix: tackroom cron"
 	case job.Health == "fail":
 		detail := job.State
 		if len(job.Problems) > 0 {
