@@ -6,6 +6,10 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## Unreleased
+
+- Deprecated: `tackroom tui`. It still runs, with a notice, and will be removed in 3.0. Use `tackroom view` (on a desktop, a phone or in a side panel) or the [Herdr panel](herdr.md); in a terminal, `tackroom status`, `tackroom cron collect --table` and `tackroom doctor` print the same facts.
+
 ## To 2.3
 
 Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats.

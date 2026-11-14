@@ -33,7 +33,6 @@ tackroom view     # the dashboard: sync state, pins, holds, crons; desktop or ph
 tackroom sync     # write each agent's native config from the repo
 tackroom status   # what is synced, held or blocked
 tackroom doctor   # check skills, roles, pins, audits and hooks
-tackroom tui      # the same state in a full-screen terminal view, read-only
 ```
 
 ## What it syncs
@@ -65,7 +64,6 @@ Terminals: a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/he
 - [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
 - [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
 - [Web view](https://yourconscience.github.io/tackroom/docs/view/): the dashboard, on a desktop or a phone
-- [TUI](https://yourconscience.github.io/tackroom/docs/tui/): the read-only terminal view
 - [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and holds
 - [Roles](https://yourconscience.github.io/tackroom/docs/roles/): role format, model tiers, per-agent output
 - [Memory](https://yourconscience.github.io/tackroom/docs/memory/): memory tiers and the `rem` workflow

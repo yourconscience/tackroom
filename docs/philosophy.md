@@ -35,7 +35,7 @@ Capture and de-duplication are machine jobs. Promoting a fact into your instruct
 Check: captured candidates sit inert in `$KNOWLEDGE_DIR/ai/` until you act on the report in `$KNOWLEDGE_DIR/reviews/`. See [memory.md](memory.md).
 
 ## You work in the view; the CLI is the engine
-Day to day you look and act in `tackroom view`: on a desktop, on a phone over your tailnet, or in a narrow pane beside your agents. The CLI is the engine and the surface for scripts and SSH. The view, `tackroom tui`, the Herdr panel and the Claude Code and Pi plugins call the same commands; none has data or an action the CLI lacks, and saving in the view never runs a sync.
+Day to day you look and act in `tackroom view`: on a desktop, on a phone over your tailnet, or in a narrow pane beside your agents. The CLI is the engine and the surface for scripts and SSH. The view, the Herdr panel, the skill and the Claude Code and Pi plugins call the same commands; none has data or an action the CLI lacks, and saving in the view never runs a sync.
 
 Check: the view's Overview lists the same held and blocked sources as `tackroom status`; its Crons tab draws `tackroom cron collect`; after a save in the view, `tackroom status` reports the change as not synced until you apply Sync.
 
