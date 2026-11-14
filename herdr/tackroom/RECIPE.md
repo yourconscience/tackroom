@@ -1,6 +1,6 @@
 # tackroom
 
-tackroom's panel in the Herdr window you already use, one click from the tab bar: Overview, Skills, Roles, MCP & hooks and Crons, the web view's tabs of those names, drawn from the same tackroom commands. It shows which harnesses are out of sync and why, the state of every skill, role, MCP server and hook in each harness, and every scheduled job on every host tackroom scans, with Run now, Pause and Resume, and Add, Edit and Delete for jobs tackroom owns. It adds a button and a panel to your layout; everything else stays as it is.
+A side panel for [tackroom](https://github.com/yourconscience/tackroom), which keeps skills, MCP servers, hooks and roles in sync across Claude Code, Codex and other coding agents. It shows which agents are out of sync and why, every skill, role, MCP server and hook per agent, every machine in your setup, and every scheduled job, with Run now, Pause and Resume. It adds a tackroom button after Files and Changes and a panel in the right column; the rest of your layout stays as it is. Its tabs, Overview, Skills, Roles, MCP & hooks and Crons, match the web view's and draw the same tackroom commands.
 
 ![tackroom](preview.png)
 
