@@ -8,6 +8,7 @@ tackroom version
 
 ## Unreleased
 
+- Fixed: a role with `tools: []` was written with no `tools` key, so Claude Code, GitHub Copilot CLI, Gemini CLI, Kimi Code, OMP and Pi gave it every tool. They now get no tools, and the next sync, including the periodic `tackroom pull`, rewrites those copies. `tools: ""` now also means no tools. Codex, Cursor, Factory Droid, OpenCode, Qwen Code and Grok Build cannot express it and keep the harness default; see [Tools](roles.md#tools).
 - The Herdr panel moved to `herdr/tackroom/`, a package Herdr's mod gallery can list, with a recipe that adds the button and the panel to the layout you use. The `tackroom` layout in `herdr/layouts/` is gone; if you copied it, it keeps working. To update the panel, copy the two mods from `herdr/tackroom/mods/`, or paste the gallery line in [herdr.md](herdr.md#install) to your agent. Where the notes below say to copy `herdr/mods/tackroom`, copy `herdr/tackroom/mods/tackroom` instead.
 
 ## To 2.5

@@ -26,6 +26,8 @@ func renderOMP(role Role) (string, error) {
 		for _, tool := range tools {
 			writeYAMLListItem(&b, tool)
 		}
+	} else if noTools(role) {
+		b.WriteString("tools: []\n")
 	}
 	writeGeneratedMarkdownBody(&b, role)
 	return b.String(), nil

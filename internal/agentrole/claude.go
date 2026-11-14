@@ -17,6 +17,9 @@ func renderClaude(role Role) (string, error) {
 		b.WriteString("tools: ")
 		b.WriteString(strings.Join(role.Tools, ", "))
 		b.WriteString("\n")
+	} else if noTools(role) {
+		// Without a tools key Claude Code grants every tool.
+		b.WriteString("tools: []\n")
 	}
 	writeYAMLScalar(&b, "color", role.Color)
 	writeGeneratedMarkdownBody(&b, role)

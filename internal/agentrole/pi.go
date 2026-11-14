@@ -29,6 +29,9 @@ func renderPi(role Role) (string, error) {
 		for _, tool := range tools {
 			writeYAMLListItem(&b, tool)
 		}
+	} else if noTools(role) {
+		// A bare tools key gives a Pi subagent no tools.
+		b.WriteString("tools:\n")
 	}
 	writeGeneratedMarkdownBody(&b, role)
 	return b.String(), nil
