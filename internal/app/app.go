@@ -146,6 +146,13 @@ type agentReport struct {
 	StaleMCP        []string // servers sync wrote earlier that are no longer wanted
 	UnsupportedHook []string
 	Conflicts       []string
+	// IdenticalCopies are native files or skill folders with the shared
+	// content that sync replaces with links; they are backed up first, so
+	// `tackroom restore` can put them back.
+	IdenticalCopies []string
+	// RoleConflicts are the Conflicts entries about one role file. They leave
+	// only that file alone; the rest of the agent still syncs.
+	RoleConflicts []string
 	// Replaceable lists conflicts that `sync --replace-conflicts` (and setup)
 	// may resolve by moving the native path into a backup and linking it.
 	Replaceable    []replaceableConflict
@@ -173,10 +180,12 @@ type agentReport struct {
 }
 
 // replaceableConflict is a native file or skill directory that sits where
-// tackroom wants a symlink and whose content differs from the canonical copy.
+// tackroom wants a symlink or a rendered role and whose content differs from
+// the canonical copy.
 type replaceableConflict struct {
-	Path    string // native path to back up and replace with a link
-	Skill   string // skill name; empty for root instructions
+	Path    string // native path to back up and replace
+	Skill   string // skill name; empty for roles and root instructions
+	Role    string // role name; empty for skills and root instructions
 	Message string // the matching entry in agentReport.Conflicts
 }
 
@@ -214,10 +223,20 @@ type runOptions struct {
 	// into a timestamped backup and links them. Setup always sets it.
 	ReplaceConflicts bool
 	// Verbose expands `status` back to the full per-surface managed and
-	// external skill lists and native root paths instead of the concise view.
+	// external skill lists and native root paths instead of the concise view,
+	// and makes setup print every step and the full sync report.
 	Verbose bool
 	// NoCron makes setup skip installing the periodic sync job.
 	NoCron bool
+	// Review makes setup show the import review and ask before each step
+	// instead of taking every default.
+	Review bool
+	// From is the git URL setup clones into (or pulls in) the config root.
+	From string
+	// setupResult, set by setup, receives what the setup-driven sync did, so
+	// setup can print its short summary. The sync report itself is then
+	// printed only with Verbose.
+	setupResult *setupSyncResult
 	// ExitCode makes `status` map drift to exit 1 and errors to exit 2
 	// (instead of the default 1 for any failure).
 	ExitCode bool
@@ -504,14 +523,29 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	fs := flag.NewFlagSet("setup", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts runOptions
-	opts.MemoryTier = memoryTierBasic
+	var assumeYes bool
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
-	fs.StringVar(&opts.MemoryTier, "memory", memoryTierBasic, "Memory tier: off, basic, or memsearch")
+	// Empty means: keep the tier an existing tackroom.yaml uses, else basic.
+	fs.StringVar(&opts.MemoryTier, "memory", "", "Memory tier: off, basic, or memsearch (default basic; an existing config keeps its tier)")
+	fs.StringVar(&opts.From, "from", "", "Clone this git repository into the config root (or pull it there) and set up from it")
+	fs.BoolVar(&opts.Review, "review", false, "Review what to import and confirm each step instead of taking the defaults")
+	fs.BoolVar(&opts.Verbose, "verbose", false, "Print every step and the full sync report")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Emit detection result as JSON and exit")
-	fs.BoolVar(&opts.DryRun, "dry-run", false, "Show detected import candidates and exit without changes (overrides --yes)")
-	fs.BoolVar(&opts.AssumeYes, "yes", false, "Answer every prompt with its default, never read stdin: import everything, initialize git, back up and replace conflicting files")
+	fs.BoolVar(&opts.DryRun, "dry-run", false, "Show detected import candidates and exit without changes")
 	fs.BoolVar(&opts.NoCron, "no-cron", false, "Do not install the periodic sync job (tackroom pull every 15m)")
+	// --yes was the way to skip the prompts; setup no longer asks, so it is
+	// accepted for old scripts and left out of the help.
+	fs.BoolVar(&assumeYes, "yes", false, "")
+	fs.Usage = func() {
+		fmt.Fprintln(fs.Output(), "usage: tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]")
+		fs.VisitAll(func(f *flag.Flag) {
+			if f.Name == "yes" {
+				return
+			}
+			fmt.Fprintf(fs.Output(), "  --%s\n    \t%s\n", f.Name, f.Usage)
+		})
+	}
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
@@ -529,7 +563,7 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.Pull, "pull", false, "Pull the repo before syncing")
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Print the plan without writing anything, fetching external sources or querying registries")
-	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup and link them")
+	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup, then link the shared skill or instructions file, or rewrite the role, in their place")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the resulting status as JSON instead of the text report")
 	addAllowFreshFlags(fs, &opts)
 	if err := fs.Parse(args); err != nil {
@@ -580,7 +614,7 @@ func printUsage() {
 	fmt.Println("tackroom - manage shared skills, MCP, and canonical config")
 	fmt.Println()
 	fmt.Println("Commands:")
-	fmt.Println("  setup    Set up this machine and sync configured harnesses")
+	fmt.Println("  setup    Set up this machine; on another machine: setup --from <git url>")
 	fmt.Println("  status   Show harness, external lock, and memsearch state")
 	fmt.Println("  sync     Regenerate committed artifacts and reconcile harnesses")
 	fmt.Println("  doctor   Check pins, dependencies, and local health")
@@ -600,7 +634,7 @@ func printUsage() {
 
 // canonicalForms is the full command reference; group --help prints its lines.
 var canonicalForms = []string{
-	"  tackroom setup [--memory off|basic|memsearch] [--agents ...] [--yes] [--no-cron] [--dry-run] [--json]",
+	"  tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]",
 	"  tackroom status [--verbose] [--exit-code] [--agents ...]",
 	"  tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]",
 	"  tackroom doctor [--e2e] [--agents ...]",

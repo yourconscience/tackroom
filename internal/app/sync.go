@@ -246,18 +246,23 @@ func runSync(opts runOptions) error {
 		// The text report is replaced by one JSON document at the end.
 		streams.out = io.Discard
 	}
+	reportOut := streams.out
+	if opts.setupResult != nil && !opts.Verbose {
+		// Setup prints its own summary instead of the report.
+		reportOut = io.Discard
+	}
 	starterChanges, err := reconcileStarterFiles(repoRoot, streams, opts.ConfirmRemovals)
 	if err != nil {
 		return err
 	}
-	starterChanges.report(streams.out)
+	starterChanges.report(reportOut)
 
 	toolInstalls, err := installMemoryTools(repoRoot)
 	if err != nil {
 		return err
 	}
 	if len(toolInstalls) > 0 {
-		fmt.Fprintf(streams.out, "memory tools installed: %s\n", strings.Join(toolInstalls, ", "))
+		fmt.Fprintf(reportOut, "memory tools installed: %s\n", strings.Join(toolInstalls, ", "))
 	}
 
 	inspectCfg, err := configForInspection(cfg, sources, held, repoRoot, home)
@@ -273,8 +278,10 @@ func runSync(opts runOptions) error {
 		return err
 	}
 	reports := readableReports(inspected)
+	var backupDir string
+	var moved []string
 	if opts.ReplaceConflicts {
-		if err := replaceAllConflicts(reports, home, streams, opts.ConfirmRemovals); err != nil {
+		if backupDir, moved, err = replaceAllConflicts(reports, home, streams, opts.ConfirmRemovals); err != nil {
 			return err
 		}
 	}
@@ -282,20 +289,37 @@ func runSync(opts runOptions) error {
 		confirmDestructiveSyncActions(reports, streams)
 	}
 	preflight := cloneReports(reports)
+	changes, _ := countSyncChanges(repoReport, preflight, false)
+	changes += len(starterChanges.Scaffolded) + len(starterChanges.Updated) + len(starterChanges.Removed)
 
-	// An agent with conflicts is left untouched; every other agent still syncs.
-	var conflicts []string
+	// An agent with conflicts is left untouched and every other agent still
+	// syncs; a role conflict leaves only that role file alone.
+	var conflicts, skipped []string
+	replaceableLeft := false
 	runnable := make([]agentReport, 0, len(reports))
 	for _, report := range reports {
-		if len(report.Conflicts) == 0 {
-			runnable = append(runnable, report)
-			continue
-		}
+		replaceableLeft = replaceableLeft || len(report.Replaceable) > 0
 		for _, conflict := range report.Conflicts {
 			conflicts = append(conflicts, fmt.Sprintf("%s: %s", report.Name, conflict))
 		}
+		if len(blockingConflicts(report)) == 0 {
+			runnable = append(runnable, report)
+		} else {
+			skipped = append(skipped, report.Name)
+		}
 	}
 	reports = runnable
+	if identical := len(replaceableIdenticalPaths(reports)); identical > 0 {
+		if backupDir == "" {
+			backupDir = newConflictBackupDir(home)
+		}
+		copies, err := backupIdenticalCopies(reports, backupDir, home)
+		moved = append(moved, copies...)
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(streams.out, "backed up %d identical file(s) to %s before linking them\n", len(copies), backupDir)
+	}
 	if err := applyAgentSync(reports, cfg, repoRoot, home); err != nil {
 		return err
 	}
@@ -332,18 +356,30 @@ func runSync(opts runOptions) error {
 	if err != nil {
 		return err
 	}
+	// An agent sync skipped changed nothing; its report must not say it did.
+	for i := range preflight {
+		if stringInSlice(preflight[i].Name, skipped) {
+			preflight[i] = agentReport{Name: preflight[i].Name}
+		}
+	}
 	restoreSyncActions(reports, preflight)
 	repoReport.Linked = linkingRepo && repoReport.State == stateSynced
 
-	printReport(streams.out, true, repoReport, reports, home, cfg)
-	printHeldSummary(streams.out, held)
+	printReport(reportOut, true, repoReport, reports, home, cfg)
+	printHeldSummary(reportOut, held)
+	if opts.setupResult != nil {
+		*opts.setupResult = setupSyncResult{
+			done: true, repo: repoReport, reports: reports, conflicts: conflicts,
+			changes: changes, backupDir: backupDir, moved: moved, held: len(held),
+		}
+	}
 	if opts.JSONOutput {
 		view := buildStatusJSON(repoRoot, repoReport, reports)
 		for _, c := range conflicts {
 			view.Synced = false
 			view.Agents = appendConflict(view.Agents, c)
 		}
-		if len(conflicts) > 0 {
+		if replaceableLeft {
 			view.Hint = conflictHint(home)
 		}
 		if err := encodeJSON(jsonOut, view); err != nil {
@@ -351,8 +387,19 @@ func runSync(opts runOptions) error {
 		}
 	}
 	if len(conflicts) > 0 {
-		return fmt.Errorf("left %d conflict(s) in place; the other agents synced: %s\n%s",
-			len(conflicts), strings.Join(conflicts, "; "), conflictHint(home))
+		hint := ""
+		if replaceableLeft {
+			// --replace-conflicts would resolve at least one of them.
+			hint = "\n" + conflictHint(home)
+		}
+		// Say exactly what did not sync: a role conflict leaves only that
+		// role file; any other conflict skips the whole agent.
+		outcome := "synced everything else"
+		if len(skipped) > 0 {
+			outcome = fmt.Sprintf("skipped %s entirely (a conflicting skill folder, instructions file or plugin setting keeps sync away from the whole agent) and synced everything else", joinAnd(skipped))
+		}
+		return fmt.Errorf("left %d conflict(s) in place: %s\n%s%s",
+			len(conflicts), strings.Join(conflicts, "; "), outcome, hint)
 	}
 	return agentFailures(reports)
 }
@@ -424,7 +471,7 @@ func runSyncDryRun(opts runOptions) error {
 	for i := range reports {
 		// A real sync links or rewrites the root doc; say so in the plan headline.
 		r := &reports[i]
-		r.RootLinked = r.Detected && len(r.Conflicts) == 0 && r.RootPath != "" && (r.RootState == stateMissing || r.RootState == stateDrifted)
+		r.RootLinked = r.Detected && len(blockingConflicts(*r)) == 0 && r.RootPath != "" && (r.RootState == stateMissing || r.RootState == stateDrifted)
 	}
 
 	// Starter files a real sync would scaffold, refresh or retire.
@@ -457,6 +504,12 @@ func runSyncDryRun(opts runOptions) error {
 	}
 	if opts.ReplaceConflicts {
 		listReplaceableConflicts(streams.out, reports, home)
+	}
+	if identical := replaceableIdenticalPaths(reports); len(identical) > 0 {
+		fmt.Fprintf(streams.out, "\n%d file(s) identical to the shared copy would be moved to %s and replaced by links:\n", len(identical), newConflictBackupDir(home))
+		for _, path := range identical {
+			fmt.Fprintf(streams.out, "  %s\n", path)
+		}
 	}
 
 	fmt.Fprintf(streams.out, "\ndry run: %s across %s; nothing written\n", plural(changes, "change"), plural(harnesses, "harness"))
@@ -582,6 +635,16 @@ func withoutMissingSources(cfg config, home string) (config, []string) {
 	return cfg, missing
 }
 
+// replaceableIdenticalPaths lists the native copies identical to the shared
+// one that sync backs up before linking.
+func replaceableIdenticalPaths(reports []agentReport) []string {
+	var paths []string
+	for _, report := range reports {
+		paths = append(paths, report.IdenticalCopies...)
+	}
+	return paths
+}
+
 // replaceableConflictPaths lists the native paths --replace-conflicts would
 // move into a backup.
 func replaceableConflictPaths(reports []agentReport) []string {
@@ -602,7 +665,7 @@ func listReplaceableConflicts(w io.Writer, reports []agentReport, home string) {
 		return
 	}
 	backupDir := newConflictBackupDir(home)
-	fmt.Fprintf(w, "\n%d existing file(s) differ from the shared copy and would be moved to %s and replaced with links:\n", len(paths), backupDir)
+	fmt.Fprintf(w, "\n%d existing file(s) differ from the shared copy and would be moved to %s and replaced by the shared copies:\n", len(paths), backupDir)
 	for _, path := range paths {
 		fmt.Fprintf(w, "  %s\n", path)
 	}
@@ -633,11 +696,21 @@ func countSyncChanges(repoReport repoLinkReport, reports []agentReport, replaceC
 			continue
 		}
 		replaced := 0
-		if len(report.Conflicts) > 0 {
-			if !replaceConflicts || len(report.Replaceable) != len(report.Conflicts) {
-				continue
-			}
+		if replaceConflicts {
 			replaced = len(report.Replaceable)
+		}
+		// A conflict that is neither replaced nor about one role keeps the
+		// whole harness untouched.
+		blocked := false
+		for _, conflict := range blockingConflicts(report) {
+			replaceable := false
+			for _, item := range report.Replaceable {
+				replaceable = replaceable || item.Message == conflict
+			}
+			blocked = blocked || !replaceConflicts || !replaceable
+		}
+		if blocked {
+			continue
 		}
 		n := replaced + len(report.Adds) + len(report.Updates) + len(report.Removes) +
 			len(report.AddsAgent) + len(report.UpdatesAgent) + len(report.RemovesAgent) +
@@ -656,9 +729,10 @@ func countSyncChanges(repoReport repoLinkReport, reports []agentReport, replaceC
 	return changes, harnesses
 }
 
-// replaceAllConflicts backs up and clears every replaceable conflict. When
-// confirm is set (setup), it lists them and asks first; --yes accepts.
-func replaceAllConflicts(reports []agentReport, home string, streams setupIO, confirm bool) error {
+// replaceAllConflicts backs up and clears every replaceable conflict and
+// returns the backup directory and the native paths moved into it. When
+// confirm is set (setup --review), it lists them and asks first.
+func replaceAllConflicts(reports []agentReport, home string, streams setupIO, confirm bool) (string, []string, error) {
 	var pending []string
 	for _, report := range reports {
 		for _, item := range report.Replaceable {
@@ -666,17 +740,17 @@ func replaceAllConflicts(reports []agentReport, home string, streams setupIO, co
 		}
 	}
 	if len(pending) == 0 {
-		return nil
+		return "", nil, nil
 	}
 	backupDir := newConflictBackupDir(home)
 	if confirm {
-		fmt.Fprintf(streams.out, "\n%d existing file(s) differ from the shared copy and will be replaced with links:\n", len(pending))
+		fmt.Fprintf(streams.out, "\n%d existing file(s) differ from the shared copy and will be replaced by the shared copies:\n", len(pending))
 		for _, path := range pending {
 			fmt.Fprintf(streams.out, "  %s\n", path)
 		}
-		if !promptYesNo(streams, fmt.Sprintf("Move them to %s and link the shared copies?", backupDir)) {
+		if !promptYesNo(streams, fmt.Sprintf("Move them to %s and put the shared copies in their place?", backupDir)) {
 			fmt.Fprintln(streams.out, "keeping them; those agents are skipped until the conflicts are resolved")
-			return nil
+			return "", nil, nil
 		}
 	}
 	var moved []string
@@ -684,11 +758,11 @@ func replaceAllConflicts(reports []agentReport, home string, streams setupIO, co
 		paths, err := replaceConflicts(&reports[i], backupDir, home)
 		moved = append(moved, paths...)
 		if err != nil {
-			return err
+			return backupDir, moved, err
 		}
 	}
 	fmt.Fprintf(streams.out, "backed up %d file(s) to %s\n", len(moved), backupDir)
-	return nil
+	return backupDir, moved, nil
 }
 
 func applyAgentRootInstructionSync(reports []agentReport) error {
@@ -754,7 +828,7 @@ func applyAgentSync(reports []agentReport, cfg config, repoRoot string, home str
 		if !report.Detected {
 			continue
 		}
-		if len(report.Conflicts) > 0 {
+		if len(blockingConflicts(report)) > 0 {
 			return fmt.Errorf("%s has conflicts", report.Name)
 		}
 		h := harnessFor(report.Name)

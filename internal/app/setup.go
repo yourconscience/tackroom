@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,11 +26,59 @@ func runSetup(opts runOptions) error {
 	if err := checkConfigRoot(repoRoot); err != nil {
 		return err
 	}
+	// Setup takes every default without reading stdin unless asked to review.
+	opts.AssumeYes = !opts.Review
 	streams := setupStreams(opts)
 
-	cfg, err := loadSetupConfig(configPath, home)
+	var from *setupFrom
+	if opts.From != "" {
+		plan, err := planSetupFrom(opts.From, repoRoot, home)
+		if err != nil {
+			return err
+		}
+		from = &plan
+	}
+	if from != nil && !opts.JSONOutput && !opts.DryRun {
+		if err := from.apply(); err != nil {
+			return err
+		}
+		if err := checkConfigRoot(repoRoot); err != nil {
+			return err
+		}
+	}
+	// --dry-run and --json plan against what the real run would see. For a
+	// clone that is not made yet, that is a throwaway clone in a temp dir.
+	planRoot, planConfig := repoRoot, configPath
+	if from != nil && from.clone && (opts.JSONOutput || opts.DryRun) {
+		tmp, err := os.MkdirTemp("", "tackroom-from-")
+		if err != nil {
+			return err
+		}
+		defer os.RemoveAll(tmp)
+		planRoot = filepath.Join(tmp, "config")
+		planConfig = filepath.Join(planRoot, filepath.Base(configPath))
+		if _, err := gitRemote("clone", "--quiet", "--depth", "1", "--", from.url, planRoot); err != nil {
+			return fmt.Errorf("git clone %s failed: %v", redactURL(from.url), err)
+		}
+	}
+	configExisted := hasFile(planConfig)
+
+	cfg, err := loadSetupConfig(planConfig, home)
 	if err != nil {
 		return err
+	}
+	// Without --memory, an existing config keeps the tier it already uses, and
+	// setup never changes it. A machine that lacks memsearch for a memsearch
+	// config leaves the hooks as they are and says what to install.
+	tier := opts.MemoryTier
+	keepTier := false
+	if tier == "" && configExisted {
+		tier = configuredMemoryTier(cfg)
+		if tier == memoryTierMemsearch {
+			if _, err := exec.LookPath("memsearch"); err != nil {
+				keepTier = true
+			}
+		}
 	}
 	detected, err := detectDefaultAgents(opts.Agents)
 	if err != nil {
@@ -43,79 +92,134 @@ func runSetup(opts runOptions) error {
 
 	// --json and --dry-run must exit before any mutation, including the
 	// memory-tier setup below which creates directories and config files.
+	planned := setupPlannedActions(opts)
+	if from != nil {
+		planned = append([]string{from.action()}, planned...)
+	}
 	if opts.JSONOutput {
-		detection, err := runDetection(cfg, detected, repoRoot, home)
+		detection, err := runDetection(cfg, detected, planRoot, home)
 		if err != nil {
 			return err
 		}
-		detection.PlannedActions = setupPlannedActions(opts)
+		detection.PlannedActions = planned
 		enc := json.NewEncoder(streams.out)
 		enc.SetIndent("", "  ")
 		return enc.Encode(detection)
 	}
 
 	if opts.DryRun {
-		detection, err := runDetection(cfg, detected, repoRoot, home)
+		detection, err := runDetection(cfg, detected, planRoot, home)
 		if err != nil {
 			return err
 		}
-		fmt.Fprint(streams.out, renderDetectionSummary(detection))
-		for _, action := range setupPlannedActions(opts) {
+		if opts.Review {
+			fmt.Fprint(streams.out, renderDetectionSummary(detection))
+		} else {
+			// What the default run would do, with the same decisions.
+			_, roles, _, err := scanNativeImports(cfg, detected, planRoot, home)
+			if err != nil {
+				return err
+			}
+			decisions, kept := setupImportDecisions(detection, roles, cfg.Agents, home)
+			fmt.Fprint(streams.out, renderSetupPlan(detection, decisions, kept, cfg.Agents, planRoot, displayPath(repoRoot, home), home))
+		}
+		for _, action := range planned {
 			fmt.Fprintf(streams.out, "\nplanned: %s\n", action)
 		}
-		if sources := rootInstructionSources(repoRoot, detected, home); len(sources) > 0 {
+		if sources := rootInstructionSources(planRoot, detected, home); len(sources) > 0 {
 			fmt.Fprintln(streams.out, "\nroot instructions to import into AGENTS.md (originals are backed up, then linked):")
 			for _, src := range sources {
-				fmt.Fprintf(streams.out, "  %s (%s)\n", src.Path, src.Agent)
+				fmt.Fprintf(streams.out, "  %s (%s)\n", displayPath(src.Path, home), src.Agent)
 			}
 		}
 		return nil
 	}
 
-	if err := applyMemoryTier(&cfg, opts.MemoryTier, repoRoot, home); err != nil {
+	// chatter is the step-by-step log --verbose shows. prompts carries the
+	// questions --review asks; without it every question takes its default
+	// and nothing about it is printed.
+	chatter := streams.out
+	prompts := streams
+	if !opts.Verbose {
+		chatter = io.Discard
+		if !opts.Review {
+			prompts.out = io.Discard
+		}
+	}
+	summary := setupSummary{home: home, root: repoRoot, fresh: !configExisted, from: from}
+	for _, agent := range detected {
+		summary.agents = append(summary.agents, agent.Name)
+	}
+
+	if keepTier {
+		summary.problem("this config's memory hooks use memsearch, which is not installed here. Install it (uv tool install memsearch), then run: tackroom setup")
+	} else if err := applyMemoryTier(&cfg, tier, repoRoot, home); err != nil {
 		return err
 	}
 
-	fmt.Fprintln(streams.out, "tackroom setup")
-	fmt.Fprintf(streams.out, "config root: %s\n\n", repoRoot)
+	fmt.Fprintln(chatter, "tackroom setup")
+	fmt.Fprintf(chatter, "config root: %s\n\n", repoRoot)
 
+	before := canonicalItems(repoRoot, cfg)
 	skills, roles, mcps, err := scanNativeImports(cfg, detected, repoRoot, home)
 	if err != nil {
 		return err
 	}
-	if opts.AssumeYes {
-		detection, err := runDetection(cfg, detected, repoRoot, home)
-		if err != nil {
-			return err
-		}
-		printDetectionWarnings(streams.out, detection)
-		shared, err := applyReviewDecisions(repoRoot, &cfg, shareAllDecisions(detection), skills, roles, mcps)
+	detection, err := runDetection(cfg, detected, repoRoot, home)
+	if err != nil {
+		return err
+	}
+	summary.warnings = detection.Warnings
+	var decisions []reviewDecision
+	switch {
+	case !opts.Review:
+		decisions, summary.keptRoles = setupImportDecisions(detection, roles, cfg.Agents, home)
+		shared, err := applyReviewDecisions(repoRoot, &cfg, decisions, skills, roles, mcps)
 		if err != nil {
 			return err
 		}
 		if shared > 0 {
-			fmt.Fprintf(streams.out, "imported %d item(s) without prompting (--yes)\n\n", shared)
+			fmt.Fprintf(chatter, "imported %d item(s)\n\n", shared)
 		}
-	} else if reviewTTYAvailable(streams) {
-		detection, err := runDetection(cfg, detected, repoRoot, home)
+	case reviewTTYAvailable(streams):
+		decisions, err = runReviewImport(repoRoot, &cfg, detection, skills, roles, mcps, prompts)
 		if err != nil {
-			return err
-		}
-		printDetectionWarnings(streams.out, detection)
-		if err := runReviewImport(repoRoot, &cfg, detection, skills, roles, mcps, streams); err != nil {
 			if !errors.Is(err, errReviewAborted) {
 				return err
 			}
-			fmt.Fprintln(streams.out, "import review aborted; continuing setup without importing")
+			fmt.Fprintln(prompts.out, "import review aborted; continuing setup without importing")
 		}
-	} else if err := importNativeContent(repoRoot, &cfg, skills, roles, mcps, streams); err != nil {
+	default:
+		if err := importNativeContent(repoRoot, &cfg, skills, roles, mcps, prompts); err != nil {
+			return err
+		}
+	}
+	after := canonicalItems(repoRoot, cfg)
+	summary.noteImports(before, after)
+	for name := range summary.keptRoles {
+		if before["role:"+name] {
+			// The config already shares this role; the sync reports the
+			// agent's own copy if it cannot be replaced.
+			delete(summary.keptRoles, name)
+		}
+	}
+	// An agent's own role that was not imported keeps its name: no starter
+	// role of that name is written over it.
+	skipRoles := map[string]bool{}
+	for _, item := range append(append([]detectedItem(nil), detection.Items...), detection.Resolved...) {
+		if item.Surface == "role" && !after["role:"+item.Name] {
+			skipRoles[item.Name] = true
+		}
+	}
+	summary.rootDocs = rootInstructionSources(repoRoot, detected, home)
+	if err := importRootInstructions(repoRoot, detected, home, setupIO{in: streams.in, out: chatter}); err != nil {
 		return err
 	}
-	if err := importRootInstructions(repoRoot, detected, home, streams); err != nil {
-		return err
-	}
-	if err := ensureStarterAssets(repoRoot, configPath, opts.MemoryTier); err != nil {
-		return err
+	// A config root cloned with --from is adopted as it is: no starter files.
+	if from == nil || !configExisted {
+		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, skipRoles); err != nil {
+			return err
+		}
 	}
 	if err := ensureMemoryHookExecutables(repoRoot); err != nil {
 		return err
@@ -127,95 +231,168 @@ func runSetup(opts runOptions) error {
 	for _, agent := range detected {
 		patched, err := patchAgentConfig(agent, home, repoRoot, cfg)
 		if err != nil {
-			fmt.Fprintf(streams.out, "%s: config patch failed: %v\n", agent.Name, err)
+			fmt.Fprintf(chatter, "%s: config patch failed: %v\n", agent.Name, err)
+			summary.problem("%s: could not update its config: %v. Fix the file, then run: tackroom setup", agent.Name, err)
 			continue
 		}
 		if patched {
-			fmt.Fprintf(streams.out, "%s: config patched (added %s)\n", agent.Name, filepath.Join(repoRoot, "skills"))
+			summary.changed = true
+			fmt.Fprintf(chatter, "%s: config patched (added %s)\n", agent.Name, filepath.Join(repoRoot, "skills"))
 		} else {
-			fmt.Fprintf(streams.out, "%s: config already set\n", agent.Name)
+			fmt.Fprintf(chatter, "%s: config already set\n", agent.Name)
 		}
 	}
 	migrated, err := migrateLegacyMemoryHookPaths(home, repoRoot)
 	if err != nil {
-		fmt.Fprintf(streams.out, "memory hooks: legacy path migration failed: %v\n", err)
+		fmt.Fprintf(chatter, "memory hooks: legacy path migration failed: %v\n", err)
+		summary.hookProblems = append(summary.hookProblems, fmt.Sprintf("could not update old memory hook paths: %v. Fix the file, then run: tackroom setup", err))
 	} else if migrated > 0 {
-		fmt.Fprintf(streams.out, "memory hooks: migrated legacy paths in %d config file(s)\n\n", migrated)
+		summary.changed = true
+		fmt.Fprintf(chatter, "memory hooks: migrated legacy paths in %d config file(s)\n\n", migrated)
 	}
-	cleaned, err := removeNativeManagedMemoryHooks(home, repoRoot, priorCfg, cfg)
+	// The config the sync below applies, local overlay included; when it does
+	// not load, nothing is kept and every managed memory hook is cleaned.
+	effective, _ := loadConfig(repoRoot, home, configPath)
+	cleaned, err := removeNativeManagedMemoryHooks(home, repoRoot, priorCfg, cfg, effective)
 	if err != nil {
-		fmt.Fprintf(streams.out, "memory hooks: native cleanup failed: %v\n", err)
+		fmt.Fprintf(chatter, "memory hooks: native cleanup failed: %v\n", err)
+		summary.hookProblems = append(summary.hookProblems, fmt.Sprintf("could not remove old memory hooks: %v. Fix the file, then run: tackroom setup", err))
 	} else if cleaned > 0 {
-		fmt.Fprintf(streams.out, "memory hooks: removed previous managed commands from %d native config file(s)\n\n", cleaned)
+		summary.changed = true
+		fmt.Fprintf(chatter, "memory hooks: removed previous managed commands from %d native config file(s)\n\n", cleaned)
 	}
-
-	offerGitInit(repoRoot, streams)
 
 	syncOpts := opts
 	syncOpts.ConfigPath = configPath
 	syncOpts.ConfirmRemovals = true
 	// Setup adopts this machine: native files that differ from the shared
-	// copy are backed up and linked (after a prompt; --yes accepts).
+	// copy are backed up and replaced (after a prompt with --review).
 	syncOpts.ReplaceConflicts = true
-	if err := runSync(syncOpts); err != nil {
-		return err
+	syncOpts.Stdout = prompts.out
+	syncOpts.setupResult = &summary.sync
+	summary.noteDiffering(detection)
+	syncErr := runSync(syncOpts)
+	if syncErr != nil && !summary.sync.done {
+		return syncErr
 	}
+	summary.noteDiffered(before, detection, decisions)
+	summary.memory = memorySummary(cfg, tier, keepTier)
+	// After the sync, so the first commit holds everything sync wrote too.
+	// Without --review, git init is only for a first setup: no tackroom.yaml
+	// before this run (and offerGitInit skips a root already under git). A
+	// config whose owner declined git keeps going without it.
+	if !configExisted || opts.Review {
+		var gitProblem string
+		summary.gitNew, gitProblem, summary.gitNote = offerGitInit(repoRoot, prompts)
+		if gitProblem != "" {
+			summary.problem("%s", gitProblem)
+		}
+	}
+	summary.periodic, summary.cronNew = setupPeriodicSync(syncOpts, configPath, repoRoot, home, &summary)
+	if problems := summary.print(streams.out); problems > 0 || syncErr != nil {
+		return errSetupNeedsAttention
+	}
+	return nil
+}
+
+// setupPeriodicSync installs the periodic `tackroom pull` job unless the user
+// opted out, and returns the summary line and whether it was installed now.
+func setupPeriodicSync(opts runOptions, configPath, repoRoot, home string, summary *setupSummary) (string, bool) {
 	if opts.NoCron {
 		// --no-cron is an explicit opt-out, recorded so doctor does not warn
 		// about a job the user chose not to install.
 		if err := setLocalPeriodicSync(configPath, home, false); err != nil {
-			fmt.Fprintf(streams.out, "warning: could not record periodic_sync: false: %v\n", err)
+			summary.problem("could not record periodic_sync: false in tackroom.local.yaml: %v", err)
 		}
-		return nil
+		return "Periodic sync is off (--no-cron); turn it on with: tackroom cron", false
 	}
 	// A persisted periodic_sync: false (tackroom.yaml or the local overlay) is
 	// the same opt-out; setup must not reinstall the job and reverse it.
 	if effective, err := loadConfig(repoRoot, home, ""); err == nil && !periodicSyncEnabled(effective) {
-		return nil
+		return "Periodic sync is off (periodic_sync: false); turn it on with: tackroom cron", false
 	}
 	// Setup is the one place besides `tackroom cron` that installs the job.
 	// A scheduler that cannot take it must not fail the setup. An installed
 	// job is left alone, so a chosen --interval survives.
 	if job, _ := readPeriodicSync(); job != nil {
-		return nil
+		return "Periodic sync (tackroom pull) was already installed", false
 	}
-	if err := installPeriodicSync(cronOptions{runOptions: syncOpts}); err != nil {
-		fmt.Fprintf(streams.out, "warning: periodic sync not installed: %v\nfix and retry: tackroom cron\n", err)
+	if err := installPeriodicSync(cronOptions{runOptions: opts}); err != nil {
+		summary.problem("periodic sync was not installed: %v. Fix: tackroom cron", err)
+		return "", false
 	}
-	return nil
+	return "Sync runs every 15 minutes (tackroom pull)", true
 }
 
-// offerGitInit proposes versioning a fresh config root. Skipped when the root
-// is already inside a git work tree, git is unavailable, or stdin gives no
-// answer (non-interactive runs).
-func offerGitInit(repoRoot string, streams setupIO) {
+// memorySummary is the setup summary's memory line.
+func memorySummary(cfg config, tier string, notInstalled bool) string {
+	tier = normalizeMemoryTier(tier)
+	if notInstalled {
+		return tier + " (memsearch is not installed here)"
+	}
+	var events []string
+	for _, hook := range cfg.Hooks {
+		if _, managed := managedMemoryHookNames[hook.Name]; managed && hook.Enabled {
+			events = append(events, map[string]string{"SessionStart": "session start", "Stop": "stop", "SessionEnd": "session end"}[hook.Event])
+		}
+	}
+	if tier == memoryTierOff || len(events) == 0 {
+		return "off"
+	}
+	return fmt.Sprintf("%s (hooks at %s)", tier, joinAnd(events))
+}
+
+// configuredMemoryTier reads the memory tier an existing config uses from its
+// managed memory hooks, so a rerun or a second machine keeps it.
+func configuredMemoryTier(cfg config) string {
+	tier := memoryTierOff
+	for _, hook := range cfg.Hooks {
+		if _, managed := managedMemoryHookNames[hook.Name]; !managed {
+			continue
+		}
+		switch {
+		case strings.Contains(hook.Command, "basic-session-"):
+			return memoryTierBasic
+		case strings.Contains(hook.Command, "session-start.sh"), strings.Contains(hook.Command, "session-end.sh"), strings.Contains(hook.Command, "stop.sh"):
+			tier = memoryTierMemsearch
+		}
+	}
+	return tier
+}
+
+// offerGitInit versions a fresh config root: it asks with --review and
+// otherwise just does it. Skipped when the root is already inside a git work
+// tree or git is unavailable. It reports whether it created the repository, a
+// problem line for the summary when a step failed, and a note when only the
+// first commit is missing (git has no user.name and user.email yet), which
+// leaves the setup itself complete.
+func offerGitInit(repoRoot string, streams setupIO) (bool, string, string) {
 	if _, err := exec.LookPath("git"); err != nil {
-		return
+		return false, "", ""
 	}
 	inside := exec.Command("git", "-C", repoRoot, "rev-parse", "--is-inside-work-tree")
 	if out, err := inside.Output(); err == nil && strings.TrimSpace(string(out)) == "true" {
-		return
+		return false, "", ""
 	}
 	if !promptYesNo(streams, fmt.Sprintf("Initialize a git repository in %s to version your configuration?", repoRoot)) {
-		return
+		return false, "", ""
 	}
 	if out, err := exec.Command("git", "-C", repoRoot, "init", "-b", "main").CombinedOutput(); err != nil {
 		// -b needs git >= 2.28; retry without it before giving up.
 		if out2, err2 := exec.Command("git", "-C", repoRoot, "init").CombinedOutput(); err2 != nil {
 			fmt.Fprintf(streams.out, "git init failed: %v: %s\n", err, strings.TrimSpace(string(append(out, out2...))))
-			return
+			return false, fmt.Sprintf("could not create a git repository in %s: %s. Fix: git -C %s init", repoRoot, gitErrorLine(string(out2)), repoRoot), ""
 		}
 	}
 	if out, err := exec.Command("git", "-C", repoRoot, "add", "-A").CombinedOutput(); err != nil {
 		fmt.Fprintf(streams.out, "git add failed: %v: %s\n", err, strings.TrimSpace(string(out)))
-		return
+		return true, fmt.Sprintf("could not add your config to git: %s. Fix: git -C %s add -A", gitErrorLine(string(out)), repoRoot), ""
 	}
 	if out, err := exec.Command("git", "-C", repoRoot, "commit", "-m", "initialize agent configuration").CombinedOutput(); err != nil {
-		fmt.Fprintf(streams.out, "git commit skipped: %v: %s\n", err, strings.TrimSpace(string(out)))
-		fmt.Fprintln(streams.out, "commit manually once git user.name/user.email are configured")
-		return
+		return true, "", fmt.Sprintf("Not committed yet (%s). Set git user.name and user.email, then run: git -C %s commit -m \"initialize agent configuration\"", gitErrorLine(string(out)), repoRoot)
 	}
 	fmt.Fprintf(streams.out, "initialized git repository in %s; add a private remote to sync across machines\n\n", repoRoot)
+	return true, "", ""
 }
 
 func patchAgentConfig(agent agentConfig, home string, repoRoot string, cfg config) (bool, error) {
@@ -435,7 +612,7 @@ func runCron(opts cronOptions) error {
 	if err != nil {
 		return err
 	}
-	if err := runCronPlan(plan, backend, home, legacy, false); err != nil {
+	if err := runCronPlan(setupStreams(opts.runOptions).out, plan, backend, home, legacy, false); err != nil {
 		return err
 	}
 	if !opts.Remove && !opts.Deps {

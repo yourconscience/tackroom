@@ -9,7 +9,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 
 ## Set up and sync
 
-- `tackroom setup [--memory off|basic|memsearch] [--agents a,b] [--yes] [--no-cron] [--dry-run] [--json]` creates the config root, imports what your harnesses have by copy, runs the first sync and installs the periodic job. See [setup.md](setup.md).
+- `tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents a,b] [--no-cron] [--dry-run] [--json]` creates the config root, imports what your harnesses have by copy, runs the first sync, installs the periodic job and prints a short summary. It asks nothing; `--review` asks before each step, `--verbose` prints the full sync report, and `--from` clones (or pulls) your config repository first, for another machine. `--yes` is accepted and does nothing. See [setup.md](setup.md).
 - `tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents a,b] [--json] [--allow-fresh[=item,...]] [--reason TEXT]` writes each harness's native config from the repo. `--dry-run` prints the plan, including held and blocked items, and writes nothing. `--pull` runs `tackroom pull` first.
 - `tackroom status [--verbose] [--exit-code] [--json] [--agents a,b]` shows per harness what is synced, drifted, held or blocked. `-v` is short for `--verbose`.
 - `tackroom pull` runs `git pull --ff-only` in the config root, then `sync`. A failed pull only warns. This is what the periodic job runs.

@@ -5,7 +5,7 @@ What tackroom believes about managing a coding-agent setup, and what it refuses 
 ## Your setup is a repo you own
 Your skills, roles, hooks and instructions live in a folder of yours: `--config`, else `$TACKROOM_HOME`, else `~/.agents`. tackroom's own checkout is never read as config, and a config root inside a linked git worktree is refused.
 
-Check: `tackroom config validate` prints the file it used; `tackroom setup` offers `git init`.
+Check: `tackroom config validate` prints the file it used; `tackroom setup` puts a new config root under git.
 
 ## One config for every harness, plus what makes each one itself
 You declare skills, MCP servers, hooks, roles and plugins once in `tackroom.yaml`, and every harness gets them in its own format: roles as TOML for Codex and Markdown elsewhere, hooks under each harness's event names, Gemini CLI with its own tool names.

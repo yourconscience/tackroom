@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/BurntSushi/toml"
+	"github.com/charmbracelet/x/term"
 	starter "github.com/yourconscience/tackroom"
 	"github.com/yourconscience/tackroom/internal/agentrole"
 	"gopkg.in/yaml.v3"
@@ -46,8 +48,8 @@ var memoryHookReplyUnsupported = map[string]struct{}{
 type setupIO struct {
 	in  io.Reader
 	out io.Writer
-	// assumeYes (setup --yes) answers every yes/no prompt with its default
-	// without reading stdin, so agents and scripts never block.
+	// assumeYes (setup without --review) answers every yes/no prompt with its
+	// default without reading stdin, so agents and scripts never block.
 	assumeYes bool
 }
 
@@ -85,6 +87,13 @@ func setupStreams(opts runOptions) setupIO {
 }
 
 func ensureStarterAssets(root string, configPath string, memoryTier string) error {
+	return ensureStarterAssetsExcept(root, configPath, memoryTier, nil)
+}
+
+// ensureStarterAssetsExcept leaves out the starter roles named in skipRoles:
+// an agent's own role of that name stays the agent's, never replaced by a
+// starter one.
+func ensureStarterAssetsExcept(root string, configPath string, memoryTier string, skipRoles map[string]bool) error {
 	skipMemoryTools := normalizeMemoryTier(memoryTier) == memoryTierOff
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", root, err)
@@ -101,6 +110,9 @@ func ensureStarterAssets(root string, configPath string, memoryTier string) erro
 			if d.IsDir() {
 				return fs.SkipDir
 			}
+			return nil
+		}
+		if dir, file := filepath.Split(filepath.FromSlash(path)); dir == "agents"+string(filepath.Separator) && skipRoles[strings.TrimSuffix(file, agentrole.MarkdownExtension)] {
 			return nil
 		}
 		targetPath := path
@@ -658,41 +670,58 @@ func convertNativeRoleMarkdown(path string, data []byte, fallbackName string) ([
 			return data, nil
 		}
 	}
-	role := agentrole.Role{Name: fallbackName, Description: "Imported from " + path, Model: "opus", Effort: "high", Instructions: strings.TrimSpace(string(data))}
+	// A shared role needs a description; nothing else is made up, and no
+	// machine path goes into the shared config.
+	role := agentrole.Role{Name: fallbackName, Description: importedRoleDescription(fallbackName), Instructions: strings.TrimSpace(string(data))}
 	return agentrole.RenderCanonical(role)
 }
 
+// importedRoleDescription is the description a role imported without one
+// gets: a shared role must have one, and this one asks for a real one.
+func importedRoleDescription(name string) string {
+	return name + " (imported without a description; describe when to use it)"
+}
+
 func convertCodexRoleTOMLToMarkdown(path string, data []byte) ([]byte, error) {
-	values := parseTOMLTopLevelValues(string(data))
+	values := codexRoleTOMLValues(data)
 	name := strings.TrimSuffix(filepath.Base(path), filepath.Ext(path))
-	if raw := values["name"]; raw != "" {
-		if parsed, err := parseTOMLString(raw); err == nil && strings.TrimSpace(parsed) != "" {
-			name = parsed
-		}
+	if strings.TrimSpace(values["name"]) != "" {
+		name = values["name"]
 	}
-	description := "Imported from " + path
-	if raw := values["description"]; raw != "" {
-		if parsed, err := parseTOMLString(raw); err == nil && strings.TrimSpace(parsed) != "" {
-			description = parsed
-		}
+	description := importedRoleDescription(name)
+	if strings.TrimSpace(values["description"]) != "" {
+		description = values["description"]
 	}
-	model := ""
-	if raw := values["model"]; raw != "" {
-		model, _ = parseTOMLString(raw)
-	}
-	effort := ""
-	if raw := values["model_reasoning_effort"]; raw != "" {
-		effort, _ = parseTOMLString(raw)
-	}
-	instructions := ""
-	if raw := values["developer_instructions"]; raw != "" {
-		instructions, _ = parseTOMLString(raw)
-	}
+	model := values["model"]
+	effort := values["model_reasoning_effort"]
+	instructions := values["developer_instructions"]
 	if strings.TrimSpace(instructions) == "" {
 		instructions = strings.TrimSpace(string(data))
 	}
 	role := agentrole.Role{Name: name, Description: description, Effort: effort, Instructions: instructions, Codex: agentrole.CodexOptions{Model: model, ModelReasoningEffort: effort}}
 	return agentrole.RenderCanonical(role)
+}
+
+// codexRoleTOMLValues reads a Codex role's top-level string keys. A TOML
+// decoder handles every string form ("""multi-line""" included); a file it
+// cannot decode falls back to reading simple one-line keys.
+func codexRoleTOMLValues(data []byte) map[string]string {
+	values := map[string]string{}
+	var raw map[string]any
+	if _, err := toml.Decode(string(data), &raw); err == nil {
+		for key, value := range raw {
+			if text, ok := value.(string); ok {
+				values[key] = text
+			}
+		}
+		return values
+	}
+	for key, raw := range parseTOMLTopLevelValues(string(data)) {
+		if parsed, err := parseTOMLString(raw); err == nil {
+			values[key] = parsed
+		}
+	}
+	return values
 }
 
 // confirmDestructiveSyncActions previews per-harness removals and role
@@ -744,7 +773,7 @@ func confirmDestructiveSyncActions(reports []agentReport, streams setupIO) {
 func promptYesNoDefaultNo(streams setupIO, prompt string) bool {
 	fmt.Fprintf(streams.out, "%s [y/N] ", prompt)
 	if streams.assumeYes {
-		fmt.Fprintln(streams.out, "no (--yes keeps the safe default)")
+		fmt.Fprintln(streams.out, "no (default)")
 		return false
 	}
 	line, answered := readSetupLine(streams.in)
@@ -757,9 +786,14 @@ func promptYesNoDefaultNo(streams setupIO, prompt string) bool {
 }
 
 func promptYesNo(streams setupIO, prompt string) bool {
+	if !streams.assumeYes && !isTerminalInput(streams.in) {
+		// Piped or absent input is not someone answering: the prompt shows
+		// and takes the safe default, no.
+		return promptYesNoDefaultNo(streams, prompt)
+	}
 	fmt.Fprintf(streams.out, "%s [Y/n] ", prompt)
 	if streams.assumeYes {
-		fmt.Fprintln(streams.out, "yes (--yes)")
+		fmt.Fprintln(streams.out, "yes (default)")
 		return true
 	}
 	line, answered := readSetupLine(streams.in)
@@ -769,6 +803,12 @@ func promptYesNo(streams setupIO, prompt string) bool {
 	}
 	answer := strings.ToLower(strings.TrimSpace(line))
 	return answer == "" || answer == "y" || answer == "yes"
+}
+
+// isTerminalInput reports whether r is a terminal someone types answers into.
+func isTerminalInput(r io.Reader) bool {
+	f, ok := r.(*os.File)
+	return ok && term.IsTerminal(f.Fd())
 }
 
 func promptConflict(streams setupIO, category string, name string, left string, right string) string {

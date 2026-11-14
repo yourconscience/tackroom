@@ -15,14 +15,16 @@ tackroom sync --dry-run          # what a real sync would change, including held
 **"exists but is not a symlink" or "differs from canonical content".** A real file or skill folder with different content sits where tackroom wants a link, for example `~/.claude/CLAUDE.md`. Sync skips that harness and syncs the rest. Merge anything you want to keep into the shared copy under `~/.agents`, then run:
 
 ```bash
-tackroom sync --replace-conflicts    # moves the native files to a backup, then links the shared copy
+tackroom sync --replace-conflicts    # moves the native files to a backup, then links the shared skill or instructions file, or rewrites the role
 tackroom restore                     # list backups, newest first
 tackroom restore latest --dry-run    # preview putting the newest one back
 ```
 
 Backups live in `$XDG_STATE_HOME/tackroom/backups/<time>/` (default `~/.local/state/tackroom/backups/`).
 
-**A sync proposed removals you did not expect.** Setup-driven syncs preview removals and role overwrites per harness and default to no. Answer `n`, then inspect with `tackroom status`.
+**"role ... has ... that the shared role does not" or "role ... is a link to ...".** A harness's own role file sits where the shared role of the same name would be written, and replacing it would lose something: a field tackroom cannot write for that harness (for example Claude Code's `permissionMode` or Codex's `sandbox_mode`), different instructions, or a link that keeps it live from somewhere else. `setup` and `sync --replace-conflicts` never replace such a file; sync leaves that one file alone and syncs everything else into the harness. Rename the file to keep it next to the shared role, or move it out of the harness's agents folder to use the shared role, then run `tackroom setup` (or `tackroom sync`).
+
+**A sync proposed removals you did not expect.** Setup asks about removals and role overwrites only with `--review`, per harness, defaulting to no; without it, setup leaves them and lists them in its summary for `tackroom sync`. Answer `n`, then inspect with `tackroom status`.
 
 **"refusing to run with repo root ... linked git worktree".** The config root cannot be, or live inside, a linked git worktree, because the links it creates would dangle when the worktree is removed. Point `$TACKROOM_HOME` or `--config` at the main checkout.
 
