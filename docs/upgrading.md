@@ -6,7 +6,9 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
-## Unreleased
+## To 2.5
+
+`tackroom.yaml` and `tackroom.lock` keep their formats. Scripts that run `tackroom setup --yes` keep working.
 
 - `tackroom setup` no longer asks anything. It does what `setup --yes` did: imports everything your agents have (copies; a differing native file is backed up before it is replaced), installs the periodic job, and ends with a short summary instead of the full sync report. Unlike `--yes`, it initializes git only on a first setup (no `tackroom.yaml` yet), so a config you kept out of git stays that way; it never changes the memory tier of an existing `tackroom.yaml` without `--memory` (`basic` on a new one); and it exits 1 whenever the summary lists something that needs you, possibly after the sync, commit and job are already done. To review imports and confirm each step as before, run `tackroom setup --review`; `--verbose` prints the full report. `--yes` is still accepted and does nothing, so scripts keep working.
 - New: `tackroom setup --from <git url>` sets up another machine in one command. It clones your config repository into the config root, or pulls it when it is already a clone of that URL, then sets up from it. A config root with other content is refused and left as it is. See [Multi-machine](setup.md#multi-machine).
@@ -15,6 +17,7 @@ tackroom version
 - Fixed: importing a Codex role whose `developer_instructions` is a `"""` multi-line string no longer copies the raw TOML into the instructions.
 - Fixed: rerunning `setup` no longer removes the memory hooks from each agent's config only for the sync to add them back.
 - Changed: `sync` (and so `setup`) backs up a native file or skill folder that is identical to the shared copy before linking it, as it already did for different ones, so `tackroom restore latest` puts back everything a run replaced.
+- Fixed: with many agents, the web view's Skills, Roles and MCP & hooks tables showed no names. The name column now keeps its width and the table scrolls sideways inside its card.
 - `setup` lists instructions files it merged from several agents into `AGENTS.md` as needing your attention, and `setup --dry-run` now says what the run would do: whose copy it keeps and which roles stay each agent's own.
 
 ## To 2.4
