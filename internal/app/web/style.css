@@ -368,6 +368,8 @@ button.danger:hover:not(:disabled) { background: var(--pill-negative-bg); }
 .matrix-wrap { overflow-x: auto; border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--card-shadow); }
 .matrix { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: calc(var(--fs-body) + 1px); }
 .matrix thead th:not(.lead) { width: 96px; }
+/* The name column keeps its width; with many agents the table grows past the card and scrolls inside it, names pinned on the left. */
+.matrix thead th.lead { width: 15rem; }
 .matrix th, .matrix td { height: 40px; padding: 4px 10px; border-bottom: 1px solid var(--rule); text-align: center; vertical-align: middle; }
 .matrix tbody tr:last-child > * { border-bottom: 0; }
 .matrix thead th { position: sticky; top: 0; background: var(--surface); color: var(--muted); font-size: var(--fs-small); font-weight: 400; white-space: nowrap; z-index: 1; }
