@@ -283,7 +283,7 @@ func runSetup(opts runOptions) error {
 	// config whose owner declined git keeps going without it.
 	if !configExisted || opts.Review {
 		var gitProblem string
-		summary.gitNew, gitProblem = offerGitInit(repoRoot, prompts)
+		summary.gitNew, gitProblem, summary.gitNote = offerGitInit(repoRoot, prompts)
 		if gitProblem != "" {
 			summary.problem("%s", gitProblem)
 		}
@@ -362,37 +362,37 @@ func configuredMemoryTier(cfg config) string {
 
 // offerGitInit versions a fresh config root: it asks with --review and
 // otherwise just does it. Skipped when the root is already inside a git work
-// tree or git is unavailable. It reports whether it created the repository and
-// a problem line for the summary when a step failed.
-func offerGitInit(repoRoot string, streams setupIO) (bool, string) {
+// tree or git is unavailable. It reports whether it created the repository, a
+// problem line for the summary when a step failed, and a note when only the
+// first commit is missing (git has no user.name and user.email yet), which
+// leaves the setup itself complete.
+func offerGitInit(repoRoot string, streams setupIO) (bool, string, string) {
 	if _, err := exec.LookPath("git"); err != nil {
-		return false, ""
+		return false, "", ""
 	}
 	inside := exec.Command("git", "-C", repoRoot, "rev-parse", "--is-inside-work-tree")
 	if out, err := inside.Output(); err == nil && strings.TrimSpace(string(out)) == "true" {
-		return false, ""
+		return false, "", ""
 	}
 	if !promptYesNo(streams, fmt.Sprintf("Initialize a git repository in %s to version your configuration?", repoRoot)) {
-		return false, ""
+		return false, "", ""
 	}
 	if out, err := exec.Command("git", "-C", repoRoot, "init", "-b", "main").CombinedOutput(); err != nil {
 		// -b needs git >= 2.28; retry without it before giving up.
 		if out2, err2 := exec.Command("git", "-C", repoRoot, "init").CombinedOutput(); err2 != nil {
 			fmt.Fprintf(streams.out, "git init failed: %v: %s\n", err, strings.TrimSpace(string(append(out, out2...))))
-			return false, fmt.Sprintf("could not create a git repository in %s: %s. Fix: git -C %s init", repoRoot, gitErrorLine(string(out2)), repoRoot)
+			return false, fmt.Sprintf("could not create a git repository in %s: %s. Fix: git -C %s init", repoRoot, gitErrorLine(string(out2)), repoRoot), ""
 		}
 	}
 	if out, err := exec.Command("git", "-C", repoRoot, "add", "-A").CombinedOutput(); err != nil {
 		fmt.Fprintf(streams.out, "git add failed: %v: %s\n", err, strings.TrimSpace(string(out)))
-		return true, fmt.Sprintf("could not add your config to git: %s. Fix: git -C %s add -A", gitErrorLine(string(out)), repoRoot)
+		return true, fmt.Sprintf("could not add your config to git: %s. Fix: git -C %s add -A", gitErrorLine(string(out)), repoRoot), ""
 	}
 	if out, err := exec.Command("git", "-C", repoRoot, "commit", "-m", "initialize agent configuration").CombinedOutput(); err != nil {
-		fmt.Fprintf(streams.out, "git commit skipped: %v: %s\n", err, strings.TrimSpace(string(out)))
-		fmt.Fprintln(streams.out, "commit manually once git user.name/user.email are configured")
-		return true, fmt.Sprintf("could not make the first commit in %s (%s). Set git user.name and user.email, then run: git -C %s commit -m \"initialize agent configuration\"", repoRoot, gitErrorLine(string(out)), repoRoot)
+		return true, "", fmt.Sprintf("Not committed yet (%s). Set git user.name and user.email, then run: git -C %s commit -m \"initialize agent configuration\"", gitErrorLine(string(out)), repoRoot)
 	}
 	fmt.Fprintf(streams.out, "initialized git repository in %s; add a private remote to sync across machines\n\n", repoRoot)
-	return true, ""
+	return true, "", ""
 }
 
 func patchAgentConfig(agent agentConfig, home string, repoRoot string, cfg config) (bool, error) {

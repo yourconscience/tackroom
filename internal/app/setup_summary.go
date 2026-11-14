@@ -36,6 +36,7 @@ type setupSummary struct {
 	fresh    bool       // the config root had no tackroom.yaml before this run
 	from     *setupFrom // --from: what the clone or pull did
 	gitNew   bool       // this run created the git repository
+	gitNote  string     // the first commit is still to do (git has no identity)
 	imported map[string]int
 	// warnings name harness configs detection could not read; what they
 	// hold was left out of the import.
@@ -250,6 +251,9 @@ func (s *setupSummary) print(w io.Writer) int {
 	}
 	fmt.Fprintf(w, "Found %s: %s\n", plural(len(s.agents), "coding agent"), strings.Join(found, ", "))
 	fmt.Fprintf(w, "Config: %s%s\n", root, s.configNote())
+	if s.gitNote != "" {
+		fmt.Fprintf(w, "  %s\n", strings.ReplaceAll(s.gitNote, s.root, root))
+	}
 	if s.memory != "" {
 		fmt.Fprintln(w, "Memory: "+s.memory)
 	}
