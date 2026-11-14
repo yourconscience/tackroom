@@ -1,6 +1,6 @@
 {
   "name": "tackroom",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "description": "tackroom in Claude Code: sync status and scheduled jobs in a pane, with Run now, Pause and Resume.",
   "author": { "name": "yourconscience" },
   "homepage": "https://github.com/yourconscience/tackroom",
