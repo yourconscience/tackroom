@@ -121,6 +121,7 @@ main section.hero { border-top: 0; padding: 40px 0 48px; }
 
 /* Launch video */
 .demo video { display: block; width: 100%; height: auto; max-width: 880px; aspect-ratio: 16 / 9; border: 1px solid var(--tr-line); border-radius: var(--tr-radius-card); background: var(--tr-surface); }
+.demo .credit { margin-top: 10px; max-width: 880px; font-size: var(--tr-fs-caption); color: var(--tr-muted); }
 
 /* Agent wall: one item per agent, its mark and its name. All rows share one height. */
 .wall { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: var(--tr-space-4) var(--tr-space-3); }
