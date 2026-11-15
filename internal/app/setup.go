@@ -243,9 +243,17 @@ func runSetup(opts runOptions) error {
 	if err := importRootInstructions(repoRoot, detected, home, setupIO{in: streams.in, out: chatter}); err != nil {
 		return err
 	}
-	// A config root cloned with --from is adopted as it is: no starter files.
-	if from == nil || !configExisted {
-		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, skipRoles); err != nil {
+	// Starter files go only into a config root with no tackroom.yaml before
+	// this run, so a starter role, skill or plugin.json the user deleted stays
+	// deleted. An existing root gets just the memory layer a tier that is on
+	// needs; a root cloned with --from is adopted as it is.
+	switch {
+	case !configExisted:
+		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, skipRoles, false); err != nil {
+			return err
+		}
+	case from == nil && normalizeMemoryTier(tier) != memoryTierOff:
+		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, nil, true); err != nil {
 			return err
 		}
 	}

@@ -86,6 +86,8 @@ A new or changed external skill pin, and a new or changed reference to an exact 
 
 A held item is skipped and what is already in the harness stays. `--allow-fresh` releases it and records the decision in `tackroom.lock` under `holds:`.
 
+The lock records an npm or PyPI version while its hold is in force, while its publish time is unknown, or once you release it. A version already older than 72 hours when it is first looked up adds nothing to the lock, so the first sync on a new machine leaves it unchanged. Pi packages are looked up only on a machine where Pi is detected; elsewhere a decision already in the lock still applies.
+
 ## The audit gate
 
 ```bash
