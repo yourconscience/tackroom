@@ -78,7 +78,7 @@ A launchd job's row offers Run now, Pause and Resume; an owned job on the machin
 
 ## In Claude Code and Pi
 
-The same view is available inside Claude Code and Pi, from the [`claude/`](https://github.com/yourconscience/tackroom/tree/main/claude) and [`pi/`](https://github.com/yourconscience/tackroom/tree/main/pi) folders of the repository. Both run `tackroom` from your `PATH`, show which harnesses are out of sync, list the jobs from `cron collect`, and act through `tackroom cron run|pause|resume`. `/tackroom` opens them.
+The same view is available inside Claude Code and Pi, from the [`claude/`](https://github.com/yourconscience/tackroom/tree/main/claude) and [`pi/`](https://github.com/yourconscience/tackroom/tree/main/pi) folders of the repository. Both run `tackroom` from your `PATH`, show which harnesses are out of sync, list the jobs from `cron collect`, and act through `tackroom cron run|pause|resume`. `/tackroom` opens them. The Claude Code pane also syncs, turns harnesses, MCP servers and hooks on and off, and shows each machine's health, as the [Herdr panel](herdr.md) does; see [plugins.md](plugins.md#tackroom-in-claude-code-and-pi).
 
 ```bash
 claude plugin install tackroom --marketplace yourconscience/tackroom
