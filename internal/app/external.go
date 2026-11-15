@@ -369,21 +369,28 @@ func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot s
 	for _, src := range selected {
 		selectedNames[sourceName(src)] = true
 	}
-	entries := rebuildLockEntries(sources, home, lock)
-	for i := range entries {
-		if selectedNames[entries[i].Name] {
-			continue
-		}
-		for _, src := range sources {
-			if sourceName(src) != entries[i].Name {
+	var entries []externalLockEntry
+	for _, entry := range rebuildLockEntries(sources, home, lock) {
+		if !selectedNames[entry.Name] {
+			pinned := false
+			for _, src := range sources {
+				if sourceName(src) != entry.Name {
+					continue
+				}
+				if pin := lockEntryFor(lock, src); pin != nil {
+					entry.Commit = pin.Commit
+					entry.Materialized = pin.Materialized
+					pinned = true
+				}
+				break
+			}
+			if !pinned {
+				// An unpinned source that was not updated is held, blocked or
+				// not synced yet: only its own gate may pin it.
 				continue
 			}
-			if pin := lockEntryFor(lock, src); pin != nil {
-				entries[i].Commit = pin.Commit
-				entries[i].Materialized = pin.Materialized
-			}
-			break
 		}
+		entries = append(entries, entry)
 	}
 	entries = keepHeldLockEntries(entries, lock, held)
 	if lockEntriesEqual(lock.ExternalSkills, entries) && !holdsChanged(repoRoot, lock) {
