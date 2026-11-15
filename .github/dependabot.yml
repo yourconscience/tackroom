@@ -1,0 +1,29 @@
+version: 2
+
+# Weekly, grouped, and only versions that have been out for three days: the
+# same wait tackroom applies to the skills and packages it installs.
+updates:
+  - package-ecosystem: gomod
+    directories:
+      - "/"
+      - "/tools/sitedocs"
+      - "/tools/stats"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    groups:
+      go:
+        patterns:
+          - "*"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 3
+    groups:
+      actions:
+        patterns:
+          - "*"

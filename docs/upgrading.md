@@ -6,6 +6,14 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## Unreleased
+
+Nothing to migrate by hand.
+
+### Changed
+
+- **Release binaries are built with Go 1.27.** They were built with Go 1.25, which no longer gets security fixes: `govulncheck` reports 14 standard-library vulnerabilities in the 2.7.0 binary and none in a 1.27.4 build. Building from source still needs Go 1.25 or newer.
+
 ## To 2.7
 
 Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats.
