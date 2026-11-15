@@ -14,6 +14,7 @@ Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their forma
 - Fixed: `setup` no longer rewrites `tackroom.yaml` when its content does not change. Before, every run reformatted it (blank lines dropped), which left a change in a cloned config repository and could stop `git pull --ff-only` there.
 - Fixed: `sync`, and the sync `setup` runs, no longer add a `holds:` entry to `tackroom.lock` for an npm or PyPI version that was already older than 72 hours when first looked up. On a new machine every pinned Pi package or MCP server version was new, so its first sync changed the lock. Entries already in the lock are handled as before; one an earlier release wrote with a `hold_until` in the past and no `allowed` can be deleted and committed once every machine runs this release.
 - Changed: Pi packages are looked up only on a machine where Pi is detected. A machine without Pi makes no registry lookup for them and records no hold; a decision already in the lock still applies there.
+- Changed: release binaries are built with Go 1.27. They were built with Go 1.25, which no longer gets security fixes: `govulncheck` reports 14 standard-library vulnerabilities in the 2.7.0 binary and none in a 1.27.4 build. Building from source still needs Go 1.25 or newer.
 
 ## To 2.7
 
