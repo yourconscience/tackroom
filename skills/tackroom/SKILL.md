@@ -37,7 +37,7 @@ tackroom skill list [--agents ...]
 tackroom skill info <name>
 tackroom skill sources [--json]
 tackroom skill sources search <query> [--json]
-tackroom skill sources add <owner/repo[/path] | git URL> [--skills a,b | --all] [--latest] [--name N] [--no-sync]
+tackroom skill sources add <owner/repo[/path] | git URL> [--skills a,b | --all] [--latest] [--name N] [--no-sync] [--allow-fresh[=item,...]]
 tackroom skill update [name ...] [--allow-fresh[=item,...]]
 tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]
 tackroom mcp <list|add|import|remove> [options]
@@ -177,7 +177,7 @@ external_skills:
 
 `tackroom.lock` records exact commits and materialized ownership. `sync` repairs drift to the pin; `skill update` explicitly advances it. `doctor` audits external source content and fails on materialization drift.
 
-Add a source without editing YAML: `tackroom skill sources add mattpocock/skills --skills tdd,grill-me` (or `--all`; without either, an attended run lists the skills to pick and an unattended one fails with the list). It pins the newest commit at least 3 days old (`--latest` pins the head), writes the entry with `materialize: true`, refuses to overwrite a different `~/.agents/skills/<name>` (an identical copy, as `npx skills add` leaves it, is adopted), then syncs. `tackroom skill sources` lists configured sources and the ones installed outside tackroom (Claude Code plugins, `npx skills`); `search` queries skills.sh. A source that Claude Code already has as a plugin gets `exclude_agents: [claude]`, so Claude does not load its skills twice. Two repos with the same basename need a distinct `name:`; `add` picks `<owner>-<repo>` itself.
+Add a source without editing YAML: `tackroom skill sources add mattpocock/skills --skills tdd,grill-me` (or `--all`; without either, an attended run lists the skills to pick and an unattended one fails with the list). It pins the newest commit at least 3 days old (`--latest` pins the head, held like any new pin while it is younger than 72 hours), writes the entry with `materialize: true`, refuses to overwrite a different `~/.agents/skills/<name>` (an identical copy, as `npx skills add` leaves it, is adopted), then syncs. `tackroom skill sources` lists configured sources and the ones installed outside tackroom (Claude Code plugins, `npx skills`); `search` queries skills.sh. A source that Claude Code already has as a plugin gets `exclude_agents: [claude]`, so Claude does not load its skills twice. Two repos with the same basename need a distinct `name:`; `add` picks `<owner>-<repo>` itself.
 
 ## publish
 

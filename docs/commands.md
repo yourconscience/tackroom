@@ -39,7 +39,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 - `tackroom skill info <name>` shows one skill's origin and how each harness sees it.
 - `tackroom skill sources [--json]` lists configured external sources and ones installed outside tackroom.
 - `tackroom skill sources search <query>` searches skills.sh.
-- `tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync]` pins a source and syncs it.
+- `tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync] [--allow-fresh[=item,...]]` pins a source and syncs it. A `--latest` head younger than 72 hours is held until it is 72 hours old or `--allow-fresh` releases it.
 - `tackroom skill update [name ...] [--allow-fresh[=item,...]]` advances pins.
 - `tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]` pushes allowlisted skills to a remote registry. See [skills.md](skills.md#publish-skills).
 

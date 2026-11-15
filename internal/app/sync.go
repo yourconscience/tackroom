@@ -64,6 +64,9 @@ func applyStatusGates(repoRoot, home string, cfg config, selected []agentConfig,
 	for k, v := range pkgHeld {
 		held["package-hold:"+k] = v
 	}
+	for k, v := range pendingUpdateHolds(sources, home, statusLock, timeNow()) {
+		held[k] = v
+	}
 	return statusGates{repoRoot: repoRoot, home: home, cfg: cfg, selected: selected, sources: sources, lock: statusLock, held: held}, nil
 }
 
@@ -239,6 +242,13 @@ func runSync(opts runOptions) error {
 	}
 	for k, v := range pkgHeld {
 		held["package-hold:"+k] = v
+	}
+	lock, err := readLockFile(repoRoot)
+	if err != nil {
+		return err
+	}
+	for k, v := range pendingUpdateHolds(sources, home, lock, timeNow()) {
+		held[k] = v
 	}
 	if err := renderCommittedArtifacts(repoRoot); err != nil {
 		return err
@@ -447,6 +457,9 @@ func runSyncDryRun(opts runOptions) error {
 	}
 	for k, v := range pkgHeld {
 		held["package-hold:"+k] = v
+	}
+	for k, v := range pendingUpdateHolds(sources, home, lock, gate.now) {
+		held[k] = v
 	}
 
 	repoReport, err := inspectRepoLink(repoRoot, home)

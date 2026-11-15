@@ -84,13 +84,8 @@ func gateExternalSources(sources []externalSkillSource, home string, lock *lockF
 			continue
 		}
 		item := externalSourceItem(src, home)
-		if blockers := unacceptedCritical(item, *lock); len(blockers) > 0 {
-			held[name] = heldItem{
-				Item:    item.ID(),
-				Kind:    "blocked",
-				Reason:  fmt.Sprintf("%s in %s", blockers[0].Rule, blockers[0].File),
-				Command: fmt.Sprintf("tackroom doctor audit accept %s %s --reason \"...\"", item.ID(), blockers[0].Rule),
-			}
+		if h, ok := auditBlock(item, *lock); ok {
+			held[name] = h
 			continue
 		}
 		if isLocalSourceURL(src.URL) {
@@ -101,6 +96,20 @@ func gateExternalSources(sources []externalSkillSource, home string, lock *lockF
 		}
 	}
 	return held
+}
+
+// auditBlock blocks an external item with an unaccepted CRITICAL finding.
+func auditBlock(item auditItem, lock lockFile) (heldItem, bool) {
+	blockers := unacceptedCritical(item, lock)
+	if len(blockers) == 0 {
+		return heldItem{}, false
+	}
+	return heldItem{
+		Item:    item.ID(),
+		Kind:    "blocked",
+		Reason:  fmt.Sprintf("%s in %s", blockers[0].Rule, blockers[0].File),
+		Command: fmt.Sprintf("tackroom doctor audit accept %s %s --reason \"...\"", item.ID(), blockers[0].Rule),
+	}, true
 }
 
 // filterHeldSources drops held sources from the list sync works with.
@@ -408,6 +417,8 @@ func lockRows(g statusGates) []lockRow {
 		} else if issue != "" {
 			row.State, _, _ = strings.Cut(issue, " (")
 			row.Reason, row.Command = issue, "tackroom sync"
+		} else if h, ok := g.held["update-hold:"+name]; ok {
+			row.State, row.Reason, row.Until, row.Command = h.Kind, h.Reason, h.Until, h.Command
 		}
 		if cloned {
 			item := externalSourceItem(src, g.home)

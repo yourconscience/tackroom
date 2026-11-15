@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 func externalCacheDir(home string) string {
@@ -126,6 +127,9 @@ func refreshExternalCache(src externalSkillSource, cachePath string, lock lockFi
 		if err := gitCheckoutCommit(cachePath, pin.Commit, src.Branch); err != nil {
 			return fmt.Errorf("pin external %s to %s: %w", name, pin.Commit, err)
 		}
+	} else if commit := heldSourceCommit(lock, src, timeNow()); commit != "" && gitCheckoutCommit(cachePath, commit, src.Branch) == nil {
+		// Stay on the held commit, so a release applies to the commit that
+		// was shown; a newer head is gated once this hold ends.
 	} else if err := gitFetchReset(cachePath, src.Branch); err != nil {
 		return fmt.Errorf("update external %s: %w", name, err)
 	}
@@ -294,7 +298,34 @@ func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile,
 	}
 	held := gateExternalSources(candidates, externalCandidateHome(home), &probe, gate)
 	lock.Holds = probe.Holds
+	for name, h := range held {
+		if h.Kind == "held" {
+			// sync never moves an existing pin, so only update releases it.
+			h.Command = "tackroom skill update " + name + " --allow-fresh=" + h.Item
+			held[name] = h
+		}
+	}
 	return held
+}
+
+// pendingUpdateHolds lists, keyed "update-hold:"+name, each pinned source whose
+// last `skill update` candidate the gate held or blocked and which is still
+// staged. It writes neither the lock nor any checkout, so status can call it.
+func pendingUpdateHolds(sources []externalSkillSource, home string, lock lockFile, now time.Time) map[string]heldItem {
+	var staged []externalCandidate
+	for _, src := range sources {
+		path := externalCandidatePath(home, sourceName(src))
+		if lockEntryFor(lock, src) == nil || !hasDir(filepath.Join(path, ".git")) {
+			continue
+		}
+		staged = append(staged, externalCandidate{src: src, path: path, commit: externalSkillCommitFull(path)})
+	}
+	lock.Holds = append([]holdEntry(nil), lock.Holds...)
+	out := map[string]heldItem{}
+	for name, h := range gateUpdatedSources(staged, home, &lock, gateOptions{now: now}) {
+		out["update-hold:"+name] = h
+	}
+	return out
 }
 
 func selectExternalSources(sources []externalSkillSource, names []string) ([]externalSkillSource, error) {
@@ -341,21 +372,28 @@ func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot s
 	for _, src := range selected {
 		selectedNames[sourceName(src)] = true
 	}
-	entries := rebuildLockEntries(sources, home, lock)
-	for i := range entries {
-		if selectedNames[entries[i].Name] {
-			continue
-		}
-		for _, src := range sources {
-			if sourceName(src) != entries[i].Name {
+	var entries []externalLockEntry
+	for _, entry := range rebuildLockEntries(sources, home, lock) {
+		if !selectedNames[entry.Name] {
+			pinned := false
+			for _, src := range sources {
+				if sourceName(src) != entry.Name {
+					continue
+				}
+				if pin := lockEntryFor(lock, src); pin != nil {
+					entry.Commit = pin.Commit
+					entry.Materialized = pin.Materialized
+					pinned = true
+				}
+				break
+			}
+			if !pinned {
+				// An unpinned source that was not updated is held, blocked or
+				// not synced yet: only its own gate may pin it.
 				continue
 			}
-			if pin := lockEntryFor(lock, src); pin != nil {
-				entries[i].Commit = pin.Commit
-				entries[i].Materialized = pin.Materialized
-			}
-			break
 		}
+		entries = append(entries, entry)
 	}
 	entries = keepHeldLockEntries(entries, lock, held)
 	if lockEntriesEqual(lock.ExternalSkills, entries) && !holdsChanged(repoRoot, lock) {

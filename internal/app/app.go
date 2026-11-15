@@ -680,7 +680,7 @@ var canonicalForms = []string{
 	"  tackroom skill info <name>",
 	"  tackroom skill sources [--json]           # external sources: configured and installed elsewhere",
 	"  tackroom skill sources search <query>     # find sources on skills.sh",
-	"  tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync]",
+	"  tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync] [--allow-fresh[=item,...]]",
 	"  tackroom skill update [name ...] [--allow-fresh[=item,...]]",
 	"  tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]",
 	"  tackroom mcp <list|add|import|remove> [options]   # add: --command ... or --url ... [--header 'Name: value']",
