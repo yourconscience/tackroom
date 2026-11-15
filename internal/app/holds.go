@@ -205,6 +205,19 @@ func gateSourceFreshness(src externalSkillSource, home string, item string, lock
 	})
 }
 
+// heldSourceCommit is the commit of an unpinned source's hold that is still in
+// force and not released, or "" when there is none.
+func heldSourceCommit(lock lockFile, src externalSkillSource, now time.Time) string {
+	prefix := "git:" + src.URL + "@"
+	commit := ""
+	for _, h := range lock.Holds {
+		if strings.HasSuffix(h.Item, ":"+sourceName(src)) && strings.HasPrefix(h.Ref, prefix) && h.Allowed == nil && holdInForce(h, now) {
+			commit = strings.TrimPrefix(h.Ref, prefix)
+		}
+	}
+	return commit
+}
+
 var reExactVersion = regexp.MustCompile(`^v?\d+(\.\d+)*([-+.][0-9A-Za-z.+-]*)?$`)
 
 // exactRefs returns the exact-version registry references of a package list,

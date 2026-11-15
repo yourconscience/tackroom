@@ -127,6 +127,9 @@ func refreshExternalCache(src externalSkillSource, cachePath string, lock lockFi
 		if err := gitCheckoutCommit(cachePath, pin.Commit, src.Branch); err != nil {
 			return fmt.Errorf("pin external %s to %s: %w", name, pin.Commit, err)
 		}
+	} else if commit := heldSourceCommit(lock, src, timeNow()); commit != "" && gitCheckoutCommit(cachePath, commit, src.Branch) == nil {
+		// Stay on the held commit, so a release applies to the commit that
+		// was shown; a newer head is gated once this hold ends.
 	} else if err := gitFetchReset(cachePath, src.Branch); err != nil {
 		return fmt.Errorf("update external %s: %w", name, err)
 	}
