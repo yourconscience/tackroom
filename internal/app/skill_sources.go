@@ -599,7 +599,7 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 		label += " (" + sub + ")"
 	}
 	if held {
-		fmt.Fprintf(out, "added %s as %q: %s at %s (%s), not pinned while held\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit))
+		fmt.Fprintf(out, "added %s as %q: %s at %s (%s), not pinned while %s\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit), hold.Kind)
 		fmt.Fprintln(out, heldLines(map[string]heldItem{sourceName(src): hold})[0])
 	} else {
 		fmt.Fprintf(out, "added %s as %q: %s pinned at %s (%s)\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit))
@@ -614,9 +614,9 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 // writeSourceEntry re-reads tackroom.yaml and tackroom.lock (a clone takes long
 // enough for another add or a sync to change them), writes the lock pin first
 // so the source is never configured without it, then the config entry. A
-// failed config write restores the previous lock. With gate set, a commit
-// inside its freshness hold gets the hold decision in the lock but no pin, so
-// sync gates the source like any new unpinned one; the hold is returned.
+// failed config write restores the previous lock. A commit with an unaccepted
+// CRITICAL finding, or (with gate set) inside its freshness hold, gets no pin,
+// so sync gates the source like any new unpinned one; the hold is returned.
 func writeSourceEntry(configPath string, repoRoot string, home string, src externalSkillSource, commit string, names []string, selected []sourceSkill, cachePath string, gate *gateOptions) (heldItem, bool, error) {
 	shared, sharedPath, err := loadEditableMCPConfig(configPath)
 	if err != nil {
@@ -634,10 +634,11 @@ func writeSourceEntry(configPath string, repoRoot string, home string, src exter
 	if err := checkCanonicalSkillTargets(selected, cachePath, repoRoot, lock, sourceName(src)); err != nil {
 		return heldItem{}, false, err
 	}
-	var hold heldItem
-	held := false
-	if gate != nil {
-		hold, held = gateSourceFreshness(src, home, externalSourceItem(src, home).ID(), &lock, *gate)
+	// The same audit gate sync applies to new content, then the freshness hold.
+	item := externalSourceItem(src, home)
+	hold, held := auditBlock(item, lock)
+	if !held && gate != nil {
+		hold, held = gateSourceFreshness(src, home, item.ID(), &lock, *gate)
 	}
 	// Drop an entry left by a source of this name removed without a sync.
 	kept := lock.ExternalSkills[:0]
