@@ -32,8 +32,17 @@ var hostsProbeScript string
 var gitCommitPattern = regexp.MustCompile(`^[0-9a-f]{7,64}$`)
 
 func runHostsCommand(args []string) error {
+	if len(args) > 0 {
+		switch args[0] {
+		case "fix":
+			return runHostsFix(args[1:])
+		case "setup":
+			return runHostsSetup(args[1:])
+		}
+	}
 	fs := flag.NewFlagSet("hosts", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
+	fs.Usage = hostsUsage(fs)
 	configPath := fs.String("config", "", "Path to tackroom YAML config")
 	asJSON := fs.Bool("json", false, "Print the result as JSON")
 	hosts, err := parseInterleaved(fs, args)
@@ -112,7 +121,7 @@ func collectHosts(configPath string, hosts []string) (hostsJSON, error) {
 	}
 	for i := range out.Hosts {
 		relateHost(&out.Hosts[i], root, out.Commit)
-		annotateHost(&out.Hosts[i], out.Version, fixConfig, localUncommitted)
+		annotateHost(&out.Hosts[i], out.Version, fixConfig, self, localUncommitted)
 	}
 	return out, nil
 }
@@ -133,6 +142,7 @@ func probeHost(host, bin, config string) hostJSON {
 	found := got["bin"]
 	h.bin, h.onPath = strings.TrimSpace(found.Body), found.Key == "path"
 	if h.bin == "" {
+		h.brew, h.npm = strings.TrimSpace(got["brew"].Body), strings.TrimSpace(got["npm"].Body)
 		h.Error = "tackroom not found on PATH or in ~/.local/bin, ~/go/bin, /opt/homebrew/bin or /usr/local/bin"
 		return h
 	}
