@@ -6,10 +6,13 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
-## Unreleased
+## To 2.7
+
+Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats.
 
 - New: `tackroom setup --overlay NAME` copies `overlays/NAME.yaml`, a complete `tackroom.local.yaml` committed in the config repository, into place before the first sync, for machines of one kind such as cloud VMs: `tackroom setup --from <repository url> --overlay cloud --no-cron`. A different `tackroom.local.yaml` is never overwritten; setup lists it as needing your attention and exits 1. An unknown name stops setup before it syncs anything. See [Machine overlays](setup.md#machine-overlays).
 - New: `tackroom hosts fix [HOST...]` runs the fix `tackroom hosts` names (`tackroom setup`, `pull` or `sync` on that machine, over SSH) and prints the machine's new row; `--dry-run` only prints it. A fix that commits and pushes is still printed for you to run. `tackroom hosts setup user@host` sets up another machine from this one with `tackroom setup --from`, and `--install` installs tackroom there first. `hosts --json` adds `fix_runnable` to each host.
+- Changed: for a machine that has tackroom but no config, `tackroom hosts` now names `tackroom hosts setup HOST` as the fix, not a bare `tackroom setup` there, which would start an unrelated config.
 - New: the Claude Code pane syncs and edits, as the Herdr panel does. When something waits, Sync shows the plan, with what it removes or overwrites, before it applies it, and applies only that plan. Harnesses, MCP servers and hooks have Turn on and Turn off, MCP servers and hooks add or remove a harness, and with more than one machine in `crons.hosts` a Machines section shows each one's health. It needs tackroom 2.6 or newer as the plugin's `tackroom` program; with an older one the pane stays as before and says to update tackroom. Update the Claude Code plugin to get it.
 
 ## To 2.6
