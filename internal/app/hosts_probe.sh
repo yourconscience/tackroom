@@ -1,7 +1,8 @@
 # tackroom hosts probe. Runs under `sh -s -- TOKEN BIN CONFIG`, locally or
 # over SSH, and prints this machine's tackroom state as sections that start
 # with a "TOKEN kind<TAB>key" line, as crons_probe.sh does. It runs only
-# `tackroom version`, `tackroom status --json` and read-only git commands.
+# `tackroom version`, `tackroom status --json` and read-only git commands;
+# with no tackroom it only looks for brew and npm.
 # BIN is the tackroom to ask; empty means look for one. CONFIG, when set, is
 # passed to status as --config.
 T="$1"
@@ -11,24 +12,36 @@ sec() { printf '\n%s %s\t%s\n' "$T" "$1" "$2"; }
 run() { kind=$1; key=$2; shift 2; sec "$kind" "$key"; "$@" 2>&1; rc=$?; sec rc "$rc"; }
 
 # A non-login SSH shell has a short PATH, so after PATH look where installers
-# put tackroom. The key says how it was found: given, path, dir or none.
+# put programs. Sets found to the program and how to path, dir or none.
+look() {
+	how=path
+	found=$(command -v "$1" 2>/dev/null)
+	[ -n "$found" ] && return
+	how=none
+	for d in "$HOME/.local/bin" "$HOME/go/bin" /opt/homebrew/bin /usr/local/bin; do
+		if [ -x "$d/$1" ]; then
+			found="$d/$1"
+			how=dir
+			return
+		fi
+	done
+}
+
+# The key says how tackroom was found: given, path, dir or none.
 how=given
 if [ -z "$bin" ]; then
-	how=path
-	bin=$(command -v tackroom 2>/dev/null)
-	if [ -z "$bin" ]; then
-		how=none
-		for d in "$HOME/.local/bin" "$HOME/go/bin" /opt/homebrew/bin /usr/local/bin; do
-			if [ -x "$d/tackroom" ]; then
-				bin="$d/tackroom"
-				how=dir
-				break
-			fi
-		done
-	fi
+	look tackroom
+	bin=$found
 fi
 run bin "$how" printf %s "$bin"
-[ -n "$bin" ] || exit 0
+if [ -z "$bin" ]; then
+	# What `tackroom hosts setup --install` can install tackroom with.
+	look brew
+	run brew "" printf %s "$found"
+	look npm
+	run npm "" printf %s "$found"
+	exit 0
+fi
 
 run version "" "$bin" version
 

@@ -827,10 +827,13 @@ func launchdTrigger(plist map[string]any) string {
 	return strings.Join(out, ", ")
 }
 
+// shellJoin quotes args for sh, bash or zsh, including the one ssh starts on
+// another host: no argument may run a command (`...`), expand into more
+// arguments ({a,b}, [x], ~) or start a comment (#).
 func shellJoin(args []string) string {
 	quoted := make([]string, len(args))
 	for i, a := range args {
-		if a == "" || strings.ContainsAny(a, " \t\n'\"$&|;<>*?()") {
+		if a == "" || strings.ContainsAny(a, " \t\n'\"$&|;<>*?()`\\#~{}[]!^") {
 			quoted[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
 		} else {
 			quoted[i] = a

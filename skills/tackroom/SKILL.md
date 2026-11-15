@@ -47,6 +47,8 @@ tackroom rex [--config PATH] [--dry-run]        # open a tackroom workspace in t
 tackroom pull [options]        # git pull --ff-only, then sync; what the periodic job runs
 tackroom cron [--interval 15m|--deps|--remove]   # periodic sync job, installed by setup; default 15m
 tackroom hosts [HOST...] [--json] [--config PATH]      # tackroom on each machine in crons.hosts: version, sync state, config commit, fix
+tackroom hosts fix [HOST...] [--dry-run]               # run the fix hosts names (setup, pull or sync there); never commits or pushes
+tackroom hosts setup HOST [--from GIT_URL] [--overlay NAME] [--no-cron] [--install] [--dry-run]   # tackroom setup --from on another machine over SSH
 tackroom cron collect [--hosts local,HOST...] [--table] # read-only scheduled-job inventory
 tackroom cron apply [--dry-run]       # install crons.jobs entries with schedule+command as launchd, systemd or crontab units
 tackroom cron run|pause|resume [--host HOST] ID   # act on a launchd job, here or over SSH

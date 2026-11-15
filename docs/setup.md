@@ -88,6 +88,7 @@ tackroom setup --from <repository url> --overlay cloud --no-cron
 - An unknown name stops setup before it syncs anything, and lists the overlays the repository has. With `--from` that is after the clone or pull. The name is a file name under `overlays/`, never a path.
 - `--dry-run` and `--json` list the copy as a planned action.
 - Only `setup --overlay` reads `overlays/`. `sync` and `config validate` ignore it, and the starter `.gitignore` does not exclude it, so it is committed with the rest.
+You can also set up another machine from this one: `tackroom hosts setup user@host` runs `tackroom setup --from` there over SSH, from this config root's `origin` unless you pass `--from`, and `--install` first installs tackroom there with Homebrew or npm. Later, `tackroom hosts fix` runs the fix `tackroom hosts` names, such as `tackroom pull` on a machine that is behind.
 
 ## The web view
 

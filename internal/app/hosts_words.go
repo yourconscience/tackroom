@@ -14,15 +14,16 @@ import (
 
 var hostVersionPattern = regexp.MustCompile(`^v?(\d+)\.(\d+)\.(\d+)`)
 
-// annotateHost fills RelationText, Health, Summary and Fix. version is this
-// machine's tackroom; config is a --config path a local fix must carry;
-// localUncommitted says this machine has not committed its tackroom.yaml.
+// annotateHost fills RelationText, Health, Summary and Fix, with the steps
+// `hosts fix` runs for Fix. version is this machine's tackroom; config is a
+// --config path a local fix must carry; self is this binary, which a local fix
+// runs; localUncommitted says this machine has not committed its tackroom.yaml.
 //
 // fail: unreachable, no tackroom, status errored (not set up, unreadable
 // config), or a tackroom a major version behind this machine's. warn: config
 // not committed, out of sync, behind or diverged, uncommitted changes, or an
 // older tackroom than this machine's. ok otherwise.
-func annotateHost(h *hostJSON, version, config string, localUncommitted bool) {
+func annotateHost(h *hostJSON, version, config, self string, localUncommitted bool) {
 	h.RelationText = hostRelationText(*h)
 	older, majorOlder := "", false
 	if versionOlder(h.Version, version) {
@@ -34,16 +35,23 @@ func annotateHost(h *hostJSON, version, config string, localUncommitted bool) {
 	// The probe found tackroom off the non-login PATH, so name it in full.
 	bin := "tackroom"
 	if h.Host != "local" && !h.onPath {
-		bin = shellJoin([]string{h.bin})
+		bin = h.bin
 	}
-	fix := func(verb string) string {
+	// setFix sets Fix and the steps `hosts fix` runs for it, so it never parses
+	// Fix back. No steps: the user runs Fix, tackroom does not.
+	setFix := func(text string, steps ...[]string) {
+		h.Fix, h.fixSteps, h.FixRunnable = text, steps, len(steps) > 0
+	}
+	fix := func(verb string) {
 		if h.Host == "local" {
 			if config != "" {
-				return "tackroom " + verb + " --config " + shellJoin([]string{config})
+				setFix("tackroom "+verb+" --config "+shellJoin([]string{config}), []string{self, verb, "--config", config})
+				return
 			}
-			return "tackroom " + verb
+			setFix("tackroom "+verb, []string{self, verb})
+			return
 		}
-		return "ssh " + h.Host + " " + bin + " " + verb
+		setFix("ssh "+h.Host+" "+shellJoin([]string{bin})+" "+verb, []string{bin, verb})
 	}
 	// The host's config root shares history with this machine's: it is a
 	// clone of the same repo, so it sets up from what this machine pushed.
@@ -70,9 +78,11 @@ func annotateHost(h *hostJSON, version, config string, localUncommitted bool) {
 				// The fix is on this machine's row: commit tackroom.yaml first.
 				parts = append(parts, "This machine has not committed its tackroom.yaml for it to pull")
 			case sameRepo:
-				h.Fix = "ssh " + h.Host + " " + shellJoin([]string{"git -C " + shellJoin([]string{h.ConfigRoot}) + " pull --ff-only && " + bin + " setup"})
+				pull := []string{"git", "-C", h.ConfigRoot, "pull", "--ff-only"}
+				setup := []string{bin, "setup"}
+				setFix("ssh "+h.Host+" "+shellJoin([]string{shellJoin(pull) + " && " + shellJoin(setup)}), pull, setup)
 			default:
-				h.Fix = fix("setup")
+				fix("setup")
 			}
 		} else {
 			parts = append(parts, "Status failed: "+h.Error)
@@ -82,7 +92,7 @@ func annotateHost(h *hostJSON, version, config string, localUncommitted bool) {
 		}
 		if majorOlder {
 			// Setting up or syncing with that tackroom is the harm; no command here.
-			h.Fix = ""
+			setFix("")
 		}
 		h.Summary = strings.Join(parts, ". ")
 		return
@@ -95,13 +105,14 @@ func annotateHost(h *hostJSON, version, config string, localUncommitted bool) {
 			if h.hasLock {
 				files += " tackroom.lock"
 			}
-			h.Fix = "cd " + commandPath(h.ConfigRoot) + " && git add " + files + ` && git commit -m "Add tackroom config" && git push`
+			// Committing and pushing is the user's call: printed, never run.
+			setFix("cd " + commandPath(h.ConfigRoot) + " && git add " + files + ` && git commit -m "Add tackroom config" && git push`)
 		}
 	}
 	switch h.Relation {
 	case "behind":
 		parts = append(parts, plural(h.Behind, "commit")+" behind this machine")
-		h.Fix = fix("pull")
+		fix("pull")
 	case "diverged":
 		parts = append(parts, "Config diverged from this machine")
 	}
@@ -119,7 +130,7 @@ func annotateHost(h *hostJSON, version, config string, localUncommitted bool) {
 			parts = append(parts, "Out of sync")
 		}
 		if h.Fix == "" {
-			h.Fix = fix("sync")
+			fix("sync")
 		}
 	}
 	if h.Dirty > 0 {
@@ -129,7 +140,8 @@ func annotateHost(h *hostJSON, version, config string, localUncommitted bool) {
 		parts = append(parts, older)
 	}
 	if majorOlder {
-		h.Health, h.Fix = "fail", ""
+		h.Health = "fail"
+		setFix("")
 		h.Summary = strings.Join(parts, ". ")
 		return
 	}

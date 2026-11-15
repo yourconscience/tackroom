@@ -650,7 +650,7 @@ func printUsage() {
 	fmt.Println("  config   Validate or print the canonical YAML")
 	fmt.Println("  restore  List backups or put backed-up native files back")
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
-	fmt.Println("  hosts    Show tackroom on every machine in crons.hosts")
+	fmt.Println("  hosts    Show tackroom on every machine in crons.hosts; fix one or set one up")
 	fmt.Println()
 	fmt.Println("Command groups:")
 	fmt.Println("  skill    Inspect, create, and update skills")
@@ -690,6 +690,8 @@ var canonicalForms = []string{
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
 	"  tackroom rex [--config PATH] [--dry-run]          # open a tackroom workspace in the Rex terminal",
 	"  tackroom hosts [HOST...] [--json] [--config PATH]   # tackroom on each machine in crons.hosts: version, sync state, config commit",
+	"  tackroom hosts fix [HOST...] [--dry-run] [--config PATH]   # run the fix hosts names (setup, pull or sync there); never commits or pushes",
+	"  tackroom hosts setup HOST [--from GIT_URL] [--overlay NAME] [--no-cron] [--install] [--dry-run] [--config PATH]   # tackroom setup --from on HOST over SSH",
 	"  tackroom cron collect [--hosts local,HOST...] [--table] [--config PATH]",
 	"  tackroom cron apply [--dry-run] [--config PATH]",
 	"  tackroom cron run|pause|resume [--host HOST] [--config PATH] ID",

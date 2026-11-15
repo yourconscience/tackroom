@@ -145,15 +145,19 @@ type hostJSON struct {
 	OutOfSync    []hostAgentJSON `json:"out_of_sync"`
 	Error        string          `json:"error,omitempty"`
 	// Health (ok, warn or fail), Summary and Fix are what both views draw
-	// (hosts_words.go). Fix is a command to run on this machine.
-	Health  string `json:"health"`
-	Summary string `json:"summary"`
-	Fix     string `json:"fix,omitempty"`
+	// (hosts_words.go). Fix is a command to run on this machine. FixRunnable:
+	// `tackroom hosts fix` runs it; otherwise the user does.
+	Health      string `json:"health"`
+	Summary     string `json:"summary"`
+	Fix         string `json:"fix,omitempty"`
+	FixRunnable bool   `json:"fix_runnable"`
 
-	bin      string // the tackroom the probe ran
-	onPath   bool   // found on the host's non-login PATH
-	repoLink string // status repo_link
-	hasLock  bool   // tackroom.lock exists beside an uncommitted tackroom.yaml
+	bin       string     // the tackroom the probe ran
+	onPath    bool       // found on the host's non-login PATH
+	repoLink  string     // status repo_link
+	hasLock   bool       // tackroom.lock exists beside an uncommitted tackroom.yaml
+	fixSteps  [][]string // the argvs Fix runs on Host, in order
+	brew, npm string     // installers the probe found where tackroom was not
 }
 
 // hostAgentJSON is one harness a host's status reports out of sync, with what
