@@ -6,6 +6,13 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## Unreleased
+
+- New: the Herdr panel syncs and edits. Overview has a Sync button that shows the plan, with what it removes or overwrites, before it applies it. Harnesses, MCP servers and hooks have Turn on and Turn off, and MCP servers and hooks add or remove an agent, as the web view's switches and cells do. Copy the two mods from `herdr/tackroom/mods/` again to get it. With an older tackroom the panel stays read-only.
+- Fixed: the Herdr panel could stay on "Loading…" (the crons panel on "Collecting…") for good when Herdr created it hidden, as it does at start: its first loads never returned. They now start a moment later.
+- New: `tackroom config set <section/name/field> <value>` changes one field, as the web view's switches do, for example `tackroom config set mcp_servers/exa/enabled false`. An entry defined in `tackroom.local.yaml` is changed there.
+- New: `sync --dry-run --json` adds `plan`, `destructive` and `plan_digest`, and `tackroom sync --plan-digest DIGEST` syncs only while the plan is still the one with that digest.
+
 ## To 2.5.1
 
 Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats.

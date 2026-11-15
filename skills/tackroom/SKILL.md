@@ -21,6 +21,7 @@ Never infer configuration from the current project. Never replace a user's confi
 tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]
 tackroom status [--verbose] [--exit-code] [--agents ...]
 tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]
+tackroom sync --plan-digest DIGEST              # sync only if the plan is still the one sync --dry-run --json showed
 tackroom doctor [--e2e] [--agents ...]
 tackroom doctor audit [--json]                  # findings per item; exit 1 on an unaccepted CRITICAL in external content
 tackroom doctor audit accept <item> <rule> --reason "..."   # record an audit decision; item is kind:name, e.g. skill:foo
@@ -28,6 +29,7 @@ tackroom doctor audit revoke <item> <rule>
 tackroom config validate
 tackroom config print
 tackroom config inventory                       # the web view's inventory as JSON: harnesses, skills, roles, MCP servers, hooks
+tackroom config set <section/name/field> <value>   # one field, e.g. mcp_servers/exa/enabled false; sync applies it
 tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]
 tackroom tui [--config PATH]                    # deprecated, removed in 3.0; do not recommend it: use view, status or cron collect --table
 tackroom skill new <name> [--description ...]

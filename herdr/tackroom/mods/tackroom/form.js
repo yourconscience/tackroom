@@ -2,13 +2,27 @@ import { div } from "gpui-kit";
 import { h_flex, v_flex, InputState, Input } from "gpui-base";
 import { exec, props, closeOverlay, theme, notify, run } from "herdr";
 
-// The add, edit and delete dialog of tackroom's Crons panel. main.js opens it
-// as an overlay of the same mod, with props { form: { mode, job? }, tackroom,
-// config }, and it acts through `tackroom cron add|edit|remove`, the verbs
-// behind the web view's form. A refusal shows in the dialog.
+// The dialogs of the tackroom panel. main.js opens one as an overlay of the
+// same mod, with props { form: { mode, job?, plan? }, tackroom, config }:
+//   add, edit, delete  a cron, through `tackroom cron add|edit|remove`
+//   sync               the plan of `sync --dry-run --json`, applied with
+//                      `sync --plan-digest`, so only the plan shown applies
+// A refusal shows in the dialog.
 
-const DONE = { add: "Added", edit: "Saved", delete: "Deleted" };
-const TITLE = { add: "Add cron", edit: "Edit", delete: "Delete" };
+const DONE = { add: "Added", edit: "Saved", delete: "Deleted", sync: "Synced" };
+const TITLE = { add: "Add cron", edit: "Edit", delete: "Delete", sync: "Sync" };
+
+// Plan lines read "agent: what"; agents with the same change share one line.
+function grouped(lines) {
+  const out = new Map();
+  for (const line of lines) {
+    const at = line.indexOf(": ");
+    const [agent, what] = at < 0 ? ["", line] : [line.slice(0, at), line.slice(at + 2)];
+    if (what === "up to date" || what === "not installed, skipped") continue;
+    out.set(what, [...(out.get(what) ?? []), agent].filter(Boolean));
+  }
+  return [...out];
+}
 
 let home = null;
 // exec does not expand ~, so a leading ~/ is expanded here.
@@ -31,6 +45,7 @@ export default class JobForm {
     const f = p.form ?? {};
     this.mode = f.mode;
     this.job = f.job ?? null;
+    this.plan = f.plan ?? null;
     this.conn = { bin: p.tackroom ?? "tackroom", config: p.config ?? "" };
     this.overlay = props()?.overlay;
     this.error = "";
@@ -52,7 +67,7 @@ export default class JobForm {
     this.effect = field(this.job?.effect);
     this.field = field;
 
-    if (this.mode === "delete") this.handle.focus();
+    if (this.mode === "delete" || this.mode === "sync") this.handle.focus();
     else {
       const first = this.mode === "add" ? this.id : this.schedule;
       first.focus();
@@ -64,6 +79,8 @@ export default class JobForm {
   command() {
     const text = (state) => state.value().trim();
     const job = this.job;
+    // --plan-digest=… stays one argument: runTackroom puts --config after it.
+    if (this.mode === "sync") return { args: ["sync", `--plan-digest=${this.plan.digest}`], name: "", reload: "synced", timeout: 300000 };
     if (this.mode === "delete") return { args: ["cron", "remove", job.id], name: job.short_name };
     const exe = text(this.exe);
     const args = this.args.map((a) => a.value()).filter((a) => a !== "");
@@ -93,18 +110,18 @@ export default class JobForm {
     cx.spawn(async (cx) => {
       let ok = false;
       try {
-        const r = await runTackroom(this.conn, c.args, 150000);
+        const r = await runTackroom(this.conn, c.args, c.timeout ?? 150000);
         ok = r.code === 0;
         if (!ok) this.error = (r.stderr || r.stdout || `exit ${r.code}`).trim().slice(0, 500);
       } catch (e) {
         this.error = String(e?.message ?? e);
       }
-      // The panel collects again either way: a failed apply leaves the config changed.
-      run("tackroom.reload");
+      // The panel loads again either way: a failed apply leaves the config changed.
+      run(`tackroom.${c.reload ?? "reload"}`);
       this.busy = false;
       if (ok) {
         closeOverlay(this.overlay);
-        notify({ title: `${DONE[this.mode]} ${c.name}`, level: "success", timeout: 3000 });
+        notify({ title: `${DONE[this.mode]} ${c.name}`.trim(), level: "success", timeout: 3000 });
       }
       cx.notify();
     });
@@ -126,11 +143,24 @@ export default class JobForm {
       .hover((s) => s.opacity(0.88))
       .on_click((_e, cx) => { if (!this.busy) action(cx); })
       .child(text);
-    const title = this.mode === "add" ? TITLE.add : this.mode === "edit" ? `${TITLE.edit} ${this.job.short_name}` : `${TITLE.delete} ${this.job.short_name}?`;
+    const title = this.mode === "add" || this.mode === "sync" ? TITLE[this.mode] : this.mode === "edit" ? `${TITLE.edit} ${this.job.short_name}` : `${TITLE.delete} ${this.job.short_name}?`;
     const close = () => closeOverlay(this.overlay);
 
     let body;
-    if (this.mode === "delete") {
+    const removes = this.plan?.destructive ?? [];
+    if (this.mode === "sync") {
+      const change = ([what, agents], color) => v_flex().gap(1)
+        .child(div().text_size(12.5).text_color(color).child(what))
+        .when(agents.length > 0, (el) => el.child(div().text_size(11.5).text_color(t.dim).child(agents.join(", "))));
+      const changes = grouped(this.plan.lines);
+      body = v_flex().max_h(380).overflow_y_scrollbar().gap(8).pt(12)
+        .when(changes.length === 0 && removes.length === 0, (el) => el.child(div().text_size(12.5).text_color(t.muted).child("Nothing to change.")))
+        .children(changes.map((g) => change(g, t.foreground)))
+        .when(removes.length > 0, (el) => el
+          .child(div().pt(6).text_size(11).font_semibold().text_color(t.ansi1).child("REMOVES OR OVERWRITES"))
+          .children(grouped(removes).map((g) => change(g, t.ansi1))))
+        .child(div().pt(6).text_size(11.5).text_color(t.dim).child("Sync applies only this plan. If anything changed since it loaded, it stops and the panel loads the new plan."));
+    } else if (this.mode === "delete") {
       const command = (this.job.declared_command ?? []).join(" ");
       body = v_flex().gap(6).pt(12).text_size(12.5).text_color(t.muted)
         .child("This removes the job from your tackroom config and its unit from this machine. tackroom touches no other job.")
@@ -164,6 +194,7 @@ export default class JobForm {
       .when(Boolean(this.error), (el) => el.child(div().pt(10).text_size(11.5).text_color(t.ansi1).child(this.error)))
       .child(h_flex().pt(18).gap(8).justify_end()
         .child(button("form-cancel", "Cancel", "plain", close))
-        .child(button("form-ok", this.busy ? "Working…" : this.mode === "add" ? "Add cron" : this.mode === "edit" ? "Save" : "Delete", this.mode === "delete" ? "danger" : "primary", (cx) => this.submit(cx))));
+        .child(button("form-ok", this.busy ? "Working…" : { add: "Add cron", edit: "Save", delete: "Delete", sync: removes.length ? "Sync and remove" : "Sync" }[this.mode],
+          this.mode === "delete" || removes.length ? "danger" : "primary", (cx) => this.submit(cx))));
   }
 }

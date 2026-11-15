@@ -641,6 +641,30 @@ func summarizeSyncPlan(reports []agentReport) []string {
 	return lines
 }
 
+// destructiveSyncItems lists what a sync removes or overwrites, the items the
+// web view and the Herdr panel ask about before they apply a plan.
+func destructiveSyncItems(reports []agentReport) []string {
+	var items []string
+	for _, report := range reports {
+		for _, item := range report.Removes {
+			items = append(items, report.Name+": remove "+item)
+		}
+		for _, item := range report.RemovesAgent {
+			items = append(items, report.Name+": remove role "+item)
+		}
+		for _, item := range report.UpdatesAgent {
+			items = append(items, report.Name+": overwrite role "+item)
+		}
+		for _, item := range report.RemovesPlugin {
+			items = append(items, report.Name+": remove plugin "+item)
+		}
+		for _, item := range report.RemovesMCP {
+			items = append(items, report.Name+": remove MCP server "+item)
+		}
+	}
+	return items
+}
+
 func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) {
 	snapshot, err := doc.syncSnapshot()
 	if err != nil {
@@ -661,24 +685,7 @@ func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) 
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}
-	plan := syncPlan{RepoRoot: snapshot.repoRoot, Repo: repo, Reports: reports, Summary: summarizeSyncPlan(reports)}
-	for _, report := range reports {
-		for _, item := range report.Removes {
-			plan.Destructive = append(plan.Destructive, report.Name+": remove "+item)
-		}
-		for _, item := range report.RemovesAgent {
-			plan.Destructive = append(plan.Destructive, report.Name+": remove role "+item)
-		}
-		for _, item := range report.UpdatesAgent {
-			plan.Destructive = append(plan.Destructive, report.Name+": overwrite role "+item)
-		}
-		for _, item := range report.RemovesPlugin {
-			plan.Destructive = append(plan.Destructive, report.Name+": remove plugin "+item)
-		}
-		for _, item := range report.RemovesMCP {
-			plan.Destructive = append(plan.Destructive, report.Name+": remove MCP server "+item)
-		}
-	}
+	plan := syncPlan{RepoRoot: snapshot.repoRoot, Repo: repo, Reports: reports, Summary: summarizeSyncPlan(reports), Destructive: destructiveSyncItems(reports)}
 	planData, _ := json.Marshal(struct {
 		Repo    repoLinkReport
 		Reports []agentReport

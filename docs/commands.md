@@ -10,7 +10,8 @@ tackroom <command> --help            # flags of one command (exit code 0)
 ## Set up and sync
 
 - `tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents a,b] [--no-cron] [--dry-run] [--json]` creates the config root, imports what your harnesses have by copy, runs the first sync, installs the periodic job and prints a short summary. It asks nothing; `--review` asks before each step, `--verbose` prints the full sync report, and `--from` clones (or pulls) your config repository first, for another machine. `--yes` is accepted and does nothing. See [setup.md](setup.md).
-- `tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents a,b] [--json] [--allow-fresh[=item,...]] [--reason TEXT]` writes each harness's native config from the repo. `--dry-run` prints the plan, including held and blocked items, and writes nothing. `--pull` runs `tackroom pull` first.
+- `tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents a,b] [--json] [--allow-fresh[=item,...]] [--reason TEXT]` writes each harness's native config from the repo. `--dry-run` prints the plan, including held and blocked items, and writes nothing; with `--json` it also lists one `plan` line per harness, the `destructive` items (removals and role overwrites) and a `plan_digest`. `--pull` runs `tackroom pull` first.
+- `tackroom sync --plan-digest DIGEST` syncs only if `sync --dry-run --json` would still print that `plan_digest`, so it applies the plan that was shown and nothing that changed since. The [Herdr panel](herdr.md)'s Sync uses it.
 - `tackroom status [--verbose] [--exit-code] [--json] [--agents a,b]` shows per harness what is synced, drifted, held or blocked. `-v` is short for `--verbose`.
 - `tackroom pull` runs `git pull --ff-only` in the config root, then `sync`. A failed pull only warns. This is what the periodic job runs.
 - `tackroom restore [<backup> | latest] [--dry-run]` lists the backups of native files, newest first, or puts one back. What it replaces is saved as a new backup, so `restore latest` undoes a restore. See [troubleshooting.md](troubleshooting.md#conflicts).
@@ -54,6 +55,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 - `tackroom config validate [--config PATH]` checks the config and prints its file and revision.
 - `tackroom config print [--config PATH]` prints the shared, local and effective config.
 - `tackroom config inventory [--config PATH]` prints, as JSON, what the web view's Overview, Skills, Roles and MCP & hooks tabs draw: per harness the counts and state, per skill, role, MCP server and hook its state in each harness (`ok`, `drift`, `missing`, `conflict`, `off`, `disabled`, `unsupported`, `absent`, `error`), and each skill's origin. Read-only. The [Herdr panel](herdr.md) draws it.
+- `tackroom config set [--config PATH] <section/name/field> <value>` changes one field of an entry, as the web view's switches and cells do: `config set mcp_servers/exa/enabled false`, `config set hooks/notify/agents '["claude","codex"]'`. The value is JSON when it parses as JSON and text otherwise. An entry defined in `tackroom.local.yaml` is changed there, otherwise `tackroom.yaml`. It prints the changed lines and does not sync.
 - `tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]` opens the loopback web UI. See [view.md](view.md).
 
 ## Scheduled jobs
