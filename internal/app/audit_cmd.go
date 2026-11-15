@@ -608,6 +608,6 @@ func printAuditFindings(w io.Writer, findings []auditFinding) (crit, warn, info 
 			info++
 		}
 	}
-	fmt.Fprintf(w, "\n%d finding(s): %d critical, %d warn, %d info\n", len(findings), crit, warn, info)
+	fmt.Fprintf(w, "\n%d heuristic finding(s): %d critical, %d warn, %d info\n", len(findings), crit, warn, info)
 	return crit, warn, info
 }

@@ -82,7 +82,7 @@ tackroom sync --allow-fresh=<item> --reason "checked the diff"
 tackroom skill update --allow-fresh
 ```
 
-A new or changed external skill pin, and a new or changed reference to an exact npm or PyPI version (in an MCP server command or a Pi `packages` entry), is held until 72 hours after its publish time. The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means held.
+A new or changed external skill pin, and a new or changed reference to an exact npm or PyPI version (in an MCP server command or a Pi `packages` entry), is held until 72 hours after its publish time. The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means held. Local sources (`file://` URLs and paths) have no publish time and are never held; the audit gate still applies to them.
 
 A held item is skipped and what is already in the harness stays. `--allow-fresh` releases it and records the decision in `tackroom.lock` under `holds:`. A held `skill update` keeps the previous pin; sync never moves a pin, so it is released with `tackroom skill update <name> --allow-fresh=<item>`.
 
