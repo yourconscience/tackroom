@@ -478,7 +478,7 @@ func isReportSynced(report agentReport) bool {
 	if len(report.MissingHook) > 0 || len(report.DriftedHook) > 0 || len(report.DriftedPackage) > 0 || len(report.DriftedSetting) > 0 {
 		return false
 	}
-	if len(report.MissingPlugin) > 0 || len(report.StalePlugin) > 0 || len(report.StaleMCP) > 0 {
+	if len(report.MissingPlugin) > 0 || len(report.StalePlugin) > 0 || len(report.StaleMCP) > 0 || len(report.StaleHook) > 0 {
 		return false
 	}
 	return report.RootState == "" || report.RootState == stateSynced

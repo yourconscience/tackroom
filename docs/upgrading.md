@@ -10,8 +10,10 @@ tackroom version
 
 - New: the Herdr panel syncs and edits. Overview has a Sync button that shows the plan, with what it removes or overwrites, before it applies it. Harnesses, MCP servers and hooks have Turn on and Turn off, and MCP servers and hooks add or remove an agent, as the web view's switches and cells do. Copy the two mods from `herdr/tackroom/mods/` again to get it. With an older tackroom the panel stays read-only.
 - Fixed: the Herdr panel could stay on "Loading…" (the crons panel on "Collecting…") for good when Herdr created it hidden, as it does at start: its first loads never returned. They now start a moment later.
-- New: `tackroom config set <section/name/field> <value>` changes one field, as the web view's switches do, for example `tackroom config set mcp_servers/exa/enabled false`. An entry defined in `tackroom.local.yaml` is changed there.
-- New: `sync --dry-run --json` adds `plan`, `destructive` and `plan_digest`, and `tackroom sync --plan-digest DIGEST` syncs only while the plan is still the one with that digest.
+- New: `tackroom config set <section/name/field> <value>` changes one field, as the web view's switches do, for example `tackroom config set mcp_servers/exa/enabled false`. An entry defined in `tackroom.local.yaml` is changed there. The path must name a field that section's entries have; a misspelled field, a shorter path or `null` is refused.
+- New: `sync --dry-run --json` adds `plan`, `destructive` and `plan_digest`, and `tackroom sync --plan-digest DIGEST` syncs only while the plan is still the one with that digest and `tackroom.yaml` and `tackroom.local.yaml` are unchanged. `destructive` lists every removal (skills, roles, MCP servers, hooks, plugins, Pi packages, starter files) and every role overwrite.
+- Fixed: turning a hook off, or removing an agent from it, now removes it from that agent on the next sync. Before, `sync` reported "up to date" and the command stayed registered until `tackroom hook remove`. The native file is backed up first, so `tackroom restore latest` puts it back. `status` lists such a hook as `hooks stale`, and `--json` as `agents[].hooks.stale`. This applies to hooks `tackroom.yaml` still declares; a registration of a hook you deleted from the config is left alone, as before.
+- Changed: the web view's Sync now also asks you to tick hook and Pi package removals.
 
 ## To 2.5.1
 

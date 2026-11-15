@@ -199,7 +199,7 @@ func pendingChanges(report agentReport) int {
 	for _, list := range [][]string{
 		report.Adds, report.AddsAgent, report.AddsMCP, report.AddsHook,
 		report.Updates, report.UpdatesAgent, report.UpdatesMCP, report.UpdatesHook, report.UpdatesPackage, report.UpdatesSetting,
-		report.Removes, report.RemovesAgent, report.RemovesPackage,
+		report.Removes, report.RemovesAgent, report.RemovesPackage, report.RemovesHook,
 	} {
 		total += len(list)
 	}

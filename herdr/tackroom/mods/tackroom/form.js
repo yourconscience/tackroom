@@ -7,7 +7,8 @@ import { exec, props, closeOverlay, theme, notify, run } from "herdr";
 //   add, edit, delete  a cron, through `tackroom cron add|edit|remove`
 //   sync               the plan of `sync --dry-run --json`, applied with
 //                      `sync --plan-digest`, so only the plan shown applies
-// A refusal shows in the dialog.
+// A refusal shows in the dialog. After a failed sync the plan shown is out of
+// date, so only Cancel stays.
 
 const DONE = { add: "Added", edit: "Saved", delete: "Deleted", sync: "Synced" };
 const TITLE = { add: "Add cron", edit: "Edit", delete: "Delete", sync: "Sync" };
@@ -50,6 +51,7 @@ export default class JobForm {
     this.overlay = props()?.overlay;
     this.error = "";
     this.busy = false;
+    this.stale = false;
     this.handle = cx.focus_handle();
 
     // No placeholders: Herdr draws them nearly as bright as typed text, so an
@@ -101,7 +103,7 @@ export default class JobForm {
   }
 
   submit(cx) {
-    if (this.busy) return;
+    if (this.busy || this.stale) return;
     const c = this.command();
     if (c.error) { this.error = c.error; cx.notify(); return; }
     this.busy = true;
@@ -119,6 +121,8 @@ export default class JobForm {
       // The panel loads again either way: a failed apply leaves the config changed.
       run(`tackroom.${c.reload ?? "reload"}`);
       this.busy = false;
+      // A retry would send the digest of a plan that is no longer the plan.
+      this.stale = !ok && this.mode === "sync";
       if (ok) {
         closeOverlay(this.overlay);
         notify({ title: `${DONE[this.mode]} ${c.name}`.trim(), level: "success", timeout: 3000 });
@@ -159,7 +163,7 @@ export default class JobForm {
         .when(removes.length > 0, (el) => el
           .child(div().pt(6).text_size(11).font_semibold().text_color(t.ansi1).child("REMOVES OR OVERWRITES"))
           .children(grouped(removes).map((g) => change(g, t.ansi1))))
-        .child(div().pt(6).text_size(11.5).text_color(t.dim).child("Sync applies only this plan. If anything changed since it loaded, it stops and the panel loads the new plan."));
+        .child(div().pt(6).text_size(11.5).text_color(t.dim).child("Sync applies this plan from the config it was made from. If the plan or the config changed since it loaded, it stops and the panel loads the new plan. Edits inside skill and role files are not checked."));
     } else if (this.mode === "delete") {
       const command = (this.job.declared_command ?? []).join(" ");
       body = v_flex().gap(6).pt(12).text_size(12.5).text_color(t.muted)
@@ -192,9 +196,11 @@ export default class JobForm {
         .child(div().text_size(11).text_color(t.dim).child("Esc")))
       .child(body)
       .when(Boolean(this.error), (el) => el.child(div().pt(10).text_size(11.5).text_color(t.ansi1).child(this.error)))
+      .when(this.stale, (el) => el.child(div().pt(6).text_size(11.5).text_color(t.dim).child("Nothing more is applied from this plan. Cancel, then press Sync for the current one.")))
       .child(h_flex().pt(18).gap(8).justify_end()
         .child(button("form-cancel", "Cancel", "plain", close))
         .child(button("form-ok", this.busy ? "Working…" : { add: "Add cron", edit: "Save", delete: "Delete", sync: removes.length ? "Sync and remove" : "Sync" }[this.mode],
-          this.mode === "delete" || removes.length ? "danger" : "primary", (cx) => this.submit(cx))));
+          this.mode === "delete" || removes.length ? "danger" : "primary", (cx) => this.submit(cx))
+          .when(this.stale, (el) => el.opacity(0.5))));
   }
 }

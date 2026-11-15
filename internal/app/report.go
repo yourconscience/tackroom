@@ -182,7 +182,7 @@ func actionsBySurface(r agentReport) []surfaceActions {
 		{"skills", r.Adds, r.Updates, r.Removes},
 		{"agents", r.AddsAgent, r.UpdatesAgent, r.RemovesAgent},
 		{"mcp", r.AddsMCP, r.UpdatesMCP, r.RemovesMCP},
-		{"hooks", r.AddsHook, r.UpdatesHook, nil},
+		{"hooks", r.AddsHook, r.UpdatesHook, r.RemovesHook},
 		{"packages", nil, r.UpdatesPackage, r.RemovesPackage},
 		{"settings", nil, r.UpdatesSetting, nil},
 		{"plugins", r.AddsPlugin, nil, r.RemovesPlugin},
@@ -486,6 +486,8 @@ func sortReportLists(report *agentReport) {
 	sort.Strings(report.StalePlugin)
 	sort.Strings(report.StaleMCP)
 	sort.Strings(report.RemovesMCP)
+	sort.Strings(report.StaleHook)
+	sort.Strings(report.RemovesHook)
 	sort.Strings(report.Drifted)
 	sort.Strings(report.DriftedAgent)
 	sort.Strings(report.DriftedMCP)
@@ -539,6 +541,7 @@ func restoreSyncActions(current []agentReport, preflight []agentReport) {
 			current[i].UpdatesMCP = append([]string{}, original.UpdatesMCP...)
 			current[i].RemovesMCP = append([]string{}, original.RemovesMCP...)
 			current[i].UpdatesHook = append([]string{}, original.UpdatesHook...)
+			current[i].RemovesHook = append([]string{}, original.RemovesHook...)
 			current[i].UpdatesPackage = append([]string{}, original.UpdatesPackage...)
 			current[i].UpdatesSetting = append([]string{}, original.UpdatesSetting...)
 			current[i].RemovesPackage = append([]string{}, original.RemovesPackage...)
@@ -773,6 +776,7 @@ func driftBuckets(r agentReport) []driftBucket {
 		{"mcp stale", r.StaleMCP, bucketDrift},
 		{"hooks drifted", r.DriftedHook, bucketDrift},
 		{"hooks missing", r.MissingHook, bucketDrift},
+		{"hooks stale", r.StaleHook, bucketDrift},
 		{"hooks unsupported", r.UnsupportedHook, bucketNotice},
 		{"packages drifted", r.DriftedPackage, bucketDrift},
 		{"packages removed", r.RemovesPackage, bucketAction},

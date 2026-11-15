@@ -84,6 +84,23 @@ func runConfigSet(args []string) error {
 		return errors.New("usage: tackroom config set [--config PATH] <section/name/field> <value>")
 	}
 	path, value := fs.Arg(0), json.RawMessage(fs.Arg(1))
+	// One field of one entry only: a shorter path would replace an entry or a
+	// whole section, and an unknown field would be saved as a stray key.
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+		return fmt.Errorf("config set %s: the path must be section/name/field, such as mcp_servers/exa/enabled", path)
+	}
+	schema := sequenceEntrySchema()
+	fields, ok := schema[parts[0]]
+	if !ok {
+		return fmt.Errorf("config set %s: unknown section %q; the sections are %s", path, parts[0], strings.Join(sortedKeysNative(schema), ", "))
+	}
+	if !fields[parts[2]] {
+		return fmt.Errorf("config set %s: %s entries have no field %q; the fields are %s", path, parts[0], parts[2], strings.Join(sortedKeysNative(fields), ", "))
+	}
+	if strings.TrimSpace(fs.Arg(1)) == "null" {
+		return fmt.Errorf("config set %s: null is not a value; give the new value, such as false or '[\"claude\"]'", path)
+	}
 	if !json.Valid(value) {
 		value, _ = json.Marshal(fs.Arg(1))
 	}

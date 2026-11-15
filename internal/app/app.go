@@ -144,6 +144,7 @@ type agentReport struct {
 	DisabledPlugin  []string
 	StalePlugin     []string
 	StaleMCP        []string // servers sync wrote earlier that are no longer wanted
+	StaleHook       []string // hooks the config turned off or no longer aims here, still registered
 	UnsupportedHook []string
 	Conflicts       []string
 	// IdenticalCopies are native files or skill folders with the shared
@@ -172,6 +173,7 @@ type agentReport struct {
 	Removes        []string
 	RemovesAgent   []string
 	RemovesMCP     []string
+	RemovesHook    []string
 	RemovesPackage []string
 	RemovesPlugin  []string
 	Synced         bool
@@ -247,6 +249,9 @@ type runOptions struct {
 	// PlanDigest makes sync apply only the plan `sync --dry-run --json` showed
 	// with this plan_digest.
 	PlanDigest string
+	// configRevision identifies the config files ConfigOverride was read from;
+	// the plan digest covers it.
+	configRevision string
 }
 
 func Run(args []string) error {
@@ -581,6 +586,12 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	}
 	if fs.NArg() != 0 {
 		return runOptions{}, errors.New("sync does not accept positional arguments")
+	}
+	// An empty digest must not fall through to a sync that checks nothing.
+	emptyDigest := false
+	fs.Visit(func(f *flag.Flag) { emptyDigest = emptyDigest || (f.Name == "plan-digest" && opts.PlanDigest == "") })
+	if emptyDigest {
+		return runOptions{}, errors.New("sync --plan-digest needs the plan_digest that tackroom sync --dry-run --json printed; it cannot be empty")
 	}
 	return opts, nil
 }
