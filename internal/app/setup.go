@@ -53,32 +53,6 @@ func runSetup(opts runOptions) error {
 			return fmt.Errorf("git clone %s failed: %v", redactURL(from.url), err)
 		}
 	}
-	// An unknown --overlay fails before the clone or pull. With --from the
-	// overlays are the repository's, so they are read from a throwaway clone
-	// unless the plan above already made one.
-	var overlay *setupOverlay
-	if opts.Overlay != "" {
-		lookRoot, repo := planRoot, displayPath(repoRoot, home)
-		if from != nil {
-			repo = redactURL(from.url)
-		}
-		if from != nil && planRoot == repoRoot {
-			tmp, err := os.MkdirTemp("", "tackroom-overlay-")
-			if err != nil {
-				return err
-			}
-			defer os.RemoveAll(tmp)
-			lookRoot = filepath.Join(tmp, "config")
-			if _, err := gitRemote("clone", "--quiet", "--depth", "1", "--", from.url, lookRoot); err != nil {
-				return fmt.Errorf("git clone %s failed: %v", redactURL(from.url), err)
-			}
-		}
-		plan, err := planSetupOverlay(opts.Overlay, lookRoot, repoRoot, repo)
-		if err != nil {
-			return err
-		}
-		overlay = &plan
-	}
 	if from != nil && !opts.JSONOutput && !opts.DryRun {
 		if err := from.apply(); err != nil {
 			return err
@@ -86,6 +60,20 @@ func runSetup(opts runOptions) error {
 		if err := checkConfigRoot(repoRoot); err != nil {
 			return err
 		}
+	}
+	// An unknown --overlay stops setup here, after any clone or pull and
+	// before anything is synced: with --from the overlays are the repository's.
+	var overlay *setupOverlay
+	if opts.Overlay != "" {
+		repo := displayPath(repoRoot, home)
+		if from != nil {
+			repo = redactURL(from.url)
+		}
+		plan, err := planSetupOverlay(opts.Overlay, planRoot, repoRoot, repo)
+		if err != nil {
+			return err
+		}
+		overlay = &plan
 	}
 	// The overlay is in place before anything loads tackroom.local.yaml, as if
 	// it had been written by hand before setup ran.

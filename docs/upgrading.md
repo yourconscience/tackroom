@@ -8,7 +8,7 @@ tackroom version
 
 ## Unreleased
 
-- New: `tackroom setup --overlay NAME` copies `overlays/NAME.yaml`, a complete `tackroom.local.yaml` committed in the config repository, into place before the first sync, for machines of one kind such as cloud VMs: `tackroom setup --from <repository url> --overlay cloud --no-cron`. A different `tackroom.local.yaml` is never overwritten; setup lists it as needing your attention and exits 1. An unknown name fails before anything changes. See [Machine overlays](setup.md#machine-overlays).
+- New: `tackroom setup --overlay NAME` copies `overlays/NAME.yaml`, a complete `tackroom.local.yaml` committed in the config repository, into place before the first sync, for machines of one kind such as cloud VMs: `tackroom setup --from <repository url> --overlay cloud --no-cron`. A different `tackroom.local.yaml` is never overwritten; setup lists it as needing your attention and exits 1. An unknown name stops setup before it syncs anything. See [Machine overlays](setup.md#machine-overlays).
 
 ## To 2.6
 

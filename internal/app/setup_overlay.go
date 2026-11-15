@@ -22,9 +22,9 @@ type setupOverlay struct {
 	data []byte // the overlay as found by planSetupOverlay, for --dry-run
 }
 
-// planSetupOverlay finds the overlay in lookRoot (the config root, or a
-// throwaway clone of --from) before anything changes, and otherwise fails
-// naming the overlays there.
+// planSetupOverlay finds the overlay in lookRoot (the config root, or the
+// throwaway clone a dry run plans against), and otherwise fails naming the
+// overlays there.
 func planSetupOverlay(name, lookRoot, repoRoot, repo string) (setupOverlay, error) {
 	file := name + ".yaml"
 	data, err := os.ReadFile(filepath.Join(lookRoot, "overlays", file))
@@ -36,7 +36,7 @@ func planSetupOverlay(name, lookRoot, repoRoot, repo string) (setupOverlay, erro
 	}
 	entries, err := os.ReadDir(filepath.Join(lookRoot, "overlays"))
 	if errors.Is(err, fs.ErrNotExist) {
-		return setupOverlay{}, fmt.Errorf("no overlay %q: %s has no overlays/ folder; nothing was changed", name, repo)
+		return setupOverlay{}, fmt.Errorf("no overlay %q: %s has no overlays/ folder", name, repo)
 	}
 	if err != nil {
 		return setupOverlay{}, err
@@ -48,9 +48,9 @@ func planSetupOverlay(name, lookRoot, repoRoot, repo string) (setupOverlay, erro
 		}
 	}
 	if len(names) == 0 {
-		return setupOverlay{}, fmt.Errorf("no overlay %q: overlays/ in %s has no .yaml files; nothing was changed", name, repo)
+		return setupOverlay{}, fmt.Errorf("no overlay %q: overlays/ in %s has no .yaml files", name, repo)
 	}
-	return setupOverlay{}, fmt.Errorf("no overlay %q in %s (overlays there: %s); nothing was changed", name, repo, strings.Join(names, ", "))
+	return setupOverlay{}, fmt.Errorf("no overlay %q in %s (overlays there: %s)", name, repo, strings.Join(names, ", "))
 }
 
 // action is the step as --dry-run and --json list it.

@@ -85,7 +85,7 @@ tackroom setup --from <repository url> --overlay cloud --no-cron
 - Setup copies `overlays/<name>.yaml` to `tackroom.local.yaml` in the config root after the clone or pull and before the first sync, so the first sync already leaves those entries out. It works without `--from` too.
 - A `tackroom.local.yaml` that already holds the overlay is left as it is. One that differs is never overwritten: setup syncs with it, lists it under what needs your attention and exits 1.
 - `periodic_sync` is left out of that comparison. `--no-cron` records `periodic_sync: false` in the copied file, and running the same command again reports nothing to do.
-- An unknown name stops setup before it clones, pulls or writes anything, and lists the overlays the repository has. With `--from` the names come from a throwaway shallow clone of the URL. The name is a file name under `overlays/`, never a path.
+- An unknown name stops setup before it syncs anything, and lists the overlays the repository has. With `--from` that is after the clone or pull. The name is a file name under `overlays/`, never a path.
 - `--dry-run` and `--json` list the copy as a planned action.
 - Only `setup --overlay` reads `overlays/`. `sync` and `config validate` ignore it, and the starter `.gitignore` does not exclude it, so it is committed with the rest.
 
