@@ -492,6 +492,8 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 	name := flags.String("name", "", "Source name in tackroom.yaml (default: the repo name)")
 	latest := flags.Bool("latest", false, "Pin the newest commit instead of one at least 3 days old")
 	noSync := flags.Bool("no-sync", false, "Only write tackroom.yaml and tackroom.lock")
+	var fresh runOptions
+	addAllowFreshFlags(flags, &fresh)
 	positional, err := parseInterleaved(flags, args)
 	if err != nil {
 		return err
@@ -582,14 +584,26 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 		fmt.Fprintf(out, "Claude Code already has this source as plugin %s; tackroom adds it for the other agents only.\n", plugin)
 	}
 
-	if err := writeSourceEntry(*configPath, repoRoot, src, commit, names, selected, cachePath); err != nil {
+	// A --latest head is held like any new pin until it is 72 hours old; an
+	// older commit is never held, and a local source has no publish time.
+	var gate *gateOptions
+	if *latest && !isLocalSourceURL(src.URL) {
+		gate = ptrGate(gateOptionsFor(fresh))
+	}
+	hold, held, err := writeSourceEntry(*configPath, repoRoot, home, src, commit, names, selected, cachePath, gate)
+	if err != nil {
 		return err
 	}
 	label := repoURL
 	if sub != "" {
 		label += " (" + sub + ")"
 	}
-	fmt.Fprintf(out, "added %s as %q: %s pinned at %s (%s)\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit))
+	if held {
+		fmt.Fprintf(out, "added %s as %q: %s at %s (%s), not pinned while held\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit))
+		fmt.Fprintln(out, heldLines(map[string]heldItem{sourceName(src): hold})[0])
+	} else {
+		fmt.Fprintf(out, "added %s as %q: %s pinned at %s (%s)\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit))
+	}
 	if *noSync {
 		fmt.Fprintln(out, "next: tackroom sync")
 		return nil
@@ -600,23 +614,30 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 // writeSourceEntry re-reads tackroom.yaml and tackroom.lock (a clone takes long
 // enough for another add or a sync to change them), writes the lock pin first
 // so the source is never configured without it, then the config entry. A
-// failed config write restores the previous lock.
-func writeSourceEntry(configPath string, repoRoot string, src externalSkillSource, commit string, names []string, selected []sourceSkill, cachePath string) error {
+// failed config write restores the previous lock. With gate set, a commit
+// inside its freshness hold gets the hold decision in the lock but no pin, so
+// sync gates the source like any new unpinned one; the hold is returned.
+func writeSourceEntry(configPath string, repoRoot string, home string, src externalSkillSource, commit string, names []string, selected []sourceSkill, cachePath string, gate *gateOptions) (heldItem, bool, error) {
 	shared, sharedPath, err := loadEditableMCPConfig(configPath)
 	if err != nil {
-		return err
+		return heldItem{}, false, err
 	}
 	for _, existing := range shared.ExternalSkills {
 		if strings.EqualFold(sourceName(existing), sourceName(src)) || (existing.URL == src.URL && overlaps(externalSkillDirs(existing), src.SkillDirs)) {
-			return fmt.Errorf("tackroom.yaml changed meanwhile and already has %q; run the add again", sourceName(existing))
+			return heldItem{}, false, fmt.Errorf("tackroom.yaml changed meanwhile and already has %q; run the add again", sourceName(existing))
 		}
 	}
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
-		return err
+		return heldItem{}, false, err
 	}
 	if err := checkCanonicalSkillTargets(selected, cachePath, repoRoot, lock, sourceName(src)); err != nil {
-		return err
+		return heldItem{}, false, err
+	}
+	var hold heldItem
+	held := false
+	if gate != nil {
+		hold, held = gateSourceFreshness(src, home, externalSourceItem(src, home).ID(), &lock, *gate)
 	}
 	// Drop an entry left by a source of this name removed without a sync.
 	kept := lock.ExternalSkills[:0]
@@ -625,17 +646,20 @@ func writeSourceEntry(configPath string, repoRoot string, src externalSkillSourc
 			kept = append(kept, entry)
 		}
 	}
-	lock.ExternalSkills = append(kept, externalLockEntry{
-		Name: sourceName(src), URL: src.URL, Branch: src.Branch, Commit: commit,
-		Materialized: newMaterializedSkillNames(names),
-	})
+	lock.ExternalSkills = kept
+	if !held {
+		lock.ExternalSkills = append(kept, externalLockEntry{
+			Name: sourceName(src), URL: src.URL, Branch: src.Branch, Commit: commit,
+			Materialized: newMaterializedSkillNames(names),
+		})
+	}
 	lockPath := lockFilePath(repoRoot)
 	previous, readErr := os.ReadFile(lockPath)
 	if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
-		return readErr
+		return heldItem{}, false, readErr
 	}
 	if err := writeLockFile(repoRoot, lock); err != nil {
-		return err
+		return heldItem{}, false, err
 	}
 	shared.ExternalSkills = append(shared.ExternalSkills, src)
 	if err := writeEditableMCPConfig(sharedPath, shared); err != nil {
@@ -648,9 +672,9 @@ func writeSourceEntry(configPath string, repoRoot string, src externalSkillSourc
 		if restoreErr != nil {
 			restoreErr = fmt.Errorf("restore %s: %w", lockPath, restoreErr)
 		}
-		return errors.Join(err, restoreErr)
+		return heldItem{}, false, errors.Join(err, restoreErr)
 	}
-	return nil
+	return hold, held, nil
 }
 
 // parseInterleaved parses flags that may also follow positional arguments

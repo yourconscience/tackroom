@@ -49,7 +49,7 @@ tackroom skill sources add owner/repo --all
 tackroom skill sources add owner/repo/path/in/repo --skills a   # a folder inside a repo
 ```
 
-`add` pins the newest commit that is at least 3 days old; `--latest` pins the branch head instead. Without `--skills` or `--all`, an attended run shows a numbered list. Then it syncs; `--no-sync` skips that. Other flags: `--branch`, `--name`.
+`add` pins the newest commit that is at least 3 days old; `--latest` pins the branch head instead. A head younger than 72 hours is held like any new pin: `add` records the hold and no pin, sync skips the source, and `--allow-fresh` on `add` (or a later `sync --allow-fresh=<item>`) releases it. Without `--skills` or `--all`, an attended run shows a numbered list. Then it syncs; `--no-sync` skips that. Other flags: `--branch`, `--name`.
 
 - `--all` keeps no allowlist, so skills upstream adds later in the same folders arrive on `skill update`. A skill in a new folder needs another `add` or a `skill_dirs` edit.
 - If `~/.agents/skills/<name>` already exists, `add` adopts it only when it is identical to the source (as `npx skills add` leaves it) and stops otherwise.
