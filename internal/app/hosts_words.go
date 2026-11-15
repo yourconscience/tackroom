@@ -81,6 +81,10 @@ func annotateHost(h *hostJSON, version, config, self string, localUncommitted bo
 				pull := []string{"git", "-C", h.ConfigRoot, "pull", "--ff-only"}
 				setup := []string{bin, "setup"}
 				setFix("ssh "+h.Host+" "+shellJoin([]string{shellJoin(pull) + " && " + shellJoin(setup)}), pull, setup)
+			case h.Host != "local":
+				// A bare setup there would start an unrelated config; hosts
+				// setup clones this machine's. Printed, not run by hosts fix.
+				setFix("tackroom hosts setup " + h.Host)
 			default:
 				fix("setup")
 			}

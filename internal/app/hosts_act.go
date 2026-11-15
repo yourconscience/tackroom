@@ -68,7 +68,9 @@ func runHostsFix(args []string) error {
 			}
 			fmt.Println()
 			printHostsTable(os.Stdout, after)
-			if runErr != nil || after.Hosts[0].Health != "ok" {
+			// Fixed means the command worked and the host names no further
+			// fix; a warning without one, such as uncommitted changes, stays.
+			if runErr != nil || after.Hosts[0].Fix != "" {
 				notFixed = append(notFixed, h.Host)
 			}
 		}
