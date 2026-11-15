@@ -78,10 +78,10 @@ Run `tackroom help --all` for maintenance commands.
 `tackroom setup` asks nothing and never reads stdin. It:
 
 1. Creates the canonical config root when absent.
-2. Extracts missing public starter assets without overwriting user files.
+2. Extracts the public starter assets into a config root that has no `tackroom.yaml` yet. An existing config root gets no starter files, so a starter role, skill or `plugin.json` the user deleted stays deleted; only a memory tier that is on gets its missing files under `memory/`.
 3. Detects supported harness binaries.
 4. Copies every native skill, role, and MCP server into the config root. Where harnesses have different copies of a skill, the first detected harness's copy is kept. A role is shared only when every harness's copy would come back unchanged from the shared one (same fields and values, same instructions, nothing added); a role with a field tackroom cannot write, without frontmatter, with differing copies, or that is a symlink stays each harness's own, and no starter role of that name is added. Imports are copy or conversion only and add no fields.
-5. Registers the memory tier (`basic` on a new config; an existing config keeps its tier unless `--memory` is given).
+5. Registers the memory tier (`basic` on a new config; an existing config keeps its tier unless `--memory` is given). `tackroom.yaml` is rewritten only when its content changes.
 6. Patches only the required native harness settings.
 7. Runs the first sync: every native file or skill folder it replaces, identical or not, is backed up to `~/.local/state/tackroom/backups/<time>/` first, so `tackroom restore latest` undoes it; a native role is replaced only when the rewritten role is the same role, never a symlinked one, and a role conflict leaves only that file alone while the rest of the harness syncs. Removals or overwrites of content an earlier tackroom run wrote are left for `tackroom sync`. Instructions merged from several agents are listed as needing attention.
 8. Initializes and commits git on a first setup (no `tackroom.yaml` before, not already under git).

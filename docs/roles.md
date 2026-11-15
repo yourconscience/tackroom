@@ -24,7 +24,7 @@ codex:
 You review code changes. Report findings; do not edit files.
 ```
 
-`setup` copies six starter roles once (`architect`, `builder`, `general`, `researcher`, `reviewer`, `tester`). After that they are your files: sync never overwrites them.
+`setup` copies six starter roles (`architect`, `builder`, `general`, `researcher`, `reviewer`, `tester`) into a new config root only. After that they are your files: sync never overwrites them, and a role you delete stays deleted.
 
 ## Where each harness gets its role
 

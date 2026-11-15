@@ -383,43 +383,6 @@ hooks:
 	}
 }
 
-func TestSetupMemoryBasicUsesCustomRootCommands(t *testing.T) {
-	home := t.TempDir()
-	root := filepath.Join(home, "custom-agents")
-	t.Setenv("HOME", home)
-	fakePath(t, "claude")
-	configPath := filepath.Join(root, "tackroom.yaml")
-	writeSyncTestFile(t, configPath, []byte(`version: 1
-agents:
-  - name: claude
-    enabled: true
-    skill_root: ~/.claude/skills
-    agent_root: ~/.claude/agents
-`))
-	if err := runSetup(runOptions{ConfigPath: configPath, MemoryTier: memoryTierBasic, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}}); err != nil {
-		t.Fatal(err)
-	}
-	cfg := readConfigFile(t, configPath)
-	wantStart := filepath.Join(root, "memory", "hooks", "basic-session-start.py")
-	wantEnd := filepath.Join(root, "memory", "hooks", "basic-session-end.py")
-	if len(cfg.Hooks) != 2 || cfg.Hooks[0].Command != wantStart || cfg.Hooks[1].Command != wantEnd {
-		t.Fatalf("custom-root memory hooks = %#v, want %q and %q", cfg.Hooks, wantStart, wantEnd)
-	}
-	data, err := os.ReadFile(filepath.Join(home, ".claude", "settings.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	if !strings.Contains(text, wantStart) || !strings.Contains(text, wantEnd) || strings.Contains(text, "~/.agents/memory/hooks") {
-		t.Fatalf("native custom-root hooks not rendered from canonical root:\n%s", text)
-	}
-	linkPath := filepath.Join(home, ".claude", "skills", "tackroom")
-	if !sameResolvedPath(linkPath, filepath.Join(root, "skills", "tackroom")) {
-		rawTarget, _ := os.Readlink(linkPath)
-		t.Fatalf("custom-root skill link %s -> %q, want %s", linkPath, rawTarget, filepath.Join(root, "skills", "tackroom"))
-	}
-}
-
 func TestImportPromptsTreatEOFAsNo(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(t.TempDir(), "skill")

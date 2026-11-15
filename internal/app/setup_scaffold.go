@@ -87,13 +87,13 @@ func setupStreams(opts runOptions) setupIO {
 }
 
 func ensureStarterAssets(root string, configPath string, memoryTier string) error {
-	return ensureStarterAssetsExcept(root, configPath, memoryTier, nil)
+	return ensureStarterAssetsExcept(root, configPath, memoryTier, nil, false)
 }
 
 // ensureStarterAssetsExcept leaves out the starter roles named in skipRoles:
 // an agent's own role of that name stays the agent's, never replaced by a
-// starter one.
-func ensureStarterAssetsExcept(root string, configPath string, memoryTier string, skipRoles map[string]bool) error {
+// starter one. memoryOnly writes only the memory layer under memory/.
+func ensureStarterAssetsExcept(root string, configPath string, memoryTier string, skipRoles map[string]bool, memoryOnly bool) error {
 	skipMemoryTools := normalizeMemoryTier(memoryTier) == memoryTierOff
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", root, err)
@@ -103,6 +103,12 @@ func ensureStarterAssetsExcept(root string, configPath string, memoryTier string
 			return err
 		}
 		if path == "." {
+			return nil
+		}
+		if memoryOnly && path != "memory" && !strings.HasPrefix(path, "memory/") {
+			if d.IsDir() {
+				return fs.SkipDir
+			}
 			return nil
 		}
 		if skipMemoryTools && (path == "memory/tools" || strings.HasPrefix(path, "memory/tools/")) {
@@ -185,7 +191,20 @@ func writeSetupConfig(configPath string, cfg config, home string) error {
 	if err := doc.reload(); err != nil {
 		return err
 	}
-	_, err := doc.replaceTyped(configLayerShared, doc.revision(configLayerShared), cfg)
+	// A config that encodes the same as the file on disk is left as it is: a
+	// rewrite would only reformat it and leave a diff in the config repository.
+	onDisk, err := yaml.Marshal(doc.shared)
+	if err != nil {
+		return err
+	}
+	wanted, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(onDisk, wanted) {
+		return nil
+	}
+	_, err = doc.replaceTyped(configLayerShared, doc.revision(configLayerShared), cfg)
 	return err
 }
 

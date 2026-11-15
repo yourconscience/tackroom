@@ -142,6 +142,11 @@ func decideHold(item, ref string, lock *lockFile, opts gateOptions, lookup func(
 			entry.HoldUntil = published.Add(defaultPackageAgeMinimum).UTC().Format(time.RFC3339)
 		}
 		if idx < 0 {
+			// A registry reference whose hold already ended guards nothing;
+			// recording it would only change the lock on every new machine.
+			if !holdInForce(entry, opts.now) && !opts.allows(item) && !strings.HasPrefix(ref, "git:") {
+				return heldItem{}, false
+			}
 			lock.Holds = append(lock.Holds, entry)
 			idx = len(lock.Holds) - 1
 		} else {
@@ -305,7 +310,9 @@ func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, op
 			}
 			newRefs[item+"|"+ref] = true
 			var lookup func() (time.Time, string, error)
-			if resolve {
+			// Sync installs packages only for a detected agent, so one not on
+			// this machine needs no lookup; a decision in the lock still applies.
+			if resolve && isDetected(agent) {
 				lookup = holdLookup(r, timeSourceNPM)
 			}
 			h, isHeld := decideHold(item, ref, &lock, opts, lookup)
