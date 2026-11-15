@@ -1,6 +1,10 @@
 package app
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -408,6 +412,13 @@ func runSync(opts runOptions) error {
 // same inspection code, and prints it without writing anything or fetching
 // external sources.
 func runSyncDryRun(opts runOptions) error {
+	if opts.JSONOutput && opts.ConfigOverride == nil {
+		// The digest below covers the config files this plan was read from.
+		var err error
+		if opts, err = withPlanConfig(opts); err != nil {
+			return err
+		}
+	}
 	repoRoot, home, cfg, selected, err := loadContext(opts)
 	if err != nil {
 		return err
@@ -491,6 +502,32 @@ func runSyncDryRun(opts runOptions) error {
 			replaceable = replaceableConflictPaths(reports)
 		}
 		view := buildDryRunJSON(repoRoot, repoReport, reports, starterPlan, held, gate.dry, notFetched, replaceable, changes, harnesses)
+		view.Plan = nonNil(summarizeSyncPlan(reports))
+		view.Destructive = nonNil(destructiveSyncItems(reports))
+		// Starter files count as changes, so the plan names them too.
+		var starter []string
+		for _, path := range starterPlan.Scaffolded {
+			starter = append(starter, "add "+path)
+		}
+		for _, path := range starterPlan.Updated {
+			starter = append(starter, "update "+path)
+		}
+		for _, path := range starterPlan.Removed {
+			starter = append(starter, "remove "+path)
+			view.Destructive = append(view.Destructive, "starter files: remove "+path)
+		}
+		if len(starter) > 0 {
+			view.Plan = append(view.Plan, "starter files: "+strings.Join(starter, ", "))
+		}
+		// The digest covers the whole document and the config files it was
+		// planned from, so `sync --plan-digest` applies only the plan that was
+		// shown, from that config. Skill and role file bodies are not covered.
+		data, err := json.Marshal(view)
+		if err != nil {
+			return err
+		}
+		digest := sha256.Sum256(append(data, opts.configRevision...))
+		view.PlanDigest = hex.EncodeToString(digest[:])
 		return encodeJSON(streams.out, view)
 	}
 
@@ -532,6 +569,51 @@ type syncDryRunJSON struct {
 	FreshnessUnchecked map[string]string `json:"freshness_unchecked,omitempty"`
 	WouldRelease       map[string]string `json:"would_release_with_allow_fresh,omitempty"`
 	Replaceable        []string          `json:"replaceable_conflicts"`
+	// Plan is one line per agent in the web view's words; Destructive lists
+	// what a sync removes or overwrites; PlanDigest is what --plan-digest takes.
+	Plan        []string `json:"plan"`
+	Destructive []string `json:"destructive"`
+	PlanDigest  string   `json:"plan_digest"`
+}
+
+// withPlanConfig reads the config once and pins it on opts, with the revision
+// of the shared file and the local overlay it came from, so a plan and the
+// sync that applies it work from one config.
+func withPlanConfig(opts runOptions) (runOptions, error) {
+	doc, _, err := openConfigDocument(configCommandOptions{ConfigPath: opts.ConfigPath})
+	if err != nil {
+		return opts, err
+	}
+	opts.ConfigOverride = &doc.effective
+	opts.configRevision = doc.revision(configLayerShared) + ":" + doc.revision(configLayerLocal)
+	return opts, nil
+}
+
+// runSyncPlanned applies a plan only while it is still the one shown: it runs
+// the same dry run again and syncs when its digest matches, as the web view's
+// Sync does with its preview. Like the web view, it syncs the config it
+// planned from, not one read again after the check.
+func runSyncPlanned(opts runOptions) error {
+	opts, err := withPlanConfig(opts)
+	if err != nil {
+		return err
+	}
+	var shown bytes.Buffer
+	dry := opts
+	dry.DryRun, dry.JSONOutput, dry.Stdout = true, true, &shown
+	if err := runSyncDryRun(dry); err != nil {
+		return err
+	}
+	var plan struct {
+		PlanDigest string `json:"plan_digest"`
+	}
+	if err := json.Unmarshal(shown.Bytes(), &plan); err != nil {
+		return err
+	}
+	if plan.PlanDigest != opts.PlanDigest {
+		return errors.New("the sync plan or the config changed since it was shown; load it again with tackroom sync --dry-run --json")
+	}
+	return runSync(opts)
 }
 
 type starterPlanJSON struct {
@@ -715,7 +797,7 @@ func countSyncChanges(repoReport repoLinkReport, reports []agentReport, replaceC
 		n := replaced + len(report.Adds) + len(report.Updates) + len(report.Removes) +
 			len(report.AddsAgent) + len(report.UpdatesAgent) + len(report.RemovesAgent) +
 			len(report.AddsMCP) + len(report.UpdatesMCP) + len(report.RemovesMCP) +
-			len(report.AddsHook) + len(report.UpdatesHook) +
+			len(report.AddsHook) + len(report.UpdatesHook) + len(report.RemovesHook) +
 			len(report.UpdatesPackage) + len(report.RemovesPackage) + len(report.UpdatesSetting) +
 			len(report.AddsPlugin) + len(report.RemovesPlugin)
 		if report.RootState == stateMissing || report.RootState == stateDrifted {

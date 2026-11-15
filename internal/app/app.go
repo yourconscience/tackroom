@@ -144,6 +144,7 @@ type agentReport struct {
 	DisabledPlugin  []string
 	StalePlugin     []string
 	StaleMCP        []string // servers sync wrote earlier that are no longer wanted
+	StaleHook       []string // hooks the config turned off or no longer aims here, still registered
 	UnsupportedHook []string
 	Conflicts       []string
 	// IdenticalCopies are native files or skill folders with the shared
@@ -172,6 +173,7 @@ type agentReport struct {
 	Removes        []string
 	RemovesAgent   []string
 	RemovesMCP     []string
+	RemovesHook    []string
 	RemovesPackage []string
 	RemovesPlugin  []string
 	Synced         bool
@@ -244,6 +246,12 @@ type runOptions struct {
 	AllowFreshAll    bool
 	AllowFreshItems  []string
 	AllowFreshReason string
+	// PlanDigest makes sync apply only the plan `sync --dry-run --json` showed
+	// with this plan_digest.
+	PlanDigest string
+	// configRevision identifies the config files ConfigOverride was read from;
+	// the plan digest covers it.
+	configRevision string
 }
 
 func Run(args []string) error {
@@ -416,6 +424,12 @@ func runSyncCommand(args []string) error {
 	if opts.DryRun && opts.Pull {
 		return errors.New("sync --dry-run cannot be combined with --pull")
 	}
+	if opts.PlanDigest != "" {
+		if opts.DryRun || opts.Pull {
+			return errors.New("sync --plan-digest cannot be combined with --dry-run or --pull")
+		}
+		return runSyncPlanned(opts)
+	}
 	if opts.Pull {
 		opts.Pull = false
 		return runPull(opts)
@@ -565,12 +579,19 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.DryRun, "dry-run", false, "Print the plan without writing anything, fetching external sources or querying registries")
 	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup, then link the shared skill or instructions file, or rewrite the role, in their place")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the resulting status as JSON instead of the text report")
+	fs.StringVar(&opts.PlanDigest, "plan-digest", "", "Sync only if the plan still has this plan_digest from sync --dry-run --json")
 	addAllowFreshFlags(fs, &opts)
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
 	if fs.NArg() != 0 {
 		return runOptions{}, errors.New("sync does not accept positional arguments")
+	}
+	// An empty digest must not fall through to a sync that checks nothing.
+	emptyDigest := false
+	fs.Visit(func(f *flag.Flag) { emptyDigest = emptyDigest || (f.Name == "plan-digest" && opts.PlanDigest == "") })
+	if emptyDigest {
+		return runOptions{}, errors.New("sync --plan-digest needs the plan_digest that tackroom sync --dry-run --json printed; it cannot be empty")
 	}
 	return opts, nil
 }
@@ -637,11 +658,13 @@ var canonicalForms = []string{
 	"  tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]",
 	"  tackroom status [--verbose] [--exit-code] [--agents ...]",
 	"  tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]",
+	"  tackroom sync --plan-digest DIGEST        # sync only if the plan is still the one sync --dry-run --json showed",
 	"  tackroom doctor [--e2e] [--agents ...]",
 	"  tackroom doctor audit [--json]            # findings per item; exit 1 on an unaccepted CRITICAL in external content",
 	"  tackroom doctor audit accept <item> <rule> --reason \"...\"   # item is kind:name, e.g. skill:foo",
 	"  tackroom doctor audit revoke <item> <rule>",
 	"  tackroom config <validate|print|inventory> [--config PATH]   # inventory prints the web view's inventory as JSON",
+	"  tackroom config set [--config PATH] <section/name/field> <value>   # e.g. mcp_servers/exa/enabled false; then tackroom sync",
 	"  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
 	"  tackroom tui [--config PATH]               # deprecated, removed in 3.0: use tackroom view",
 	"  tackroom skill new <name> [--description ...]",

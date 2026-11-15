@@ -44,8 +44,56 @@ func desiredHooksForAgent(cfg config, agentName string) ([]hookConfig, bool) {
 	return hooks, supported
 }
 
+// staleHooksForAgent finds the agent's native registrations of hooks the
+// config still declares but has turned off or no longer aims at this agent,
+// and returns those hooks' names and the registrations. A registration that a
+// hook wanted for this agent also matches stays, and so does every command
+// the config does not declare.
+func staleHooksForAgent(agentName string, cfg config, home string) ([]string, []nativeHookEntry, error) {
+	agentName = normalizeAgentName(agentName)
+	var off []hookConfig
+	for _, hook := range cfg.Hooks {
+		if !hook.Enabled || (len(hook.Agents) > 0 && !stringInSlice(agentName, hook.Agents)) {
+			off = append(off, hook)
+		}
+	}
+	if len(off) == 0 {
+		return nil, nil, nil
+	}
+	entries, _, err := collectNativeHooks(home, cfg, []agentConfig{{Name: agentName}})
+	if err != nil {
+		return nil, nil, err
+	}
+	var names []string
+	var stale []nativeHookEntry
+	for _, hook := range off {
+		// Matched as if it were on for every agent: nativeHookIsManaged knows
+		// each harness's event names.
+		asWanted := config{Hooks: []hookConfig{{Enabled: true, Event: hook.Event, Command: hook.Command}}}
+		found := false
+		for _, entry := range entries {
+			if !entry.Managed && nativeHookIsManaged(entry, asWanted) {
+				stale = append(stale, entry)
+				found = true
+			}
+		}
+		if found {
+			names = append(names, hook.Name)
+		}
+	}
+	return names, stale, nil
+}
+
 func augmentHookReport(report *agentReport, agent agentConfig, cfg config, home string) error {
 	hooks, supported := desiredHooksForAgent(cfg, agent.Name)
+	if supported {
+		stale, _, err := staleHooksForAgent(agent.Name, cfg, home)
+		if err != nil {
+			return err
+		}
+		report.StaleHook = stale
+		report.RemovesHook = append([]string(nil), stale...)
+	}
 	if len(hooks) == 0 {
 		return nil
 	}
@@ -84,6 +132,7 @@ func augmentHookReport(report *agentReport, agent agentConfig, cfg config, home 
 }
 
 func applyAgentHookSync(reports []agentReport, cfg config, home string) error {
+	backupDir := ""
 	for _, report := range reports {
 		if !report.Detected {
 			continue
@@ -91,6 +140,24 @@ func applyAgentHookSync(reports []agentReport, cfg config, home string) error {
 		target, supported := hookTargetForHarness(report.Name)
 		if !supported {
 			continue
+		}
+		if len(report.RemovesHook) > 0 {
+			_, stale, err := staleHooksForAgent(report.Name, cfg, home)
+			if err != nil {
+				return err
+			}
+			// Backed up first, as MCP removal is, so restore can undo it.
+			if backupDir == "" {
+				backupDir = newConflictBackupDir(home)
+			}
+			for _, entry := range stale {
+				if err := backupNativeConfig(entry.ConfigPath, backupDir, home); err != nil {
+					return fmt.Errorf("%s: back up %s: %w", report.Name, entry.ConfigPath, err)
+				}
+			}
+			if _, err := removeNativeHookEntries(stale); err != nil {
+				return err
+			}
 		}
 		hooks, _ := desiredHooksForAgent(cfg, report.Name)
 		byName := make(map[string]hookConfig, len(hooks))

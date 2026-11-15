@@ -91,7 +91,6 @@ func TestRemovedAliasesAreUnknownCommands(t *testing.T) {
 		{args: []string{"sync", "pull"}, wantErr: "sync does not accept positional arguments"},
 		{args: []string{"doctor", "dogfood"}, wantErr: "doctor does not accept positional arguments"},
 		{args: []string{"skill", "external", "list"}, wantErr: `unknown skill subcommand "external"`},
-		{args: []string{"config"}, wantErr: "config requires a subcommand: validate or print (edit the config with `tackroom view`)"},
 	}
 	for _, tc := range nested {
 		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {

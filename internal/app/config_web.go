@@ -616,7 +616,7 @@ func summarizeSyncPlan(reports []agentReport) []string {
 			{"add skill", report.Adds}, {"add role", report.AddsAgent}, {"add MCP", report.AddsMCP}, {"add hook", report.AddsHook},
 			{"update skill", report.Updates}, {"overwrite role", report.UpdatesAgent}, {"update MCP", report.UpdatesMCP},
 			{"update hook", report.UpdatesHook}, {"update package", report.UpdatesPackage}, {"update setting", report.UpdatesSetting}, {"add plugin", report.AddsPlugin},
-			{"remove skill", report.Removes}, {"remove role", report.RemovesAgent}, {"remove package", report.RemovesPackage},
+			{"remove skill", report.Removes}, {"remove role", report.RemovesAgent}, {"remove hook", report.RemovesHook}, {"remove package", report.RemovesPackage},
 			{"remove plugin", report.RemovesPlugin},
 		} {
 			for _, item := range group.items {
@@ -641,6 +641,36 @@ func summarizeSyncPlan(reports []agentReport) []string {
 	return lines
 }
 
+// destructiveSyncItems lists what a sync removes or overwrites, the items the
+// web view and the Herdr panel ask about before they apply a plan.
+func destructiveSyncItems(reports []agentReport) []string {
+	var items []string
+	for _, report := range reports {
+		for _, item := range report.Removes {
+			items = append(items, report.Name+": remove "+item)
+		}
+		for _, item := range report.RemovesAgent {
+			items = append(items, report.Name+": remove role "+item)
+		}
+		for _, item := range report.UpdatesAgent {
+			items = append(items, report.Name+": overwrite role "+item)
+		}
+		for _, item := range report.RemovesPlugin {
+			items = append(items, report.Name+": remove plugin "+item)
+		}
+		for _, item := range report.RemovesMCP {
+			items = append(items, report.Name+": remove MCP server "+item)
+		}
+		for _, item := range report.RemovesHook {
+			items = append(items, report.Name+": remove hook "+item)
+		}
+		for _, item := range report.RemovesPackage {
+			items = append(items, report.Name+": remove package "+item)
+		}
+	}
+	return items
+}
+
 func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) {
 	snapshot, err := doc.syncSnapshot()
 	if err != nil {
@@ -661,24 +691,7 @@ func buildConfigSyncPlan(doc *configDocument) (syncPlan, config, string, error) 
 	if err != nil {
 		return syncPlan{}, config{}, "", err
 	}
-	plan := syncPlan{RepoRoot: snapshot.repoRoot, Repo: repo, Reports: reports, Summary: summarizeSyncPlan(reports)}
-	for _, report := range reports {
-		for _, item := range report.Removes {
-			plan.Destructive = append(plan.Destructive, report.Name+": remove "+item)
-		}
-		for _, item := range report.RemovesAgent {
-			plan.Destructive = append(plan.Destructive, report.Name+": remove role "+item)
-		}
-		for _, item := range report.UpdatesAgent {
-			plan.Destructive = append(plan.Destructive, report.Name+": overwrite role "+item)
-		}
-		for _, item := range report.RemovesPlugin {
-			plan.Destructive = append(plan.Destructive, report.Name+": remove plugin "+item)
-		}
-		for _, item := range report.RemovesMCP {
-			plan.Destructive = append(plan.Destructive, report.Name+": remove MCP server "+item)
-		}
-	}
+	plan := syncPlan{RepoRoot: snapshot.repoRoot, Repo: repo, Reports: reports, Summary: summarizeSyncPlan(reports), Destructive: destructiveSyncItems(reports)}
 	planData, _ := json.Marshal(struct {
 		Repo    repoLinkReport
 		Reports []agentReport

@@ -9,9 +9,11 @@ import JobForm, { runTackroom } from "./form.js";
 //               and `hosts --json`  tackroom on each machine in crons.hosts
 //   Skills, Roles, MCP & hooks   `config inventory`  what /api/inventory serves
 //   Crons       `cron collect`  and acts through `cron run|pause|resume`
-// Add, Edit and Delete on a cron open form.js as a dialog of this same mod.
-// Nothing here writes except the cron actions: sync stays with the CLI and the
-// web view, because the plan JSON does not list every change a sync makes.
+// It changes what the web view changes, through the CLI:
+//   Sync        the plan in a dialog, applied with `sync --plan-digest`
+//   Turn on/off an agent, MCP server or hook, and which agents an MCP server
+//               or hook targets, with `config set`; Sync then applies it
+//   Crons       Add, Edit and Delete open form.js as a dialog of this same mod
 
 const SOURCES = {
   plan: { args: ["sync", "--dry-run", "--json"], timeout: 120000 },
@@ -78,9 +80,18 @@ export default class Tackroom extends View {
     this.open = new Set();
     // A crons collect probes every host over SSH, so poll gently; Refresh reloads the open tab at once.
     cx.timer.every(Math.max(60, p.refresh ?? 300) * 1000, (cx) => Object.keys(SOURCES).forEach((name) => this.load(name, cx)));
-    Object.keys(SOURCES).forEach((name) => this.load(name, cx));
-    // The dialog sends "reload" after it changes a job.
-    cx.spawn(async (cx) => { for (;;) { if ((await nextCommand()) === "reload") this.load("crons", cx); } });
+    // The first loads start from a timer: an exec started in init never
+    // returned (Herdr 0.1.15, a panel created hidden or covered), which kept
+    // every source "loading" and the panel on "Loading…" for good.
+    cx.timer.after(300, (cx) => Object.keys(SOURCES).forEach((name) => this.load(name, cx)));
+    // The dialog sends "reload" after it changes a job and "synced" after a sync.
+    cx.spawn(async (cx) => {
+      for (;;) {
+        const c = await nextCommand();
+        if (c === "reload") this.load("crons", cx);
+        if (c === "synced") ["plan", "inventory", "hosts"].forEach((name) => this.load(name, cx));
+      }
+    });
   }
 
   // args is ["cron", verb, ...]; --config goes right after the verb, because
@@ -89,9 +100,65 @@ export default class Tackroom extends View {
     return runTackroom({ bin: this.bin, config: this.config }, args, timeout);
   }
 
-  openForm(mode, j) {
+  openForm(mode, j, plan) {
     const job = j && { id: j.id, short_name: j.short_name, declared_schedule: j.declared_schedule, declared_command: j.declared_command, effect: j.effect };
-    openOverlay({ mod: "tackroom", kind: "dialog", width: 420, props: { form: { mode, job }, tackroom: this.bin, config: this.config } });
+    openOverlay({ mod: "tackroom", kind: "dialog", width: 420, props: { form: { mode, job, plan }, tackroom: this.bin, config: this.config } });
+  }
+
+  // Edits need a tackroom with `config set` and `sync --plan-digest`. Its dry run
+  // prints plan_digest; an older one does not, and the panel stays read-only,
+  // since Herdr's gallery serves this mod from main, ahead of a release.
+  canEdit() {
+    return Boolean(this.src.plan.data?.plan_digest);
+  }
+
+  openSync() {
+    const d = this.src.plan.data;
+    this.openForm("sync", null, { lines: d.plan, destructive: d.destructive, digest: d.plan_digest });
+  }
+
+  // One field of tackroom.yaml (or tackroom.local.yaml, where the entry is
+  // defined there), as the web view's switches and cells change it. The plan
+  // and inventory load again, so the Sync button shows what is waiting.
+  configSet(path, value, done, cx) {
+    this.busy = `cfg:${path}`;
+    cx.notify();
+    cx.spawn(async (cx) => {
+      try {
+        const r = await this.tackroom(["config", "set", path, JSON.stringify(value)], 60000);
+        if (r.code === 0) notify({ title: done, body: "Saved. Sync applies it.", level: "success", timeout: 3000 });
+        else notify({ title: `Could not change ${path}`, body: lastLine(r), level: "error" });
+      } catch (e) {
+        notify({ title: `Could not change ${path}`, body: String(e?.message ?? e), level: "error" });
+      } finally {
+        this.busy = "";
+      }
+      ["plan", "inventory"].forEach((name) => this.load(name, cx));
+    });
+  }
+
+  // Adds or removes one agent from an MCP server's or hook's targets, as a
+  // matrix cell of the web view does. An entry without an agents list targets
+  // every agent that supports it, so the list starts from those.
+  toggleTarget(r, agent, targeted, cx) {
+    const inv = this.src.inventory.data;
+    const order = inv.agents.map((a) => a.name);
+    const supports = r.kind === "mcp" ? "supports_mcp" : "supports_hooks";
+    const current = r.entry.explicit ? [...r.entry.targets] : inv.agents.filter((a) => a[supports]).map((a) => a.name);
+    const next = (targeted ? current.filter((n) => n !== agent) : [...new Set([...current, agent])])
+      .sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    if (!next.length) {
+      notify({ title: `${r.name} needs at least one agent`, body: "Turn it off instead.", level: "error" });
+      return;
+    }
+    this.configSet(`${r.section}/${r.name}/agents`, next, `${r.name} ${targeted ? "removed from" : "added to"} ${agent}`, cx);
+  }
+
+  // Turn on or Turn off for an agent, MCP server or hook.
+  switchButton(section, name, enabled, t) {
+    const path = `${section}/${name}/enabled`;
+    return this.button(`on:${path}`, this.busy === `cfg:${path}` ? "…" : enabled ? "Turn off" : "Turn on",
+      (cx) => this.configSet(path, !enabled, `${name} turned ${enabled ? "off" : "on"}`, cx), false, this.busy !== "", t);
   }
 
   load(name, cx) {
@@ -145,7 +212,8 @@ export default class Tackroom extends View {
   inventoryRows(id) {
     const inv = this.src.inventory.data;
     const wired = (list, kind) => list.map((w) => ({
-      name: w.name, tag: w.event || (w.enabled ? "" : "turned off"), states: w.states, kind,
+      name: w.name, tag: w.event || (w.enabled ? "" : "turned off"), states: w.states, kind, entry: w,
+      section: kind === "mcp" ? "mcp_servers" : "hooks",
       fields: [["Command", w.command], ["Targets", w.explicit ? w.targets.join(", ") : "all agents"]],
     }));
     if (id === "skills") {
@@ -259,16 +327,25 @@ export default class Tackroom extends View {
     const headline = d.synced ? "All synced" : d.changes > 0 ? `${plural(d.changes, "change")} waiting` : `${plural(waiting, "harness", "harnesses")} out of sync`;
     const out = [
       v_flex().gap(3)
-        .child(h_flex().gap(8).items_center().text_size(13).font_semibold()
-          .child(this.dot(d.synced ? t.ansi2 : t.ansi3)).child(headline))
-        .when(!d.synced, (el) => el.child(this.note("Run tackroom sync to apply it, or tackroom sync --dry-run for the plan.", t)))
+        .child(h_flex().gap(8).items_center()
+          .child(this.dot(d.synced ? t.ansi2 : t.ansi3))
+          .child(div().flex_1().min_w(0).text_size(13).font_semibold().child(headline))
+          .when(!d.synced && this.canEdit(), (el) => el.child(this.button("sync", "Sync", () => this.openSync(), true, this.busy !== "" || this.src.plan.loading, t))))
+        .when(!d.synced, (el) => el.child(this.note(this.canEdit() ? "Sync shows the plan before it changes anything."
+          : "Run tackroom sync to apply it. Update tackroom to sync and edit from this panel.", t)))
         .when(d.repo_link !== "synced", (el) => el.child(this.note(`The config root link is ${d.repo_link}.`, t))),
     ];
     // Machines come before this machine's harnesses, as in the web view, and
     // only with more than one host in crons.hosts.
     const m = this.src.hosts.data;
     if (m && m.hosts.length > 1) out.push(this.section("Machines", m.hosts.map((x) => this.machineRow(x, t)), t));
-    out.push(this.section("Harnesses", d.agents.map((a) => this.harnessRow(a, t)), t));
+    // Agents turned off in the config are not in the plan; the inventory lists them.
+    const off = (this.src.inventory.data?.agents ?? []).filter((a) => !a.enabled);
+    out.push(this.section("Harnesses", [...d.agents.map((a) => this.harnessRow(a, t)),
+      ...off.map((a) => this.fold(`h:${a.name}`,
+        [this.dot(t.dim), div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(a.name),
+          div().flex_none().text_size(11).text_color(t.dim).child("turned off")],
+        () => this.canEdit() ? h_flex().ml(22).mb(6).child(this.switchButton("agents", a.name, false, t)) : this.note("Turned off in the config.", t), t))], t));
     if (d.held.length) {
       out.push(this.section("Held or blocked", d.held.map((h) => this.fold(`x:${h.item}`,
         [this.dot(h.kind === "blocked" ? t.ansi1 : t.ansi3),
@@ -326,7 +403,8 @@ export default class Tackroom extends View {
         .children(a.conflicts.map((x) => div().text_color(t.ansi1).child(x)))
         .when(Boolean(a.root_instructions && a.root_instructions.state !== "synced"), (el) => el.child(this.field("Root file", a.root_instructions.state, t)))
         .children(surfaces.flatMap(([label, s]) => ["missing", "drifted"].filter((kind) => s[kind].length)
-          .map((kind) => this.field(label, `${kind}: ${s[kind].join(", ")}`, t)))), t);
+          .map((kind) => this.field(label, `${kind}: ${s[kind].join(", ")}`, t))))
+        .when(this.canEdit(), (el) => el.child(h_flex().pt(4).child(this.switchButton("agents", a.name, true, t)))), t);
   }
 
   // One inventory section: the rows that need attention first, then by name.
@@ -350,11 +428,17 @@ export default class Tackroom extends View {
           .children(r.fields.filter(([, v]) => v).map(([k, v]) => this.field(k, v, t)))
           .children(agents.map((a) => {
             const [word, level] = CELL[r.states[a]] ?? CELL.unknown;
+            // MCP servers and hooks can change their targets, as the web view's cells do.
+            const targeted = !["off", "unsupported", "absent", "error"].includes(r.states[a]);
+            const locked = ["unsupported", "absent", "error"].includes(r.states[a]);
             return h_flex().gap(8).items_center()
               .child(this.dot(tone(t, level)))
               .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(label(a)))
-              .child(div().flex_none().text_color(t.dim).child(word));
-          })), t);
+              .child(div().flex_none().text_color(t.dim).child(word))
+              .when(Boolean(r.entry) && !locked && this.canEdit(), (el) => el.child(this.button(`t:${r.kind}:${r.name}:${a}`, targeted ? "Remove" : "Add",
+                (cx) => this.toggleTarget(r, a, targeted, cx), false, this.busy !== "", t)));
+          }))
+          .when(Boolean(r.entry) && this.canEdit(), (el) => el.child(h_flex().pt(4).child(this.switchButton(r.section, r.name, r.entry.enabled, t)))), t);
     }), t);
   }
 

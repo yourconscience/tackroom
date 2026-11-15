@@ -21,6 +21,7 @@ Never infer configuration from the current project. Never replace a user's confi
 tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]
 tackroom status [--verbose] [--exit-code] [--agents ...]
 tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]
+tackroom sync --plan-digest DIGEST              # sync only if the plan and the config are still the ones sync --dry-run --json showed
 tackroom doctor [--e2e] [--agents ...]
 tackroom doctor audit [--json]                  # findings per item; exit 1 on an unaccepted CRITICAL in external content
 tackroom doctor audit accept <item> <rule> --reason "..."   # record an audit decision; item is kind:name, e.g. skill:foo
@@ -28,6 +29,7 @@ tackroom doctor audit revoke <item> <rule>
 tackroom config validate
 tackroom config print
 tackroom config inventory                       # the web view's inventory as JSON: harnesses, skills, roles, MCP servers, hooks
+tackroom config set <section/name/field> <value>   # one existing field, e.g. mcp_servers/exa/enabled false; sync applies it
 tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]
 tackroom tui [--config PATH]                    # deprecated, removed in 3.0; do not recommend it: use view, status or cron collect --table
 tackroom skill new <name> [--description ...]
@@ -100,7 +102,7 @@ tackroom setup                      # imports, git init, backs up and replaces d
 tackroom status --json              # verify; exit 0 = everything synced
 ```
 
-Exit codes: `status` and `sync` exit 1 when anything is out of sync or conflicting; `doctor` exits 1 when any check fails or warns. All exit 0 otherwise. Warnings are advisory (for example a package younger than three days, or a registry that could not be reached); to gate on real failures, read `failed` from `doctor --json`. `--json` output on those three is a stable contract: `synced`, `agents[].conflicts`, `agents[].skills|mcp|roles|hooks.{managed,missing,drifted}`, plus `agents[].mcp.stale` when present. When `sync` reports conflicts, show the listed paths to the user before running `tackroom sync --replace-conflicts`.
+Exit codes: `status` and `sync` exit 1 when anything is out of sync or conflicting; `doctor` exits 1 when any check fails or warns. All exit 0 otherwise. Warnings are advisory (for example a package younger than three days, or a registry that could not be reached); to gate on real failures, read `failed` from `doctor --json`. `--json` output on those three is a stable contract: `synced`, `agents[].conflicts`, `agents[].skills|mcp|roles|hooks.{managed,missing,drifted}`, plus `agents[].mcp.stale` and `agents[].hooks.stale` when present. When `sync` reports conflicts, show the listed paths to the user before running `tackroom sync --replace-conflicts`.
 
 The public starter contains `tackroom`, six generic roles (`architect` `builder` `general` `researcher` `reviewer` `tester`), and reusable memory scripts. Personal skills, hooks, MCP servers, secrets, and memory data belong only in the private config repository.
 
@@ -147,7 +149,7 @@ Pi always has managed skills. With `pi-subagents` installed, tackroom renders ca
 
 For MCP servers, sync patches only named canonical entries and preserves unrelated native servers. A server sync wrote earlier and that is no longer wanted for an agent (removed from `tackroom.yaml`, disabled, or dropped from its `agents`) shows as `mcp stale` in `status` and is removed by the next `sync`, after the native config file is copied to `~/.local/state/tackroom/backups/<time>/`. Sync never claims an entry the agent already had; `mcp remove` also claims native entries that still match the definition it removes. Import redacts literal environment values to `${KEY}` references and names the redacted keys; the source agent keeps its values. Other target agents get the literal `${KEY}`, which they may not expand: put the real value in their native config (sync never replaces a value with a reference) or import with `--agents <source>`. List output never prints values.
 
-For hooks, sync registers only declared entries on harnesses with verified hook support. Host-local review and approval state remains outside tackroom.
+For hooks, sync registers only declared entries on harnesses with verified hook support. A declared hook that is turned off, or whose `agents` no longer names an agent, shows as `hooks stale` in `status` while that agent still has it registered and is removed from that agent by the next `sync`; registrations of hooks the config does not declare are left alone. Host-local review and approval state remains outside tackroom.
 
 Claude Code plugins (mods, workflows, monitors, output styles, LSP, `bin/`) stay in Claude's native layout under the config root, listed in `<config-root>/.claude-plugin/marketplace.json`. `sync` registers that directory as a marketplace in `~/.claude/settings.json` (`extraKnownMarketplaces`) and enables each relative-path entry (`enabledPlugins`). Claude Code reads it in place: edit, then `/reload-plugins`. User disables (kept across a marketplace rename) and `defaultEnabled: false` are respected; stale enable keys are pruned and removing the marketplace file removes the registration. A name already registered with another source, or a malformed file, is a conflict and nothing is written. `doctor` runs `claude plugin validate` on it when Claude Code is detected.
 
