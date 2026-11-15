@@ -35,6 +35,7 @@ type setupSummary struct {
 	agents   []string
 	fresh    bool       // the config root had no tackroom.yaml before this run
 	from     *setupFrom // --from: what the clone or pull did
+	overlay  string     // --overlay: the line for a copy made this run
 	gitNew   bool       // this run created the git repository
 	gitNote  string     // the first commit is still to do (git has no identity)
 	imported map[string]int
@@ -173,7 +174,7 @@ func (s *setupSummary) noteDiffered(before map[string]bool, detection *detection
 
 // noop reports a rerun that found nothing to do.
 func (s *setupSummary) noop() bool {
-	if s.fresh || s.gitNew || s.changed || s.cronNew || len(s.rootDocs) > 0 || (s.from != nil && s.from.changed) {
+	if s.fresh || s.gitNew || s.changed || s.cronNew || len(s.rootDocs) > 0 || (s.from != nil && s.from.changed) || s.overlay != "" {
 		return false
 	}
 	for _, n := range s.imported {
@@ -253,6 +254,9 @@ func (s *setupSummary) print(w io.Writer) int {
 	fmt.Fprintf(w, "Config: %s%s\n", root, s.configNote())
 	if s.gitNote != "" {
 		fmt.Fprintf(w, "  %s\n", strings.ReplaceAll(s.gitNote, s.root, root))
+	}
+	if s.overlay != "" {
+		fmt.Fprintln(w, s.overlay)
 	}
 	if s.memory != "" {
 		fmt.Fprintln(w, "Memory: "+s.memory)

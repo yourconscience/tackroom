@@ -38,14 +38,6 @@ func runSetup(opts runOptions) error {
 		}
 		from = &plan
 	}
-	if from != nil && !opts.JSONOutput && !opts.DryRun {
-		if err := from.apply(); err != nil {
-			return err
-		}
-		if err := checkConfigRoot(repoRoot); err != nil {
-			return err
-		}
-	}
 	// --dry-run and --json plan against what the real run would see. For a
 	// clone that is not made yet, that is a throwaway clone in a temp dir.
 	planRoot, planConfig := repoRoot, configPath
@@ -59,6 +51,36 @@ func runSetup(opts runOptions) error {
 		planConfig = filepath.Join(planRoot, filepath.Base(configPath))
 		if _, err := gitRemote("clone", "--quiet", "--depth", "1", "--", from.url, planRoot); err != nil {
 			return fmt.Errorf("git clone %s failed: %v", redactURL(from.url), err)
+		}
+	}
+	if from != nil && !opts.JSONOutput && !opts.DryRun {
+		if err := from.apply(); err != nil {
+			return err
+		}
+		if err := checkConfigRoot(repoRoot); err != nil {
+			return err
+		}
+	}
+	// An unknown --overlay stops setup here, after any clone or pull and
+	// before anything is synced: with --from the overlays are the repository's.
+	var overlay *setupOverlay
+	if opts.Overlay != "" {
+		repo := displayPath(repoRoot, home)
+		if from != nil {
+			repo = redactURL(from.url)
+		}
+		plan, err := planSetupOverlay(opts.Overlay, planRoot, repoRoot, repo)
+		if err != nil {
+			return err
+		}
+		overlay = &plan
+	}
+	// The overlay is in place before anything loads tackroom.local.yaml, as if
+	// it had been written by hand before setup ran.
+	var overlayLine, overlayProblem string
+	if overlay != nil && !opts.JSONOutput && !opts.DryRun {
+		if overlayLine, overlayProblem, err = overlay.apply(); err != nil {
+			return err
 		}
 	}
 	configExisted := hasFile(planConfig)
@@ -93,6 +115,9 @@ func runSetup(opts runOptions) error {
 	// --json and --dry-run must exit before any mutation, including the
 	// memory-tier setup below which creates directories and config files.
 	planned := setupPlannedActions(opts)
+	if overlay != nil {
+		planned = append([]string{overlay.action()}, planned...)
+	}
 	if from != nil {
 		planned = append([]string{from.action()}, planned...)
 	}
@@ -146,9 +171,12 @@ func runSetup(opts runOptions) error {
 			prompts.out = io.Discard
 		}
 	}
-	summary := setupSummary{home: home, root: repoRoot, fresh: !configExisted, from: from}
+	summary := setupSummary{home: home, root: repoRoot, fresh: !configExisted, from: from, overlay: overlayLine}
 	for _, agent := range detected {
 		summary.agents = append(summary.agents, agent.Name)
+	}
+	if overlayProblem != "" {
+		summary.problem("%s", overlayProblem)
 	}
 
 	if keepTier {

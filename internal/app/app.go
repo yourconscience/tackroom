@@ -235,6 +235,9 @@ type runOptions struct {
 	Review bool
 	// From is the git URL setup clones into (or pulls in) the config root.
 	From string
+	// Overlay names overlays/NAME.yaml in the config root, which setup copies
+	// to tackroom.local.yaml before the first sync.
+	Overlay string
 	// setupResult, set by setup, receives what the setup-driven sync did, so
 	// setup can print its short summary. The sync report itself is then
 	// printed only with Verbose.
@@ -543,6 +546,7 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	// Empty means: keep the tier an existing tackroom.yaml uses, else basic.
 	fs.StringVar(&opts.MemoryTier, "memory", "", "Memory tier: off, basic, or memsearch (default basic; an existing config keeps its tier)")
 	fs.StringVar(&opts.From, "from", "", "Clone this git repository into the config root (or pull it there) and set up from it")
+	fs.StringVar(&opts.Overlay, "overlay", "", "Copy overlays/NAME.yaml from the config root to tackroom.local.yaml before the first sync")
 	fs.BoolVar(&opts.Review, "review", false, "Review what to import and confirm each step instead of taking the defaults")
 	fs.BoolVar(&opts.Verbose, "verbose", false, "Print every step and the full sync report")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Emit detection result as JSON and exit")
@@ -552,7 +556,7 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	// accepted for old scripts and left out of the help.
 	fs.BoolVar(&assumeYes, "yes", false, "")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "usage: tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]")
+		fmt.Fprintln(fs.Output(), "usage: tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]")
 		fs.VisitAll(func(f *flag.Flag) {
 			if f.Name == "yes" {
 				return
@@ -565,6 +569,10 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	}
 	if fs.NArg() != 0 {
 		return runOptions{}, errors.New("setup does not accept positional arguments")
+	}
+	// A name, never a path: it must not reach outside overlays/.
+	if strings.ContainsAny(opts.Overlay, `/\`) || strings.Contains(opts.Overlay, "..") {
+		return runOptions{}, fmt.Errorf("--overlay takes a name from overlays/ (cloud for overlays/cloud.yaml), not a path: %q", opts.Overlay)
 	}
 	return opts, nil
 }
@@ -655,7 +663,7 @@ func printUsage() {
 
 // canonicalForms is the full command reference; group --help prints its lines.
 var canonicalForms = []string{
-	"  tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]",
+	"  tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]",
 	"  tackroom status [--verbose] [--exit-code] [--agents ...]",
 	"  tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]",
 	"  tackroom sync --plan-digest DIGEST        # sync only if the plan is still the one sync --dry-run --json showed",

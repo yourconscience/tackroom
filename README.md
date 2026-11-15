@@ -55,7 +55,7 @@ Terminals: a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/he
 
 ## Docs
 
-- [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from`, settings
+- [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from` and `--overlay`, settings
 - [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
 - [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
 - [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
