@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 )
 
 func externalCacheDir(home string) string {
@@ -294,7 +295,34 @@ func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile,
 	}
 	held := gateExternalSources(candidates, externalCandidateHome(home), &probe, gate)
 	lock.Holds = probe.Holds
+	for name, h := range held {
+		if h.Kind == "held" {
+			// sync never moves an existing pin, so only update releases it.
+			h.Command = "tackroom skill update " + name + " --allow-fresh=" + h.Item
+			held[name] = h
+		}
+	}
 	return held
+}
+
+// pendingUpdateHolds lists, keyed "update-hold:"+name, each pinned source whose
+// last `skill update` candidate the gate held or blocked and which is still
+// staged. It writes neither the lock nor any checkout, so status can call it.
+func pendingUpdateHolds(sources []externalSkillSource, home string, lock lockFile, now time.Time) map[string]heldItem {
+	var staged []externalCandidate
+	for _, src := range sources {
+		path := externalCandidatePath(home, sourceName(src))
+		if lockEntryFor(lock, src) == nil || !hasDir(filepath.Join(path, ".git")) {
+			continue
+		}
+		staged = append(staged, externalCandidate{src: src, path: path, commit: externalSkillCommitFull(path)})
+	}
+	lock.Holds = append([]holdEntry(nil), lock.Holds...)
+	out := map[string]heldItem{}
+	for name, h := range gateUpdatedSources(staged, home, &lock, gateOptions{now: now}) {
+		out["update-hold:"+name] = h
+	}
+	return out
 }
 
 func selectExternalSources(sources []externalSkillSource, names []string) ([]externalSkillSource, error) {

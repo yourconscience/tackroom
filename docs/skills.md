@@ -76,7 +76,7 @@ external_skills:
 ## The 72 hour hold
 
 ```bash
-tackroom status                              # lists each held item: reason, hold end, override command
+tackroom status                              # lists each held item, including a held skill update: reason, hold end, override command
 tackroom sync --allow-fresh                  # release all held items
 tackroom sync --allow-fresh=<item> --reason "checked the diff"
 tackroom skill update --allow-fresh
@@ -84,7 +84,7 @@ tackroom skill update --allow-fresh
 
 A new or changed external skill pin, and a new or changed reference to an exact npm or PyPI version (in an MCP server command or a Pi `packages` entry), is held until 72 hours after its publish time. The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means held.
 
-A held item is skipped and what is already in the harness stays. `--allow-fresh` releases it and records the decision in `tackroom.lock` under `holds:`.
+A held item is skipped and what is already in the harness stays. `--allow-fresh` releases it and records the decision in `tackroom.lock` under `holds:`. A held `skill update` keeps the previous pin; sync never moves a pin, so it is released with `tackroom skill update <name> --allow-fresh=<item>`.
 
 The lock records an npm or PyPI version while its hold is in force, while its publish time is unknown, or once you release it. A version already older than 72 hours when it is first looked up adds nothing to the lock, so the first sync on a new machine leaves it unchanged. Pi packages are looked up only on a machine where Pi is detected; elsewhere a decision already in the lock still applies.
 

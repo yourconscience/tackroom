@@ -408,6 +408,8 @@ func lockRows(g statusGates) []lockRow {
 		} else if issue != "" {
 			row.State, _, _ = strings.Cut(issue, " (")
 			row.Reason, row.Command = issue, "tackroom sync"
+		} else if h, ok := g.held["update-hold:"+name]; ok {
+			row.State, row.Reason, row.Until, row.Command = h.Kind, h.Reason, h.Until, h.Command
 		}
 		if cloned {
 			item := externalSourceItem(src, g.home)
