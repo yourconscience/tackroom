@@ -6,7 +6,9 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
-## Unreleased
+## To 2.6
+
+Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats. One thing changes on its own: a hook you turned off in the config is now removed from the agents on the next sync (below).
 
 - New: the Herdr panel syncs and edits. Overview has a Sync button that shows the plan, with what it removes or overwrites, before it applies it. Harnesses, MCP servers and hooks have Turn on and Turn off, and MCP servers and hooks add or remove an agent, as the web view's switches and cells do. Copy the two mods from `herdr/tackroom/mods/` again to get it. With an older tackroom the panel stays read-only.
 - Fixed: the Herdr panel could stay on "Loading…" (the crons panel on "Collecting…") for good when Herdr created it hidden, as it does at start: its first loads never returned. They now start a moment later.
