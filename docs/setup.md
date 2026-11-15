@@ -9,7 +9,7 @@ tackroom setup --review               # review imports and confirm each step ins
 tackroom setup --dry-run              # what the run would import, whose copy it keeps; changes nothing
 ```
 
-Other flags: `--memory off|basic|memsearch` (default `basic` on a new config; an existing config keeps its tier, see [memory.md](memory.md)), `--agents a,b` to limit the run to named harnesses, `--no-cron` to skip the periodic job, `--verbose` for every step and the full sync report, `--json` for the detection result, `--config PATH`. `--yes` is still accepted and does nothing: it is the default now.
+Other flags: `--overlay NAME` to start this machine from a committed `tackroom.local.yaml` (see [Machine overlays](#machine-overlays)), `--memory off|basic|memsearch` (default `basic` on a new config; an existing config keeps its tier, see [memory.md](memory.md)), `--agents a,b` to limit the run to named harnesses, `--no-cron` to skip the periodic job, `--verbose` for every step and the full sync report, `--json` for the detection result, `--config PATH`. `--yes` is still accepted and does nothing: it is the default now.
 
 Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agents:` lists: Claude Code `claude`, Codex `codex`, Factory Droid `droid`, OMP `omp`, OpenCode `opencode`, Pi `pi`, Qwen Code `qwen-code`, Cursor `cursor`, Gemini CLI `gemini`, GitHub Copilot CLI `copilot`, Grok Build `grok`, DeepSeek Harness `dsh`, Antigravity CLI `agy`, Kimi Code `kimi`, Amp `amp`. The former key `claude-code` still works. What each harness gets, and the executable that detects it, is in [harnesses.md](harnesses.md).
 
@@ -56,6 +56,38 @@ tackroom setup --from <your-private-repository>
 Setup never changes the memory tier of an existing `tackroom.yaml` unless you pass `--memory`. When the shared tier is `memsearch` and this machine has no `memsearch`, setup leaves the memory hooks as they are, sets up everything else and lists the install command.
 
 `tackroom sync --pull` pulls the repo first, then reconciles. List the machines under `crons.hosts` in `tackroom.local.yaml` (SSH aliases, plus `local` for this one) and `tackroom hosts` shows each one's tackroom version, sync state and config commit, with the command that fixes what is wrong. Machines without a Go toolchain skip building the memory tools; everything else syncs normally.
+
+### Machine overlays
+
+A machine of a known kind, such as a cloud VM, needs the same `tackroom.local.yaml` every time. Commit it once in the config repository as `overlays/<name>.yaml`, a complete `tackroom.local.yaml`, and pass `--overlay <name>`. An entry in the local file replaces the shared entry of the same name, so write each entry in full:
+
+```yaml
+# overlays/cloud.yaml
+mcp_servers:
+  - name: browser
+    enabled: false
+    command: npx
+    args: [-y, "@acme/browser-mcp"]
+hooks:
+  - name: notify-stop
+    enabled: false
+    event: Stop
+    command: ~/.agents/hooks/notify.sh
+```
+
+A cloud VM's setup script then runs:
+
+```bash
+npm install -g tackroom
+tackroom setup --from <repository url> --overlay cloud --no-cron
+```
+
+- Setup copies `overlays/<name>.yaml` to `tackroom.local.yaml` in the config root after the clone or pull and before the first sync, so the first sync already leaves those entries out. It works without `--from` too.
+- A `tackroom.local.yaml` that already holds the overlay is left as it is. One that differs is never overwritten: setup syncs with it, lists it under what needs your attention and exits 1.
+- `periodic_sync` is left out of that comparison. `--no-cron` records `periodic_sync: false` in the copied file, and running the same command again reports nothing to do.
+- An unknown name stops setup before it clones, pulls or writes anything, and lists the overlays the repository has. With `--from` the names come from a throwaway shallow clone of the URL. The name is a file name under `overlays/`, never a path.
+- `--dry-run` and `--json` list the copy as a planned action.
+- Only `setup --overlay` reads `overlays/`. `sync` and `config validate` ignore it, and the starter `.gitignore` does not exclude it, so it is committed with the rest.
 
 ## The web view
 

@@ -18,7 +18,7 @@ Never infer configuration from the current project. Never replace a user's confi
 ## Commands
 
 ```bash
-tackroom setup [--from GIT_URL] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]
+tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]
 tackroom status [--verbose] [--exit-code] [--agents ...]
 tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]
 tackroom sync --plan-digest DIGEST              # sync only if the plan and the config are still the ones sync --dry-run --json showed
@@ -89,6 +89,8 @@ Run `tackroom help --all` for maintenance commands.
 `--review` brings back the interactive review screen (share, keep harness-specific, or skip per item) and a prompt before git init, conflict replacement and destructive changes; without a terminal it falls back to sequential `[y/N]` prompts. `--verbose` prints every step and the full sync report. `--dry-run` prints what the run would import, whose copy it keeps and which roles stay each harness's own, and changes nothing; `--json` emits the detection result and exits. `--yes` is accepted as a no-op.
 
 On another machine, `tackroom setup --from <git url>` clones the user's config repository into the config root when it is missing or empty, or pulls it with `git pull --ff-only` when it is already a clone of that URL, then sets up from its `tackroom.yaml` without adding starter files. A root with other content, another origin, or no origin is refused unchanged. Without `--memory`, setup never changes an existing config's memory tier; a memsearch config on a machine without `memsearch` keeps its hooks and the summary lists the install command.
+
+For a machine of a known kind (a cloud VM, say), `tackroom setup --from <git url> --overlay cloud --no-cron` also copies the committed `overlays/cloud.yaml`, a complete `tackroom.local.yaml`, into place before the first sync. An unknown name fails before anything changes and lists the overlays the repository has. An existing `tackroom.local.yaml` that differs is never overwritten: setup syncs with it, lists it as needing the user and exits 1. `periodic_sync` is not compared, so a rerun after `--no-cron` reports nothing to do. Only `setup --overlay` reads `overlays/`.
 
 Setup also imports existing instructions files (`~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, ...) into `~/.agents/AGENTS.md`, then backs up the originals to `~/.local/state/tackroom/backups/<time>/` and links them; several different ones are merged under a `## From <agent> (<file>)` heading each, and every `setup` run lists them as needing attention until the user merges them and deletes those headings.
 

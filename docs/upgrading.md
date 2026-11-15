@@ -6,6 +6,10 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## Unreleased
+
+- New: `tackroom setup --overlay NAME` copies `overlays/NAME.yaml`, a complete `tackroom.local.yaml` committed in the config repository, into place before the first sync, for machines of one kind such as cloud VMs: `tackroom setup --from <repository url> --overlay cloud --no-cron`. A different `tackroom.local.yaml` is never overwritten; setup lists it as needing your attention and exits 1. An unknown name fails before anything changes. See [Machine overlays](setup.md#machine-overlays).
+
 ## To 2.6
 
 Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats. One thing changes on its own: a hook you turned off in the config is now removed from the agents on the next sync (below).
