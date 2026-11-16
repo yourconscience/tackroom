@@ -4,24 +4,24 @@ tackroom is a user-level dotfiles manager for coding agents. It syncs skills, MC
 
 ## Comparison
 
-| | **tackroom** | [skillshare](https://github.com/runkids/skillshare) | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) |
-|---|---|---|---|---|---|
-| Scope | user | user, and per project | project, and a global mode | project | user + project |
-| Skills | ✓ | ✓ | ✓ | ~ | ✓ |
-| MCP | ✓ | ✓ | ✓ | ✓ | - |
-| Hooks | ✓ | ✓ | ✓ | - | - |
-| Roles | ✓ native | ✓ | ✓ | ~ | - |
-| Root instructions | ✓ | ✓ | ✓ | ✓ | - |
-| Memory tier | ✓ (`rem`) | ~ shared notes | - | - | - |
-| Pin + audit externals | ✓ lock + audit | ~ audit; commit pins in project mode | - | - | - |
-| Freshness hold (72h) | ✓ | - | - | - | - |
-| Per-harness settings | ✓ | - | - | - | - |
-| Periodic sync | ✓ | - | - | - | - |
-| Desktop app | - (web view) | ✓ | - | - | - |
-| Terminal panels | ✓ Herdr panel · Tern crons panel and workspace command · Rex workspace command and palette actions | ✓ Herdr panel | - | - | - |
-| Harness depth | deep | broad | broad | broad | narrow |
+| | **tackroom** | [skillshare](https://github.com/runkids/skillshare) | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) | [dotagents](https://github.com/getsentry/dotagents) | [HarnessKit](https://github.com/RealZST/HarnessKit) |
+|---|---|---|---|---|---|---|---|
+| Scope | user | user, and per project | project, and a global mode | project | user + project | user, and per project | user, and per project |
+| Skills | ✓ | ✓ | ✓ | ~ | ✓ | ✓ | ✓ |
+| MCP | ✓ | ✓ | ✓ | ✓ | - | ✓ | ✓ |
+| Hooks | ✓ | ✓ | ✓ | - | - | ~ 3 of 8 agents | ~ 10 of 17 agents |
+| Roles | ✓ native | ✓ | ✓ | ~ | - | ✓ subagents | ~ viewed only |
+| Root instructions | ✓ | ✓ | ✓ | ✓ | - | - | ~ viewed; Kits copy them |
+| Memory tier | ✓ (`rem`) | ~ shared notes | - | - | - | - | ~ files viewed; Kits copy them |
+| Pin + audit externals | ✓ lock + audit | ~ audit; commit pins in project mode | - | - | - | ~ trust allowlist, ref pins; no audit | ~ audit; pins not described |
+| Cooldown (72h minimum release age) | ✓ | - | - | - | - | ~ git sources only | - |
+| Per-harness settings | ✓ | - | - | - | - | - | - |
+| Periodic sync | ✓ | - | - | - | - | - | - |
+| Desktop app | - (web view) | ✓ | - | - | - | - | ✓ |
+| Terminal panels | ✓ Herdr panel · Tern crons panel and workspace command · Rex workspace command and palette actions | ✓ Herdr panel | - | - | - | - | - |
+| Harness depth | deep | broad | broad | broad | narrow | broad | broad |
 
-`✓` full, `~` partial, `-` none. The other tools' cells follow their public READMEs and documentation as read on 2026-11-13; check them before you rely on one.
+`✓` full, `~` partial, `-` none. The other tools' cells follow their public READMEs and documentation as read on 2026-11-13, except the dotagents and HarnessKit columns, which were read on 2026-11-16; check them before you rely on one.
 
 ## skillshare vs tackroom
 
@@ -32,11 +32,19 @@ For pins, it writes `.skillshare/skills.lock.json` in project mode ([how the loc
 tackroom goes further in four places:
 
 - external skills are pinned in `tackroom.lock`, which lives in your config repo and is shared by every machine;
-- new pins and new exact package versions are held for 72 hours, and a held item is skipped until you release it;
+- new pins and new exact package versions wait out a 72-hour cooldown, the minimum release age, and an item still inside it is skipped until the cooldown ends or you pass `--allow-fresh`;
 - each harness accepts declared settings keys, and a periodic job keeps machines in sync;
 - a review-first memory tier (`rem`) captures facts without promoting them.
 
 skillshare's documentation describes none of these. See [skillshare-migration.md](skillshare-migration.md) to move over.
+
+## dotagents vs tackroom
+
+dotagents is Sentry's tool, and it works per repository as well as per user. It declares skills, MCP servers, hooks, subagents and plugins in `agents.toml`, either globally under `~/.agents/` or committed in a repository, so a collaborator runs `dotagents --project install` and gets the same setup. tackroom has no project manifest and no team workflow, because it manages only your own user-level setup. dotagents supports eight agents, has a `[trust]` allowlist of GitHub orgs, repos and git domains, pins a source to a ref such as `@v1.0.0`, and has a `minimum_release_age` in minutes for git sources. Its `agents.lock` records the resolved commit, which its documentation calls informational only, and its documentation does not describe an audit of skill contents, root instructions, a memory tier, per-harness settings or a periodic sync. tackroom pins commits in a lock shared by every machine, audits what it pins, and applies its cooldown to exact npm and PyPI versions as well. tackroom itself was called dotagents until 2026-10-02 and is unrelated to Sentry's project.
+
+## HarnessKit vs tackroom
+
+HarnessKit is a desktop app, with an `hk` command line and a web mode served by `hk serve`, for viewing and managing skills, MCP servers, plugins, hooks and agent-first CLIs across 17 agents. Its documentation lists installers for macOS and Windows and binaries for Linux; tackroom's documentation does not describe Windows support. It gives every extension a trust score from 20 static analysis rules, lists each extension's permissions, and has marketplaces for skills (skills.sh) and MCP servers (Smithery); tackroom only searches skills.sh. Its Kits bundle skills, MCP servers, rules and memory files into a `.hk-kit.zip` that can be shared and added to any project. HarnessKit works in place in each agent's own directories and its documentation does not describe a lock file, a minimum release age, declared settings keys or a periodic sync. It shows rules, subagents and memory files but its documentation does not describe syncing them between agents. tackroom goes further in pinning external skills to commits, in the cooldown, and in keeping one declared config that every machine applies.
 
 ## The rest
 
