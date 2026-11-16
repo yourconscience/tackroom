@@ -42,7 +42,7 @@ You review code changes. Report findings; do not edit files.
 | Grok Build | Markdown | `~/.grok/agents/<name>.md` |
 | Kimi Code | Markdown | `~/.kimi-code/agents/<name>.md` |
 
-Amp, Antigravity CLI, Devin and DeepSeek Harness have no role surface tackroom can render, so they get none. Devin reads custom subagents from `~/.config/devin/agents/`, but its docs name only some of the tools such a file may list ([harnesses.md](harnesses.md#devin)). Paths follow each harness's `agent_root` in `tackroom.yaml`. Pi role files do nothing unless the `pi-subagents` package is installed; declare it under the Pi agent's `packages:` in `tackroom.yaml`.
+Amp, Antigravity CLI, Devin and DeepSeek Harness have no role surface tackroom can render, so it writes them none. Devin loads the role files in `~/.agents/agents/` itself when that is your config root, with their tool names as written ([harnesses.md](harnesses.md#devin)). Paths follow each harness's `agent_root` in `tackroom.yaml`. Pi role files do nothing unless the `pi-subagents` package is installed; declare it under the Pi agent's `packages:` in `tackroom.yaml`.
 
 ## Model tiers and overrides
 

@@ -353,7 +353,7 @@ func initHarnesses() {
 				Path:     func(home string) string { return filepath.Join(home, ".config", "devin", "AGENTS.md") },
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 			},
-			IntegrationNote: "skills read natively from ~/.agents/skills; MCP to ~/.config/devin/mcp_config.json; roles are not rendered (Devin documents only some of the tool names a custom subagent may list); no hooks are written because Devin loads Claude Code's hooks by default (read_config_from.claude), as it does ~/.claude/CLAUDE.md and Claude Code's MCP servers",
+			IntegrationNote: "skills read natively from ~/.agents/skills; MCP to ~/.config/devin/mcp_config.json; roles are not rendered (Devin loads the role files in ~/.agents/agents itself when that is the config root, with their tool names as written); no hooks are written because Devin loads Claude Code's hooks by default (read_config_from.claude), as it does ~/.claude/CLAUDE.md and Claude Code's MCP servers",
 		},
 
 		agentCursor: {
