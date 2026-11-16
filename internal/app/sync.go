@@ -693,7 +693,7 @@ func configForInspection(cfg config, sources []externalSkillSource, gated map[st
 		return cfg, err
 	}
 	out := cfg
-	out.ExternalSkills = append(make([]externalSkillSource, 0, len(cfg.ExternalSkills)+len(gated)), cfg.ExternalSkills...)
+	out.ExternalSkills = append([]externalSkillSource(nil), cfg.ExternalSkills...)
 	for _, src := range sources {
 		if _, ok := gated[sourceName(src)]; !ok {
 			continue
