@@ -23,7 +23,7 @@ Guides and reference for the tackroom CLI, in reading order. Philosophy says wha
 
 ## Background
 
-- [Comparison](comparison.md): how tackroom differs from skillshare, rulesync, ruler and openskills.
+- [Comparison](comparison.md): how tackroom differs from skillshare, HarnessKit, dotagents, rulesync, ruler and openskills.
 - [Migrating from skillshare](skillshare-migration.md): map a skillshare setup onto tackroom.
 - [Upgrading](upgrading.md): what changed in each release since 2.0, and the rename from dotagents.
 - [Troubleshooting](troubleshooting.md): conflicts, held and blocked items, hooks, Pi, periodic sync.
