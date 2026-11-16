@@ -22,7 +22,7 @@ A harness adapter must match what the harness really supports, so link its docs 
 
 ## Check it on the real thing
 
-Run `go test ./...` and `go vet ./...`. CI also runs lint, skill frontmatter, memory and packaging checks; `.github/workflows/ci.yml` lists them. If your change affects what tackroom writes, that isn't enough: run it in a temporary home and load the result in the harness itself. A file that parses can still stop a harness from starting.
+Run `go test ./...` and `go vet ./...`. CI also runs lint, skill frontmatter and packaging checks; `.github/workflows/ci.yml` lists them. If your change affects what tackroom writes, that isn't enough: run it in a temporary home and load the result in the harness itself. A file that parses can still stop a harness from starting.
 
 ```bash
 TMP_HOME="$(mktemp -d)"
@@ -31,7 +31,7 @@ go build -o "$TMP_HOME/tackroom" ./cmd/tackroom
   set -e
   export HOME="$TMP_HOME"
   unset TACKROOM_HOME XDG_CONFIG_HOME XDG_STATE_HOME CODEX_HOME
-  "$HOME/tackroom" setup --agents codex --memory off --no-cron
+  "$HOME/tackroom" setup --agents codex --no-cron
   codex mcp list
 )
 ```

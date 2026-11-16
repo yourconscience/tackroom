@@ -9,7 +9,10 @@ tackroom version
 ## Unreleased
 
 - New: `tackroom tmux` and `tackroom zellij`. Each opens a session named `tackroom` in the config root with a shell, `tackroom status` and `tackroom cron collect --table`, and takes `--config PATH` and `--dry-run`, as `tackroom tern` and `tackroom rex` do. A second run shows the existing session. See [terminals.md](terminals.md#tmux) and [terminals.md](terminals.md#zellij)
-- Changed: `tackroom setup` on a machine with no `tackroom.yaml` no longer turns memory on. A new config gets the `off` tier: no memory hooks, no `memory/tools/` sources, and no `rem` or `knowledge-sync` build. An existing config keeps its tier. To turn memory on, run `tackroom setup --memory basic`.
+- Removed: the bundled memory system. tackroom no longer ships memory tiers, the scripts under `memory/` or the `rem` and `knowledge-sync` tools, and `sync` no longer builds Go tools under `memory/tools/`. A memory file now reaches your harnesses as a file listed under `instructions:` ([memory.md](memory.md)).
+- Changed: `setup --memory` is still accepted and does nothing. `--memory basic` or `--memory memsearch` prints one line saying so, and setup goes on. `tackroom memsearch`, `setup memsearch` and `status memsearch` are gone, and so are the memsearch lines in `status` and `doctor`. `setup` no longer adds, removes or rewrites memory hooks, in `tackroom.yaml` or in a harness's own config.
+- What an existing config keeps: its memory hooks stay in `tackroom.yaml` and sync as ordinary hooks. While a hook runs a script under `memory/hooks/`, every file under `memory/` stays, and the first sync stops tracking them in `.tackroom-starter.json` with one note. Without such a hook, sync removes the scripts you never edited and lists the ones you did. `memory/tools/`, built `rem` and `knowledge-sync` binaries and `memsearch.conf` are left alone. Details are in [memory.md](memory.md#coming-from-the-bundled-memory).
+- `rem` and `knowledge-sync` now live in [the rem repository](https://github.com/yourconscience/rem).
 
 ## To 2.8
 

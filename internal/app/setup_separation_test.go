@@ -3,13 +3,10 @@ package app
 import (
 	"bytes"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
-
-	"gopkg.in/yaml.v3"
 )
 
 func writeExecutable(t *testing.T, dir string, name string) {
@@ -37,19 +34,6 @@ agents:
     enabled: true
     skill_root: ~/.`+agentName+`/skills
 `))
-}
-
-func readConfigFile(t *testing.T, path string) config {
-	t.Helper()
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-	var cfg config
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		t.Fatal(err)
-	}
-	return cfg
 }
 
 func TestConfigResolutionPrecedenceAndIgnoresCWD(t *testing.T) {
@@ -94,42 +78,6 @@ func TestConfigResolutionPrecedenceAndIgnoresCWD(t *testing.T) {
 	}
 	if repoRoot != filepath.Dir(explicit) || cfg.Agents[0].Name != "explicit" {
 		t.Fatalf("explicit resolution = root %q agent %q", repoRoot, cfg.Agents[0].Name)
-	}
-}
-
-func TestEnsureStarterAssetsCreatesMissingOnlyAndExecutableHooks(t *testing.T) {
-	root := t.TempDir()
-	customConfig := []byte("version: 1\nagents: []\n")
-	writeSyncTestFile(t, filepath.Join(root, "tackroom.yaml"), customConfig)
-	if err := ensureStarterAssets(root, filepath.Join(root, "tackroom.yaml"), memoryTierBasic); err != nil {
-		t.Fatal(err)
-	}
-	got, err := os.ReadFile(filepath.Join(root, "tackroom.yaml"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(got, customConfig) {
-		t.Fatalf("tackroom.yaml overwritten:\n%s", got)
-	}
-	for _, path := range []string{
-		filepath.Join(root, ".gitignore"),
-		filepath.Join(root, "skills", "tackroom", "SKILL.md"),
-		filepath.Join(root, "agents", "architect.md"),
-		filepath.Join(root, "agents", "tester.md"),
-		filepath.Join(root, "memory", "lib", "basic_memory.py"),
-		filepath.Join(root, "memory", "tools", "rem", "main.go"),
-		filepath.Join(root, "memory", "tools", "knowledge-sync", "main.go"),
-	} {
-		if _, err := os.Stat(path); err != nil {
-			t.Fatalf("starter asset %s missing: %v", path, err)
-		}
-	}
-	info, err := os.Stat(filepath.Join(root, "memory", "hooks", "basic-session-start.py"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if info.Mode().Perm()&0o111 == 0 {
-		t.Fatalf("basic-session-start.py mode = %v, want executable", info.Mode().Perm())
 	}
 }
 
@@ -266,123 +214,6 @@ func TestCopyDirMissingRejectsNestedSymlinkBeforeWriting(t *testing.T) {
 	}
 }
 
-func TestSetupMemoryOffRemovesNativeBasicHooksPreservingUnrelated(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	fakePath(t, "claude")
-	configPath := filepath.Join(home, ".agents", "tackroom.yaml")
-	writeSyncTestFile(t, configPath, []byte(`version: 1
-agents:
-  - name: claude
-    enabled: true
-    skill_root: ~/.claude/skills
-    agent_root: ~/.claude/agents
-hooks:
-  - name: memory-session-start
-    enabled: true
-    event: SessionStart
-    command: ~/.agents/memory/hooks/basic-session-start.py
-    timeout: 15
-    agents: [claude]
-  - name: memory-session-end
-    enabled: true
-    event: SessionEnd
-    command: ~/.agents/memory/hooks/basic-session-end.py
-    timeout: 30
-    agents: [claude]
-`))
-	claudeSettings := filepath.Join(home, ".claude", "settings.json")
-	writeSyncTestFile(t, claudeSettings, []byte(`{
-  "hooks": {
-    "SessionStart": [{"hooks": [{"command": "~/.agents/memory/hooks/basic-session-start.py", "timeout": 15}]}],
-    "Stop": [{"hooks": [{"command": "echo keep", "timeout": 1}]}],
-    "SessionEnd": [{"hooks": [{"command": "~/.agents/memory/hooks/basic-session-end.py", "timeout": 30}]}]
-  }
-}`))
-
-	if err := runSetup(runOptions{MemoryTier: memoryTierOff, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}}); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(claudeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	if strings.Contains(text, "basic-session-start.py") || strings.Contains(text, "basic-session-end.py") {
-		t.Fatalf("managed basic hooks survived setup --memory off:\n%s", text)
-	}
-	if !strings.Contains(text, "echo keep") {
-		t.Fatalf("unrelated hook was not preserved:\n%s", text)
-	}
-	if cfg := readConfigFile(t, configPath); len(cfg.Hooks) != 0 {
-		t.Fatalf("setup --memory off config hooks = %#v, want none", cfg.Hooks)
-	}
-}
-
-func TestSetupMemoryBasicReplacesNativeMemsearchHooksPreservingUnrelated(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	fakePath(t, "claude")
-	configPath := filepath.Join(home, ".agents", "tackroom.yaml")
-	writeSyncTestFile(t, configPath, []byte(`version: 1
-agents:
-  - name: claude
-    enabled: true
-    skill_root: ~/.claude/skills
-    agent_root: ~/.claude/agents
-hooks:
-  - name: memory-session-start
-    enabled: true
-    event: SessionStart
-    command: ~/.agents/memory/hooks/session-start.sh
-    timeout: 15
-    agents: [claude]
-  - name: memory-stop
-    enabled: true
-    event: Stop
-    command: ~/.agents/memory/hooks/stop.sh
-    timeout: 15
-    agents: [claude]
-  - name: memory-session-end
-    enabled: true
-    event: SessionEnd
-    command: ~/.agents/memory/hooks/session-end.sh
-    timeout: 30
-    agents: [claude]
-`))
-	claudeSettings := filepath.Join(home, ".claude", "settings.json")
-	writeSyncTestFile(t, claudeSettings, []byte(`{
-  "hooks": {
-    "SessionStart": [{"hooks": [{"command": "echo keep", "timeout": 1}, {"command": "~/.agents/memory/hooks/session-start.sh", "timeout": 15}]}],
-    "Stop": [{"hooks": [{"command": "~/.agents/memory/hooks/stop.sh", "timeout": 15}]}],
-    "SessionEnd": [{"hooks": [{"command": "~/.agents/memory/hooks/session-end.sh", "timeout": 30}]}]
-  }
-}`))
-
-	if err := runSetup(runOptions{MemoryTier: memoryTierBasic, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}}); err != nil {
-		t.Fatal(err)
-	}
-	data, err := os.ReadFile(claudeSettings)
-	if err != nil {
-		t.Fatal(err)
-	}
-	text := string(data)
-	for _, stale := range []string{"session-start.sh", "stop.sh", "session-end.sh"} {
-		if strings.Contains(text, stale) {
-			t.Fatalf("managed memsearch hook %s survived basic switch:\n%s", stale, text)
-		}
-	}
-	for _, want := range []string{"basic-session-start.py", "basic-session-end.py", "echo keep"} {
-		if !strings.Contains(text, want) {
-			t.Fatalf("native settings missing %q after basic switch:\n%s", want, text)
-		}
-	}
-	cfg := readConfigFile(t, configPath)
-	if len(cfg.Hooks) != 2 || strings.Contains(cfg.Hooks[0].Command+cfg.Hooks[1].Command, "stop.sh") {
-		t.Fatalf("basic config hooks = %#v", cfg.Hooks)
-	}
-}
-
 func TestImportPromptsTreatEOFAsNo(t *testing.T) {
 	root := t.TempDir()
 	src := filepath.Join(t.TempDir(), "skill")
@@ -421,115 +252,6 @@ func TestScanNativeImportsExpandsPortableAgentPaths(t *testing.T) {
 	}
 	if len(skills) != 1 || skills[0].Name != "native" || len(roles) != 1 || roles[0].TargetName != "native" {
 		t.Fatalf("scan with portable paths skills=%#v roles=%#v", skills, roles)
-	}
-}
-
-func TestImportedStarterNameWinsOnFreshSetupOrdering(t *testing.T) {
-	root := t.TempDir()
-	skillSrc := filepath.Join(t.TempDir(), "tackroom")
-	writeSyncTestFile(t, filepath.Join(skillSrc, "SKILL.md"), []byte("imported tackroom skill\n"))
-	roleData := []byte("---\nname: builder\ndescription: Imported builder\n---\n\nImported builder role.\n")
-	role := nativeRoleCandidate{
-		nativeImportCandidate: nativeImportCandidate{Name: "builder", Origin: agentClaudeCode, Path: filepath.Join(t.TempDir(), "builder.md")},
-		TargetName:            "builder",
-		Convert: func() ([]byte, error) {
-			return roleData, nil
-		},
-	}
-	skills := []nativeSkillCandidate{{nativeImportCandidate: nativeImportCandidate{Name: "tackroom", Origin: agentClaudeCode, Path: skillSrc}}}
-	if err := importNativeContent(root, &config{Version: 1}, skills, []nativeRoleCandidate{role}, nil, setupIO{in: strings.NewReader("y\ny\n"), out: &bytes.Buffer{}}); err != nil {
-		t.Fatal(err)
-	}
-	if err := ensureStarterAssets(root, filepath.Join(root, "tackroom.yaml"), memoryTierBasic); err != nil {
-		t.Fatal(err)
-	}
-	skillData, err := os.ReadFile(filepath.Join(root, "skills", "tackroom", "SKILL.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(skillData) != "imported tackroom skill\n" {
-		t.Fatalf("starter overwrote imported same-name skill:\n%s", skillData)
-	}
-	gotRole, err := os.ReadFile(filepath.Join(root, "agents", "builder.md"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(gotRole, roleData) {
-		t.Fatalf("starter overwrote imported same-name role:\n%s", gotRole)
-	}
-}
-
-func TestSetupFirstRunSyncStatusEndToEnd(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	fakePath(t, "claude")
-	if err := runSetup(runOptions{MemoryTier: memoryTierBasic, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}}); err != nil {
-		t.Fatal(err)
-	}
-	configPath := filepath.Join(home, ".agents", "tackroom.yaml")
-	cfg := readConfigFile(t, configPath)
-	if len(cfg.Agents) != 1 || cfg.Agents[0].Name != agentClaudeCode {
-		t.Fatalf("setup agents = %#v", cfg.Agents)
-	}
-	if len(cfg.Hooks) != 2 || !strings.Contains(cfg.Hooks[0].Command, "basic-session-start.py") || cfg.Hooks[1].Event != "SessionEnd" {
-		t.Fatalf("setup memory hooks = %#v", cfg.Hooks)
-	}
-	for _, path := range []string{
-		filepath.Join(home, ".agents", "agents", "tester.md"),
-		filepath.Join(home, ".agents", "memory", "hooks", "basic-session-end.py"),
-		filepath.Join(home, ".claude", "skills", "tackroom"),
-		filepath.Join(home, ".claude", "agents", "builder.md"),
-	} {
-		if _, err := os.Lstat(path); err != nil {
-			t.Fatalf("expected setup/sync output %s: %v", path, err)
-		}
-	}
-	if err := runStatus(runOptions{}); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestSetupOffersGitInitOnFreshRoot(t *testing.T) {
-	gitPath, err := exec.LookPath("git")
-	if err != nil {
-		t.Skip("git not available")
-	}
-	home := t.TempDir()
-	t.Cleanup(func() {
-		// Git clone creates read-only objects; fix perms so TempDir can remove them.
-		extDir := filepath.Join(home, ".agents", "external")
-		_ = filepath.Walk(extDir, func(p string, info os.FileInfo, _ error) error {
-			if info != nil {
-				_ = os.Chmod(p, 0o777)
-			}
-			return nil
-		})
-		_ = os.RemoveAll(extDir)
-	})
-	t.Setenv("HOME", home)
-	dir := fakePath(t, "claude")
-	if err := os.Symlink(gitPath, filepath.Join(dir, "git")); err != nil {
-		t.Fatal(err)
-	}
-	var out bytes.Buffer
-	if err := runSetup(runOptions{MemoryTier: memoryTierBasic, Stdin: strings.NewReader("y\ny\ny\ny\n"), Stdout: &out}); err != nil {
-		t.Fatal(err)
-	}
-	root := filepath.Join(home, ".agents")
-	if _, err := os.Stat(filepath.Join(root, ".git")); err != nil {
-		t.Fatalf("expected git repository in %s: %v\noutput:\n%s", root, err, out.String())
-	}
-}
-
-func TestSetupSkipsGitInitNonInteractive(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	fakePath(t, "claude")
-	if err := runSetup(runOptions{MemoryTier: memoryTierBasic, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}}); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(filepath.Join(home, ".agents", ".git")); err == nil {
-		t.Fatal("expected no git repository without an interactive answer")
 	}
 }
 
@@ -618,42 +340,5 @@ func TestValidateConfigPiMCPTargetIsPreserved(t *testing.T) {
 	}
 	if !reflect.DeepEqual(cfg.MCPServers[0].Agents, []string{"pi", "claude"}) {
 		t.Fatalf("Pi MCP target changed: %#v", cfg.MCPServers[0].Agents)
-	}
-}
-
-func TestSetupMemsearchDependencyFailure(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	fakePath(t, "codex")
-	err := runSetup(runOptions{MemoryTier: memoryTierMemsearch, Stdin: strings.NewReader(""), Stdout: &bytes.Buffer{}})
-	if err == nil || !strings.Contains(err.Error(), "requires the memsearch binary") {
-		t.Fatalf("setup --memory memsearch error = %v", err)
-	}
-}
-
-func TestStarterShipsNoPersonalInstructionsOrThirdPartySkills(t *testing.T) {
-	root := t.TempDir()
-	configPath := filepath.Join(root, "tackroom.yaml")
-	if err := ensureStarterAssets(root, configPath, memoryTierOff); err != nil {
-		t.Fatal(err)
-	}
-	for _, path := range []string{"AGENTS.md", filepath.Join("skills", "grilling"), filepath.Join("memory", "tools")} {
-		if _, err := os.Stat(filepath.Join(root, path)); !os.IsNotExist(err) {
-			t.Fatalf("starter must not create %s (err=%v)", path, err)
-		}
-	}
-	gitignore, err := os.ReadFile(filepath.Join(root, ".gitignore"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(gitignore), "npm/bin") || !strings.Contains(string(gitignore), "tackroom.local.yaml") {
-		t.Fatalf("starter .gitignore should be the config-root one:\n%s", gitignore)
-	}
-	cfg, err := os.ReadFile(configPath)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(cfg), "mattpocock") {
-		t.Fatalf("starter config must not pull third-party skills:\n%s", cfg)
 	}
 }

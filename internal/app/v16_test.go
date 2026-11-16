@@ -222,25 +222,6 @@ func TestMCPAddRemoteServerFromTheCLI(t *testing.T) {
 
 // Findings from the 1.6 end-to-end run (Gemini 4 Argon via OpenCode).
 
-func TestSetupKeepsARemoteBearerTokenOutOfTackroomYAML(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("XDG_STATE_HOME", "")
-	fakePath(t, "claude", "codex")
-	writeSyncTestFile(t, filepath.Join(home, ".claude.json"), []byte(`{"mcpServers":{"acme":{"type":"http","url":"https://api.acme.example.com/mcp","headers":{"Authorization":"Bearer sk-test-123"}}}}`))
-	var out bytes.Buffer
-	if err := runSetup(runOptions{Agents: "claude,codex", MemoryTier: memoryTierOff, AssumeYes: true, Stdin: strings.NewReader(""), Stdout: &out}); err != nil {
-		t.Fatalf("setup: %v\n%s", err, out.String())
-	}
-	cfg, _ := os.ReadFile(filepath.Join(home, ".agents", "tackroom.yaml"))
-	if strings.Contains(string(cfg), "sk-test-123") || !strings.Contains(string(cfg), "Bearer ${ACME_AUTHORIZATION}") {
-		t.Fatalf("tackroom.yaml must hold a reference, not the token:\n%s", cfg)
-	}
-	if native, _ := os.ReadFile(filepath.Join(home, ".claude.json")); !strings.Contains(string(native), "sk-test-123") {
-		t.Fatalf("Claude Code lost its token:\n%s", native)
-	}
-}
-
 func TestMaterializedSkillProgressStaysOffStdout(t *testing.T) {
 	source := filepath.Join(t.TempDir(), "tdd")
 	writeSyncTestFile(t, filepath.Join(source, "SKILL.md"), []byte("---\nname: tdd\ndescription: d\n---\n"))

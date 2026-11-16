@@ -156,6 +156,10 @@ func shellArg(s string) string {
 	return shellQuote(s)
 }
 
+func shellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
 // redactURL drops credentials and query strings from a source URL before it
 // is printed.
 func redactURL(raw string) string {

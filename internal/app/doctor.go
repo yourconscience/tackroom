@@ -9,9 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/yourconscience/tackroom/internal/agentrole"
@@ -104,7 +102,6 @@ func runDoctorChecks(skipPackageAge bool, repoRoot, home string, cfg config, sel
 	results = append(results, checkAgnix(repoRoot, cfg))
 	results = append(results, checkAgentsMDSize(repoRoot))
 	results = append(results, checkREADMESkillInventory(repoRoot))
-	results = append(results, checkMemsearchIndex(repoRoot, home))
 	results = append(results, checkAgentManagerCoexistence(repoRoot, home, cfg))
 	results = append(results, checkHerdrPluginHealth())
 	results = append(results, checkTern())
@@ -465,63 +462,6 @@ func checkREADMESkillInventory(repoRoot string) checkResult {
 		return checkResult{"README skills", checkStatusFail, "generated block is stale; " + remediation}
 	}
 	return checkResult{"README skills", checkStatusPass, fmt.Sprintf("exact inventory of %d skills", count)}
-}
-
-// memsearchSetUp reports whether this machine opted into the memsearch
-// memory tier: setup writes memsearch.conf and creates ~/.memsearch.
-func memsearchSetUp(repoRoot string, home string) bool {
-	for _, path := range []string{filepath.Join(repoRoot, "memsearch.conf"), filepath.Join(home, ".memsearch")} {
-		if _, err := os.Stat(path); err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-func checkMemsearchIndex(repoRoot string, home string) checkResult {
-	if !memsearchSetUp(repoRoot, home) {
-		return checkResult{"memsearch index", checkStatusPass, "not set up (enable with setup --memory memsearch)"}
-	}
-	if _, err := exec.LookPath("memsearch"); err == nil {
-		out, err := exec.Command("memsearch", "stats", "--collection", "ai").CombinedOutput()
-		if err == nil {
-			if chunks, ok := parseMemsearchChunks(string(out)); ok {
-				if chunks == 0 {
-					return checkResult{"memsearch index", checkStatusWarn, "collection ai has 0 chunks"}
-				}
-				return checkResult{"memsearch index", checkStatusPass, fmt.Sprintf("collection ai has %d chunks", chunks)}
-			}
-		}
-	}
-
-	stateDir := filepath.Join(home, ".memsearch", "state")
-	entries, err := os.ReadDir(stateDir)
-	if err != nil {
-		return checkResult{"memsearch index", checkStatusWarn, "state dir missing or unreadable"}
-	}
-	count := 0
-	for _, e := range entries {
-		if !strings.HasPrefix(e.Name(), ".") {
-			count++
-		}
-	}
-	if count == 0 {
-		return checkResult{"memsearch index", checkStatusWarn, "state dir empty, index never built"}
-	}
-	return checkResult{"memsearch index", checkStatusPass, fmt.Sprintf("state dir has %d files", count)}
-}
-
-func parseMemsearchChunks(statsOutput string) (int, bool) {
-	re := regexp.MustCompile(`(?m)Total indexed chunks:\s*([0-9]+)[.,]?\s*$`)
-	match := re.FindStringSubmatch(statsOutput)
-	if len(match) != 2 {
-		return 0, false
-	}
-	n, err := strconv.Atoi(match[1])
-	if err != nil {
-		return 0, false
-	}
-	return n, true
 }
 
 func checkExternalSkillSources(cfg config, home string) checkResult {

@@ -55,8 +55,6 @@ Unrelated hook entries are preserved.
 
 **Pi packages are listed but not installed.** tackroom manages the `packages` declaration in `~/.pi/agent/settings.json`, not the Pi executable or its npm runtime. Install Pi, run `tackroom sync`, then start Pi once so it installs the declared packages.
 
-## Periodic sync and memory
+## Periodic sync
 
 **"periodic sync is off".** The `tackroom-pull` job is missing, paused, broken or its last run failed. Reinstall it with `tackroom cron`. `setup --no-cron` records `periodic_sync: false` in `tackroom.local.yaml`, which silences the warning on purpose.
-
-**Memory tools are skipped during sync.** No Go toolchain on `PATH`. Install Go, or copy prebuilt `rem` and `knowledge-sync` binaries to `$GOBIN` or `~/.local/bin`; sync rebuilds them only when their sources change.

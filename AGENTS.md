@@ -14,7 +14,8 @@ Never restore project-directory config discovery or make the public checkout the
 
 - tackroom syncs exactly five surfaces: skills, MCP servers, hooks, agent roles, and plugins. Alongside the five surfaces, tackroom also manages root instruction files, Pi packages and the settings keys a user declares per harness.
 - Plugins follow the agent-plugins-spec v1.0.0 format. For harnesses with native plugin systems (Codex), tackroom projects spec-format plugins into the native format. Claude Code plugins stay in Claude's native layout: the config root's `.claude-plugin/marketplace.json` is registered as a directory marketplace and its relative-path plugins are enabled in `~/.claude/settings.json`.
-- `setup` owns first-run scaffolding, harness detection, optional copy/convert import, memory-tier selection, and the first sync. There is no separate `init` command.
+- `setup` owns first-run scaffolding, harness detection, optional copy/convert import, and the first sync. There is no separate `init` command.
+- tackroom runs no memory system. A memory file reaches harnesses only as a file listed under `instructions:`; capture tools stay separate and are registered as ordinary hooks.
 - Native import is copy-only. Never move or delete the source content.
 - Existing unrelated native harness configuration must remain untouched.
 - External Git skills are commit-pinned in `tackroom.lock`; materialized files remain owned by that lock entry.
@@ -32,16 +33,14 @@ The distribution intentionally contains:
 - `agents/researcher.md`
 - `agents/reviewer.md`
 - `agents/tester.md`
-- reusable memory infrastructure under `memory/`
 
 New starter content requires an explicit product decision and an inventory test update.
 
 # Development
 
-- Go version and module layout are declared by `go.mod`. The memory tools under `memory/tools/` are packages of that root module; `setup` scaffolds a standalone `go.mod` beside each copied tool so a user-owned config root can build them without the source checkout.
+- Go version and module layout are declared by `go.mod`.
 - Install the development CLI with `go install ./cmd/tackroom`.
 - Use focused package tests while iterating; run `go test ./...` before submission.
-- Use Python 3's standard library for the dependency-free basic memory tier.
 - Keep tests isolated with temporary homes and paths. Tests must never mutate live harness configuration.
 - Prefer surgical changes and existing adapters over parallel implementations.
 - Do not add new unit tests. When a change breaks an existing unit test, delete that test instead of updating it.

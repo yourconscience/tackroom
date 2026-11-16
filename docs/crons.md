@@ -113,10 +113,10 @@ A job with a `schedule` and a `command` is owned: tackroom writes it as a native
 crons:
   scheduler: auto          # auto | launchd | systemd | crontab
   jobs:
-    knowledge-sync:
+    notes-sync:
       host: m1             # matched against crons.self; omit to run on every machine
       schedule: "*/30 * * * *"
-      command: [~/.local/bin/knowledge-sync]
+      command: [~/.local/bin/notes-sync]
       created_by: human
 ```
 

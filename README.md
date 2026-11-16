@@ -63,7 +63,7 @@ Terminals: a `tackroom tmux` workspace for [tmux](https://yourconscience.github.
 - [Web view](https://yourconscience.github.io/tackroom/docs/view/): the dashboard, on a desktop or a phone
 - [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and holds
 - [Roles](https://yourconscience.github.io/tackroom/docs/roles/): role format, model tiers, per-agent output
-- [Memory](https://yourconscience.github.io/tackroom/docs/memory/): memory tiers and the `rem` workflow
+- [Memory](https://yourconscience.github.io/tackroom/docs/memory/): a memory file in every harness, and native memory settings
 - [Crons](https://yourconscience.github.io/tackroom/docs/crons/): every scheduled job, here and over SSH
 - [Comparison](https://yourconscience.github.io/tackroom/docs/comparison/) and [moving from skillshare](https://yourconscience.github.io/tackroom/docs/skillshare-migration/)
 - [Upgrading](https://yourconscience.github.io/tackroom/docs/upgrading/) and [Troubleshooting](https://yourconscience.github.io/tackroom/docs/troubleshooting/)

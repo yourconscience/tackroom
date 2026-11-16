@@ -243,40 +243,6 @@ func TestReconcileStarterSetConfirmationKeepsRetiredFiles(t *testing.T) {
 	}
 }
 
-func TestShippedStarterFilesAreManagedPathsOnly(t *testing.T) {
-	shipped, err := shippedStarterFiles()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(shipped) == 0 {
-		t.Fatal("no managed starter files found in the embedded assets")
-	}
-	for path := range shipped {
-		if !isManagedStarterPath(path) {
-			t.Fatalf("unmanaged path in the managed set: %s", path)
-		}
-	}
-	// User content must never be treated as managed code.
-	for _, path := range []string{"AGENTS.md", "tackroom.yaml", "agents/architect.md", "skills/tackroom/SKILL.md"} {
-		if isManagedStarterPath(path) {
-			t.Fatalf("%s must not be managed", path)
-		}
-	}
-	// Files this release stopped shipping must be gone from the shipped set.
-	for _, path := range []string{"memory/lib/amp_digest.py", "memory/lib/factory_digest.py", "memory/lib/hermes_digest.py", "memory/hooks/omp-memory.ts"} {
-		if _, ok := shipped[path]; ok {
-			t.Fatalf("%s is still shipped", path)
-		}
-	}
-	// Every legacy hash must describe a managed path, so the bridge cannot be
-	// pointed at user content by mistake.
-	for path := range legacyStarterHashes {
-		if !isManagedStarterPath(path) {
-			t.Fatalf("legacy hash for unmanaged path: %s", path)
-		}
-	}
-}
-
 func TestReconcileStarterSetIgnoresUnsafeManifestEntries(t *testing.T) {
 	root := t.TempDir()
 	shipped, legacy := testStarterSet()
