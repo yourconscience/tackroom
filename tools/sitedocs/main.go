@@ -23,6 +23,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -372,7 +373,13 @@ func (b *builder) writePages(out string) error {
 			if err := b.md.Renderer().Render(&buf, d.Source, d.root); err != nil {
 				return err
 			}
-			p.Content = template.HTML(boxes.Replace(buf.String()))
+			rendered := buf.String()
+			for _, m := range siteImage.FindAllStringSubmatch(rendered, -1) {
+				if _, err := os.Stat(filepath.Join(b.root, "docs", "site", filepath.FromSlash(m[1]))); err != nil {
+					return fmt.Errorf("%s: image site/%s is not in docs/site", d.File, m[1])
+				}
+			}
+			p.Content = template.HTML(boxes.Replace(siteImage.ReplaceAllString(rendered, `src="`+p.Root+`$1"`)))
 			p.RawHref = relFile(d.Dir, "docs/"+d.File)
 			p.EditURL = repoURL + "/edit/main/docs/" + d.File
 		} else {
@@ -396,6 +403,11 @@ func (b *builder) writePages(out string) error {
 	}
 	return nil
 }
+
+// siteImage matches an <img> in a docs page that points into docs/site, as
+// src="site/marks/tmux.svg", the path GitHub resolves from docs/*.md. The built
+// site serves docs/site at its root, so the build points it there instead.
+var siteImage = regexp.MustCompile(`src="site/([^"]+)"`)
 
 // boxes lets tables and code blocks scroll inside their own box and be reached by keyboard.
 var boxes = strings.NewReplacer(

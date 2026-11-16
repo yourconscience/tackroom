@@ -44,6 +44,8 @@ tackroom mcp <list|add|import|remove> [options]
 tackroom restore [<backup> | latest] [--dry-run]
 tackroom tern [--config PATH] [--dry-run]       # open a tackroom workspace in the Tern terminal
 tackroom rex [--config PATH] [--dry-run]        # open a tackroom workspace in the Rex terminal
+tackroom tmux [--config PATH] [--dry-run]       # open a tackroom workspace in tmux
+tackroom zellij [--config PATH] [--dry-run]     # open a tackroom workspace in zellij
 tackroom pull [options]        # git pull --ff-only, then sync; what the periodic job runs
 tackroom cron [--interval 15m|--deps|--remove]   # periodic sync job, installed by setup; default 15m
 tackroom hosts [HOST...] [--json] [--config PATH]      # tackroom on each machine in crons.hosts: version, sync state, config commit, fix

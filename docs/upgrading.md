@@ -8,6 +8,7 @@ tackroom version
 
 ## Unreleased
 
+- New: `tackroom tmux` and `tackroom zellij`. Each opens a session named `tackroom` in the config root with a shell, `tackroom status` and `tackroom cron collect --table`, and takes `--config PATH` and `--dry-run`, as `tackroom tern` and `tackroom rex` do. A second run shows the existing session. See [terminals.md](terminals.md#tmux) and [terminals.md](terminals.md#zellij)
 - Changed: `tackroom setup` on a machine with no `tackroom.yaml` no longer turns memory on. A new config gets the `off` tier: no memory hooks, no `memory/tools/` sources, and no `rem` or `knowledge-sync` build. An existing config keeps its tier. To turn memory on, run `tackroom setup --memory basic`.
 
 ## To 2.8

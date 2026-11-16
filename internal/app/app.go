@@ -301,6 +301,10 @@ func run(args []string) error {
 		return runTernCommand(args[1:])
 	case "rex":
 		return runRexCommand(args[1:])
+	case "tmux":
+		return runTmuxCommand(args[1:])
+	case "zellij":
+		return runZellijCommand(args[1:])
 	case "hosts":
 		return runHostsCommand(args[1:])
 	case "cron":
@@ -689,6 +693,8 @@ var canonicalForms = []string{
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
 	"  tackroom rex [--config PATH] [--dry-run]          # open a tackroom workspace in the Rex terminal",
+	"  tackroom tmux [--config PATH] [--dry-run]         # open a tackroom workspace in tmux",
+	"  tackroom zellij [--config PATH] [--dry-run]       # open a tackroom workspace in zellij",
 	"  tackroom hosts [HOST...] [--json] [--config PATH]   # tackroom on each machine in crons.hosts: version, sync state, config commit",
 	"  tackroom hosts fix [HOST...] [--dry-run] [--config PATH]   # run the fix hosts names (setup, pull or sync there); never commits or pushes",
 	"  tackroom hosts setup HOST [--from GIT_URL] [--overlay NAME] [--no-cron] [--install] [--dry-run] [--config PATH]   # tackroom setup --from on HOST over SSH",

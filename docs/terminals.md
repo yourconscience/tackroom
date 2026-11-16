@@ -1,12 +1,82 @@
 # Terminals
 
-tackroom shows up inside three terminal apps: a native panel in Herdr, and a ready-made workspace in Tern and in Rex. Each integration is optional and calls the same `tackroom` commands you can run yourself. The old full-screen terminal view is at the end.
+tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe for cmux. There are three kinds of integration. A panel is tackroom's own interface inside the terminal. A workspace command opens a session in the terminal with a shell, `tackroom status` and `tackroom cron collect --table`. A recipe is a snippet you add or run yourself. Each integration is optional and calls the same `tackroom` commands you can run in any shell. The old full-screen terminal view is at the end.
 
-## Herdr panel
+| Tool | Panel | Workspace command | Recipe |
+| --- | --- | --- | --- |
+| <img src="site/marks/tmux.svg" alt="tmux logo" width="20" height="20"> [tmux](#tmux) | - | `tackroom tmux` | [popup](#popup) with `tackroom status` |
+| <img src="site/marks/zellij.svg" alt="zellij logo" width="17" height="20"> [zellij](#zellij) | - | `tackroom zellij` | - |
+| <img src="site/marks/herdr.svg" alt="Herdr logo" width="20" height="20"> [Herdr](#herdr) | [tackroom panel](#herdr-panel) in the Herdr app; the Herdr TUI has none | - | - |
+| <img src="site/marks/tern.png" alt="Tern logo" width="20" height="20"> [Tern](#tern) | crons panel | `tackroom tern` | - |
+| <img src="site/marks/rex.png" alt="Rex logo" width="20" height="20"> [Rex](#rex) | - | `tackroom rex` | palette actions |
+| [cmux](#cmux) | - | - | `cmux new-workspace`, not run here |
+
+## tmux
+
+<img src="site/marks/tmux.svg" alt="tmux logo" width="20" height="20"> [tmux](https://github.com/tmux/tmux) is the terminal multiplexer. `tackroom tmux` opens a tackroom workspace in it.
+
+```bash
+tackroom tmux [--config PATH] [--dry-run]
+```
+
+It creates a session named `tackroom` in the config root with three panes: a shell on the left, `tackroom status` on the right and `tackroom cron collect --table` below it. Then it shows the session. Outside tmux it attaches to it; inside tmux it switches your client to it; with no terminal on stdin or stdout it prints the `tmux attach-session` command instead. The two command panes run the same `tackroom` that opened them, by its absolute path, and keep a shell open when the command ends so you can read what it printed.
+
+A second run shows the existing `tackroom` session instead of creating another. `--dry-run` prints the `tmux` commands and runs nothing. `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `tmux` is an error.
+
+Checked with tmux 3.7c on macOS; not checked on Linux.
+
+### Popup
+
+To see `tackroom status` over what you are working on, bind a key in `~/.tmux.conf`:
+
+```
+bind-key T display-popup -w 90% -h 80% 'tackroom status'
+```
+
+Press the prefix key, then `T`. The popup stays open after the command ends and Escape closes it. Adding `-E` would close it as soon as the command ends, before you can read it. `tackroom` must be on the `PATH` of the tmux server. Checked with tmux 3.7c.
+
+## zellij
+
+<img src="site/marks/zellij.svg" alt="zellij logo" width="17" height="20"> [zellij](https://github.com/zellij-org/zellij) is a terminal workspace with layouts written in KDL. `tackroom zellij` opens a tackroom workspace in it.
+
+```bash
+tackroom zellij [--config PATH] [--dry-run]
+```
+
+It writes this layout to a temporary file, never into zellij's own config folder, with the config root and the path of the running `tackroom` filled in:
+
+```kdl
+layout {
+    cwd "/home/you/.agents"
+    pane split_direction="vertical" {
+        pane name="shell"
+        pane split_direction="horizontal" {
+            pane name="status" command="/usr/local/bin/tackroom" { args "status"; }
+            pane name="crons" command="/usr/local/bin/tackroom" { args "cron" "collect" "--table"; }
+        }
+    }
+}
+```
+
+Run inside zellij, it adds the workspace to the session you are in as a tab named `tackroom`, and each run adds another tab. Run outside zellij, it attaches to the session named `tackroom` if there is one, and otherwise starts that session with the layout. zellij needs a terminal to create or attach to a session, so with no terminal on stdin or stdout `tackroom zellij` prints the `zellij` command to run instead. The two command panes stay open when the command ends, with its exit code in the pane frame.
+
+`--dry-run` prints the layout and the `zellij` commands and runs nothing. `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `zellij` is an error.
+
+The first time zellij runs it shows its own welcome wizard, which tackroom does not control; Escape dismisses it without installing anything. Checked with zellij 0.46.0 on macOS; not checked on Linux.
+
+## Herdr
+
+<img src="site/marks/herdr.svg" alt="Herdr logo" width="20" height="20"> [Herdr](https://herdr.dev) is two separate products: the Herdr app, a desktop app, and the Herdr TUI, the original terminal program. Herdr's [FAQ](https://herdr.dev/faq) says the TUI keeps working and that the two do not share agents. tackroom's panel is for the app.
+
+### Herdr app
+
+The Herdr app is herdr-core, which keeps terminals alive when the window closes, plus herdr-app, the desktop app. Its configuration is JSON in `~/.config/herdr-app` (layouts, `keys.json`, `settings.json`) and its mods are JavaScript. tackroom's panel is two of those mods.
+
+#### Herdr panel
 
 The [Herdr](https://herdr.dev) app can show tackroom as a native side panel with five tabs named like the web view's: Overview, Skills, Roles, MCP & hooks and Crons. Each tab draws the JSON of a tackroom command, the same data the web view draws, and the panel changes what the web view changes: Sync applies the plan it shows first, harnesses, MCP servers and hooks turn on and off, MCP servers and hooks add or remove an agent, and Crons runs, pauses, adds, edits and deletes jobs. Every change goes through a tackroom command, so the panel never has data or actions the web view lacks.
 
-### Install
+#### Install
 
 The panel is two Herdr mods, `tackroom` and `tackroom-toggle`, in [`herdr/tackroom/`](https://github.com/yourconscience/tackroom/tree/main/herdr/tackroom), with a [recipe](https://github.com/yourconscience/tackroom/blob/main/herdr/tackroom/RECIPE.md) that adds them to the layout you already use: a tackroom button after Files and Changes, and the panel in the right column. It needs tackroom 2.4 or newer on the PATH Herdr runs programs with; otherwise set the block's `tackroom` prop to its path. Sync and the on and off buttons need a tackroom with `config set` and `sync --plan-digest`, tackroom 2.6 or newer; with an older one they stay hidden and only the Crons tab changes anything.
 
@@ -28,13 +98,13 @@ Then follow "Add to your window" in the recipe: put the `tabs` block in a row wi
 
 tackroom never edits Herdr layouts or key bindings for you.
 
-### Update
+#### Update
 
 Paste the same line to your agent again, or copy the mods again from an updated checkout with the `cp` above. The layout edit is one-time: an update replaces only the two mod folders. The gallery serves the repository's `main` branch; Herdr pins no version.
 
 If you copied the `tackroom` layout that earlier releases shipped in `herdr/layouts/`, it keeps working, since it already has the button and the panel. To update, copy only the mods.
 
-### What the panel shows
+#### What the panel shows
 
 - A header with the time the open tab's data was loaded, a Refresh button that reloads it and a Web button that opens the same tab of the running `tackroom view`. A dot after a tab's name marks a tab that needs attention.
 - **Overview**: whether everything is synced or how many changes wait, a Machines section with one row per machine in `crons.hosts` (its health, a summary and the command that fixes it; only with more than one host), one row per harness (what is missing or drifted, then how many skills, roles, MCP servers and hooks it has, and its state) that opens into the exact names, a "Held or blocked" list of what sync skips with the command that overrides it, and a line for the Crons tab. An open harness row has Turn off; a harness turned off in the config is listed with Turn on. It draws `tackroom sync --dry-run --json`, which writes and fetches nothing, and `tackroom hosts --json`.
@@ -46,7 +116,7 @@ The panel loads all four when it opens and every `refresh` seconds (default 300,
 
 Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tackroom.yaml`, or `tackroom.local.yaml` for an entry defined there, as the web view's switches do. The change then waits in Overview until you Sync; nothing syncs on its own. Turning a hook off, or removing a harness from it, shows in the plan as that hook's removal from the harness.
 
-### Limits
+#### Limits
 
 - The web view cannot be embedded: Herdr mods are native elements drawn from JavaScript, so Herdr has its own renderer over the same data.
 - The web view's Unmanaged and Config tabs are not in the panel.
@@ -55,13 +125,15 @@ Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tack
 - A collect probes every host over SSH. On a loaded machine the local probe can hit tackroom's 2 minute timeout, and the host shows "unreachable" until the next collect.
 - After an Add, Edit, Delete or action, the Crons tab runs a full collect and the row updates when that finishes, not at once as in the web view.
 
-### doctor
+### Herdr TUI
 
-Inside a Herdr session (`HERDR_ENV=1`), `tackroom doctor` has a `herdr plugins` check that looks for plugin commands pointing at missing files or executables, and outside Herdr it reports `skipped`. See [crons.md](crons.md#herdr-automations) for the herdr-automations check.
+The Herdr TUI is `herdr`, the original Herdr: a client and a background server that run in any terminal. It is configured in `~/.config/herdr/config.toml`, and its plugins are folders with a `herdr-plugin.toml`. tackroom has no panel for it, because the panel is made of app mods, which the TUI does not load.
+
+`tackroom doctor` checks the TUI's plugins. Inside a Herdr session (`HERDR_ENV=1`), its `herdr plugins` check runs `herdr plugin list --json` and looks for plugin commands pointing at missing files or executables, and outside Herdr it reports `skipped`. tackroom has not checked whether terminals in the Herdr app set `HERDR_ENV`. See [crons.md](crons.md#herdr-automations) for the herdr-automations check.
 
 ## Tern
 
-[Tern](https://stencil.so/tern) is the multiplexing terminal by Stencil Labs (`/Applications/Tern.app` on macOS, with a `tern` CLI). tackroom integrates with it optionally. Other tools that also install a `tern` command are not supported.
+<img src="site/marks/tern.png" alt="Tern logo" width="20" height="20"> [Tern](https://stencil.so/tern) is the multiplexing terminal by Stencil Labs (`/Applications/Tern.app` on macOS, with a `tern` CLI). tackroom integrates with it optionally. Other tools that also install a `tern` command are not supported.
 
 ### Shipped
 
@@ -79,7 +151,7 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 
 ## Rex
 
-[Rex](https://www.superlogical.com/rex) is the terminal multiplexer by Superlogical, with sessions, windows, blocks, a `rex` CLI and Lua configuration. tackroom integrates with it optionally.
+<img src="site/marks/rex.png" alt="Rex logo" width="20" height="20"> [Rex](https://www.superlogical.com/rex) is the terminal multiplexer by Superlogical, with sessions, windows, blocks, a `rex` CLI and Lua configuration. tackroom integrates with it optionally.
 
 ### Shipped
 
@@ -91,6 +163,27 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 ### Constraint
 
 Rex blocks are terminals, and Rex has no plugin or custom panel API. Integration goes through the `rex` CLI, Lua actions the person adds to their own `init.lua`, and `tackroom` CLI verbs. tackroom never reads or writes Rex's configuration.
+
+## cmux
+
+[cmux](https://cmux.com) is a terminal app for macOS with a `cmux` CLI. tackroom has no `tackroom cmux` command and does not check for cmux. This recipe is taken from cmux's own documentation ([custom commands](https://cmux.com/docs/custom-commands) and `cmux new-workspace --help`) and has not been run here.
+
+```bash
+ROOT="${TACKROOM_HOME:-$HOME/.agents}"
+cmux new-workspace --name tackroom --cwd "$ROOT" --focus true --layout '{"direction":"horizontal","split":0.5,"children":[
+  {"pane":{"surfaces":[{"type":"terminal","name":"shell"}]}},
+  {"direction":"vertical","children":[
+    {"pane":{"surfaces":[{"type":"terminal","name":"status","command":"tackroom status"}]}},
+    {"pane":{"surfaces":[{"type":"terminal","name":"crons","command":"tackroom cron collect --table"}]}}]}]}'
+```
+
+In cmux's layout, `horizontal` puts the children side by side and `vertical` stacks them. Whether a pane stays open after its command ends, and whether `--cwd` applies to every pane, is not known.
+
+By default cmux accepts commands only from processes started inside cmux, so run this from a cmux terminal. From any other terminal it answers `Access denied - only processes started inside cmux can connect`. That default is the `cmuxOnly` socket mode, and cmux's settings list other modes.
+
+## Other terminals
+
+WezTerm, kitty, Ghostty, iTerm2 and Warp can each run the tmux or zellij workspace above: open a tab and run `tackroom tmux` or `tackroom zellij`. tackroom has no integration of its own for them and has not tested them.
 
 ## Terminal view (deprecated)
 
@@ -126,3 +219,7 @@ Each tab loads in the background and shows `loading…` until it is ready. A tab
 | `q`, `ctrl+c` | Quit |
 
 The Doctor tab runs the same checks as `tackroom doctor`, including the package age lookup, which asks the npm and PyPI registries about the packages your MCP servers and Pi packages reference. `r` runs the checks again.
+
+## Credits
+
+The marks on this page belong to their owners. Their sources and terms are in [NOTICES.md](site/marks/NOTICES.md).
