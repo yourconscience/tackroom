@@ -18,7 +18,7 @@ tackroom is a user-level dotfiles manager for coding agents. It syncs skills, MC
 | Per-harness settings | ✓ | - | - | - | - | - | - |
 | Periodic sync | ✓ | - | - | - | - | - | - |
 | Desktop app | - (web view) | ✓ | ✓ | - | - | - | - |
-| Terminal panels | ✓ Herdr panel · Tern crons panel and workspace command · Rex workspace command and palette actions | ✓ Herdr panel | - | - | - | - | - |
+| Terminal panels | ✓ Herdr panel · Tern crons panel and workspace command · Rex workspace command and palette actions · tmux and zellij workspace commands | ✓ Herdr panel | - | - | - | - | - |
 | Harness depth | deep | broad | broad | broad | broad | broad | narrow |
 
 `✓` full, `~` partial, `-` none. The other tools' cells follow their public READMEs and documentation as read on 2026-11-13, HarnessKit's its [docs](https://harness-kit.dev/docs/) and dotagents' its README and docs as read on 2026-11-16, and skillshare's memory cell its [v0.24.0 release notes](https://github.com/runkids/skillshare/releases/tag/v0.24.0) as read on 2026-11-16; check them before you rely on one.

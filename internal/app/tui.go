@@ -17,7 +17,7 @@ import (
 
 // `tackroom tui` is one read-only terminal view of what status, doctor,
 // cron collect and the lock already report. It reuses their data functions
-// and writes nothing. See docs/tui.md.
+// and writes nothing. See docs/terminals.md.
 
 var tuiTabNames = []string{"Agents", "Lock", "Crons", "Doctor"}
 

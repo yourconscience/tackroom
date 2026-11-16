@@ -51,10 +51,11 @@ Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GE
 
 Claude Code, Codex, Factory Droid, OMP, OpenCode, Pi, Qwen Code, Cursor, Devin, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp. What each one gets is in the [capability matrix](https://yourconscience.github.io/tackroom/docs/harnesses/).
 
-Terminals: a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/herdr/) (one line to your agent from Herdr's mod gallery), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/tern/), and a `tackroom rex` workspace and palette actions for [Rex](https://yourconscience.github.io/tackroom/docs/rex/).
+Terminals: a `tackroom tmux` workspace for [tmux](https://yourconscience.github.io/tackroom/docs/terminals/#tmux), a `tackroom zellij` workspace for [zellij](https://yourconscience.github.io/tackroom/docs/terminals/#zellij), a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/terminals/#herdr-panel) (one line to your agent from Herdr's mod gallery), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/terminals/#tern), and a `tackroom rex` workspace and palette actions for [Rex](https://yourconscience.github.io/tackroom/docs/terminals/#rex). A recipe for [cmux](https://yourconscience.github.io/tackroom/docs/terminals/#cmux) is on the same page.
 
 ## Docs
 
+- [Philosophy](https://yourconscience.github.io/tackroom/docs/philosophy/): why it works this way
 - [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from` and `--overlay`, settings
 - [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
 - [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
@@ -65,7 +66,6 @@ Terminals: a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/he
 - [Memory](https://yourconscience.github.io/tackroom/docs/memory/): a memory file in every harness, and native memory settings
 - [Crons](https://yourconscience.github.io/tackroom/docs/crons/): every scheduled job, here and over SSH
 - [Comparison](https://yourconscience.github.io/tackroom/docs/comparison/) and [moving from skillshare](https://yourconscience.github.io/tackroom/docs/skillshare-migration/)
-- [Philosophy](https://yourconscience.github.io/tackroom/docs/philosophy/): why it works this way
 - [Upgrading](https://yourconscience.github.io/tackroom/docs/upgrading/) and [Troubleshooting](https://yourconscience.github.io/tackroom/docs/troubleshooting/)
 
 Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
