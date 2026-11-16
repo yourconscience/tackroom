@@ -1,6 +1,6 @@
 # Web view
 
-`tackroom view` opens a local dashboard over your config: the sync state of every harness, outside sources with their pins, holds and blocks, what is on disk, MCP and hook targeting, scheduled jobs and a YAML editor. It is where you look and act day to day; every action calls the same code as a CLI command, which stays the surface for scripts and SSH.
+`tackroom view` opens a local dashboard over your config: the sync state of every harness, outside sources with their pins, cooldowns and blocks, what is on disk, MCP and hook targeting, scheduled jobs and a YAML editor. It is where you look and act day to day; every action calls the same code as a CLI command, which stays the surface for scripts and SSH.
 
 ```bash
 tackroom view                                  # start it and open your browser
@@ -25,7 +25,7 @@ The seven tabs are Overview, Skills, Roles, MCP & hooks, Unmanaged, Crons and Co
 
 | Tab | Shows |
 |---|---|
-| Overview | Every outside source: pinned, held or blocked, with the reason and the command that releases or accepts it, the same items `tackroom status` lists. |
+| Overview | Every outside source: pinned, in cooldown or blocked, with the reason and the command that skips the cooldown or accepts the finding, the same items `tackroom status` lists. |
 | Skills, Roles | Matrices of what is on disk per harness. |
 | MCP & hooks | MCP and hook targeting per harness. |
 | Unmanaged | Items in harness folders that tackroom did not put there. It never deletes them. |

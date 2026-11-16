@@ -132,7 +132,7 @@ If you copied the `tackroom` layout that earlier releases shipped in `herdr/layo
   - whether everything is synced or how many changes wait;
   - a Machines section with one row per machine in `crons.hosts` (its health, a summary and the command that fixes it; only with more than one host);
   - one row per harness (what is missing or drifted, then how many skills, roles, MCP servers and hooks it has, and its state) that opens into the exact names. An open harness row has Turn off; a harness turned off in the config is listed with Turn on;
-  - a "Held or blocked" list of what sync skips, with the command that overrides it;
+  - an "In cooldown or blocked" list of what sync skips, with the command that overrides it;
   - a line for the Crons tab.
 - **Sync.** When something waits, Overview has a Sync button. It opens the plan in a dialog: each change once, with the harnesses it touches under it, and in red what the sync removes or overwrites. The dialog's button reads Sync and remove when it removes something.
   - It runs `tackroom sync --plan-digest`, so when the plan or the config changed since the plan loaded, nothing is applied, the dialog says so and the panel loads the new plan. The dialog then leaves only Cancel, and Sync on Overview opens the new plan.
@@ -160,7 +160,7 @@ Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tack
 
 - The web view cannot be embedded: Herdr mods are native elements drawn from JavaScript, so Herdr has its own renderer over the same data.
 - The web view's Unmanaged and Config tabs are not in the panel.
-- The Skills tab lists skills of a source sync has not pinned because it is blocked or held as missing in every harness, as the web view does; Overview lists the source under "Held or blocked".
+- The Skills tab lists skills of a source sync has not pinned because it is blocked or in cooldown as missing in every harness, as the web view does; Overview lists the source under "In cooldown or blocked".
 - The Web button reads `view.addr` and `view.token` from tackroom's default state folder, so it does not find a view started with another `--token-file`.
 - A collect probes every host over SSH. On a loaded machine the local probe can hit tackroom's 2 minute timeout, and the host shows "unreachable" until the next collect.
 - After an Add, Edit, Delete or action, the Crons tab runs a full collect and the row updates when that finishes, not at once as in the web view.
@@ -253,7 +253,7 @@ It needs a terminal on both stdin and stdout; otherwise it prints `tackroom tui 
 | Tab | Shows |
 | --- | --- |
 | Agents | One row per enabled harness: product name, config key, sync state (synced, drifted, not detected, config unreadable) and managed counts. The facts of `tackroom status`. |
-| Lock | Every external skill source and every held package: name, source, pinned commit, state (pinned, held with its age against the 72 hour hold, blocked, or why the pin is off) and audit result (pass, findings, critical). The facts of `tackroom.lock`, the freshness hold and `doctor audit`. |
+| Lock | Every external skill source and every package in cooldown: name, source, pinned commit, state (pinned, cooldown with its age against the 72 hour minimum release age, blocked, or why the pin is off) and audit result (pass, findings, critical). The facts of `tackroom.lock`, the minimum release age and `doctor audit`. |
 | Crons | The jobs of `tackroom cron collect`: host, source, id, schedule, state, last run and result. |
 | Doctor | The checks of `tackroom doctor` with their marks, and the summary line. |
 

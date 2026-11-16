@@ -11,7 +11,7 @@ Guides and reference for the tackroom CLI, in reading order. Philosophy says wha
 
 ## Guides
 
-- [Skills](skills.md): write your own, add external sources, provenance, the 72 hour hold, the audit gate and publishing.
+- [Skills](skills.md): write your own, add external sources, provenance, the 72 hour cooldown, the audit gate and publishing.
 - [Roles](roles.md): the role file format, where each harness gets it, model tiers and overrides.
 - [MCP servers](mcp.md): add, import and remove servers, remote servers, secrets and which harnesses get what.
 - [Hooks](hooks.md): declare a hook, the events each harness takes, and list or remove native registrations.
@@ -24,4 +24,4 @@ Guides and reference for the tackroom CLI, in reading order. Philosophy says wha
 ## More
 
 - [Comparison](comparison.md): how tackroom differs from skillshare, HarnessKit, dotagents, rulesync, ruler and openskills, and how to move from skillshare.
-- [Troubleshooting](troubleshooting.md): conflicts, held and blocked items, hooks, Pi, periodic sync.
+- [Troubleshooting](troubleshooting.md): conflicts, items in cooldown and blocked items, hooks, Pi, periodic sync.
