@@ -1,6 +1,6 @@
 # Harnesses
 
-tackroom writes your setup into 15 coding agents, called harnesses, each in its own native format. This page is the capability matrix: what each harness gets today, the key that names it in `tackroom.yaml`, and where its files land.
+tackroom writes your setup into 15 coding agents, called harnesses, each in its own native format. This page is the capability matrix: what each harness gets today, the key that names it in `tackroom.yaml`, and where its files land. Look here before you rely on a surface in one harness.
 
 ```bash
 tackroom status                       # per harness: synced, drifted, or not detected
@@ -36,9 +36,11 @@ What each `~` means:
 - **Hooks, OMP and Pi.** Only `SessionStart` and `SessionEnd` map. Other events are reported as unsupported. See [hooks.md](hooks.md#which-harnesses-run-hooks).
 - **Plugins, Codex.** Only agent-plugins-spec sources with `mcp: true`, installed through `codex plugin add` ([plugins.md](plugins.md#codex-plugins)). Codex has no plugin layout for your own plugins in the config root.
 
-**Plugins** is `✓` where tackroom registers a harness's own plugin format, which is Claude Code ([plugins.md](plugins.md)). Codex is `~`: tackroom installs agent-plugins-spec sources with `mcp: true` as native plugins by running `codex plugin`, tested with codex-cli 0.159.2. Otherwise, skills and, with `mcp: true`, MCP servers from an agent-plugins-spec source reach each harness through the Skills and MCP columns.
+What the Plugins and Settings columns mean:
 
-**Settings** means a `settings:` block under the agent entry is written into the harness's own settings file ([setup.md](setup.md#per-harness-settings)). Supported: Claude Code, Codex, Pi and OMP; the files are in the table below. Other harnesses report `settings unsupported` and ignore the block.
+- **Plugins** is `✓` where tackroom registers a harness's own plugin format, which is Claude Code ([plugins.md](plugins.md)). Codex is `~`: tackroom installs agent-plugins-spec sources with `mcp: true` as native plugins by running `codex plugin`, tested with codex-cli 0.159.2.
+- **Plugins elsewhere.** In every other harness, skills and, with `mcp: true`, MCP servers from an agent-plugins-spec source arrive through the Skills and MCP columns.
+- **Settings** means a `settings:` block under the agent entry is written into the harness's own settings file ([setup.md](setup.md#per-harness-settings)). Supported: Claude Code, Codex, Pi and OMP; the files are in the table below. Other harnesses report `settings unsupported` and ignore the block.
 
 ## Config keys and detection
 
@@ -62,11 +64,10 @@ The key is what you write in `tackroom.yaml`, in `--agents`, and in the `agents:
 | Kimi Code | `kimi` | `kimi` | `~/.kimi-code/skills` |
 | Amp | `amp` | `amp` | `~/.agents/skills` |
 
-Claude Code is `claude`. The former key `claude-code` is still accepted and read as `claude`. A tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config ([upgrading.md](upgrading.md#the-claude-key)).
-
-Gemini CLI (`gemini`) is no longer supported. A config that still names it loads and syncs: the `gemini` agent entry and every `agents:` list item naming it are ignored, with one warning ([upgrading.md](upgrading.md)).
-
-`setup` detects every harness above except Amp; add that with `--agents amp`. Pi and OMP are separate harnesses: `pi` is not counted as detected when its `--version` output starts with `omp/`.
+- `setup` detects every harness above except Amp; add that with `--agents amp`.
+- Pi and OMP are separate harnesses: `pi` is not counted as detected when its `--version` output starts with `omp/`.
+- Claude Code is `claude`. The former key `claude-code` is still accepted and read as `claude`. A tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config ([release notes](upgrading.md#the-claude-key)).
+- Gemini CLI (`gemini`) is no longer supported. A config that still names it loads and syncs: the `gemini` agent entry and every `agents:` list item naming it are ignored, with one warning ([release notes](upgrading.md)).
 
 ## Where each surface lands
 
@@ -135,15 +136,26 @@ Antigravity CLI also reads `~/.gemini/skills`, where releases that supported Gem
 
 ### Devin
 
-Devin means Devin CLI and the Devin Local agent in Devin Desktop (formerly Windsurf), which share one configuration in `~/.config/devin`. It is detected by `devin` on `PATH`, so Devin Desktop without the CLI installed is not detected. The adapter was checked against Devin CLI 3000.12.57 with `devin skills`, `devin mcp`, `devin rules` and `devin doctor`, without signing in. Nothing here was checked in a model session or in Devin Desktop.
+Devin means Devin CLI and the Devin Local agent in Devin Desktop (formerly Windsurf), which share one configuration in `~/.config/devin`. It is detected by `devin` on `PATH`, so Devin Desktop without the CLI installed is not detected.
+
+The adapter was checked against Devin CLI 3000.12.57 with `devin skills`, `devin mcp`, `devin rules` and `devin doctor`, without signing in. Nothing here was checked in a model session or in Devin Desktop.
 
 - **Skills.** Devin reads `~/.agents/skills` itself. tackroom mirrors skills into `~/.config/devin/skills` only when your config root is not `~/.agents`.
 - **MCP.** Stdio and remote servers go to `mcpServers` in `~/.config/devin/mcp_config.json`. A remote server gets `url` and `headers` and no `transport`, so Devin tries Streamable HTTP first and falls back to SSE. Devin fills in a `${NAME}` in a header from its environment, as it does `${env:NAME}`. Whether it does the same in a stdio server's `env` is not verified.
 - **Root file.** `~/.config/devin/AGENTS.md`, the global rules file Devin documents.
-- **Roles.** Not rendered, but Devin loads them itself when your config root is `~/.agents`: it reads `~/.agents/agents/*.md` as custom subagents, beside the `~/.config/devin/agents/` its docs name. `devin doctor` lists them and warns that it ignores the `color` key. A role's `tools` reach Devin as written, with Claude Code's names. Devin's docs list `read`, `edit`, `grep`, `glob` and `exec` for that field, and whether Devin matches `Read` or `Bash` to them was not checked, so do not rely on a role's tool limits in Devin. With the config root elsewhere, Devin gets no roles.
+- **Roles.** Not rendered, but Devin loads them itself when your config root is `~/.agents`: it reads `~/.agents/agents/*.md` as custom subagents, beside the `~/.config/devin/agents/` its docs name. With the config root elsewhere, Devin gets no roles.
+  - `devin doctor` lists them and warns that it ignores the `color` key.
+  - A role's `tools` reach Devin as written, with Claude Code's names. Devin's docs list `read`, `edit`, `grep`, `glob` and `exec` for that field, and whether Devin matches `Read` or `Bash` to them was not checked, so do not rely on a role's tool limits in Devin.
 - **Hooks.** Not written. By default Devin loads Claude Code's hooks from `~/.claude/settings.json` (setting `read_config_from.claude`), so a second copy written by tackroom would run each hook twice on a machine that has both.
 
-By default Devin also imports Claude Code's rules and MCP servers: it reads `~/.claude/CLAUDE.md` as a global rule and the servers in `~/.claude.json`. A server with the same name as one in `~/.config/devin/mcp_config.json` is listed once, from Devin's own file. What happens to the root file depends on your config. Without an `instructions:` list, both files are links to the same `AGENTS.md`: Devin loads it once, and `devin rules list` reports `~/.claude/CLAUDE.md` as a conflict. With an `instructions:` list, `~/.claude/CLAUDE.md` is a generated file of `@path` import lines, and Devin loads it as a second rule next to its own generated copy. To turn the import off, set this in `~/.config/devin/config.json`:
+By default Devin also imports Claude Code's rules and MCP servers: it reads `~/.claude/CLAUDE.md` as a global rule and the servers in `~/.claude.json`. A server with the same name as one in `~/.config/devin/mcp_config.json` is listed once, from Devin's own file.
+
+What happens to the root file depends on your config:
+
+- Without an `instructions:` list, both files are links to the same `AGENTS.md`: Devin loads it once, and `devin rules list` reports `~/.claude/CLAUDE.md` as a conflict.
+- With an `instructions:` list, `~/.claude/CLAUDE.md` is a generated file of `@path` import lines, and Devin loads it as a second rule next to its own generated copy.
+
+To turn the import off, set this in `~/.config/devin/config.json`:
 
 ```json
 {
