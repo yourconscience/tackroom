@@ -68,7 +68,7 @@ Each job is one JSON record. Main fields:
 
 `tackroom view` has a Crons tab with the same inventory. It collects on first open, caches for a minute and collects again on request. Jobs that need attention come first, then one table per host with an access chip per source. A job needs attention when it has problems or is `dead` or `missing`; a paused job's old error does not count until it is turned on again.
 
-A launchd job's row offers Run now, Pause and Resume; an owned job on the machine the view runs on also takes a new schedule. The tab has an Add cron button, and an open row of a job tackroom owns here has Edit and Delete. Any other row has neither, and says why (`edit_note`). The CLI verbs do the same for scripts and other clients, such as the [Herdr panel](herdr.md).
+A launchd job's row offers Run now, Pause and Resume; an owned job on the machine the view runs on also takes a new schedule. The tab has an Add cron button, and an open row of a job tackroom owns here has Edit and Delete. Any other row has neither, and says why (`edit_note`). The CLI verbs do the same for scripts and other clients, such as the [Herdr panel](terminals.md#herdr-panel).
 
 - Run is `launchctl kickstart gui/$UID/<label>`. Pause is `launchctl disable` then `bootout`, so the job stays off across logins and `collect` reports it `disabled`. Resume is `launchctl enable`, then `bootstrap` of the plist when it is not loaded. On another host the same script runs over SSH.
 - An action addresses a job by host, source and id as the last scan reported it, never by a label or path from the request. The view answers `stale_crons` for a job that is not in its last scan.
@@ -78,7 +78,7 @@ A launchd job's row offers Run now, Pause and Resume; an owned job on the machin
 
 ## In Claude Code and Pi
 
-The same view is available inside Claude Code and Pi, from the [`claude/`](https://github.com/yourconscience/tackroom/tree/main/claude) and [`pi/`](https://github.com/yourconscience/tackroom/tree/main/pi) folders of the repository. Both run `tackroom` from your `PATH`, show which harnesses are out of sync, list the jobs from `cron collect`, and act through `tackroom cron run|pause|resume`. `/tackroom` opens them. The Claude Code pane also syncs, turns harnesses, MCP servers and hooks on and off, and shows each machine's health, as the [Herdr panel](herdr.md) does; see [plugins.md](plugins.md#tackroom-in-claude-code-and-pi).
+The same view is available inside Claude Code and Pi, from the [`claude/`](https://github.com/yourconscience/tackroom/tree/main/claude) and [`pi/`](https://github.com/yourconscience/tackroom/tree/main/pi) folders of the repository. Both run `tackroom` from your `PATH`, show which harnesses are out of sync, list the jobs from `cron collect`, and act through `tackroom cron run|pause|resume`. `/tackroom` opens them. The Claude Code pane also syncs, turns harnesses, MCP servers and hooks on and off, and shows each machine's health, as the [Herdr panel](terminals.md#herdr-panel) does; see [plugins.md](plugins.md#tackroom-in-claude-code-and-pi).
 
 ```bash
 claude plugin install tackroom --marketplace yourconscience/tackroom

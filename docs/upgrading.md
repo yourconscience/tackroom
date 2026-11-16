@@ -61,7 +61,7 @@ Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their forma
 Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats.
 
 - Fixed: a role with `tools: []` was written with no `tools` key, so Claude Code, GitHub Copilot CLI, Gemini CLI, Kimi Code, OMP and Pi gave it every tool. They now get no tools, and the next sync, including the periodic `tackroom pull`, rewrites those copies. `tools: ""` now also means no tools. Codex, Cursor, Factory Droid, OpenCode, Qwen Code and Grok Build cannot express it and keep the harness default; see [Tools](roles.md#tools).
-- The Herdr panel moved to `herdr/tackroom/`, a package Herdr's mod gallery can list, with a recipe that adds the button and the panel to the layout you use. The `tackroom` layout in `herdr/layouts/` is gone; if you copied it, it keeps working. To update the panel, copy the two mods from `herdr/tackroom/mods/`, or paste the gallery line in [herdr.md](herdr.md#install) to your agent. Where the notes below say to copy `herdr/mods/tackroom`, copy `herdr/tackroom/mods/tackroom` instead.
+- The Herdr panel moved to `herdr/tackroom/`, a package Herdr's mod gallery can list, with a recipe that adds the button and the panel to the layout you use. The `tackroom` layout in `herdr/layouts/` is gone; if you copied it, it keeps working. To update the panel, copy the two mods from `herdr/tackroom/mods/`, or paste the gallery line in [herdr.md](terminals.md#install) to your agent. Where the notes below say to copy `herdr/mods/tackroom`, copy `herdr/tackroom/mods/tackroom` instead.
 
 ## To 2.5
 
@@ -84,7 +84,7 @@ Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their forma
 - New: `tackroom hosts` shows tackroom on every machine in `crons.hosts`: its version, whether it is set up and synced, and its config commit against this machine's, with the command that fixes what is wrong. With more than one host, the view's Overview and the Herdr panel's Overview show the same as a Machines block. Copy `herdr/mods/tackroom` again to get it in the panel. See [commands.md](commands.md#check-health).
 - Fixed: `tackroom setup` stopped with `config hook memory-session-start targets unknown agent "claude"` when `tackroom.local.yaml` listed an agent, for example one turned off on that machine. It also stopped on any machine with Grok Build installed, reading `~/.grok/config.toml` as JSON. Both now set up; a harness config tackroom cannot read is reported as a warning and its MCP servers are left out of the import.
 - If you first installed the periodic sync job with a tackroom before 2.0, run `tackroom cron` once. That job sources `~/.profile` first, and when the file is missing (common with zsh) or fails, `/bin/sh` stops before tackroom runs: the job never synced and its log stayed empty. `tackroom status` and `tackroom doctor` now name this case.
-- Deprecated: `tackroom tui`. It still runs, with a notice, and will be removed in 3.0. Use `tackroom view` (on a desktop, a phone or in a side panel) or the [Herdr panel](herdr.md); in a terminal, `tackroom status`, `tackroom cron collect --table` and `tackroom doctor` print the same facts.
+- Deprecated: `tackroom tui`. It still runs, with a notice, and will be removed in 3.0. Use `tackroom view` (on a desktop, a phone or in a side panel) or the [Herdr panel](terminals.md#herdr-panel); in a terminal, `tackroom status`, `tackroom cron collect --table` and `tackroom doctor` print the same facts.
 
 ## To 2.3
 
@@ -93,7 +93,7 @@ Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their forma
 - `tackroom view` works on a phone and in a narrow side panel: larger text and tap targets, matrices that stack into rows, a web app manifest so it can go on a home screen, and a page that asks for the token when a phone opens it without one. See [On a phone](view.md#on-a-phone).
 - The view's Overview lists outside sources as pinned, held or blocked, with the reason and the command that overrides it. The view now applies the freshness hold and the audit gate the way `tackroom status` does, so it no longer offers a sync for a skill that sync would skip.
 - New: `tackroom config inventory` prints the view's inventory as JSON.
-- The Herdr panel is now a `tackroom` panel with Overview, Skills, Roles, MCP & hooks and Crons tabs. Copy `herdr/mods/tackroom` and the `tackroom` layout again to get it; the old `crons.svg` icon is replaced by `tackroom.svg`. See [herdr.md](herdr.md).
+- The Herdr panel is now a `tackroom` panel with Overview, Skills, Roles, MCP & hooks and Crons tabs. Copy `herdr/mods/tackroom` and the `tackroom` layout again to get it; the old `crons.svg` icon is replaced by `tackroom.svg`. See [terminals.md](terminals.md#herdr-panel).
 
 ## To 2.2
 
@@ -118,7 +118,7 @@ Nothing to migrate: `tackroom.yaml` and `tackroom.lock` keep their formats.
 - The Hermes memory bridge is gone. The next `tackroom sync` deletes `memory/hooks/sync.sh`, `sync-memory-to-vault.sh`, `sync-vault-to-memory.sh` and `memory/lib/sync.py` from your config root if you never edited them. Edited copies are reported and left alone. `tackroom setup` removes the old sync hook commands from native configs.
 - `tackroom doctor` no longer fails because an external skill is held or blocked. It passes, counts them and says what to do next.
 - Install with Homebrew or npm. The install script is no longer offered.
-- New: `tackroom tui`, a read-only terminal view. See [tui.md](tui.md).
+- New: `tackroom tui`, a read-only terminal view. See [terminals.md](terminals.md#terminal-view-deprecated).
 
 ## To 2.0
 

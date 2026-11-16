@@ -11,7 +11,7 @@ import (
 
 // The words both cron views draw: health, a short name and the schedule in
 // words, worked out once here so the web view and the Herdr panel cannot
-// disagree (docs/herdr.md).
+// disagree (docs/terminals.md).
 
 var (
 	cronPausedStates = map[string]bool{"disabled": true, "paused": true, "not_loaded": true}

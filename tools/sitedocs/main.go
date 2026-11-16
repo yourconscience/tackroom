@@ -142,9 +142,24 @@ func run(repo, out, base string) error {
 	if err := writeFile(out, "llms.txt", []byte(b.llms())); err != nil {
 		return err
 	}
+	for from, to := range movedPages {
+		stub := fmt.Sprintf("<!doctype html>\n<meta charset=\"utf-8\">\n<title>Moved</title>\n<link rel=\"canonical\" href=\"%[1]s\">\n<meta http-equiv=\"refresh\" content=\"0; url=%[1]s\">\n<p><a href=\"%[1]s\">This page moved.</a></p>\n", to)
+		if err := writeFile(out, from+"/index.html", []byte(stub)); err != nil {
+			return err
+		}
+	}
 	b.checkAnchors()
 	fmt.Fprintf(os.Stderr, "sitedocs: wrote %d docs pages to %s\n", len(b.nav)+1, out)
 	return nil
+}
+
+// movedPages keeps the address of a page that was merged into another one
+// working: the old address serves a stub that sends the browser on.
+var movedPages = map[string]string{
+	"docs/herdr": "../terminals/#herdr-panel",
+	"docs/tern":  "../terminals/#tern",
+	"docs/rex":   "../terminals/#rex",
+	"docs/tui":   "../terminals/#terminal-view-deprecated",
 }
 
 func findRoot(repo string) (string, error) {
