@@ -95,6 +95,11 @@ Put flags before the query. `remove` prints the matching registrations, removes 
 
 `remove` does not check ownership and writes no backup, so preview first. It also removes registrations of hooks that are still declared and enabled; the next `sync` writes those again.
 
-`sync` adds and updates registrations, and removes one when the hook is still declared but no longer wanted for that agent: `enabled: false`, or an `agents` list that no longer names it. `status` shows it as `hooks stale` until then. The registration is matched by event and command, and stays when another enabled hook for that agent has the same event and command. `sync` never removes the native entry of a hook that is no longer declared at all. It shows up as `unmanaged` in `hook list` until you remove it.
+What `sync` does with registrations:
+
+- It adds and updates them.
+- It removes one when the hook is still declared but no longer wanted for that agent: `enabled: false`, or an `agents` list that no longer names it. `status` shows it as `hooks stale` until then.
+- The registration is matched by event and command, and stays when another enabled hook for that agent has the same event and command.
+- `sync` never removes the native entry of a hook that is no longer declared at all. It shows up as `unmanaged` in `hook list` until you remove it.
 
 To retire a hook you declared, set `enabled: false` and run `tackroom sync`; delete the entry afterwards if you like. If you deleted the entry first, run `hook remove`. Use the same steps for hooks left behind by a tool you uninstalled ([troubleshooting.md](troubleshooting.md#hooks)).
