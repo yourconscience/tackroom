@@ -6,6 +6,12 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## Unreleased
+
+- Removed: Gemini CLI support. Google moved individual accounts from Gemini CLI to Antigravity CLI on 2026-06-18 ([announcement](https://developers.googleblog.com/en/an-important-update-transitioning-gemini-cli-to-antigravity-cli/)); tackroom keeps supporting Antigravity CLI as `agy`. A config that still names `gemini` loads and syncs: the `gemini` agent entry is ignored, and so is `gemini` in the `agents:` list of an MCP server or hook and in `exclude_agents` or `mcp_agents` of an external skill source. A server, hook or source MCP whose list named only `gemini` is turned off rather than sent to every harness. Each run prints one warning. `gemini` is not read as `agy`, because the two use different files: add an `agy` entry yourself if you use Antigravity CLI. A command that rewrites `tackroom.yaml`, such as `tackroom mcp add`, saves it without the `gemini` entries.
+- Removed: what earlier syncs wrote for Gemini CLI stays where it is. tackroom does not remove its MCP servers and hooks from `~/.gemini/settings.json`, its skill links in `~/.gemini/skills` or its roles in `~/.gemini/agents`; delete them by hand if you no longer want them. Antigravity CLI also reads `~/.gemini/skills`, and `tackroom doctor` warns when a skill is there and in `~/.gemini/antigravity-cli/skills`. `~/.gemini/GEMINI.md` stays, as Antigravity CLI's root file.
+- New: Devin (key `devin`, detected by `devin` on `PATH`), which covers Devin CLI and the Devin Local agent in Devin Desktop. It gets skills (read from `~/.agents/skills`, mirrored into `~/.config/devin/skills` only when the config root is elsewhere), stdio and remote MCP servers in `~/.config/devin/mcp_config.json`, and a root file at `~/.config/devin/AGENTS.md`. It gets no roles and no hooks: Devin's docs name too few tool names to map roles, and Devin loads Claude Code's hooks by default, so a copy from tackroom would run twice. Devin also reads `~/.claude/CLAUDE.md` by default, so a machine with both gets the root instructions twice unless you set `read_config_from.claude` to `false` in `~/.config/devin/config.json`. The adapter is written from Devin's documentation and has not been run against a real Devin install. See [Devin](harnesses.md#devin).
+
 ## To 2.7.1
 
 Nothing to migrate by hand: `tackroom.yaml` and `tackroom.lock` keep their formats.

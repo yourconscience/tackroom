@@ -53,19 +53,6 @@ func newHarnessCases(home string) []newHarnessCase {
 			},
 			takesNotification: true,
 		},
-		{
-			name: agentGemini, detect: "gemini", skillRoot: "~/.gemini/skills", agentRoot: "~/.gemini/agents",
-			roleFile: filepath.Join(home, ".gemini", "agents", "reviewer.md"),
-			mcpFile:  filepath.Join(home, ".gemini", "settings.json"),
-			hookFile: filepath.Join(home, ".gemini", "settings.json"),
-			rootLink: filepath.Join(home, ".gemini", "GEMINI.md"),
-			mcpWant:  []string{`"mcpServers"`, `"local"`, `"command": "local-mcp"`, `"theme": "GitHub"`},
-			hookWant: []string{`"AfterAgent"`, `"type": "command"`, `"command": "~/.agents/memory/hooks/stop.sh"`, `"timeout": 15000`, `"Notification"`},
-			preexisting: map[string]string{
-				filepath.Join(home, ".gemini", "settings.json"): `{"ui":{"theme":"GitHub"}}`,
-			},
-			takesNotification: true,
-		},
 	}
 }
 

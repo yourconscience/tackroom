@@ -18,7 +18,6 @@ func TestRemoteMCPServerInEveryMainFormat(t *testing.T) {
 		agentPi:         {`"url": "https://mcp.example.com/mcp"`, `"Authorization": "Bearer ${DOCS_TOKEN}"`},
 		agentGrok:       {`url = "https://mcp.example.com/mcp"`, `"Authorization" = "Bearer ${DOCS_TOKEN}"`},
 		agentCursor:     {`"url": "https://mcp.example.com/mcp"`, `"Authorization": "Bearer ${env:DOCS_TOKEN}"`},
-		agentGemini:     {`"httpUrl": "https://mcp.example.com/mcp"`, `"X-Region": "eu"`},
 	}
 	for agent, want := range cases {
 		t.Run(agent, func(t *testing.T) {

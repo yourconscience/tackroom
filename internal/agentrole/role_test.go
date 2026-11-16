@@ -176,18 +176,3 @@ func TestNewHarnessRenderersHonorOverrides(t *testing.T) {
 		t.Error("cursor should pass through a non-tier generic model")
 	}
 }
-
-func TestRenderGeminiLocalSubagent(t *testing.T) {
-	out, err := renderGemini(Role{Name: "reviewer", Description: "Review code", Tools: []string{"Read", "Grep", "WebSearch"}, Instructions: "Review carefully."})
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, want := range []string{`name: "reviewer"`, "kind: local\n", `- "read_file"`, `- "grep_search"`, `- "google_web_search"`, "Review carefully."} {
-		if !strings.Contains(out, want) {
-			t.Fatalf("missing %q in:\n%s", want, out)
-		}
-	}
-	if strings.Contains(out, "model:") {
-		t.Fatalf("no model unless one is set:\n%s", out)
-	}
-}
