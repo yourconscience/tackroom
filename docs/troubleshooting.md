@@ -22,7 +22,13 @@ tackroom restore latest --dry-run    # preview putting the newest one back
 
 Backups live in `$XDG_STATE_HOME/tackroom/backups/<time>/` (default `~/.local/state/tackroom/backups/`).
 
-**"role ... has ... that the shared role does not" or "role ... is a link to ...".** A harness's own role file sits where the shared role of the same name would be written, and replacing it would lose something: a field tackroom cannot write for that harness (for example Claude Code's `permissionMode` or Codex's `sandbox_mode`), different instructions, or a link that keeps it live from somewhere else. `setup` and `sync --replace-conflicts` never replace such a file; sync leaves that one file alone and syncs everything else into the harness. Rename the file to keep it next to the shared role, or move it out of the harness's agents folder to use the shared role, then run `tackroom setup` (or `tackroom sync`).
+**"role ... has ... that the shared role does not" or "role ... is a link to ...".** A harness's own role file sits where the shared role of the same name would be written, and replacing it would lose something:
+
+- a field tackroom cannot write for that harness (for example Claude Code's `permissionMode` or Codex's `sandbox_mode`);
+- different instructions;
+- a link that keeps it live from somewhere else.
+
+`setup` and `sync --replace-conflicts` never replace such a file; sync leaves that one file alone and syncs everything else into the harness. Rename the file to keep it next to the shared role, or move it out of the harness's agents folder to use the shared role. Then run `tackroom setup` (or `tackroom sync`).
 
 **A sync proposed removals you did not expect.** Setup asks about removals and role overwrites only with `--review`, per harness, defaulting to no; without it, setup leaves them and lists them in its summary for `tackroom sync`. Answer `n`, then inspect with `tackroom status`.
 

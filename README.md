@@ -56,17 +56,19 @@ Terminals: a `tackroom tmux` workspace for [tmux](https://yourconscience.github.
 ## Docs
 
 - [Philosophy](https://yourconscience.github.io/tackroom/docs/philosophy/): why it works this way
-- [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from` and `--overlay`, settings
-- [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
+- [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from` and `--overlay`, settings, upgrade and uninstall
 - [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
-- [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
-- [Web view](https://yourconscience.github.io/tackroom/docs/view/): the dashboard, on a desktop or a phone
+- [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
 - [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and holds
 - [Roles](https://yourconscience.github.io/tackroom/docs/roles/): role format, model tiers, per-agent output
+- [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
+- [Plugins](https://yourconscience.github.io/tackroom/docs/plugins/): Claude Code plugins, agent-plugins-spec sources and the Claude Code and Pi panels
 - [Memory](https://yourconscience.github.io/tackroom/docs/memory/): a memory file in every harness, and native memory settings
 - [Crons](https://yourconscience.github.io/tackroom/docs/crons/): every scheduled job, here and over SSH
-- [Comparison](https://yourconscience.github.io/tackroom/docs/comparison/) and [moving from skillshare](https://yourconscience.github.io/tackroom/docs/skillshare-migration/)
-- [Upgrading](https://yourconscience.github.io/tackroom/docs/upgrading/) and [Troubleshooting](https://yourconscience.github.io/tackroom/docs/troubleshooting/)
+- [Web view](https://yourconscience.github.io/tackroom/docs/view/): the dashboard, on a desktop or a phone
+- [Terminals](https://yourconscience.github.io/tackroom/docs/terminals/): tmux, zellij, Herdr, Tern, Rex and cmux
+- [Comparison](https://yourconscience.github.io/tackroom/docs/comparison/), with [moving from skillshare](https://yourconscience.github.io/tackroom/docs/comparison/#moving-from-skillshare)
+- [Troubleshooting](https://yourconscience.github.io/tackroom/docs/troubleshooting/) and the [release notes](https://yourconscience.github.io/tackroom/docs/upgrading/)
 
 Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
 

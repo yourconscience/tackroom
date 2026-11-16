@@ -20,7 +20,7 @@ import (
 // command in crons.jobs as native units of the host's own scheduler, and
 // removes the ones that are no longer declared. tackroom runs no daemon.
 // Plain `tackroom cron` manages its two built-in jobs the same way.
-// See docs/crons.md section 4.
+// See docs/crons.md, "Declare your own jobs" and "Built-in jobs".
 
 const (
 	ownedLaunchdPrefix = "dev.tackroom."

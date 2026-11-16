@@ -7,7 +7,7 @@ tackroom doctor     # validates every role: name, description, instructions
 tackroom sync       # renders roles into each harness
 ```
 
-## Format
+## Write a role
 
 The file has YAML frontmatter and the system prompt as body. Required: `name` (lowercased), `description` and a non-empty body. Optional: `model`, `effort`, `tools` (a list or a comma-separated string), `color`, and per-harness override blocks.
 
@@ -42,9 +42,13 @@ You review code changes. Report findings; do not edit files.
 | Grok Build | Markdown | `~/.grok/agents/<name>.md` |
 | Kimi Code | Markdown | `~/.kimi-code/agents/<name>.md` |
 
-Amp, Antigravity CLI, Devin and DeepSeek Harness have no role surface tackroom can render, so it writes them none. Devin loads the role files in `~/.agents/agents/` itself when that is your config root, with their tool names as written ([harnesses.md](harnesses.md#devin)). Paths follow each harness's `agent_root` in `tackroom.yaml`. Pi role files do nothing unless the `pi-subagents` package is installed; declare it under the Pi agent's `packages:` in `tackroom.yaml`.
+Paths follow each harness's `agent_root` in `tackroom.yaml`.
 
-## Model tiers and overrides
+- Amp, Antigravity CLI, Devin and DeepSeek Harness have no role surface tackroom can render, so it writes them none.
+- Devin loads the role files in `~/.agents/agents/` itself when that is your config root, with their tool names as written ([harnesses.md](harnesses.md#devin)).
+- Pi role files do nothing unless the `pi-subagents` package is installed; declare it under the Pi agent's `packages:` in `tackroom.yaml`.
+
+## Choose a model
 
 `model` takes a tier (`haiku`, `sonnet`, `opus`) or an exact id. Each harness handles a tier differently:
 
@@ -70,4 +74,7 @@ Qwen Code, GitHub Copilot CLI, Pi, OMP, Factory Droid and Kimi Code get their ow
 
 Kimi Code grants every tool to an agent with no `tools` key, so a role whose tools all lack a Kimi Code equivalent fails to render instead of widening. Cursor has no per-agent tool list; `cursor.readonly: true` is its only restriction.
 
-`tools: []` (or `tools: ""`) gives a role no tools, for example a judge that only reads the text it is given. Leaving `tools` out gives the harness default, which is usually every tool. Claude Code, GitHub Copilot CLI, Kimi Code and OMP get `tools: []`, and Pi gets a bare `tools:`. Codex, Cursor, Factory Droid, OpenCode, Qwen Code and Grok Build have no way to give an agent no tools, so their copy of such a role gets that harness's default.
+`tools: []` (or `tools: ""`) gives a role no tools, for example a judge that only reads the text it is given. Leaving `tools` out gives the harness default, which is usually every tool.
+
+- Claude Code, GitHub Copilot CLI, Kimi Code and OMP get `tools: []`, and Pi gets a bare `tools:`.
+- Codex, Cursor, Factory Droid, OpenCode, Qwen Code and Grok Build have no way to give an agent no tools, so their copy of such a role gets that harness's default.

@@ -1,13 +1,13 @@
 # Plugins
 
-tackroom handles two kinds of plugin: Claude Code plugins, which stay in Claude's native layout and load in place from your config root, and agent-plugins-spec sources, whose skills and MCP servers sync like any other source's, or reach Codex as a native plugin. It also ships its own sync and jobs panel as a Claude Code plugin and a Pi package.
+tackroom handles two kinds of plugin: Claude Code plugins, which keep their native layout and load in place from your config root, and agent-plugins-spec sources, whose skills and MCP servers sync like any other source's or reach Codex as a native plugin. Its own sync and jobs panel ships as a Claude Code plugin and a Pi package. Use this page to add either kind, or to get that panel.
 
 ```bash
 tackroom sync        # registers the marketplace and enables its plugins
 tackroom status      # the plugins column counts what is enabled
 ```
 
-## Claude Code plugins
+## Add your own Claude Code plugins
 
 A Claude Code plugin carries what the other surfaces cannot: mods, workflows, monitors, output styles, LSP servers and `bin/` tools. Put each plugin in its native layout under the config root and list it in `.claude-plugin/marketplace.json` there:
 
@@ -19,7 +19,10 @@ A Claude Code plugin carries what the other surfaces cannot: mods, workflows, mo
 }
 ```
 
-`sync` writes two things into `~/.claude/settings.json`. It registers the config root under `extraKnownMarketplaces` as a `directory` source, and it sets `enabledPlugins["<plugin>@<marketplace>"]` to `true` for each relative-path entry.
+`sync` writes two things into `~/.claude/settings.json`:
+
+- it registers the config root under `extraKnownMarketplaces` as a `directory` source;
+- it sets `enabledPlugins["<plugin>@<marketplace>"]` to `true` for each relative-path entry.
 
 Claude Code reads a directory marketplace in place, so there is no install step and no plugin cache. Edit a plugin, run `/reload-plugins`, and the change is live.
 
@@ -34,7 +37,7 @@ What `sync` leaves alone or cleans up:
 
 `tackroom doctor` runs `claude plugin validate` on the config root when Claude Code is detected, and skips the check when there is no marketplace file.
 
-## Agent plugins sources
+## Add an agent-plugins-spec source
 
 A source that follows [agent-plugins-spec](https://agent-plugins.org) is added like any external skill source. Its skills reach every harness, and `mcp: true` registers the MCP servers from its `mcp.json`.
 
@@ -59,7 +62,11 @@ In `mcp.json`, tackroom takes stdio servers only:
 - `${PLUGIN_ROOT}` and `${PLUGIN_DATA}` expand in `args` and `env`, and both are also set as environment variables. The data folder is `~/.agents/external-data/<source name>`.
 - A server with the same name as one in your own `mcp_servers:` is skipped, and so are servers that two plugin sources both declare.
 
-The pin, the 72 hour hold and the audit gate apply as for any external source ([skills.md](skills.md#the-72-hour-hold)). The audit names the source `plugin:<name>`, also scans its stdio MCP servers and the raw `mcp.json` (every transport), `plugin.json`, `.codex-plugin/plugin.json` and `hooks/hooks.json`, and `tackroom.lock` records the plugin name and version. Servers a plugin adds are written and listed like your own ([mcp.md](mcp.md)).
+The pin, the 72 hour hold and the audit gate apply as for any external source ([skills.md](skills.md#the-72-hour-hold)). Servers a plugin adds are written and listed like your own ([mcp.md](mcp.md)).
+
+- The audit names the source `plugin:<name>`.
+- It also scans its stdio MCP servers and the raw `mcp.json` (every transport), `plugin.json`, `.codex-plugin/plugin.json` and `hooks/hooks.json`.
+- `tackroom.lock` records the plugin name and version.
 
 ### Codex plugins
 
@@ -73,7 +80,9 @@ Codex loads a plugin from its own cache, so tackroom drives Codex's CLI (`codex 
 
 For such a source Codex gets the skills and every MCP server, `streamable-http` ones included, from the plugin alone. `sync` links no skills and writes no `[mcp_servers]` rows for it into Codex. Other harnesses are unchanged, and a source without `mcp: true` keeps its skill links.
 
-`sync` writes `~/.agents/external/.agents/plugins/marketplace.json`, a generated marketplace named `tackroom` with one entry per plugin, and runs `codex plugin marketplace add ~/.agents/external` once. It then runs `codex plugin add <name>@tackroom` when the plugin is not installed or Codex's copy differs from the cached source. It never writes Codex's plugin cache and never touches your own `~/.agents/plugins/marketplace.json`.
+`sync` writes `~/.agents/external/.agents/plugins/marketplace.json`, a generated marketplace named `tackroom` with one entry per plugin, and runs `codex plugin marketplace add ~/.agents/external` once.
+
+It then runs `codex plugin add <name>@tackroom` when the plugin is not installed or Codex's copy differs from the cached source. It never writes Codex's plugin cache and never touches your own `~/.agents/plugins/marketplace.json`.
 
 ```bash
 tackroom status      # plugins (1)   acme@tackroom
@@ -90,16 +99,27 @@ tackroom status      # plugins (1)   acme@tackroom
 
 ## tackroom in Claude Code and Pi
 
-The sync status and scheduled jobs from [Scheduled jobs](crons.md) are also available inside Claude Code and Pi, as a plugin and a package from the [`claude/`](https://github.com/yourconscience/tackroom/tree/main/claude) and [`pi/`](https://github.com/yourconscience/tackroom/tree/main/pi) folders of the repository.
+The sync status and scheduled jobs from [Crons](crons.md) are also available inside Claude Code and Pi, as a plugin and a package from the [`claude/`](https://github.com/yourconscience/tackroom/tree/main/claude) and [`pi/`](https://github.com/yourconscience/tackroom/tree/main/pi) folders of the repository.
 
 ```bash
 claude plugin install tackroom --marketplace yourconscience/tackroom
 pi install git:github.com/yourconscience/tackroom@v2.0.0
 ```
 
+On a Pi entry with a `packages` list in `tackroom.yaml`, add the `git:` line to that list instead of running `pi install`, because `sync` writes the list as a whole ([harnesses.md](harnesses.md#pi)).
+
 Both run `tackroom` from your `PATH`, show which harnesses are out of sync, list the jobs from `tackroom cron collect`, and act through `tackroom cron run|pause|resume`, the same verbs as the web view and the [Herdr panel](terminals.md#herdr-panel).
 
-- **Claude Code.** `/tackroom` opens a pane with the sync status, health counts per host, the jobs that need attention and every job per host. A job opens into its details with Run now, Pause and Resume. With tackroom 2.6 or newer the pane also syncs and edits, as the [Herdr panel](terminals.md#herdr-panel) does. When something waits, Sync shows the plan first: each change once with the harnesses it touches, and in red what the sync removes or overwrites. It applies that plan alone with `tackroom sync --plan-digest`; when the plan or the config changed since it loaded, nothing is applied, the pane shows the refusal and loads the new plan. The Harnesses, MCP servers and Hooks sections open into one row each with Turn off or Turn on, and an MCP server or hook adds or removes one harness, through `tackroom config set`; the change waits until you Sync. With more than one machine in `crons.hosts`, a Machines section shows each one's health, summary and the command that fixes it. With an older tackroom the pane changes nothing but crons and says to update tackroom. The plugin takes two options in `/config`: `tackroom`, the program to run, and `config`, the full path of a config file other than the default.
-- **Pi.** `/tackroom` lists the jobs with the sync status in the title; picking one shows its details and the same actions. Pi uses `tackroom` from the `PATH` and follows `$TACKROOM_HOME`.
+### Claude Code
 
-On a Pi entry with a `packages` list in `tackroom.yaml`, add the `git:` line to that list instead of running `pi install`, because `sync` writes the list as a whole ([harnesses.md](harnesses.md#pi)).
+`/tackroom` opens a pane with the sync status, health counts per host, the jobs that need attention and every job per host. A job opens into its details with Run now, Pause and Resume. The plugin takes two options in `/config`: `tackroom`, the program to run, and `config`, the full path of a config file other than the default.
+
+With tackroom 2.6 or newer the pane also syncs and edits, as the [Herdr panel](terminals.md#herdr-panel) does. With an older tackroom the pane changes nothing but crons and says to update tackroom.
+
+- **Sync.** When something waits, Sync shows the plan first: each change once with the harnesses it touches, and in red what the sync removes or overwrites. It applies that plan alone with `tackroom sync --plan-digest`. When the plan or the config changed since it loaded, nothing is applied, the pane shows the refusal and loads the new plan.
+- **Turn on and off.** The Harnesses, MCP servers and Hooks sections open into one row each with Turn off or Turn on, and an MCP server or hook adds or removes one harness, through `tackroom config set`. The change waits until you Sync.
+- **Machines.** With more than one machine in `crons.hosts`, a Machines section shows each one's health, summary and the command that fixes it.
+
+### Pi
+
+`/tackroom` lists the jobs with the sync status in the title; picking one shows its details and the same actions. Pi uses `tackroom` from the `PATH` and follows `$TACKROOM_HOME`.

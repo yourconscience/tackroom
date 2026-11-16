@@ -5,7 +5,7 @@ Guides and reference for the tackroom CLI, in reading order. Philosophy says wha
 ## Start here
 
 - [Philosophy](philosophy.md): what tackroom believes and refuses to do.
-- [Setup](setup.md): first run, `--review`, more machines with `--from` and `--overlay`, settings and root instructions.
+- [Setup](setup.md): first run, `--review`, more machines with `--from` and `--overlay`, settings, root instructions, upgrades with the release notes, and uninstalling.
 - [Commands](commands.md): every command by task, exit codes, config lookup order and output rules.
 - [Harnesses](harnesses.md): what each of the 15 agents gets, the key that names it and where its files land.
 
@@ -17,13 +17,11 @@ Guides and reference for the tackroom CLI, in reading order. Philosophy says wha
 - [Hooks](hooks.md): declare a hook, the events each harness takes, and list or remove native registrations.
 - [Plugins](plugins.md): Claude Code plugins, agent-plugins-spec sources and the Claude Code and Pi panels.
 - [Memory](memory.md): deliver a memory file to every harness, native memory settings, and separate tools such as rem.
-- [Scheduled jobs](crons.md): inventory every job on every host, run and pause launchd jobs, declare your own.
+- [Crons](crons.md): inventory every job on every host, run and pause launchd jobs, declare your own.
 - [Web view](view.md): the loopback dashboard, its token, remote access and what it can change.
 - [Terminals](terminals.md): the tmux, zellij, Tern and Rex workspaces, the Herdr panel, a cmux recipe, and the deprecated `tackroom tui`.
 
-## Background
+## More
 
-- [Comparison](comparison.md): how tackroom differs from skillshare, HarnessKit, dotagents, rulesync, ruler and openskills.
-- [Migrating from skillshare](skillshare-migration.md): map a skillshare setup onto tackroom.
-- [Upgrading](upgrading.md): what changed in each release since 2.0, and the rename from dotagents.
+- [Comparison](comparison.md): how tackroom differs from skillshare, HarnessKit, dotagents, rulesync, ruler and openskills, and how to move from skillshare.
 - [Troubleshooting](troubleshooting.md): conflicts, held and blocked items, hooks, Pi, periodic sync.

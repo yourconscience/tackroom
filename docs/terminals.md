@@ -1,6 +1,12 @@
 # Terminals
 
-tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe for cmux. There are three kinds of integration. A panel is tackroom's own interface inside the terminal. A workspace command opens a session in the terminal with a shell, `tackroom status` and `tackroom cron collect --table`. A recipe is a snippet you add or run yourself. Each integration is optional and calls the same `tackroom` commands you can run in any shell. The old full-screen terminal view is at the end.
+tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe for cmux. Each integration is optional and calls the same `tackroom` commands you can run in any shell. There are three kinds of integration:
+
+- A panel is tackroom's own interface inside the terminal.
+- A workspace command opens a session in the terminal with a shell, `tackroom status` and `tackroom cron collect --table`.
+- A recipe is a snippet you add or run yourself.
+
+The old full-screen terminal view is at the end.
 
 | Tool | Panel | Workspace command | Recipe |
 | --- | --- | --- | --- |
@@ -19,7 +25,9 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 tackroom tmux [--config PATH] [--dry-run]
 ```
 
-It creates a session named `tackroom` in the config root with three panes: a shell on the left, `tackroom status` on the right and `tackroom cron collect --table` below it. Then it shows the session. Outside tmux it attaches to it; inside tmux it switches your client to it; with no terminal on stdin or stdout it prints the `tmux attach-session` command instead. The two command panes run the same `tackroom` that opened them, by its absolute path, and keep a shell open when the command ends so you can read what it printed.
+It creates a session named `tackroom` in the config root with three panes: a shell on the left, `tackroom status` on the right and `tackroom cron collect --table` below it. Then it shows the session. Outside tmux it attaches to it; inside tmux it switches your client to it; with no terminal on stdin or stdout it prints the `tmux attach-session` command instead.
+
+The two command panes run the same `tackroom` that opened them, by its absolute path, and keep a shell open when the command ends so you can read what it printed.
 
 A second run shows the existing `tackroom` session instead of creating another. `--dry-run` prints the `tmux` commands and runs nothing. `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `tmux` is an error.
 
@@ -58,7 +66,9 @@ layout {
 }
 ```
 
-Run inside zellij, it adds the workspace to the session you are in as a tab named `tackroom`, and each run adds another tab. Run outside zellij, it attaches to the session named `tackroom` if there is one, and otherwise starts that session with the layout. zellij needs a terminal to create or attach to a session, so with no terminal on stdin or stdout `tackroom zellij` prints the `zellij` command to run instead. The two command panes stay open when the command ends, with its exit code in the pane frame.
+Run inside zellij, it adds the workspace to the session you are in as a tab named `tackroom`, and each run adds another tab. Run outside zellij, it attaches to the session named `tackroom` if there is one, and otherwise starts that session with the layout.
+
+zellij needs a terminal to create or attach to a session, so with no terminal on stdin or stdout `tackroom zellij` prints the `zellij` command to run instead. The two command panes stay open when the command ends, with its exit code in the pane frame.
 
 `--dry-run` prints the layout and the `zellij` commands and runs nothing. `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `zellij` is an error.
 
@@ -74,11 +84,22 @@ The Herdr app is herdr-core, which keeps terminals alive when the window closes,
 
 #### Herdr panel
 
-The [Herdr](https://herdr.dev) app can show tackroom as a native side panel with five tabs named like the web view's: Overview, Skills, Roles, MCP & hooks and Crons. Each tab draws the JSON of a tackroom command, the same data the web view draws, and the panel changes what the web view changes: Sync applies the plan it shows first, harnesses, MCP servers and hooks turn on and off, MCP servers and hooks add or remove an agent, and Crons runs, pauses, adds, edits and deletes jobs. Every change goes through a tackroom command, so the panel never has data or actions the web view lacks.
+The [Herdr](https://herdr.dev) app can show tackroom as a native side panel with five tabs named like the web view's: Overview, Skills, Roles, MCP & hooks and Crons. Each tab draws the JSON of a tackroom command, the same data the web view draws.
+
+The panel changes what the web view changes:
+
+- Sync applies the plan it shows first.
+- Harnesses, MCP servers and hooks turn on and off, and MCP servers and hooks add or remove an agent.
+- Crons runs, pauses, adds, edits and deletes jobs.
+
+Every change goes through a tackroom command, so the panel never has data or actions the web view lacks.
 
 #### Install
 
-The panel is two Herdr mods, `tackroom` and `tackroom-toggle`, in [`herdr/tackroom/`](https://github.com/yourconscience/tackroom/tree/main/herdr/tackroom), with a [recipe](https://github.com/yourconscience/tackroom/blob/main/herdr/tackroom/RECIPE.md) that adds them to the layout you already use: a tackroom button after Files and Changes, and the panel in the right column. It needs tackroom 2.4 or newer on the PATH Herdr runs programs with; otherwise set the block's `tackroom` prop to its path. Sync and the on and off buttons need a tackroom with `config set` and `sync --plan-digest`, tackroom 2.6 or newer; with an older one they stay hidden and only the Crons tab changes anything.
+The panel is two Herdr mods, `tackroom` and `tackroom-toggle`, in [`herdr/tackroom/`](https://github.com/yourconscience/tackroom/tree/main/herdr/tackroom), with a [recipe](https://github.com/yourconscience/tackroom/blob/main/herdr/tackroom/RECIPE.md) that adds them to the layout you already use: a tackroom button after Files and Changes, and the panel in the right column.
+
+- It needs tackroom 2.4 or newer on the PATH Herdr runs programs with; otherwise set the block's `tackroom` prop to its path.
+- Sync and the on and off buttons need a tackroom with `config set` and `sync --plan-digest`, tackroom 2.6 or newer; with an older one they stay hidden and only the Crons tab changes anything.
 
 From Herdr's mod gallery, paste this line to the agent you use in Herdr:
 
@@ -106,13 +127,32 @@ If you copied the `tackroom` layout that earlier releases shipped in `herdr/layo
 
 #### What the panel shows
 
-- A header with the time the open tab's data was loaded, a Refresh button that reloads it and a Web button that opens the same tab of the running `tackroom view`. A dot after a tab's name marks a tab that needs attention.
-- **Overview**: whether everything is synced or how many changes wait, a Machines section with one row per machine in `crons.hosts` (its health, a summary and the command that fixes it; only with more than one host), one row per harness (what is missing or drifted, then how many skills, roles, MCP servers and hooks it has, and its state) that opens into the exact names, a "Held or blocked" list of what sync skips with the command that overrides it, and a line for the Crons tab. An open harness row has Turn off; a harness turned off in the config is listed with Turn on. It draws `tackroom sync --dry-run --json`, which writes and fetches nothing, and `tackroom hosts --json`.
-- **Sync**: when something waits, Overview has a Sync button. It opens the plan in a dialog: each change once, with the harnesses it touches under it, and in red what the sync removes or overwrites. The dialog's button reads Sync and remove when it removes something. It runs `tackroom sync --plan-digest`, so when the plan or the config changed since the plan loaded, nothing is applied, the dialog says so and the panel loads the new plan; the dialog then leaves only Cancel, and Sync on Overview opens the new plan. An edit inside a skill or role file that leaves the plan's lines the same is not noticed.
-- **Skills, Roles, MCP & hooks**: one row per item with its worst state, a tag (a skill's origin, a hook's event) and how many harnesses have it in place. A row opens into the state in each harness, with the web view's words. An MCP server's or hook's row also has Turn off or Turn on, and Add or Remove beside each harness that supports it, as the web view's switches and matrix cells do. They draw `tackroom config inventory`, the document behind the web view's `/api/inventory`.
-- **Crons**: one line per host with a count per health (failing, last run failed, no result, healthy, paused; a host whose probe failed shows "unreachable" and the error), a "needs attention" list, then one section per host, sorted by health. A row opens into its command, effect, log, schedule, last result and problems. Run now, Pause and Resume on launchd jobs, as in the web view; other sources are read-only. Add cron at the top, and Edit and Delete in an open row of a job tackroom owns here. Add and Edit open a dialog with text fields for the name (add only), schedule, command, arguments (one box each, with a button to add more) and an optional effect; Delete asks first. A refusal from tackroom shows in the dialog. A job tackroom does not own, or one for another host, shows the reason instead of the buttons. It draws `tackroom cron collect`.
+- **Header.** The time the open tab's data was loaded, a Refresh button that reloads it and a Web button that opens the same tab of the running `tackroom view`. A dot after a tab's name marks a tab that needs attention.
+- **Overview.** It draws `tackroom sync --dry-run --json`, which writes and fetches nothing, and `tackroom hosts --json`. From the top:
+  - whether everything is synced or how many changes wait;
+  - a Machines section with one row per machine in `crons.hosts` (its health, a summary and the command that fixes it; only with more than one host);
+  - one row per harness (what is missing or drifted, then how many skills, roles, MCP servers and hooks it has, and its state) that opens into the exact names. An open harness row has Turn off; a harness turned off in the config is listed with Turn on;
+  - a "Held or blocked" list of what sync skips, with the command that overrides it;
+  - a line for the Crons tab.
+- **Sync.** When something waits, Overview has a Sync button. It opens the plan in a dialog: each change once, with the harnesses it touches under it, and in red what the sync removes or overwrites. The dialog's button reads Sync and remove when it removes something.
+  - It runs `tackroom sync --plan-digest`, so when the plan or the config changed since the plan loaded, nothing is applied, the dialog says so and the panel loads the new plan. The dialog then leaves only Cancel, and Sync on Overview opens the new plan.
+  - An edit inside a skill or role file that leaves the plan's lines the same is not noticed.
+- **Skills, Roles, MCP & hooks.** They draw `tackroom config inventory`, the document behind the web view's `/api/inventory`.
+  - One row per item with its worst state, a tag (a skill's origin, a hook's event) and how many harnesses have it in place. A row opens into the state in each harness, with the web view's words.
+  - An MCP server's or hook's row also has Turn off or Turn on, and Add or Remove beside each harness that supports it, as the web view's switches and matrix cells do.
+- **Crons.** It draws `tackroom cron collect`.
+  - One line per host with a count per health (failing, last run failed, no result, healthy, paused; a host whose probe failed shows "unreachable" and the error), a "needs attention" list, then one section per host, sorted by health.
+  - A row opens into its command, effect, log, schedule, last result and problems. Run now, Pause and Resume on launchd jobs, as in the web view; other sources are read-only.
+  - Add cron at the top, and Edit and Delete in an open row of a job tackroom owns here. Add and Edit open a dialog with text fields for the name (add only), schedule, command, arguments (one box each, with a button to add more) and an optional effect; Delete asks first.
+  - A refusal from tackroom shows in the dialog. A job tackroom does not own, or one for another host, shows the reason instead of the buttons.
 
-The panel loads all four when it opens and every `refresh` seconds (default 300, at least 60). Props on the block, all optional: `tackroom` (the program, default `tackroom` on the PATH Herdr runs programs with), `config` (a config file other than the default) and `refresh`.
+The panel loads all four when it opens and every `refresh` seconds (default 300, at least 60). Props on the block, all optional:
+
+| Prop | Meaning |
+|---|---|
+| `tackroom` | The program, default `tackroom` on the PATH Herdr runs programs with |
+| `config` | A config file other than the default |
+| `refresh` | Seconds between loads |
 
 Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tackroom.yaml`, or `tackroom.local.yaml` for an entry defined there, as the web view's switches do. The change then waits in Overview until you Sync; nothing syncs on its own. Turning a hook off, or removing a harness from it, shows in the plan as that hook's removal from the harness.
 
@@ -129,7 +169,9 @@ Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tack
 
 The Herdr TUI is `herdr`, the original Herdr: a client and a background server that run in any terminal. It is configured in `~/.config/herdr/config.toml`, and its plugins are folders with a `herdr-plugin.toml`. tackroom has no panel for it, because the panel is made of app mods, which the TUI does not load.
 
-`tackroom doctor` checks the TUI's plugins. Inside a Herdr session (`HERDR_ENV=1`), its `herdr plugins` check runs `herdr plugin list --json` and looks for plugin commands pointing at missing files or executables, and outside Herdr it reports `skipped`. tackroom has not checked whether terminals in the Herdr app set `HERDR_ENV`. See [crons.md](crons.md#herdr-automations) for the herdr-automations check.
+`tackroom doctor` checks the TUI's plugins. Inside a Herdr session (`HERDR_ENV=1`), its `herdr plugins` check runs `herdr plugin list --json` and looks for plugin commands pointing at missing files or executables, and outside Herdr it reports `skipped`.
+
+tackroom has not checked whether terminals in the Herdr app set `HERDR_ENV`. See [crons.md](crons.md#herdr-automations) for the herdr-automations check.
 
 ## Tern
 
@@ -138,8 +180,10 @@ The Herdr TUI is `herdr`, the original Herdr: a client and a background server t
 ### Shipped
 
 - `tackroom doctor` checks Tern: installed, version, runnable (`checkTern`). An absent Tern reports `skipped` (a pass), never a failure. A `tern` on PATH whose `--version` is not Tern's `tern VERSION (COMMIT)` also reports `skipped`.
-- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane. The window then shows that session. `--dry-run` prints the `tern` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. Recipe: [`tern/RECIPE.md`](../tern/RECIPE.md).
-- A crons panel: the `tackroom-crons` Tern plugin shows `tackroom cron collect` as a block, host health and per-host jobs, with Run now / Pause / Resume for launchd jobs, through the same `tackroom cron run|pause|resume` verbs as the web view and the Herdr panel. Install from a checkout with `tern plugin link ./tern/plugins/tackroom-crons` (or `tern plugin install` for a copy), then open it from the palette or `Ctrl+Alt+C`. Recipe: [`tern/plugins/tackroom-crons/RECIPE.md`](../tern/plugins/tackroom-crons/RECIPE.md).
+- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane. The window then shows that session. Recipe: [`tern/RECIPE.md`](../tern/RECIPE.md).
+  - `--dry-run` prints the `tern` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`.
+- A crons panel: the `tackroom-crons` Tern plugin shows `tackroom cron collect` as a block, host health and per-host jobs, with Run now / Pause / Resume for launchd jobs, through the same `tackroom cron run|pause|resume` verbs as the web view and the Herdr panel.
+  - Install from a checkout with `tern plugin link ./tern/plugins/tackroom-crons` (or `tern plugin install` for a copy), then open it from the palette or `Ctrl+Alt+C`. Recipe: [`tern/plugins/tackroom-crons/RECIPE.md`](../tern/plugins/tackroom-crons/RECIPE.md).
 
 ### Planned
 
@@ -156,8 +200,15 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 ### Shipped
 
 - `tackroom doctor` checks Rex (`checkRex`): it runs `rex version`. With Rex absent it reports `skipped`, which counts as a pass. With Rex installed but not runnable it warns. Otherwise it prints the version line.
-- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane, then asks the Rex app to show it. The panes run the same `tackroom` that opened them, by its absolute path. Showing the session needs the app open with Remote Control turned on in its settings; otherwise `tackroom rex` prints one line saying to open the session from Rex's sidebar. A second run shows the existing `tackroom` session instead of opening another. `--dry-run` prints the `rex` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `rex` is an error. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
-- Palette actions: `rex/tackroom.lua`, which you `require` from Rex's `init.lua`, adds three actions under "tackroom" in the command palette: Open tackroom Workspace (`tackroom rex`), Open tackroom Crons (`tackroom cron collect --table` in a new tab) and Open tackroom View on Crons (the running `tackroom view` on its Crons tab in the default browser). Install: [`rex/RECIPE.md`](../rex/RECIPE.md#palette-actions).
+- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane, then asks the Rex app to show it. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
+  - The panes run the same `tackroom` that opened them, by its absolute path.
+  - Showing the session needs the app open with Remote Control turned on in its settings; otherwise `tackroom rex` prints one line saying to open the session from Rex's sidebar.
+  - A second run shows the existing `tackroom` session instead of opening another.
+  - `--dry-run` prints the `rex` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `rex` is an error.
+- Palette actions: `rex/tackroom.lua`, which you `require` from Rex's `init.lua`, adds three actions under "tackroom" in the command palette. Install: [`rex/RECIPE.md`](../rex/RECIPE.md#palette-actions).
+  - Open tackroom Workspace (`tackroom rex`).
+  - Open tackroom Crons (`tackroom cron collect --table` in a new tab).
+  - Open tackroom View on Crons (the running `tackroom view` on its Crons tab in the default browser).
 - Crons with actions: Rex has no panel API, so Run now, Pause and Resume for launchd jobs go through the web view. Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)). In Rex itself the jobs are the read-only `cron collect` table.
 
 ### Constraint
