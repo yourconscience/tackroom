@@ -246,13 +246,14 @@ func runSetup(opts runOptions) error {
 	// Starter files go only into a config root with no tackroom.yaml before
 	// this run, so a starter role, skill or plugin.json the user deleted stays
 	// deleted. An existing root gets just the memory layer a tier that is on
-	// needs; a root cloned with --from is adopted as it is.
+	// needs; a root cloned with --from is adopted as it is unless --memory
+	// asks for a tier, which needs that layer too.
 	switch {
 	case !configExisted:
 		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, skipRoles, false); err != nil {
 			return err
 		}
-	case from == nil && normalizeMemoryTier(tier) != memoryTierOff:
+	case (from == nil || opts.MemoryTier != "") && normalizeMemoryTier(tier) != memoryTierOff:
 		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, nil, true); err != nil {
 			return err
 		}
@@ -372,7 +373,10 @@ func memorySummary(cfg config, tier string, notInstalled bool) string {
 			events = append(events, map[string]string{"SessionStart": "session start", "Stop": "stop", "SessionEnd": "session end"}[hook.Event])
 		}
 	}
-	if tier == memoryTierOff || len(events) == 0 {
+	if tier == memoryTierOff {
+		return "off (turn on with: tackroom setup --memory basic)"
+	}
+	if len(events) == 0 {
 		return "off"
 	}
 	return fmt.Sprintf("%s (hooks at %s)", tier, joinAnd(events))

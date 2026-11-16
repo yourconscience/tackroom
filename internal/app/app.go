@@ -543,8 +543,8 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	var assumeYes bool
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
-	// Empty means: keep the tier an existing tackroom.yaml uses, else basic.
-	fs.StringVar(&opts.MemoryTier, "memory", "", "Memory tier: off, basic, or memsearch (default basic; an existing config keeps its tier)")
+	// Empty means: keep the tier an existing tackroom.yaml uses, else off.
+	fs.StringVar(&opts.MemoryTier, "memory", "", "Memory tier: off, basic, or memsearch (default off; an existing config keeps its tier)")
 	fs.StringVar(&opts.From, "from", "", "Clone this git repository into the config root (or pull it there) and set up from it")
 	fs.StringVar(&opts.Overlay, "overlay", "", "Copy overlays/NAME.yaml from the config root to tackroom.local.yaml before the first sync")
 	fs.BoolVar(&opts.Review, "review", false, "Review what to import and confirm each step instead of taking the defaults")

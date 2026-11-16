@@ -6,6 +6,10 @@ What changes when you move to a new tackroom release, and what to do on every ma
 tackroom version
 ```
 
+## Unreleased
+
+- Changed: `tackroom setup` on a machine with no `tackroom.yaml` no longer turns memory on. A new config gets the `off` tier: no memory hooks, no `memory/tools/` sources, and no `rem` or `knowledge-sync` build. An existing config keeps its tier. To turn memory on, run `tackroom setup --memory basic`.
+
 ## To 2.8
 
 - Removed: Gemini CLI support. Google moved individual accounts from Gemini CLI to Antigravity CLI on 2026-06-18 ([announcement](https://developers.googleblog.com/en/an-important-update-transitioning-gemini-cli-to-antigravity-cli/)); tackroom keeps supporting Antigravity CLI as `agy`. A config that still names `gemini` loads and syncs: the `gemini` agent entry is ignored, and so is `gemini` in the `agents:` list of an MCP server or hook and in `exclude_agents` or `mcp_agents` of an external skill source. A server, hook or source MCP whose list named only `gemini` is turned off rather than sent to every harness. Each run prints one warning. `gemini` is not read as `agy`, because the two use different files: add an `agy` entry yourself if you use Antigravity CLI. A command that rewrites `tackroom.yaml`, such as `tackroom mcp add`, saves it without the `gemini` entries.

@@ -3,16 +3,4 @@ agents: [] # populated by tackroom setup
 
 external_skills: [] # add third-party skill repos with `tackroom skill sources add`
 
-hooks:
-  - name: memory-session-start
-    enabled: true
-    event: SessionStart
-    command: python3 ~/.agents/memory/hooks/basic-session-start.py
-    timeout: 15
-    agents: [claude]
-  - name: memory-session-end
-    enabled: true
-    event: SessionEnd
-    command: python3 ~/.agents/memory/hooks/basic-session-end.py
-    timeout: 30
-    agents: [claude]
+hooks: [] # `tackroom setup --memory basic` adds the memory hooks
