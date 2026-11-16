@@ -135,15 +135,15 @@ Antigravity CLI also reads `~/.gemini/skills`, where releases that supported Gem
 
 ### Devin
 
-Devin means Devin CLI and the Devin Local agent in Devin Desktop (formerly Windsurf), which share one configuration in `~/.config/devin`. It is detected by `devin` on `PATH`, so Devin Desktop without the CLI installed is not detected. This adapter is written from Devin's documentation and has not been run against a real Devin install.
+Devin means Devin CLI and the Devin Local agent in Devin Desktop (formerly Windsurf), which share one configuration in `~/.config/devin`. It is detected by `devin` on `PATH`, so Devin Desktop without the CLI installed is not detected. The adapter was checked against Devin CLI 3000.12.57 with `devin skills`, `devin mcp`, `devin rules` and `devin doctor`, without signing in. Nothing here was checked in a model session or in Devin Desktop.
 
 - **Skills.** Devin reads `~/.agents/skills` itself. tackroom mirrors skills into `~/.config/devin/skills` only when your config root is not `~/.agents`.
-- **MCP.** Stdio and remote servers go to `mcpServers` in `~/.config/devin/mcp_config.json`. A remote server gets `url` and `headers` and no `transport`, so Devin tries Streamable HTTP first and falls back to SSE. Devin documents `${env:VAR}` expansion only for its OAuth fields, so whether it expands a `${NAME}` in a header is not verified.
+- **MCP.** Stdio and remote servers go to `mcpServers` in `~/.config/devin/mcp_config.json`. A remote server gets `url` and `headers` and no `transport`, so Devin tries Streamable HTTP first and falls back to SSE. Devin fills in a `${NAME}` in a header from its environment, as it does `${env:NAME}`. Whether it does the same in a stdio server's `env` is not verified.
 - **Root file.** `~/.config/devin/AGENTS.md`, the global rules file Devin documents.
-- **Roles.** Not rendered. Devin reads custom subagents from `~/.config/devin/agents/`, and their `allowed-tools` limits the tools a subagent gets. Its docs list only `read`, `edit`, `grep`, `glob` and `exec` as tool names for `allowed-tools`, and do not say whether `write` or `webfetch`, which its hook docs name, work there. Roles that use `Write`, `WebFetch` or `WebSearch` cannot be mapped without guessing, and a role whose tools all fail to map would get every tool.
+- **Roles.** Not rendered, but Devin loads them itself when your config root is `~/.agents`: it reads `~/.agents/agents/*.md` as custom subagents, beside the `~/.config/devin/agents/` its docs name. `devin doctor` lists them and warns that it ignores the `color` key. A role's `tools` reach Devin as written, with Claude Code's names. Devin's docs list `read`, `edit`, `grep`, `glob` and `exec` for that field, and whether Devin matches `Read` or `Bash` to them was not checked, so do not rely on a role's tool limits in Devin. With the config root elsewhere, Devin gets no roles.
 - **Hooks.** Not written. By default Devin loads Claude Code's hooks from `~/.claude/settings.json` (setting `read_config_from.claude`), so a second copy written by tackroom would run each hook twice on a machine that has both.
 
-By default Devin also imports Claude Code's rules and MCP servers: it reads `~/.claude/CLAUDE.md` as a global rule and the servers in `~/.claude.json`. On a machine with both, Devin gets your root instructions twice, once from `~/.config/devin/AGENTS.md` and once from `~/.claude/CLAUDE.md`, and Devin's docs do not say how it treats an imported server with the same name as one in its own file. To turn the import off, set this in `~/.config/devin/config.json`:
+By default Devin also imports Claude Code's rules and MCP servers: it reads `~/.claude/CLAUDE.md` as a global rule and the servers in `~/.claude.json`. A server with the same name as one in `~/.config/devin/mcp_config.json` is listed once, from Devin's own file. What happens to the root file depends on your config. Without an `instructions:` list, both files are links to the same `AGENTS.md`: Devin loads it once, and `devin rules list` reports `~/.claude/CLAUDE.md` as a conflict. With an `instructions:` list, `~/.claude/CLAUDE.md` is a generated file of `@path` import lines, and Devin loads it as a second rule next to its own generated copy. To turn the import off, set this in `~/.config/devin/config.json`:
 
 ```json
 {
@@ -153,7 +153,7 @@ By default Devin also imports Claude Code's rules and MCP servers: it reads `~/.
 }
 ```
 
-That also stops Devin loading Claude Code's hooks, so Devin then runs none of your tackroom hooks. On a machine with Codex, Devin also reads `~/.codex/skills`, where tackroom links your skills for Codex, so a skill reaches Devin from two folders and its docs do not say whether it drops the second. `"codex": false` under `read_config_from` turns that import off.
+That also stops Devin loading Claude Code's hooks, so Devin then runs none of your tackroom hooks. On a machine with Codex, Devin also reads `~/.codex/skills`, where tackroom links your skills for Codex. A skill that reaches Devin from both folders is listed once.
 
 ### Kimi Code
 
