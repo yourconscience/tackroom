@@ -98,7 +98,7 @@ tackroom doctor audit revoke skill:<name> <rule>
 
 New or changed external content with an unaccepted CRITICAL finding is skipped by sync, and the previous pin stays. `skill sources add` applies the same gate: a blocked source is added to `tackroom.yaml` without a pin, and the first sync after `accept` pins it. CRITICAL means a prompt-injection phrase, a secret sent out or a credential file read, invisible tag characters, or a download piped into a shell (rule `remote-exec`). A match inside a Markdown code fence or a script comment counts one level lower, so a documented example is HIGH and does not block. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
 
-Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing. A git commit date is a weaker time source than a registry publish time.
+Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing. A git commit date is a weaker time source than a registry publish time. A commit pushed today with an older date passes at once. Two more gaps: the npm package `@openai/codex` is exempt from the cooldown, and a PyPI pre-release version such as `1.0rc1` is not recognised as an exact version, so it is not gated.
 
 ## Plugins
 
