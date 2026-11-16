@@ -21,7 +21,7 @@ type setupSyncResult struct {
 	changes   int
 	backupDir string
 	moved     []string // native paths moved into backupDir
-	held      int
+	gated     int
 }
 
 // errSetupNeedsAttention ends a setup whose summary lists what is left to fix.
@@ -294,8 +294,8 @@ func (s *setupSummary) print(w io.Writer) int {
 		fmt.Fprintf(w, "Backed up %s before replacing %s: %s (undo: tackroom restore latest)\n", plural(len(s.sync.moved), "original"), them, displayPath(s.sync.backupDir, s.home))
 	}
 	s.printLinked(w)
-	if s.sync.held > 0 {
-		fmt.Fprintf(w, "Held back %s from external sources (too new or blocked); see: tackroom status\n", plural(s.sync.held, "item"))
+	if s.sync.gated > 0 {
+		fmt.Fprintf(w, "Held back %s from external sources (too new or blocked); see: tackroom status\n", plural(s.sync.gated, "item"))
 	}
 	if s.periodic != "" {
 		fmt.Fprintln(w, s.periodic)

@@ -23,11 +23,11 @@ type config struct {
 	// AGENTS.md, in order. Relative paths resolve against the config root.
 	Instructions []string `yaml:"instructions,omitempty"`
 
-	// heldMCP names MCP servers whose package version is inside its freshness
-	// hold. desiredMCPServersForAgent keeps what each harness already has for
+	// cooldownMCP names MCP servers whose package version is in cooldown.
+	// desiredMCPServersForAgent keeps what each harness already has for
 	// them and writes nothing new. Set by gatePackages; never from YAML.
-	heldMCP  map[string]bool
-	heldHome string
+	cooldownMCP  map[string]bool
+	cooldownHome string
 	// codexPluginMCP names plugin MCP servers Codex loads from its native
 	// plugin, so desiredMCPServersForAgent writes no [mcp_servers] row for them.
 	// Set by injectPluginMCPServersMode; never from YAML.
@@ -245,7 +245,7 @@ type runOptions struct {
 	// ExitCode makes `status` map drift to exit 1 and errors to exit 2
 	// (instead of the default 1 for any failure).
 	ExitCode bool
-	// AllowFresh* release items held for freshness (sync --allow-fresh).
+	// AllowFresh* skip the cooldown of items (sync --allow-fresh).
 	AllowFreshAll    bool
 	AllowFreshItems  []string
 	AllowFreshReason string

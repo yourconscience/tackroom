@@ -63,8 +63,8 @@ func syncExternalRepos(sources []externalSkillSource, home string, repoRoot stri
 
 // syncExternalReposGated is syncExternalRepos plus the sync-time gate: when
 // gate is non-nil, a source whose pin is new and that has an unaccepted
-// CRITICAL finding (or is inside its freshness hold) is skipped and returned.
-func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot string, gate *gateOptions) (map[string]heldItem, error) {
+// CRITICAL finding (or is in cooldown) is skipped and returned.
+func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot string, gate *gateOptions) (map[string]gatedItem, error) {
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
 		return nil, err
@@ -88,27 +88,27 @@ func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot
 			return nil, err
 		}
 	}
-	var held map[string]heldItem
+	var gated map[string]gatedItem
 	original := lock
 	if gate != nil {
-		held = gateExternalSources(sources, home, &lock, *gate)
-		restoreHeldCaches(sources, home, original, held)
-		for name := range held {
+		gated = gateExternalSources(sources, home, &lock, *gate)
+		restoreGatedCaches(sources, home, original, gated)
+		for name := range gated {
 			unavailable[name] = true
 		}
 	}
-	active := filterHeldSources(sources, held)
+	active := filterGatedSources(sources, gated)
 	plan, err := planMaterializedSkills(active, home, repoRoot, lock, true, unavailable)
 	if err != nil {
 		return nil, err
 	}
-	if err := writeLockIfChanged(active, home, repoRoot, lock, held); err != nil {
+	if err := writeLockIfChanged(active, home, repoRoot, lock, gated); err != nil {
 		return nil, err
 	}
 	if err := applyMaterializedSkills(plan); err != nil {
 		return nil, restoreMaterializationLock(repoRoot, original, err)
 	}
-	return held, nil
+	return gated, nil
 }
 
 // refreshExternalCache brings the local cache for src to its lock pin (or the
@@ -127,9 +127,9 @@ func refreshExternalCache(src externalSkillSource, cachePath string, lock lockFi
 		if err := gitCheckoutCommit(cachePath, pin.Commit, src.Branch); err != nil {
 			return fmt.Errorf("pin external %s to %s: %w", name, pin.Commit, err)
 		}
-	} else if commit := heldSourceCommit(lock, src, timeNow()); commit != "" && gitCheckoutCommit(cachePath, commit, src.Branch) == nil {
-		// Stay on the held commit, so a release applies to the commit that
-		// was shown; a newer head is gated once this hold ends.
+	} else if commit := cooldownSourceCommit(lock, src, timeNow()); commit != "" && gitCheckoutCommit(cachePath, commit, src.Branch) == nil {
+		// Stay on the commit in cooldown, so --allow-fresh applies to the commit
+		// that was shown; a newer head is gated once this cooldown ends.
 	} else if err := gitFetchReset(cachePath, src.Branch); err != nil {
 		return fmt.Errorf("update external %s: %w", name, err)
 	}
@@ -180,15 +180,15 @@ func updateExternalRepos(sources []externalSkillSource, home string, repoRoot st
 	if err != nil {
 		return err
 	}
-	// The new pin is a candidate: an unaccepted CRITICAL finding or a freshness
-	// hold keeps the previous pin and skips the source.
+	// The new pin is a candidate: an unaccepted CRITICAL finding or a cooldown
+	// keeps the previous pin and skips the source.
 	original := lock
-	held := gateUpdatedSources(staged, home, &lock, gate)
-	restoreHeldCaches(selected, home, original, held)
+	gated := gateUpdatedSources(staged, home, &lock, gate)
+	restoreGatedCaches(selected, home, original, gated)
 	var updated []externalSkillSource
 	for _, candidate := range staged {
 		name := sourceName(candidate.src)
-		if _, ok := held[name]; ok {
+		if _, ok := gated[name]; ok {
 			// Keep the rejected checkout so `tackroom doctor audit` can still
 			// inspect and accept its findings.
 			continue
@@ -201,18 +201,18 @@ func updateExternalRepos(sources []externalSkillSource, home string, repoRoot st
 		updated = append(updated, candidate.src)
 		fmt.Printf("updated %s -> %s\n", name, externalSkillCommit(cachePath))
 	}
-	for name, h := range held {
+	for name, h := range gated {
 		fmt.Printf("skipped %s: %s %s; %s\n", name, h.Kind, h.Reason, h.Command)
 	}
-	keep := make(map[string]bool, len(held))
-	for name := range held {
+	keep := make(map[string]bool, len(gated))
+	for name := range gated {
 		keep[name] = true
 	}
 	plan, err := planMaterializedSkills(updated, home, repoRoot, lock, false, keep)
 	if err != nil {
 		return err
 	}
-	if err := writeLockAfterUpdate(sources, home, repoRoot, lock, updated, held); err != nil {
+	if err := writeLockAfterUpdate(sources, home, repoRoot, lock, updated, gated); err != nil {
 		return restoreMaterializationLock(repoRoot, original, err)
 	}
 	if err := applyMaterializedSkills(plan); err != nil {
@@ -273,7 +273,7 @@ func publishExternalCandidate(src externalSkillSource, cachePath string, commit 
 // gateUpdatedSources gates the staged candidates whose commit moved off the
 // locked pin, or that are not pinned yet, reading each candidate from its
 // staging checkout.
-func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile, gate gateOptions) map[string]heldItem {
+func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile, gate gateOptions) map[string]gatedItem {
 	var candidates []externalSkillSource
 	for _, candidate := range staged {
 		pin := lockEntryFor(*lock, candidate.src)
@@ -296,22 +296,22 @@ func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile,
 			probe.ExternalSkills = append(probe.ExternalSkills, e)
 		}
 	}
-	held := gateExternalSources(candidates, externalCandidateHome(home), &probe, gate)
-	lock.Holds = probe.Holds
-	for name, h := range held {
+	gated := gateExternalSources(candidates, externalCandidateHome(home), &probe, gate)
+	lock.Cooldowns = probe.Cooldowns
+	for name, h := range gated {
 		if h.Kind == "held" {
-			// sync never moves an existing pin, so only update releases it.
+			// sync never moves an existing pin, so only update skips its cooldown.
 			h.Command = "tackroom skill update " + name + " --allow-fresh=" + h.Item
-			held[name] = h
+			gated[name] = h
 		}
 	}
-	return held
+	return gated
 }
 
-// pendingUpdateHolds lists, keyed "update-hold:"+name, each pinned source whose
-// last `skill update` candidate the gate held or blocked and which is still
+// pendingUpdateGates lists, keyed "update-gate:"+name, each pinned source whose
+// last `skill update` candidate the gate put in cooldown or blocked and which is still
 // staged. It writes neither the lock nor any checkout, so status can call it.
-func pendingUpdateHolds(sources []externalSkillSource, home string, lock lockFile, now time.Time) map[string]heldItem {
+func pendingUpdateGates(sources []externalSkillSource, home string, lock lockFile, now time.Time) map[string]gatedItem {
 	var staged []externalCandidate
 	for _, src := range sources {
 		path := externalCandidatePath(home, sourceName(src))
@@ -320,10 +320,10 @@ func pendingUpdateHolds(sources []externalSkillSource, home string, lock lockFil
 		}
 		staged = append(staged, externalCandidate{src: src, path: path, commit: externalSkillCommitFull(path)})
 	}
-	lock.Holds = append([]holdEntry(nil), lock.Holds...)
-	out := map[string]heldItem{}
+	lock.Cooldowns = append([]cooldownEntry(nil), lock.Cooldowns...)
+	out := map[string]gatedItem{}
 	for name, h := range gateUpdatedSources(staged, home, &lock, gateOptions{now: now}) {
-		out["update-hold:"+name] = h
+		out["update-gate:"+name] = h
 	}
 	return out
 }
@@ -355,19 +355,19 @@ func externalSourceNames(sources []externalSkillSource) []string {
 	return names
 }
 
-// writeLockIfChanged records the pins of active sources. A held source keeps
+// writeLockIfChanged records the pins of active sources. A gated source keeps
 // its previous entry (or none), so its candidate commit is never locked.
-func writeLockIfChanged(sources []externalSkillSource, home string, repoRoot string, lock lockFile, held map[string]heldItem) error {
+func writeLockIfChanged(sources []externalSkillSource, home string, repoRoot string, lock lockFile, gated map[string]gatedItem) error {
 	previous := lock
-	entries := keepHeldLockEntries(rebuildLockEntries(sources, home, lock), previous, held)
-	if lockEntriesEqual(lock.ExternalSkills, entries) && !holdsChanged(repoRoot, lock) {
+	entries := keepGatedLockEntries(rebuildLockEntries(sources, home, lock), previous, gated)
+	if lockEntriesEqual(lock.ExternalSkills, entries) && !cooldownsChanged(repoRoot, lock) {
 		return nil
 	}
 	lock.ExternalSkills = entries
 	return writeLockFile(repoRoot, lock)
 }
 
-func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot string, lock lockFile, selected []externalSkillSource, held map[string]heldItem) error {
+func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot string, lock lockFile, selected []externalSkillSource, gated map[string]gatedItem) error {
 	selectedNames := make(map[string]bool, len(selected))
 	for _, src := range selected {
 		selectedNames[sourceName(src)] = true
@@ -388,15 +388,15 @@ func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot s
 				break
 			}
 			if !pinned {
-				// An unpinned source that was not updated is held, blocked or
+				// An unpinned source that was not updated is in cooldown, blocked or
 				// not synced yet: only its own gate may pin it.
 				continue
 			}
 		}
 		entries = append(entries, entry)
 	}
-	entries = keepHeldLockEntries(entries, lock, held)
-	if lockEntriesEqual(lock.ExternalSkills, entries) && !holdsChanged(repoRoot, lock) {
+	entries = keepGatedLockEntries(entries, lock, gated)
+	if lockEntriesEqual(lock.ExternalSkills, entries) && !cooldownsChanged(repoRoot, lock) {
 		return nil
 	}
 	lock.ExternalSkills = entries

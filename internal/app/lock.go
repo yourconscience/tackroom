@@ -17,11 +17,11 @@ type lockFile struct {
 	Version         int                  `yaml:"version"`
 	ExternalSkills  []externalLockEntry  `yaml:"external_skills"`
 	PublishedSkills []publishedLockEntry `yaml:"published_skills,omitempty"`
-	// Accepted records audit findings the user accepted per item. Holds records
-	// the freshness decision for each new external reference. Older tackroom
+	// Accepted records audit findings the user accepted per item. Cooldowns records
+	// the minimum release age decision for each new external reference. Older tackroom
 	// versions ignore both keys on read and drop them when they rewrite the lock.
-	Accepted []acceptedFinding `yaml:"accepted,omitempty"`
-	Holds    []holdEntry       `yaml:"holds,omitempty"`
+	Accepted  []acceptedFinding `yaml:"accepted,omitempty"`
+	Cooldowns []cooldownEntry   `yaml:"holds,omitempty"`
 }
 
 // publishedLockEntry pins one skill pushed to a remote skill registry. It is the
