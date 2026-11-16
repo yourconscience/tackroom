@@ -5,7 +5,7 @@ import JobForm, { runTackroom } from "./form.js";
 
 // tackroom inside Herdr, one tab for each tab of the web view. Every tab draws
 // the JSON of a tackroom command, the same data the web view draws:
-//   Overview    `sync --dry-run --json`  harness state, held and blocked items,
+//   Overview    `sync --dry-run --json`  harness state, items in cooldown or blocked,
 //               and `hosts --json`  tackroom on each machine in crons.hosts
 //   Skills, Roles, MCP & hooks   `config inventory`  what /api/inventory serves
 //   Crons       `cron collect`  and acts through `cron run|pause|resume`
@@ -45,6 +45,8 @@ const CELL = {
 const RANK = { fail: 3, warn: 2, ok: 1, idle: 0 };
 const hostName = (h) => (h === "local" ? "This Mac" : h || "Unknown host");
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+// Items sync skips, in cooldown or blocked; a tackroom older than 3.0 names the list `held`.
+const skippedItems = (d) => d.skipped ?? d.held ?? [];
 
 function ago(iso) {
   const t = Date.parse(iso);
@@ -232,7 +234,7 @@ export default class Tackroom extends View {
     if (!d) return "";
     let level = "idle";
     if (tab.id === "overview") {
-      level = d.agents.some((a) => a.conflicts.length || a.error) ? "fail" : !d.synced || d.held.length ? "warn" : "idle";
+      level = d.agents.some((a) => a.conflicts.length || a.error) ? "fail" : !d.synced || skippedItems(d).length ? "warn" : "idle";
     } else if (tab.id === "crons") {
       level = d.jobs.some((j) => j.health === "fail") ? "fail" : "idle";
     } else {
@@ -346,15 +348,15 @@ export default class Tackroom extends View {
         [this.dot(t.dim), div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(a.name),
           div().flex_none().text_size(11).text_color(t.dim).child("turned off")],
         () => this.canEdit() ? h_flex().ml(22).mb(6).child(this.switchButton("agents", a.name, false, t)) : this.note("Turned off in the config.", t), t))], t));
-    if (d.held.length) {
-      out.push(this.section("Held or blocked", d.held.map((h) => this.fold(`x:${h.item}`,
+    if (skippedItems(d).length) {
+      out.push(this.section("In cooldown or blocked", skippedItems(d).map((h) => this.fold(`x:${h.item}`,
         [this.dot(h.kind === "blocked" ? t.ansi1 : t.ansi3),
           v_flex().flex_1().min_w(0)
             .child(div().truncate().text_size(12).child(h.item))
             .child(div().text_size(11).text_color(t.dim).child(h.reason)),
           div().flex_none().text_size(11).text_color(t.dim).child(h.kind)],
         () => v_flex().ml(22).mb(6).gap(3).text_size(11)
-          .when(Boolean(h.until), (el) => el.child(this.field("Hold ends", h.until, t)))
+          .when(Boolean(h.until), (el) => el.child(this.field("Cooldown ends", h.until, t)))
           .child(this.field("Override", h.command, t)), t)), t));
     }
     if (d.not_fetched.length) out.push(this.note(`A sync would first fetch ${d.not_fetched.join(", ")}.`, t));

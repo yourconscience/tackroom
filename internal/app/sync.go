@@ -577,7 +577,7 @@ type syncDryRunJSON struct {
 	Harnesses          int               `json:"harnesses"`
 	Agents             []agentStatusJSON `json:"agents"`
 	StarterFiles       starterPlanJSON   `json:"starter_files"`
-	Cooldown           []gatedItemJSON   `json:"cooldown"`
+	Skipped            []gatedItemJSON   `json:"skipped"`
 	NotFetched         []string          `json:"not_fetched"`
 	FreshnessUnchecked map[string]string `json:"freshness_unchecked,omitempty"`
 	WouldRelease       map[string]string `json:"would_release_with_allow_fresh,omitempty"`
@@ -660,13 +660,13 @@ func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agent
 			Removed:      nonNil(starter.Removed),
 			KeptModified: nonNil(starter.KeptModified),
 		},
-		Cooldown:    []gatedItemJSON{},
+		Skipped:     []gatedItemJSON{},
 		NotFetched:  nonNil(notFetched),
 		Replaceable: nonNil(replaceable),
 	}
 	for _, name := range sortedKeysNative(gated) {
 		h := gated[name]
-		out.Cooldown = append(out.Cooldown, gatedItemJSON(h))
+		out.Skipped = append(out.Skipped, gatedItemJSON(h))
 	}
 	if len(notes.unchecked) > 0 {
 		out.FreshnessUnchecked = notes.unchecked
