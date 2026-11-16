@@ -67,6 +67,9 @@ func runConfigServe(opts configServeOptions) error {
 		return nil
 	}
 	listener, err := net.Listen("tcp", opts.Addr)
+	if err != nil && !opts.AddrSet {
+		listener, err = listenFallback(opts.Addr, addrFile, err)
+	}
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", opts.Addr, err)
 	}
@@ -95,10 +98,8 @@ func runConfigServe(opts configServeOptions) error {
 func runningViewURL(opts configServeOptions, addrFile, token string) string {
 	addrs := []string{opts.Addr}
 	if !opts.AddrSet {
-		if data, err := os.ReadFile(addrFile); err == nil {
-			if recorded := strings.TrimSpace(string(data)); recorded != opts.Addr && validateLoopbackAddr(recorded) == nil {
-				addrs = append([]string{recorded}, addrs...)
-			}
+		if recorded := recordedViewAddr(addrFile, opts.Addr); recorded != "" {
+			addrs = append([]string{recorded}, addrs...)
 		}
 	}
 	client := &http.Client{
@@ -119,6 +120,44 @@ func runningViewURL(opts configServeOptions, addrFile, token string) string {
 		}
 	}
 	return ""
+}
+
+// recordedViewAddr returns the loopback address the last view recorded in
+// addrFile, or "" when there is none or it equals addr.
+func recordedViewAddr(addrFile, addr string) string {
+	data, err := os.ReadFile(addrFile)
+	if err != nil {
+		return ""
+	}
+	recorded := strings.TrimSpace(string(data))
+	if recorded == addr || validateLoopbackAddr(recorded) != nil {
+		return ""
+	}
+	return recorded
+}
+
+// listenFallback finds another address when the default one is taken and
+// --addr was not given: first the address the last view recorded, so a
+// restarted view keeps its URL, then any free port on the same host. It
+// returns cause when neither can be opened.
+func listenFallback(addr, addrFile string, cause error) (net.Listener, error) {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return nil, cause
+	}
+	candidates := []string{net.JoinHostPort(host, "0")}
+	if recorded := recordedViewAddr(addrFile, addr); recorded != "" {
+		candidates = append([]string{recorded}, candidates...)
+	}
+	for _, candidate := range candidates {
+		listener, err := net.Listen("tcp", candidate)
+		if err != nil {
+			continue
+		}
+		fmt.Fprintf(os.Stdout, "\n%s is in use by another program; serving on %s instead.\n", addr, listener.Addr())
+		return listener, nil
+	}
+	return nil, cause
 }
 
 // viewUpgradePoll is how often a running view checks whether the tackroom
