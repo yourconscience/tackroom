@@ -40,7 +40,6 @@ type Role struct {
 	Cursor       CursorOptions   `yaml:"cursor"`
 	Copilot      CopilotOptions  `yaml:"copilot"`
 	Grok         GrokOptions     `yaml:"grok"`
-	Gemini       GeminiOptions   `yaml:"gemini"`
 }
 
 type ClaudeOptions struct {
@@ -93,11 +92,6 @@ type GrokOptions struct {
 	Model string `yaml:"model"`
 }
 
-type GeminiOptions struct {
-	Model string   `yaml:"model"`
-	Tools []string `yaml:"tools"`
-}
-
 // Renderer is a harness projection of a canonical role.
 type Renderer interface {
 	Extension() string
@@ -123,7 +117,6 @@ var renderers = map[string]Renderer{
 	"cursor":    renderer{extension: ".md", render: renderCursor},
 	"copilot":   renderer{extension: ".agent.md", render: renderCopilot},
 	"grok":      renderer{extension: ".md", render: renderGrok},
-	"gemini":    renderer{extension: ".md", render: renderGemini},
 	"kimi":      renderer{extension: ".md", render: renderKimi},
 }
 

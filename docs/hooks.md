@@ -19,7 +19,7 @@ hooks:
     event: Stop                       # Claude Code event names
     command: ~/.agents/hooks/notify.sh
     timeout: 10                       # seconds; omit for the harness default
-    agents: [claude, codex, gemini]   # optional; default: every harness with hooks
+    agents: [claude, codex, agy]      # optional; default: every harness with hooks
 ```
 
 - `name` is unique and `event` and `command` are required. `timeout` is in seconds and cannot be negative.
@@ -49,7 +49,7 @@ The memory hooks go to every enabled harness with a hook surface except Antigrav
 
 ## Which harnesses run hooks
 
-Twelve harnesses have a hook surface; OpenCode, DeepSeek Harness and Amp have none, and tackroom writes nothing for them.
+Eleven harnesses get hooks. OpenCode, DeepSeek Harness and Amp have no hook surface, and Devin loads Claude Code's hooks itself; tackroom writes nothing for those four.
 
 | Harness | Written to | Events |
 |---|---|---|
@@ -58,7 +58,6 @@ Twelve harnesses have a hook surface; OpenCode, DeepSeek Harness and Amp have no
 | Factory Droid | `~/.factory/hooks.json` | Any, as given |
 | Qwen Code | `~/.qwen/settings.json` | Any, as given |
 | Grok Build | `~/.grok/hooks/tackroom.json` | Any, as given |
-| Gemini CLI | `~/.gemini/settings.json` | See below |
 | Cursor | `~/.cursor/hooks.json` | See below |
 | GitHub Copilot CLI | `~/.copilot/hooks/tackroom.json` | `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `Stop`, `SubagentStop`, `ErrorOccurred`, `PreCompact` |
 | Antigravity CLI | `~/.gemini/config/hooks.json` | `SessionStart`, `Stop`, `PreToolUse`, `PostToolUse` |
@@ -68,7 +67,7 @@ Twelve harnesses have a hook surface; OpenCode, DeepSeek Harness and Amp have no
 
 A hook whose event a harness cannot take is skipped for that harness and `tackroom status` lists it under the harness as `hooks unsupported: <name>`. That line does not change the exit code. A hook that names a harness with no hook surface in its `agents:` is reported the same way.
 
-**Gemini CLI** renames `UserPromptSubmit` to `BeforeAgent`, `Stop` to `AfterAgent`, `PreToolUse` to `BeforeTool`, `PostToolUse` to `AfterTool` and `PreCompact` to `PreCompress`. `SessionStart`, `SessionEnd` and `Notification` keep their names. No other event maps.
+**Devin** gets no hooks from tackroom. By default it loads Claude Code's hooks from `~/.claude/settings.json` (setting `read_config_from.claude`), so a second copy written by tackroom would run each hook twice on a machine that has both. With that import turned off, Devin runs none of your tackroom hooks.
 
 **Cursor** uses `sessionStart`, `sessionEnd`, `stop`, `preToolUse`, `postToolUse`, `beforeSubmitPrompt` (for `UserPromptSubmit`), `subagentStop` and `preCompact`. If Cursor's third-party configs setting is on, it also runs Claude Code's hooks, so a hook synced to both runs twice there.
 
@@ -76,7 +75,7 @@ A hook whose event a harness cannot take is skipped for that harness and `tackro
 
 For `SessionStart`, an `additionalContext` value in the command's JSON output reaches the model with the next prompt. `Stop` and the tool events would need block-and-continue behavior the module does not reproduce.
 
-Timeouts are seconds in `tackroom.yaml`. Qwen Code and Gemini CLI take milliseconds, and tackroom converts. Codex gives `SessionEnd` hooks at most 3 seconds, so a larger `timeout` is written as 3 there. Codex also needs `hooks = true` under `[features]` in `~/.codex/config.toml`, which `sync` sets.
+Timeouts are seconds in `tackroom.yaml`. Qwen Code takes milliseconds, and tackroom converts. Codex gives `SessionEnd` hooks at most 3 seconds, so a larger `timeout` is written as 3 there. Codex also needs `hooks = true` under `[features]` in `~/.codex/config.toml`, which `sync` sets.
 
 Factory Droid uses `~/.factory/settings.json` instead when `hooks.json` does not exist and `settings.json` already has a `hooks` block.
 
@@ -87,9 +86,9 @@ tackroom hook list [--agents a,b] [query]
 ```
 
 ```
+agy	Stop	managed	~/.agents/hooks/notify.sh
 claude	SessionStart	managed	~/.agents/memory/hooks/basic-session-start.py
 claude	Stop	unmanaged stale=/path/to/old-tool/hook.sh	/path/to/old-tool/hook.sh
-gemini	AfterAgent	managed	~/.agents/hooks/notify.sh
 unsupported hook surfaces: amp, dsh, opencode
 3 native hook registration(s)
 ```

@@ -11,7 +11,7 @@ tackroom setup --dry-run              # what the run would import, whose copy it
 
 Other flags: `--overlay NAME` to start this machine from a committed `tackroom.local.yaml` (see [Machine overlays](#machine-overlays)), `--memory off|basic|memsearch` (default `basic` on a new config; an existing config keeps its tier, see [memory.md](memory.md)), `--agents a,b` to limit the run to named harnesses, `--no-cron` to skip the periodic job, `--verbose` for every step and the full sync report, `--json` for the detection result, `--config PATH`. `--yes` is still accepted and does nothing: it is the default now.
 
-Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agents:` lists: Claude Code `claude`, Codex `codex`, Factory Droid `droid`, OMP `omp`, OpenCode `opencode`, Pi `pi`, Qwen Code `qwen-code`, Cursor `cursor`, Gemini CLI `gemini`, GitHub Copilot CLI `copilot`, Grok Build `grok`, DeepSeek Harness `dsh`, Antigravity CLI `agy`, Kimi Code `kimi`, Amp `amp`. The former key `claude-code` still works. What each harness gets, and the executable that detects it, is in [harnesses.md](harnesses.md).
+Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agents:` lists: Claude Code `claude`, Codex `codex`, Factory Droid `droid`, OMP `omp`, OpenCode `opencode`, Pi `pi`, Qwen Code `qwen-code`, Cursor `cursor`, Devin `devin`, GitHub Copilot CLI `copilot`, Grok Build `grok`, DeepSeek Harness `dsh`, Antigravity CLI `agy`, Kimi Code `kimi`, Amp `amp`. The former key `claude-code` still works. Gemini CLI's key `gemini` is ignored with a warning ([upgrading.md](upgrading.md)). What each harness gets, and the executable that detects it, is in [harnesses.md](harnesses.md).
 
 ## What setup does
 
@@ -127,7 +127,7 @@ agents:
 - Amp `~/.config/amp/AGENTS.md`, Claude Code `~/.claude/CLAUDE.md`, Codex `~/.codex/AGENTS.md`, Factory Droid `~/.factory/AGENTS.md`
 - Pi `~/.pi/agent/AGENTS.md`, OMP `~/.omp/agent/AGENTS.md`, Qwen Code `~/.qwen/QWEN.md`
 - GitHub Copilot CLI `~/.copilot/copilot-instructions.md`, Grok Build `~/.grok/AGENTS.md`, DeepSeek Harness `~/.dsh/AGENTS.md` (`$COPILOT_HOME`, `$GROK_HOME` and `$DSH_HOME` replace the folders when set)
-- Gemini CLI and Antigravity CLI share `~/.gemini/GEMINI.md`
+- Antigravity CLI `~/.gemini/GEMINI.md`, Devin `~/.config/devin/AGENTS.md` (Devin also reads `~/.claude/CLAUDE.md` by default; see [harnesses.md](harnesses.md#devin))
 - Cursor and OpenCode get no root file from tackroom. Kimi Code reads `~/.agents/AGENTS.md` itself, so none is written for it either
 
 Without `AGENTS.md`, tackroom leaves every harness's instructions file alone. `tackroom status` reports drift. A real file with different content is replaced only by `setup` or `sync --replace-conflicts`, and only after a backup. An identical copy is backed up, then linked.
