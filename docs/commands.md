@@ -76,6 +76,8 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 
 - `tackroom tern [--config PATH] [--dry-run]` opens a tackroom workspace in the Tern terminal. See [terminals.md](terminals.md#tern).
 - `tackroom rex [--config PATH] [--dry-run]` opens a tackroom workspace in the Rex terminal. See [terminals.md](terminals.md#rex).
+- `tackroom tmux [--config PATH] [--dry-run]` opens a tackroom workspace in tmux. See [terminals.md](terminals.md#tmux).
+- `tackroom zellij [--config PATH] [--dry-run]` opens a tackroom workspace in zellij. See [terminals.md](terminals.md#zellij).
 
 ## Other
 
