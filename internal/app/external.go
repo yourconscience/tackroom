@@ -299,7 +299,7 @@ func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile,
 	gated := gateExternalSources(candidates, externalCandidateHome(home), &probe, gate)
 	lock.Cooldowns = probe.Cooldowns
 	for name, h := range gated {
-		if h.Kind == "held" {
+		if h.Kind == "cooldown" {
 			// sync never moves an existing pin, so only update skips its cooldown.
 			h.Command = "tackroom skill update " + name + " --allow-fresh=" + h.Item
 			gated[name] = h

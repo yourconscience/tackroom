@@ -599,7 +599,7 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 		label += " (" + sub + ")"
 	}
 	if gated {
-		fmt.Fprintf(out, "added %s as %q: %s at %s (%s), not pinned while %s\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit), verdict.Kind)
+		fmt.Fprintf(out, "added %s as %q: %s at %s (%s), not pinned (%s)\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit), verdict.Kind)
 		fmt.Fprintln(out, gatedLines(map[string]gatedItem{sourceName(src): verdict})[0])
 	} else {
 		fmt.Fprintf(out, "added %s as %q: %s pinned at %s (%s)\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit))

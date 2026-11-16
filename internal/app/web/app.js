@@ -363,23 +363,23 @@ function machineItem(host) {
     host.fix ? command(host.fix) : null);
 }
 
-// Outside sources: each pin, and what sync holds or blocks with the command that releases it.
-// The same rows as the lock tab of `tackroom tui` and the held lines of `tackroom status`, drawn
-// with the site's lock stamps: pinned solid, held dashed, blocked a 2px fill, audit pass outlined.
-const LOCK_STATES = {pinned: ['t-pin', '✓', 'i-pin'], held: ['t-warn', '!', 'i-timer'], blocked: ['t-bad', '✗', 'i-audit']};
+// Outside sources: each pin, and what sync puts in cooldown or blocks with the command that lets it through.
+// The same rows as the lock tab of `tackroom tui` and the cooldown lines of `tackroom status`, drawn
+// with the site's lock stamps: pinned solid, cooldown dashed, blocked a 2px fill, audit pass outlined.
+const LOCK_STATES = {pinned: ['t-pin', '✓', 'i-pin'], cooldown: ['t-warn', '!', 'i-timer'], blocked: ['t-bad', '✗', 'i-audit']};
 function lockTag(cls, glyph, word, code) {
   return h('span', {class: `lock-tag ${cls}`}, h('span', {class: 'g', 'aria-hidden': 'true', text: glyph}), h('span', {class: 'w'}, word, code ? h('code', {text: code}) : null));
 }
 function lockBlock(rows) {
   const blocked = rows.filter((row) => row.state === 'blocked').length;
-  const help = 'Skills and packages from outside your config root. Sync pins each source to a commit in tackroom.lock, audits it, and holds anything published in the last 72 hours. Nothing held or blocked reaches your agents until it is released or accepted.';
+  const help = 'Skills and packages from outside your config root. Sync pins each source to a commit in tackroom.lock, audits it, and puts anything published in the last 72 hours in cooldown. Nothing in cooldown or blocked reaches your agents until the cooldown ends or is skipped, or the finding is accepted.';
   return h('section', {class: 'block'},
     h('div', {class: 'block-title'}, icon('i-pin'), h('h2', {text: 'Outside sources'}),
       h('span', {class: blocked ? 'count-chip bad' : 'count-chip', text: String(rows.length)}),
       h('span', {class: 'help', tabindex: '0', role: 'note', 'aria-label': help, dataset: {tip: help}}, icon('i-info'))),
     rows.length
       ? h('ul', {class: 'lock-list'}, rows.map(lockItem))
-      : h('p', {class: 'muted'}, 'None yet. ', h('code', {text: 'tackroom skill sources add owner/repo'}), ' adds one; sync pins it, audits it and holds anything published in the last 72 hours.'));
+      : h('p', {class: 'muted'}, 'None yet. ', h('code', {text: 'tackroom skill sources add owner/repo'}), ' adds one; sync pins it, audits it and puts anything published in the last 72 hours in cooldown.'));
 }
 function lockItem(row) {
   const [cls, glyph, iconId] = LOCK_STATES[row.state] || ['t-warn', '!', 'i-warn'];
@@ -388,13 +388,13 @@ function lockItem(row) {
     : row.critical ? lockTag('t-bad', '✗', 'audit', `${row.critical} critical`)
     : row.findings ? lockTag('t-warn', '!', 'audit', plural(row.findings, 'finding')) : lockTag('t-ok', '✓', 'audit pass');
   const why = {
-    held: until ? 'Sync skips it until then and your agents keep what they have. To take it now:' : `Held: ${row.reason}. To take it anyway:`,
+    cooldown: until ? 'Sync skips it until then and your agents keep what they have. To take it now:' : `In cooldown: ${row.reason}. To take it anyway:`,
     blocked: `Sync skips it: ${row.reason}. Read the finding with tackroom doctor audit; to sync it anyway, accept it:`,
   }[row.state] || `${sentence(row.reason || row.state)}. Fix it with:`;
   return h('li', {},
     h('div', {class: 'lock-head'}, icon(iconId, `lock-icon ${cls}`), h('span', {class: 'lock-name', text: row.name}),
       row.state === 'pinned' ? lockTag(cls, glyph, 'pinned', row.commit)
-        : row.state === 'held' && until ? lockTag(cls, glyph, 'held until', weekdayClock(until)) : lockTag(cls, glyph, row.state),
+        : row.state === 'cooldown' && until ? lockTag(cls, glyph, 'cooldown until', weekdayClock(until)) : lockTag(cls, glyph, row.state),
       audit),
     row.source ? h('div', {class: 'lock-meta'}, h('span', {text: row.source.replace(/^https:\/\//, '')}),
       row.commit && !row.pinned ? h('span', {class: 'fig', title: 'The commit sync would take; not pinned', text: `new ${row.commit}`}) : null) : null,
@@ -1207,7 +1207,7 @@ function renderPlan() {
     }
     body.push(h('div', {class: 'plan-agent'}, h('h3', {}, agentMark(report.Name), report.Name), h('ul', {}, items.map(([verb, text]) => h('li', {}, h('span', {class: `verb ${verb}`, text: verb}), h('span', {text}))))));
   }
-  const waiting = (store.inv?.lock || []).filter((row) => row.state === 'held' || row.state === 'blocked');
+  const waiting = (store.inv?.lock || []).filter((row) => row.state === 'cooldown' || row.state === 'blocked');
   if (waiting.length) body.push(h('div', {class: 'plan-agent'}, h('h3', {}, icon('i-pin'), 'Outside sources'),
     h('ul', {}, waiting.map((row) => h('li', {}, h('span', {class: `verb ${row.state}`, text: row.state}), h('span', {text: `${row.name}, skipped. See Overview.`}))))));
   const destructive = plan.destructive || [];

@@ -143,23 +143,23 @@ func printGatedSection(w io.Writer, gated map[string]gatedItem) {
 	if len(lines) == 0 {
 		return
 	}
-	fmt.Fprintln(w, "\nheld or blocked (skipped by sync)")
+	fmt.Fprintln(w, "\nin cooldown or blocked (skipped by sync)")
 	for _, line := range lines {
 		fmt.Fprintf(w, "  %s\n", line)
 	}
 }
 
 // printDryGateNotes reports what a dry run could not decide without a registry
-// lookup and what --allow-fresh would release.
+// lookup and what --allow-fresh would let through.
 func printDryGateNotes(w io.Writer, notes *dryGateNotes) {
 	if len(notes.unchecked) > 0 {
-		fmt.Fprintln(w, "\nfreshness not checked (a dry run makes no registry lookup; a real sync may hold these)")
+		fmt.Fprintln(w, "\nfreshness not checked (a dry run makes no registry lookup; a real sync may put these in cooldown)")
 		for _, item := range sortedKeys(notes.unchecked) {
 			fmt.Fprintf(w, "  %s %s\n", item, notes.unchecked[item])
 		}
 	}
 	if len(notes.released) > 0 {
-		fmt.Fprintln(w, "\nwould release with --allow-fresh (nothing recorded)")
+		fmt.Fprintln(w, "\nwould skip the cooldown with --allow-fresh (nothing recorded)")
 		for _, item := range sortedKeys(notes.released) {
 			fmt.Fprintf(w, "  %s %s\n", item, notes.released[item])
 		}
@@ -577,7 +577,7 @@ type syncDryRunJSON struct {
 	Harnesses          int               `json:"harnesses"`
 	Agents             []agentStatusJSON `json:"agents"`
 	StarterFiles       starterPlanJSON   `json:"starter_files"`
-	Cooldown           []gatedItemJSON   `json:"held"`
+	Cooldown           []gatedItemJSON   `json:"cooldown"`
 	NotFetched         []string          `json:"not_fetched"`
 	FreshnessUnchecked map[string]string `json:"freshness_unchecked,omitempty"`
 	WouldRelease       map[string]string `json:"would_release_with_allow_fresh,omitempty"`

@@ -27,7 +27,7 @@ type acceptedFinding struct {
 // in cooldown.
 type gatedItem struct {
 	Item    string
-	Kind    string // "blocked" or "held" (in cooldown)
+	Kind    string // "blocked" or "cooldown"
 	Reason  string
 	Until   string // cooldown end, RFC 3339; empty for blocked
 	Command string // the exact command that overrides it
@@ -208,7 +208,7 @@ func printGatedSummary(w io.Writer, gated map[string]gatedItem) {
 			cooldownN++
 		}
 	}
-	fmt.Fprintf(w, "skipped %d blocked and %d held item(s); see tackroom status\n", blocked, cooldownN)
+	fmt.Fprintf(w, "skipped %d blocked item(s) and %d item(s) in cooldown; see tackroom status\n", blocked, cooldownN)
 }
 
 // gatedNote describes external sources in cooldown or blocked in one line and
@@ -229,9 +229,9 @@ func gatedNote(gated map[string]gatedItem) string {
 		return ""
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d held, %d blocked (skipped by sync); see tackroom status", cooldownN, blockedN)
+	fmt.Fprintf(&b, "%d in cooldown, %d blocked (skipped by sync); see tackroom status", cooldownN, blockedN)
 	if cooldownN > 0 {
-		b.WriteString("; a hold ends on its own or with sync --allow-fresh=<item>")
+		b.WriteString("; a cooldown ends on its own, or sync --allow-fresh=<item> skips it")
 	}
 	if blockedN > 0 {
 		b.WriteString("; a blocked item needs tackroom doctor audit accept ... or a fix upstream")
@@ -386,7 +386,7 @@ type lockRow struct {
 	Source   string `json:"source,omitempty"` // the source URL; empty for a package in cooldown
 	Commit   string `json:"commit,omitempty"` // the short pin, or the cloned head while unpinned
 	Pinned   bool   `json:"pinned"`
-	State    string `json:"state"`            // pinned, held (in cooldown), blocked, or a pin issue such as "unpinned"
+	State    string `json:"state"`            // pinned, cooldown, blocked, or a pin issue such as "unpinned"
 	Reason   string `json:"reason,omitempty"` // why it is in cooldown or blocked, or the whole pin issue
 	Until    string `json:"until,omitempty"`  // cooldown end, RFC 3339
 	Command  string `json:"command,omitempty"`
@@ -455,7 +455,7 @@ func gatedLines(gated map[string]gatedItem) []string {
 	for _, h := range gated {
 		line := fmt.Sprintf("%s %s: %s", h.Kind, h.Item, h.Reason)
 		if h.Until != "" {
-			line += "; hold ends " + h.Until
+			line += "; cooldown ends " + h.Until
 		}
 		lines = append(lines, line+"; override: "+h.Command)
 	}

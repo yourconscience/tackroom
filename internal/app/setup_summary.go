@@ -295,7 +295,7 @@ func (s *setupSummary) print(w io.Writer) int {
 	}
 	s.printLinked(w)
 	if s.sync.gated > 0 {
-		fmt.Fprintf(w, "Held back %s from external sources (too new or blocked); see: tackroom status\n", plural(s.sync.gated, "item"))
+		fmt.Fprintf(w, "Skipped %s from external sources (in cooldown or blocked); see: tackroom status\n", plural(s.sync.gated, "item"))
 	}
 	if s.periodic != "" {
 		fmt.Fprintln(w, s.periodic)

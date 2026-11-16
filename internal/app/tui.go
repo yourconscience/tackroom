@@ -426,7 +426,7 @@ func tuiLockTable(opts runOptions) (tuiTable, error) {
 			audit = tuiAuditCell(row.Findings, row.Critical)
 		}
 		state := tuiState("ok", "pinned")
-		if row.State == "held" || row.State == "blocked" {
+		if row.State == "cooldown" || row.State == "blocked" {
 			state = tuiGatedState(gatedItem{Kind: row.State, Until: row.Until}, now)
 		} else if row.State != "pinned" {
 			state = tuiState("warn", row.State)
@@ -444,10 +444,10 @@ func tuiGatedState(h gatedItem, now time.Time) string {
 	}
 	until, err := time.Parse(time.RFC3339, h.Until)
 	if err != nil {
-		return tuiState("warn", "held, age unknown")
+		return tuiState("warn", "cooldown, age unknown")
 	}
 	age := min(max(defaultPackageAgeMinimum-until.Sub(now), 0), defaultPackageAgeMinimum)
-	return tuiState("warn", fmt.Sprintf("held %dh of %dh", int(age.Hours()), int(defaultPackageAgeMinimum.Hours())))
+	return tuiState("warn", fmt.Sprintf("cooldown %dh of %dh", int(age.Hours()), int(defaultPackageAgeMinimum.Hours())))
 }
 
 // tuiAuditCell words the findings `doctor audit` lists for an item that the

@@ -80,7 +80,7 @@ func checkExternalPackageAgeWithResolver(repoRoot string, cfg config, skip bool,
 		return checkResult{"package age", checkStatusWarn, "registry lookup failed (offline or a wrong pin?): " + strings.Join(unresolved, "; ")}
 	}
 	if len(fresh) > 0 {
-		return checkResult{"package age", checkStatusWarn, fmt.Sprintf("package newer than %d days: %s; sync holds new MCP and Pi package references until then (see tackroom status); pin an older release or wait, or pass --skip-package-age", defaultPackageAgeMinimumDays, strings.Join(fresh, "; "))}
+		return checkResult{"package age", checkStatusWarn, fmt.Sprintf("package newer than %d days: %s; sync keeps new MCP and Pi package references in cooldown until then (see tackroom status); pin an older release or wait, or pass --skip-package-age", defaultPackageAgeMinimumDays, strings.Join(fresh, "; "))}
 	}
 	detail := fmt.Sprintf("%d references at least %d days old", len(refs)-exempt, defaultPackageAgeMinimumDays)
 	if exempt > 0 {

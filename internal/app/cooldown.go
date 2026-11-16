@@ -9,6 +9,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // cooldownEntry records the minimum release age decision for one immutable external
@@ -19,8 +21,26 @@ type cooldownEntry struct {
 	Ref           string           `yaml:"ref"`
 	PublishedAt   string           `yaml:"published_at,omitempty"`
 	TimeSource    string           `yaml:"time_source"`
-	CooldownUntil string           `yaml:"hold_until,omitempty"`
+	CooldownUntil string           `yaml:"cooldown_until,omitempty"`
 	Allowed       *cooldownAllowed `yaml:"allowed,omitempty"`
+}
+
+// UnmarshalYAML also reads hold_until, the key tackroom 2.x wrote, so an entry
+// keeps its end time; cooldown_until wins when both are set.
+func (e *cooldownEntry) UnmarshalYAML(node *yaml.Node) error {
+	type plain cooldownEntry
+	var raw struct {
+		plain     `yaml:",inline"`
+		HoldUntil string `yaml:"hold_until"`
+	}
+	if err := node.Decode(&raw); err != nil {
+		return err
+	}
+	*e = cooldownEntry(raw.plain)
+	if e.CooldownUntil == "" {
+		e.CooldownUntil = raw.HoldUntil
+	}
+	return nil
 }
 
 type cooldownAllowed struct {
@@ -35,7 +55,7 @@ type gateOptions struct {
 	allowItems map[string]bool
 	reason     string
 	// dry is set by sync --dry-run to collect what the run cannot decide
-	// without a registry lookup, and what --allow-fresh would release.
+	// without a registry lookup, and what --allow-fresh would let through.
 	dry *dryGateNotes
 }
 
@@ -74,7 +94,7 @@ func (f allowFreshFlag) Set(v string) error {
 }
 
 func addAllowFreshFlags(fs *flag.FlagSet, opts *runOptions) {
-	fs.Var(allowFreshFlag{opts}, "allow-fresh", "Release held fresh items: all, or --allow-fresh=item[,item...]")
+	fs.Var(allowFreshFlag{opts}, "allow-fresh", "Skip the cooldown: all items, or --allow-fresh=item[,item...]")
 	fs.StringVar(&opts.AllowFreshReason, "reason", "", "Reason recorded with --allow-fresh (optional)")
 }
 
@@ -166,13 +186,13 @@ func decideCooldown(item, ref string, lock *lockFile, opts gateOptions, lookup f
 	}
 	command := "tackroom sync --allow-fresh=" + item
 	if entry.TimeSource == timeSourceUnknown {
-		return gatedItem{Item: item, Kind: "held", Reason: "publish time unknown for " + ref, Command: command}, true
+		return gatedItem{Item: item, Kind: "cooldown", Reason: "publish time unknown for " + ref, Command: command}, true
 	}
 	until, err := time.Parse(time.RFC3339, entry.CooldownUntil)
 	if err != nil || !opts.now.Before(until) {
 		return gatedItem{}, false
 	}
-	return gatedItem{Item: item, Kind: "held", Reason: fmt.Sprintf("%s published %s (%s)", ref, entry.PublishedAt, entry.TimeSource),
+	return gatedItem{Item: item, Kind: "cooldown", Reason: fmt.Sprintf("%s published %s (%s)", ref, entry.PublishedAt, entry.TimeSource),
 		Until: entry.CooldownUntil, Command: command}, true
 }
 
