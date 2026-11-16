@@ -13,7 +13,7 @@ tackroom config print                          # shared, local and effective con
 
 `view` prints `tackroom config UI ready:` followed by the URL on its own line, then opens your default browser. It does not open one with `--no-open` or inside an SSH session (when `SSH_CONNECTION` is set).
 
-- `--addr` is the listen address, default `127.0.0.1:8765`. It must be loopback: `127.0.0.1`, `::1` or `localhost`. Anything else is refused.
+- `--addr` is the listen address, default `127.0.0.1:8765`. It must be loopback: `127.0.0.1`, `::1` or `localhost`. Anything else is refused. When another program holds the default port and `--addr` was not given, `view` takes a free port, says so and prints that URL; later runs reuse the same port while it stays free. An explicit `--addr` that is taken is an error.
 - `--config PATH` opens another config file; without it the file is [resolved as for every command](commands.md#config-resolution).
 - A second `tackroom view` finds the running one, prints its URL and starts nothing. Without `--addr` it looks where the last view recorded its address.
 
