@@ -246,13 +246,14 @@ func runSetup(opts runOptions) error {
 	// Starter files go only into a config root with no tackroom.yaml before
 	// this run, so a starter role, skill or plugin.json the user deleted stays
 	// deleted. An existing root gets just the memory layer a tier that is on
-	// needs; a root cloned with --from is adopted as it is.
+	// needs; a root cloned with --from is adopted as it is unless --memory
+	// asks for a tier, which needs that layer too.
 	switch {
 	case !configExisted:
 		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, skipRoles, false); err != nil {
 			return err
 		}
-	case from == nil && normalizeMemoryTier(tier) != memoryTierOff:
+	case (from == nil || opts.MemoryTier != "") && normalizeMemoryTier(tier) != memoryTierOff:
 		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, nil, true); err != nil {
 			return err
 		}
