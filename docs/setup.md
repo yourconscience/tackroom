@@ -98,7 +98,7 @@ tackroom setup --from <repository url> --overlay cloud --no-cron
 
 ### Set up a machine over SSH
 
-You can also set up another machine from this one. `tackroom hosts setup user@host` runs `tackroom setup --from` there over SSH, from this config root's `origin` unless you pass `--from`, and `--install` first installs tackroom there with Homebrew or npm. Its other flags are in [commands.md](commands.md#check-health).
+You can also set up another machine from this one. `tackroom hosts setup user@host` runs `tackroom setup --from` there over SSH, from this config root's `origin` unless you pass `--from`, and `--install` first installs tackroom there with Homebrew or npm. Its other flags are in [commands.md](commands.md#check-health-in-detail).
 
 ### Check every machine
 
