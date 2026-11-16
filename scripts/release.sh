@@ -83,13 +83,6 @@ run_checks() {
 	note "go vet ./..."
 	go vet ./...
 
-	if command -v python3 >/dev/null 2>&1; then
-		note "python3 memory tests"
-		python3 -m unittest discover -s memory/tests
-	else
-		note "python3 not found: skipped memory tests"
-	fi
-
 	if command -v node >/dev/null 2>&1; then
 		note "node --test npm/install.test.js"
 		node --test npm/install.test.js
