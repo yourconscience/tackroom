@@ -1,10 +1,6 @@
-# Upgrading
+# Release notes
 
-What changes when you move to a new tackroom release, and what to do on every machine that shares your config root.
-
-```bash
-tackroom version
-```
+What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
 ## Unreleased
 

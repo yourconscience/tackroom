@@ -1,4 +1,4 @@
-# Scheduled jobs
+# Crons
 
 `tackroom cron` lists every scheduled job on your machines, runs and pauses launchd jobs, and installs jobs you declare as native units of the host's own scheduler. tackroom runs no scheduler daemon of its own.
 

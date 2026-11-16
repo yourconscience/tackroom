@@ -1,8 +1,8 @@
-# tackroom vs the field
+# Comparison
 
 tackroom is a user-level dotfiles manager for coding agents. It syncs skills, MCP servers, hooks, roles and root instructions across the harnesses you use, and pins and audits what you install from strangers.
 
-## Comparison
+## At a glance
 
 | | **tackroom** | [skillshare](https://github.com/runkids/skillshare) | [HarnessKit](https://github.com/RealZST/HarnessKit) | [dotagents](https://github.com/getsentry/dotagents) | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) |
 |---|---|---|---|---|---|---|---|
@@ -35,7 +35,7 @@ tackroom goes further in three places:
 - new pins and new exact package versions wait out a 72-hour cooldown, the minimum release age, and an item still inside it is skipped until the cooldown ends or you pass `--allow-fresh`;
 - each harness accepts declared settings keys, and a periodic job keeps machines in sync.
 
-skillshare's documentation describes none of these. See [skillshare-migration.md](skillshare-migration.md) to move over.
+skillshare's documentation describes none of these. See [Moving from skillshare](#moving-from-skillshare) to move over.
 
 Memory goes the other way. Since v0.24.0 (2026-10-03), skillshare keeps shared Markdown notes in `extras/memory`, with commands and a dashboard page to browse and search them, and you connect the agents that read them. tackroom runs no memory system: it delivers the files you list under `instructions:`, and capture is left to a separate tool such as [rem](https://github.com/yourconscience/rem). See [memory.md](memory.md).
 
@@ -58,3 +58,69 @@ tackroom pins commits in a lock shared by every machine, audits what it pins, an
 ## The rest
 
 rulesync and ruler generate config per repository; rulesync also has a `--global` mode, and ruler a global config used when a repository has no `.ruler/` folder. openskills installs skills only. None of them treats a personal setup as a dependency-managed dotfiles repo. For what tackroom refuses to do, read [philosophy.md](philosophy.md).
+
+## Moving from skillshare
+
+skillshare and tackroom solve the same problem: one place for your agent skills, roles, hooks, MCP servers and instructions. This section maps a skillshare setup onto `tackroom.yaml` and the `~/.agents` folders; [skillshare vs tackroom](#skillshare-vs-tackroom) says where the two differ.
+
+### Mapping
+
+| skillshare | tackroom |
+|---|---|
+| Skills source folder (default `~/.config/skillshare/skills`) | `~/.agents/skills/` for skills you wrote |
+| Skills installed from a repo (`skills:` entries with a `source`) | `external_skills:`, pinned in `tackroom.lock` |
+| Agents source folder | `~/.agents/agents/`, rendered into each harness's role format |
+| `targets` | `agents:` entries, one per harness; `setup` detects them |
+| `mcp.servers` | `mcp_servers:` |
+| Hooks managed with `skillshare hooks` | `hooks:` |
+| `audit.block_threshold` | `doctor audit`: an unaccepted CRITICAL finding in external content blocks sync, and new pins wait 72 hours |
+| An extra holding a shared `AGENTS.md` or similar | `~/.agents/AGENTS.md`, plus `instructions:` for more files |
+
+### Steps
+
+1. **Preview.** `tackroom setup --dry-run` lists what it would import and changes nothing.
+2. **Copy what you wrote.** Skills are `skills/<name>/SKILL.md` and roles are `agents/<name>.md` directly under the config root:
+   ```bash
+   mkdir -p ~/.agents/skills ~/.agents/agents
+   cp -R ~/.config/skillshare/skills/<your-skill> ~/.agents/skills/
+   cp ~/.config/skillshare/agents/<your-role>.md ~/.agents/agents/
+   ```
+3. **Pin external skills.** For each repo skillshare installed from, add it to tackroom so the commit is pinned and audited instead of copied:
+   ```bash
+   tackroom skill sources add owner/repo --skills a,b
+   ```
+4. **Move hooks** into a top-level `hooks:` block:
+   ```yaml
+   hooks:
+     - name: notify-stop
+       enabled: true
+       event: Stop                       # Claude Code event names
+       command: ~/.agents/hooks/notify.sh
+       timeout: 10                       # seconds
+       agents: [claude, codex]           # optional; default: every harness with hooks
+   ```
+5. **Move MCP servers** with `tackroom mcp add NAME --command ... [--arg ...]` or `--url ...`, or write them in `mcp_servers:`. To adopt one a harness already has, run `tackroom mcp import <harness> <name>`.
+6. **Move Pi packages and per-harness settings** under the harness's own entry:
+   ```yaml
+   agents:
+     - name: pi
+       enabled: true
+       detect: pi
+       packages:
+         - npm:<package>@<exact-version>
+       settings:
+         <dotted.key>: <value>
+   ```
+7. **Run it.** On the first machine, `tackroom setup`. After that, `tackroom sync` and `tackroom doctor`.
+
+Skills that skillshare linked into a harness are relinked to the canonical copy on the first sync. A real folder with different content is never replaced without your confirmation, and then only after a backup.
+
+### Verify
+
+- `tackroom status` shows every harness synced with no drift.
+- `tackroom doctor` has no failures, and any held or blocked item has a reason in `status`.
+- `tackroom hook list` and `tackroom mcp list` match what skillshare used to write.
+
+### Clean up
+
+Once `tackroom status` is clean, uninstall skillshare the way you installed it and remove its config folder, so the two tools never write the same harness files.

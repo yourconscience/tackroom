@@ -90,7 +90,7 @@ tackroom status      # plugins (1)   acme@tackroom
 
 ## tackroom in Claude Code and Pi
 
-The sync status and scheduled jobs from [Scheduled jobs](crons.md) are also available inside Claude Code and Pi, as a plugin and a package from the [`claude/`](https://github.com/yourconscience/tackroom/tree/main/claude) and [`pi/`](https://github.com/yourconscience/tackroom/tree/main/pi) folders of the repository.
+The sync status and scheduled jobs from [Crons](crons.md) are also available inside Claude Code and Pi, as a plugin and a package from the [`claude/`](https://github.com/yourconscience/tackroom/tree/main/claude) and [`pi/`](https://github.com/yourconscience/tackroom/tree/main/pi) folders of the repository.
 
 ```bash
 claude plugin install tackroom --marketplace yourconscience/tackroom

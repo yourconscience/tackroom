@@ -60,7 +60,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 - `tackroom config set [--config PATH] <section/name/field> <value>` changes one field of an entry, as the web view's switches and cells do: `config set mcp_servers/exa/enabled false`, `config set hooks/notify/agents '["claude","codex"]'`. The path is always `section/name/field`: the section is `agents`, `mcp_servers`, `hooks`, `external_skills` or `publish_targets`, the name is an existing entry and the field is one that section's entries have. Anything else is refused, so it cannot add a misspelled key or replace an entry or a section. The value is JSON when it parses as JSON and text otherwise; `null` is refused. An entry defined in `tackroom.local.yaml` is changed there, otherwise `tackroom.yaml`. It prints the changed lines and does not sync.
 - `tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]` opens the loopback web UI. See [view.md](view.md).
 
-## Scheduled jobs
+## Crons
 
 - `tackroom cron collect [--hosts local,HOST...] [--table]` is a read-only inventory of scheduled jobs here and over SSH. It prints JSON, or a table with `--table`.
 - `tackroom cron apply [--dry-run]` installs, replaces or removes the jobs declared under `crons.jobs`.
