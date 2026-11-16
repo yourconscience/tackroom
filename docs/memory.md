@@ -3,12 +3,12 @@
 tackroom ships a review-first memory system: capture is automatic and cheap, consolidation produces reports, and only you promote facts into durable instructions. Memory data lives in your knowledge directory, never in the tool repository.
 
 ```bash
-tackroom setup --memory basic        # default
-tackroom setup --memory off
+tackroom setup --memory off          # default
+tackroom setup --memory basic
 tackroom setup --memory memsearch    # needs memsearch on PATH (uv tool install memsearch)
 ```
 
-Without `--memory`, setup uses `basic` on a new config and keeps the tier an existing config already uses.
+Memory is opt-in. Without `--memory`, setup uses `off` on a new config and keeps the tier an existing config already uses.
 
 ## Tiers
 

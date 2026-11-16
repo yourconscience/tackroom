@@ -7,12 +7,13 @@ instructions automatically.
 ## Setup and shipped tools
 
 ```bash
-tackroom setup --memory basic      # default; Python 3 only
-tackroom setup --memory off        # no managed memory hooks
+tackroom setup --memory off        # default; no managed memory hooks
+tackroom setup --memory basic      # Python 3 only
 tackroom setup --memory memsearch  # derived search index; requires memsearch
 ```
 
-A fresh setup scaffolds `memory/hooks`, `memory/lib`, and the Go sources for
+A fresh setup scaffolds `memory/hooks` and `memory/lib`. With `--memory basic`
+or `--memory memsearch` it also scaffolds the Go sources for
 `memory/tools/rem` and `memory/tools/knowledge-sync`. `tackroom sync` builds
 those source packages and installs `rem` and `knowledge-sync` into `$GOBIN` or
 `~/.local/bin`; no prebuilt binaries are shipped. The repository tests both

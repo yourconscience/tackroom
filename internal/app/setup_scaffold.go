@@ -382,7 +382,7 @@ func warnSkippedMemoryHookAgents(cfg config) {
 func normalizeMemoryTier(tier string) string {
 	trimmed := strings.ToLower(strings.TrimSpace(tier))
 	if trimmed == "" {
-		return memoryTierBasic
+		return memoryTierOff
 	}
 	return trimmed
 }

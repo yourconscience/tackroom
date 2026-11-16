@@ -372,7 +372,10 @@ func memorySummary(cfg config, tier string, notInstalled bool) string {
 			events = append(events, map[string]string{"SessionStart": "session start", "Stop": "stop", "SessionEnd": "session end"}[hook.Event])
 		}
 	}
-	if tier == memoryTierOff || len(events) == 0 {
+	if tier == memoryTierOff {
+		return "off (turn on with: tackroom setup --memory basic)"
+	}
+	if len(events) == 0 {
 		return "off"
 	}
 	return fmt.Sprintf("%s (hooks at %s)", tier, joinAnd(events))
