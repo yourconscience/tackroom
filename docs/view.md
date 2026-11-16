@@ -1,6 +1,6 @@
 # Web view
 
-`tackroom view` opens a local dashboard over your config: the sync state of every harness, outside sources with their pins, holds and blocks, what is on disk, MCP and hook targeting, scheduled jobs and a YAML editor. It is where you look and act day to day; every action calls the same code as a CLI command, and the CLI stays the surface for scripts and SSH. It listens on loopback only and never runs `sync` on its own.
+`tackroom view` opens a local dashboard over your config: the sync state of every harness, outside sources with their pins, holds and blocks, what is on disk, MCP and hook targeting, scheduled jobs and a YAML editor. It is where you look and act day to day; every action calls the same code as a CLI command, which stays the surface for scripts and SSH.
 
 ```bash
 tackroom view                                  # start it and open your browser
@@ -11,13 +11,30 @@ tackroom config print                          # shared, local and effective con
 
 ## Start it
 
-`view` prints `tackroom config UI ready:` followed by the URL on its own line, then opens your default browser. It does not open one with `--no-open` or inside an SSH session (when `SSH_CONNECTION` is set).
+`view` prints `tackroom config UI ready:` followed by the URL on its own line, then opens your default browser. It does not open one with `--no-open` or inside an SSH session (when `SSH_CONNECTION` is set). The view listens on loopback only and never runs `sync` on its own.
+
+Flags and reruns:
 
 - `--addr` is the listen address, default `127.0.0.1:8765`. It must be loopback: `127.0.0.1`, `::1` or `localhost`. Anything else is refused. When another program holds the default port and `--addr` was not given, `view` takes a free port, says so and prints that URL; later runs reuse the same port while it stays free. An explicit `--addr` that is taken is an error.
 - `--config PATH` opens another config file; without it the file is [resolved as for every command](commands.md#config-resolution).
 - A second `tackroom view` finds the running one, prints its URL and starts nothing. Without `--addr` it looks where the last view recorded its address.
 
-The seven tabs are Overview, Skills, Roles, MCP & hooks, Unmanaged, Crons and Config. Overview lists every outside source: pinned, held or blocked, with the reason and the command that releases or accepts it, the same items `tackroom status` lists. With more than one host in `crons.hosts`, Overview also has a Machines block right under the counts: one row per machine with its health, a one-line summary, its tackroom version, its config commit against this machine's and, when something is wrong, the command that fixes it, the same as `tackroom hosts`. It appears once the hosts answer and is cached for a minute. Skills and Roles are matrices of what is on disk per harness. Unmanaged lists items in harness folders that tackroom did not put there and never deletes them. Crons shows the inventory from [crons.md](crons.md#run-pause-and-resume-jobs).
+## Find your way around
+
+The seven tabs are Overview, Skills, Roles, MCP & hooks, Unmanaged, Crons and Config.
+
+| Tab | Shows |
+|---|---|
+| Overview | Every outside source: pinned, held or blocked, with the reason and the command that releases or accepts it, the same items `tackroom status` lists. |
+| Skills, Roles | Matrices of what is on disk per harness. |
+| MCP & hooks | MCP and hook targeting per harness. |
+| Unmanaged | Items in harness folders that tackroom did not put there. It never deletes them. |
+| Crons | The inventory from [crons.md](crons.md#run-pause-and-resume-jobs). |
+| Config | Either config file as YAML ([What it can change](#what-it-can-change)). |
+
+With more than one host in `crons.hosts`, Overview also has a Machines block right under the counts: one row per machine with its health, a one-line summary, its tackroom version, its config commit against this machine's and, when something is wrong, the command that fixes it, the same as `tackroom hosts`. It appears once the hosts answer and is cached for a minute.
+
+### Add links to the header
 
 To add entries to the header's Links menu, list them under `ui.links` in either config file:
 
@@ -28,7 +45,7 @@ ui:
       url: https://usage.example.com   # an https URL or a path such as /usage
 ```
 
-## The token
+## When it asks for a token
 
 Requests straight to `http://127.0.0.1:PORT` or `localhost` from the same machine need no token, so a bookmark keeps working. A request through a proxy, or with a non-loopback `Host` or forwarding headers, needs the session. The startup URL carries a token, which the server swaps for an `HttpOnly`, `SameSite=Strict` cookie. A browser without that cookie gets a page that asks for the token.
 
@@ -36,7 +53,7 @@ On a machine shared with other users, anyone who can reach its loopback can use 
 
 The token is stored in `view.token`, created with mode 0600 on first use, next to a `view.addr` file with the listen address. Both live in `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`). `--token-file PATH` keeps the token somewhere else, and the address file sits beside it. Because the token persists, the URL survives restarts.
 
-## From another machine
+## Open it from another machine
 
 ```bash
 tackroom view --no-open --ssh-host me@server
@@ -75,7 +92,10 @@ The token file keeps the URL and open sessions valid. If the restart fails, the 
 
 ## What it can change
 
-- **Config files.** Toggles on Overview and MCP & hooks save to the file that defines the item: `tackroom.local.yaml` when it has the entry, else `tackroom.yaml`. The Config tab edits either file as YAML, with a check step before Save. Edits keep comments and keys tackroom does not know. Each save checks the file's revision, so a change made elsewhere is reported as stale instead of overwritten. Turning a harness off stops syncing it and removes nothing from disk.
+- **Config files.** Toggles on Overview and MCP & hooks save to the file that defines the item: `tackroom.local.yaml` when it has the entry, else `tackroom.yaml`. The Config tab edits either file as YAML, with a check step before Save.
+  - Edits keep comments and keys tackroom does not know.
+  - Each save checks the file's revision, so a change made elsewhere is reported as stale instead of overwritten.
+  - Turning a harness off stops syncing it and removes nothing from disk.
 - **Harness files, through Sync.** Sync opens a per-harness plan first. Each destructive item must be ticked before it applies: removing a skill, role, plugin, MCP server, hook or Pi package, or overwriting a role. If the plan or the config changed since the preview, you preview again.
 - **Launchd jobs.** The Crons tab runs, pauses and resumes a launchd job, changes the schedule of a job tackroom owns on that machine, and adds, edits and deletes owned jobs ([crons.md](crons.md#run-pause-and-resume-jobs)).
 
