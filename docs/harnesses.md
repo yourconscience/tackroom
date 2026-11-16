@@ -92,7 +92,7 @@ Roles follow each harness's `agent_root`; the paths are in [roles.md](roles.md#w
 
 Some folders move with an environment variable: `$COPILOT_HOME`, `$GROK_HOME`, `$DSH_HOME` and `$KIMI_CODE_HOME` replace the folder of their harness, and `$XDG_CONFIG_HOME/opencode` replaces `~/.config/opencode`.
 
-The root files are links to `~/.agents/AGENTS.md`, or generated files when you list extra `instructions:` ([setup.md](setup.md#root-instructions)). Where the table says none, nothing is written for that surface.
+The root files are links to `~/.agents/AGENTS.md`, or generated files when you list extra `instructions:` ([setup.md](setup.md#share-your-root-instructions)). Where the table says none, nothing is written for that surface.
 
 ## Notes per harness
 

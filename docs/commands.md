@@ -15,7 +15,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 - `tackroom status [--verbose] [--exit-code] [--json] [--agents a,b]` shows per harness what is synced, drifted, held or blocked. `-v` is short for `--verbose`.
 - `tackroom pull` runs `git pull --ff-only` in the config root, then `sync`. A failed pull only warns. This is what the periodic job runs.
 - `tackroom restore [<backup> | latest] [--dry-run]` lists the backups of native files, newest first, or puts one back. What it replaces is saved as a new backup, so `restore latest` undoes a restore. See [troubleshooting.md](troubleshooting.md#conflicts).
-- `tackroom cron [--interval 15m] [--deps] [--remove]` installs, replaces or removes the periodic sync job. `--deps` installs the weekly dependency job instead. See [setup.md](setup.md#periodic-sync).
+- `tackroom cron [--interval 15m] [--deps] [--remove]` installs, replaces or removes the periodic sync job. `--deps` installs the weekly dependency job instead. See [setup.md](setup.md#sync-on-a-schedule).
 
 ## Check health
 
