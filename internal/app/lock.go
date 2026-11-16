@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"slices"
 	"sort"
 	"strings"
@@ -27,8 +26,9 @@ type lockFile struct {
 }
 
 // UnmarshalYAML also reads the holds: key tackroom 2.x wrote, so every entry
-// in cooldown under the old key stays in cooldown. Entries under both keys are
-// merged; one identical under both is kept once. Writes use cooldowns: only.
+// in cooldown under the old key stays in cooldown. For an item and ref under
+// both keys the cooldowns: entry wins outright: an allowed on the old entry
+// alone is not carried over. Writes use cooldowns: only.
 func (l *lockFile) UnmarshalYAML(node *yaml.Node) error {
 	type plain lockFile
 	var raw struct {
@@ -39,8 +39,9 @@ func (l *lockFile) UnmarshalYAML(node *yaml.Node) error {
 		return err
 	}
 	*l = lockFile(raw.plain)
+	current := len(l.Cooldowns)
 	for _, legacy := range raw.Holds {
-		if !slices.ContainsFunc(l.Cooldowns, func(e cooldownEntry) bool { return reflect.DeepEqual(e, legacy) }) {
+		if !slices.ContainsFunc(l.Cooldowns[:current], func(e cooldownEntry) bool { return e.Item == legacy.Item && e.Ref == legacy.Ref }) {
 			l.Cooldowns = append(l.Cooldowns, legacy)
 		}
 	}

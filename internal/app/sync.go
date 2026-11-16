@@ -153,7 +153,7 @@ func printGatedSection(w io.Writer, gated map[string]gatedItem) {
 // lookup and what --allow-fresh would let through.
 func printDryGateNotes(w io.Writer, notes *dryGateNotes) {
 	if len(notes.unchecked) > 0 {
-		fmt.Fprintln(w, "\nfreshness not checked (a dry run makes no registry lookup; a real sync may put these in cooldown)")
+		fmt.Fprintln(w, "\nminimum release age not checked (a dry run makes no registry lookup; a real sync may put these in cooldown)")
 		for _, item := range sortedKeys(notes.unchecked) {
 			fmt.Fprintf(w, "  %s %s\n", item, notes.unchecked[item])
 		}
