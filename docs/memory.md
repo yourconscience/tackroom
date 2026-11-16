@@ -64,7 +64,7 @@ hooks:
     agents: [claude, codex]
 ```
 
-Then run `tackroom sync`. The hook gives each session context at its start. Notes you take with `rem add` stay unreviewed, and its dreams land on a branch you merge. tackroom does not install rem, so the script has to exist on every machine that syncs the hook.
+Then run `tackroom sync`. The hook gives each session context at its start, including the head of the vault's `MEMORY.md`, so a harness that runs the hook gets that file twice if you also list it under `instructions:`. Notes you take with `rem add` stay unreviewed, and its dreams land on a branch you merge. tackroom does not install rem, so the script has to exist on every machine that syncs the hook.
 
 ## Native harness memory
 
