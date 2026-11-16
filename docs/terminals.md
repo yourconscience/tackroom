@@ -1,8 +1,12 @@
-# Herdr panel
+# Terminals
+
+tackroom shows up inside three terminal apps: a native panel in Herdr, and a ready-made workspace in Tern and in Rex. Each integration is optional and calls the same `tackroom` commands you can run yourself. The old full-screen terminal view is at the end.
+
+## Herdr panel
 
 The [Herdr](https://herdr.dev) app can show tackroom as a native side panel with five tabs named like the web view's: Overview, Skills, Roles, MCP & hooks and Crons. Each tab draws the JSON of a tackroom command, the same data the web view draws, and the panel changes what the web view changes: Sync applies the plan it shows first, harnesses, MCP servers and hooks turn on and off, MCP servers and hooks add or remove an agent, and Crons runs, pauses, adds, edits and deletes jobs. Every change goes through a tackroom command, so the panel never has data or actions the web view lacks.
 
-## Install
+### Install
 
 The panel is two Herdr mods, `tackroom` and `tackroom-toggle`, in [`herdr/tackroom/`](https://github.com/yourconscience/tackroom/tree/main/herdr/tackroom), with a [recipe](https://github.com/yourconscience/tackroom/blob/main/herdr/tackroom/RECIPE.md) that adds them to the layout you already use: a tackroom button after Files and Changes, and the panel in the right column. It needs tackroom 2.4 or newer on the PATH Herdr runs programs with; otherwise set the block's `tackroom` prop to its path. Sync and the on and off buttons need a tackroom with `config set` and `sync --plan-digest`, tackroom 2.6 or newer; with an older one they stay hidden and only the Crons tab changes anything.
 
@@ -24,13 +28,13 @@ Then follow "Add to your window" in the recipe: put the `tabs` block in a row wi
 
 tackroom never edits Herdr layouts or key bindings for you.
 
-## Update
+### Update
 
 Paste the same line to your agent again, or copy the mods again from an updated checkout with the `cp` above. The layout edit is one-time: an update replaces only the two mod folders. The gallery serves the repository's `main` branch; Herdr pins no version.
 
 If you copied the `tackroom` layout that earlier releases shipped in `herdr/layouts/`, it keeps working, since it already has the button and the panel. To update, copy only the mods.
 
-## What the panel shows
+### What the panel shows
 
 - A header with the time the open tab's data was loaded, a Refresh button that reloads it and a Web button that opens the same tab of the running `tackroom view`. A dot after a tab's name marks a tab that needs attention.
 - **Overview**: whether everything is synced or how many changes wait, a Machines section with one row per machine in `crons.hosts` (its health, a summary and the command that fixes it; only with more than one host), one row per harness (what is missing or drifted, then how many skills, roles, MCP servers and hooks it has, and its state) that opens into the exact names, a "Held or blocked" list of what sync skips with the command that overrides it, and a line for the Crons tab. An open harness row has Turn off; a harness turned off in the config is listed with Turn on. It draws `tackroom sync --dry-run --json`, which writes and fetches nothing, and `tackroom hosts --json`.
@@ -42,7 +46,7 @@ The panel loads all four when it opens and every `refresh` seconds (default 300,
 
 Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tackroom.yaml`, or `tackroom.local.yaml` for an entry defined there, as the web view's switches do. The change then waits in Overview until you Sync; nothing syncs on its own. Turning a hook off, or removing a harness from it, shows in the plan as that hook's removal from the harness.
 
-## Limits
+### Limits
 
 - The web view cannot be embedded: Herdr mods are native elements drawn from JavaScript, so Herdr has its own renderer over the same data.
 - The web view's Unmanaged and Config tabs are not in the panel.
@@ -51,6 +55,74 @@ Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tack
 - A collect probes every host over SSH. On a loaded machine the local probe can hit tackroom's 2 minute timeout, and the host shows "unreachable" until the next collect.
 - After an Add, Edit, Delete or action, the Crons tab runs a full collect and the row updates when that finishes, not at once as in the web view.
 
-## doctor
+### doctor
 
 Inside a Herdr session (`HERDR_ENV=1`), `tackroom doctor` has a `herdr plugins` check that looks for plugin commands pointing at missing files or executables, and outside Herdr it reports `skipped`. See [crons.md](crons.md#herdr-automations) for the herdr-automations check.
+
+## Tern
+
+[Tern](https://stencil.so/tern) is the multiplexing terminal by Stencil Labs (`/Applications/Tern.app` on macOS, with a `tern` CLI). tackroom integrates with it optionally. Other tools that also install a `tern` command are not supported.
+
+### Shipped
+
+- `tackroom doctor` checks Tern: installed, version, runnable (`checkTern`). An absent Tern reports `skipped` (a pass), never a failure. A `tern` on PATH whose `--version` is not Tern's `tern VERSION (COMMIT)` also reports `skipped`.
+- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane. The window then shows that session. `--dry-run` prints the `tern` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. Recipe: [`tern/RECIPE.md`](../tern/RECIPE.md).
+- A crons panel: the `tackroom-crons` Tern plugin shows `tackroom cron collect` as a block, host health and per-host jobs, with Run now / Pause / Resume for launchd jobs, through the same `tackroom cron run|pause|resume` verbs as the web view and the Herdr panel. Install from a checkout with `tern plugin link ./tern/plugins/tackroom-crons` (or `tern plugin install` for a copy), then open it from the palette or `Ctrl+Alt+C`. Recipe: [`tern/plugins/tackroom-crons/RECIPE.md`](../tern/plugins/tackroom-crons/RECIPE.md).
+
+### Planned
+
+- `tackroom tern install` to copy a layout into Tern's config, backing up first.
+
+### Constraint
+
+Tern panes are terminals. Integration goes through the `tern` CLI, the plugin API, and `tackroom` CLI verbs, and never edits Tern config behind the person's back.
+
+## Rex
+
+[Rex](https://www.superlogical.com/rex) is the terminal multiplexer by Superlogical, with sessions, windows, blocks, a `rex` CLI and Lua configuration. tackroom integrates with it optionally.
+
+### Shipped
+
+- `tackroom doctor` checks Rex (`checkRex`): it runs `rex version`. With Rex absent it reports `skipped`, which counts as a pass. With Rex installed but not runnable it warns. Otherwise it prints the version line.
+- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane, then asks the Rex app to show it. The panes run the same `tackroom` that opened them, by its absolute path. Showing the session needs the app open with Remote Control turned on in its settings; otherwise `tackroom rex` prints one line saying to open the session from Rex's sidebar. A second run shows the existing `tackroom` session instead of opening another. `--dry-run` prints the `rex` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `rex` is an error. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
+- Palette actions: `rex/tackroom.lua`, which you `require` from Rex's `init.lua`, adds three actions under "tackroom" in the command palette: Open tackroom Workspace (`tackroom rex`), Open tackroom Crons (`tackroom cron collect --table` in a new tab) and Open tackroom View on Crons (the running `tackroom view` on its Crons tab in the default browser). Install: [`rex/RECIPE.md`](../rex/RECIPE.md#palette-actions).
+- Crons with actions: Rex has no panel API, so Run now, Pause and Resume for launchd jobs go through the web view. Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)). In Rex itself the jobs are the read-only `cron collect` table.
+
+### Constraint
+
+Rex blocks are terminals, and Rex has no plugin or custom panel API. Integration goes through the `rex` CLI, Lua actions the person adds to their own `init.lua`, and `tackroom` CLI verbs. tackroom never reads or writes Rex's configuration.
+
+## Terminal view (deprecated)
+
+> **Deprecated.** `tackroom tui` prints a notice on every run and will be removed in 3.0. Use [`tackroom view`](view.md), which works on a desktop, on a phone and in a side panel, or the [Herdr panel](#herdr-panel). In a terminal or over SSH, `tackroom status`, `tackroom cron collect --table` and `tackroom doctor` print the same facts.
+
+`tackroom tui` is a full-screen, read-only view of what `status`, the lock, `cron collect` and `doctor` already report. It changes nothing, so it is safe to leave open while you work.
+
+```bash
+tackroom tui [--config PATH]
+```
+
+It needs a terminal on both stdin and stdout; otherwise it prints `tackroom tui needs a terminal; use tackroom status` and exits non-zero. It follows `NO_COLOR` and the terminal's own colors. Rows are cut with `…` instead of wrapped, so a wider terminal shows more.
+
+### Tabs
+
+| Tab | Shows |
+| --- | --- |
+| Agents | One row per enabled harness: product name, config key, sync state (synced, drifted, not detected, config unreadable) and managed counts. The facts of `tackroom status`. |
+| Lock | Every external skill source and every held package: name, source, pinned commit, state (pinned, held with its age against the 72 hour hold, blocked, or why the pin is off) and audit result (pass, findings, critical). The facts of `tackroom.lock`, the freshness hold and `doctor audit`. |
+| Crons | The jobs of `tackroom cron collect`: host, source, id, schedule, state, last run and result. |
+| Doctor | The checks of `tackroom doctor` with their marks, and the summary line. |
+
+Each tab loads in the background and shows `loading…` until it is ready. A tab that fails to load shows the error in place and the other tabs keep working.
+
+### Keys
+
+| Key | Action |
+| --- | --- |
+| `tab`, `shift+tab`, `1` to `4` | Switch tab |
+| `j`, `k`, `↓`, `↑` | Move down and up |
+| `r` | Reload every tab |
+| `?` | Show or hide the key help |
+| `q`, `ctrl+c` | Quit |
+
+The Doctor tab runs the same checks as `tackroom doctor`, including the package age lookup, which asks the npm and PyPI registries about the packages your MCP servers and Pi packages reference. `r` runs the checks again.

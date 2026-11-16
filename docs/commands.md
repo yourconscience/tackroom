@@ -11,7 +11,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 
 - `tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--memory off|basic|memsearch] [--agents a,b] [--no-cron] [--dry-run] [--json]` creates the config root (starter files go only into one without `tackroom.yaml`), imports what your harnesses have by copy, runs the first sync, installs the periodic job and prints a short summary. It asks nothing; `--review` asks before each step, `--verbose` prints the full sync report, and `--from` clones (or pulls) your config repository first, for another machine. `--overlay NAME` copies `overlays/NAME.yaml` from the config repository to `tackroom.local.yaml` before the first sync and never overwrites a different one ([Machine overlays](setup.md#machine-overlays)). `--yes` is accepted and does nothing. See [setup.md](setup.md).
 - `tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents a,b] [--json] [--allow-fresh[=item,...]] [--reason TEXT]` writes each harness's native config from the repo. `--dry-run` prints the plan, including held and blocked items, and writes nothing; with `--json` it also lists `plan`, one line per harness plus one for starter files a sync would add, update or remove, the `destructive` items (every skill, role, MCP server, hook, plugin, Pi package and starter file the sync removes, and every role it overwrites) and a `plan_digest`. `--pull` runs `tackroom pull` first.
-- `tackroom sync --plan-digest DIGEST` syncs only if `sync --dry-run --json` would still print that `plan_digest`, and then syncs from the config it just checked. The digest covers the whole dry-run document and the bytes of `tackroom.yaml` and `tackroom.local.yaml`, so a changed plan or any config edit is refused with exit 1. It does not cover the text inside skill and role files: an edit there that leaves the plan's lines the same still applies. An empty digest is an error. The [Herdr panel](herdr.md)'s Sync uses it.
+- `tackroom sync --plan-digest DIGEST` syncs only if `sync --dry-run --json` would still print that `plan_digest`, and then syncs from the config it just checked. The digest covers the whole dry-run document and the bytes of `tackroom.yaml` and `tackroom.local.yaml`, so a changed plan or any config edit is refused with exit 1. It does not cover the text inside skill and role files: an edit there that leaves the plan's lines the same still applies. An empty digest is an error. The [Herdr panel](terminals.md#herdr-panel)'s Sync uses it.
 - `tackroom status [--verbose] [--exit-code] [--json] [--agents a,b]` shows per harness what is synced, drifted, held or blocked. `-v` is short for `--verbose`.
 - `tackroom pull` runs `git pull --ff-only` in the config root, then `sync`. A failed pull only warns. This is what the periodic job runs.
 - `tackroom restore [<backup> | latest] [--dry-run]` lists the backups of native files, newest first, or puts one back. What it replaces is saved as a new backup, so `restore latest` undoes a restore. See [troubleshooting.md](troubleshooting.md#conflicts).
@@ -56,7 +56,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 
 - `tackroom config validate [--config PATH]` checks the config and prints its file and revision.
 - `tackroom config print [--config PATH]` prints the shared, local and effective config.
-- `tackroom config inventory [--config PATH]` prints, as JSON, what the web view's Overview, Skills, Roles and MCP & hooks tabs draw: per harness the counts and state, per skill, role, MCP server and hook its state in each harness (`ok`, `drift`, `missing`, `conflict`, `off`, `disabled`, `unsupported`, `absent`, `error`), and each skill's origin. Read-only. The [Herdr panel](herdr.md) draws it.
+- `tackroom config inventory [--config PATH]` prints, as JSON, what the web view's Overview, Skills, Roles and MCP & hooks tabs draw: per harness the counts and state, per skill, role, MCP server and hook its state in each harness (`ok`, `drift`, `missing`, `conflict`, `off`, `disabled`, `unsupported`, `absent`, `error`), and each skill's origin. Read-only. The [Herdr panel](terminals.md#herdr-panel) draws it.
 - `tackroom config set [--config PATH] <section/name/field> <value>` changes one field of an entry, as the web view's switches and cells do: `config set mcp_servers/exa/enabled false`, `config set hooks/notify/agents '["claude","codex"]'`. The path is always `section/name/field`: the section is `agents`, `mcp_servers`, `hooks`, `external_skills` or `publish_targets`, the name is an existing entry and the field is one that section's entries have. Anything else is refused, so it cannot add a misspelled key or replace an entry or a section. The value is JSON when it parses as JSON and text otherwise; `null` is refused. An entry defined in `tackroom.local.yaml` is changed there, otherwise `tackroom.yaml`. It prints the changed lines and does not sync.
 - `tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]` opens the loopback web UI. See [view.md](view.md).
 
@@ -74,8 +74,8 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 
 ## Terminals
 
-- `tackroom tern [--config PATH] [--dry-run]` opens a tackroom workspace in the Tern terminal. See [tern.md](tern.md).
-- `tackroom rex [--config PATH] [--dry-run]` opens a tackroom workspace in the Rex terminal. See [rex.md](rex.md).
+- `tackroom tern [--config PATH] [--dry-run]` opens a tackroom workspace in the Tern terminal. See [terminals.md](terminals.md#tern).
+- `tackroom rex [--config PATH] [--dry-run]` opens a tackroom workspace in the Rex terminal. See [terminals.md](terminals.md#rex).
 
 ## Other
 
