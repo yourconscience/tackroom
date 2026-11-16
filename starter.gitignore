@@ -3,6 +3,4 @@
 .DS_Store
 external/
 tackroom.local.yaml
-memsearch.conf
 .skill-lock.json
-memory/local/

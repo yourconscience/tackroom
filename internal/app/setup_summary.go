@@ -48,17 +48,12 @@ type setupSummary struct {
 	// shared one, taken before the sync moves them.
 	differs  map[string]bool
 	differed []string
-	memory   string // the memory line, for example "basic (hooks at session start and end)"
 	rootDocs []rootInstructionSource
 	changed  bool // setup changed a harness config itself (not through sync)
 	sync     setupSyncResult
 	periodic string
 	cronNew  bool
 	problems []string
-	// hookProblems are memory hook cleanup failures. They come from an
-	// unreadable harness config, which the sync reports too, so they are only
-	// listed when the sync read every config.
-	hookProblems []string
 }
 
 func (s *setupSummary) problem(format string, args ...any) {
@@ -220,13 +215,6 @@ func (s *setupSummary) short(text string) string {
 // print writes the summary and returns how many items need the user.
 func (s *setupSummary) print(w io.Writer) int {
 	problems := append([]string(nil), s.problems...)
-	unreadable := false
-	for _, r := range s.sync.reports {
-		unreadable = unreadable || r.Error != ""
-	}
-	if !unreadable {
-		problems = append(problems, s.hookProblems...)
-	}
 	// Listed on every run until the imported sections are merged: AGENTS.md
 	// itself says whether they still are.
 	if paths := unmergedInstructionSources(s.root); len(paths) > 0 {
@@ -257,9 +245,6 @@ func (s *setupSummary) print(w io.Writer) int {
 	}
 	if s.overlay != "" {
 		fmt.Fprintln(w, s.overlay)
-	}
-	if s.memory != "" {
-		fmt.Fprintln(w, "Memory: "+s.memory)
 	}
 	for _, warning := range s.warnings {
 		fmt.Fprintln(w, "Not imported: "+s.short(warning))

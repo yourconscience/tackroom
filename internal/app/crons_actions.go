@@ -13,9 +13,10 @@ import (
 	"time"
 )
 
-// The Crons tab's actions (docs/crons.md, "View actions"): run, pause and
-// resume a launchd job on any scanned host, and change the schedule of an
-// owned job on this machine through its crons.jobs entry and `cron apply`.
+// The Crons tab's actions (docs/crons.md, "Run, pause and resume jobs"):
+// run, pause and resume a launchd job on any scanned host, and change the
+// schedule of an owned job on this machine through its crons.jobs entry and
+// `cron apply`.
 
 type cronActionRequest struct {
 	Host     string `json:"host"`

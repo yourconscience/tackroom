@@ -1,10 +1,11 @@
 # tackroom docs
 
-Guides and reference for the tackroom CLI, in reading order. Start with setup; the rest stand alone.
+Guides and reference for the tackroom CLI, in reading order. Philosophy says what tackroom is for; setup gets you running; the rest stand alone.
 
 ## Start here
 
-- [Setup](setup.md): first run, `--review`, more machines with `--from` and `--overlay`, settings and root instructions.
+- [Philosophy](philosophy.md): what tackroom believes and refuses to do.
+- [Setup](setup.md): first run, `--review`, more machines with `--from` and `--overlay`, settings, root instructions, upgrades with the release notes, and uninstalling.
 - [Commands](commands.md): every command by task, exit codes, config lookup order and output rules.
 - [Harnesses](harnesses.md): what each of the 15 agents gets, the key that names it and where its files land.
 
@@ -15,21 +16,12 @@ Guides and reference for the tackroom CLI, in reading order. Start with setup; t
 - [MCP servers](mcp.md): add, import and remove servers, remote servers, secrets and which harnesses get what.
 - [Hooks](hooks.md): declare a hook, the events each harness takes, and list or remove native registrations.
 - [Plugins](plugins.md): Claude Code plugins, agent-plugins-spec sources and the Claude Code and Pi panels.
-- [Memory](memory.md): the three tiers, the `rem` capture and review workflow, and why it is review-first.
-- [Scheduled jobs](crons.md): inventory every job on every host, run and pause launchd jobs, declare your own.
+- [Memory](memory.md): deliver a memory file to every harness, native memory settings, and separate tools such as rem.
+- [Crons](crons.md): inventory every job on every host, run and pause launchd jobs, declare your own.
 - [Web view](view.md): the loopback dashboard, its token, remote access and what it can change.
-- [Terminal view](tui.md): `tackroom tui`, deprecated and removed in 3.0; use the web view.
+- [Terminals](terminals.md): the tmux, zellij, Tern and Rex workspaces, the Herdr panel, a cmux recipe, and the deprecated `tackroom tui`.
 
-## Terminals
+## More
 
-- [Herdr panel](herdr.md): Overview, Skills, Roles, MCP & hooks and Crons as a native Herdr side panel.
-- [Tern](tern.md): a ready-made tackroom workspace in the Tern terminal.
-- [Rex](rex.md): a ready-made tackroom workspace and palette actions in the Rex terminal.
-
-## Background
-
-- [Philosophy](philosophy.md): what tackroom believes and refuses to do.
-- [Comparison](comparison.md): how tackroom differs from skillshare, rulesync, ruler and openskills.
-- [Migrating from skillshare](skillshare-migration.md): map a skillshare setup onto tackroom.
-- [Upgrading](upgrading.md): what changed in 2.1 and 2.0, and the rename from dotagents.
+- [Comparison](comparison.md): how tackroom differs from skillshare, HarnessKit, dotagents, rulesync, ruler and openskills, and how to move from skillshare.
 - [Troubleshooting](troubleshooting.md): conflicts, held and blocked items, hooks, Pi, periodic sync.

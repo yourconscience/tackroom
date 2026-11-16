@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -18,32 +17,6 @@ import (
 	"github.com/yourconscience/tackroom/internal/agentrole"
 	"gopkg.in/yaml.v3"
 )
-
-const (
-	memoryTierOff       = "off"
-	memoryTierBasic     = "basic"
-	memoryTierMemsearch = "memsearch"
-)
-
-// The memory-hermes-* names are retired: they stay listed so setup still strips
-// entries that releases before 2.0 wrote into tackroom.yaml.
-var managedMemoryHookNames = map[string]struct{}{
-	"memory-session-start":          {},
-	"memory-stop":                   {},
-	"memory-session-end":            {},
-	"memory-hermes-vault-to-memory": {},
-	"memory-hermes-memory-to-vault": {},
-}
-
-// memoryHookReplyUnsupported lists harnesses whose hook reply contract the
-// shared memory scripts cannot satisfy. The scripts answer in Claude Code's
-// hookSpecificOutput.additionalContext shape; Antigravity's SessionStart reads
-// injectSteps and its Stop reads decision
-// (https://antigravity.google/docs/hooks), so registering them there would run
-// the hook without injecting anything.
-var memoryHookReplyUnsupported = map[string]struct{}{
-	agentAgy: {},
-}
 
 type setupIO struct {
 	in  io.Reader
@@ -86,15 +59,10 @@ func setupStreams(opts runOptions) setupIO {
 	return streams
 }
 
-func ensureStarterAssets(root string, configPath string, memoryTier string) error {
-	return ensureStarterAssetsExcept(root, configPath, memoryTier, nil, false)
-}
-
 // ensureStarterAssetsExcept leaves out the starter roles named in skipRoles:
 // an agent's own role of that name stays the agent's, never replaced by a
-// starter one. memoryOnly writes only the memory layer under memory/.
-func ensureStarterAssetsExcept(root string, configPath string, memoryTier string, skipRoles map[string]bool, memoryOnly bool) error {
-	skipMemoryTools := normalizeMemoryTier(memoryTier) == memoryTierOff
+// starter one.
+func ensureStarterAssetsExcept(root string, configPath string, skipRoles map[string]bool) error {
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", root, err)
 	}
@@ -105,28 +73,12 @@ func ensureStarterAssetsExcept(root string, configPath string, memoryTier string
 		if path == "." {
 			return nil
 		}
-		if memoryOnly && path != "memory" && !strings.HasPrefix(path, "memory/") {
-			if d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
-		if skipMemoryTools && (path == "memory/tools" || strings.HasPrefix(path, "memory/tools/")) {
-			// Memory off: don't ship the Go sources sync would build.
-			if d.IsDir() {
-				return fs.SkipDir
-			}
-			return nil
-		}
 		if dir, file := filepath.Split(filepath.FromSlash(path)); dir == "agents"+string(filepath.Separator) && skipRoles[strings.TrimSuffix(file, agentrole.MarkdownExtension)] {
 			return nil
 		}
 		targetPath := path
 		if targetPath == "starter.gitignore" {
 			targetPath = ".gitignore"
-		}
-		if strings.HasSuffix(targetPath, "/go.mod.template") {
-			targetPath = strings.TrimSuffix(targetPath, ".template")
 		}
 		target := filepath.Join(root, filepath.FromSlash(targetPath))
 		if path == "tackroom.yaml" {
@@ -147,11 +99,7 @@ func ensureStarterAssetsExcept(root string, configPath string, memoryTier string
 		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 			return fmt.Errorf("create %s: %w", filepath.Dir(target), err)
 		}
-		mode := fs.FileMode(0o644)
-		if strings.HasPrefix(path, "memory/hooks/") {
-			mode = 0o755
-		}
-		if err := os.WriteFile(target, data, mode); err != nil {
+		if err := os.WriteFile(target, data, 0o644); err != nil {
 			return fmt.Errorf("write starter %s: %w", target, err)
 		}
 		return nil
@@ -181,8 +129,8 @@ func loadSetupConfig(configPath string, home string) (config, error) {
 // writeSetupConfig saves the config setup built into tackroom.yaml. It opens
 // that file without the machine-local overlay: the starter lists no agents
 // yet, and merged with a tackroom.local.yaml that names one (an agent turned
-// off on this machine, say) its memory hooks would target an unknown agent
-// before setup fills the agents in. The sync setup runs next checks the merge.
+// off on this machine, say) its hooks could target an unknown agent before
+// setup fills the agents in. The sync setup runs next checks the merge.
 func writeSetupConfig(configPath string, cfg config, home string) error {
 	if _, err := os.Stat(configPath); err != nil {
 		return saveConfigDocument(configPath, home, cfg)
@@ -293,128 +241,6 @@ func upsertSetupAgents(cfg *config, detected []agentConfig) {
 		}
 		cfg.Agents = append(cfg.Agents, agent)
 	}
-}
-
-func applyMemoryTier(cfg *config, tier string, root string, home string) error {
-	tier = normalizeMemoryTier(tier)
-	if tier != memoryTierOff {
-		warnSkippedMemoryHookAgents(*cfg)
-	}
-	startTargets := memoryHookAgents(*cfg, "SessionStart")
-	stopTargets := memoryHookAgents(*cfg, "Stop")
-	endTargets := memoryHookAgents(*cfg, "SessionEnd")
-	switch tier {
-	case memoryTierOff:
-		removeManagedMemoryHooks(cfg)
-		return nil
-	case memoryTierBasic:
-		removeManagedMemoryHooks(cfg)
-		if len(startTargets) > 0 {
-			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-session-start", Enabled: true, Event: "SessionStart", Command: managedMemoryHookCommand(root, home, "basic-session-start.py"), Timeout: 15, Agents: startTargets})
-		}
-		if len(endTargets) > 0 {
-			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-session-end", Enabled: true, Event: "SessionEnd", Command: managedMemoryHookCommand(root, home, "basic-session-end.py"), Timeout: 30, Agents: endTargets})
-		}
-		return nil
-	case memoryTierMemsearch:
-		if _, err := exec.LookPath("memsearch"); err != nil {
-			return fmt.Errorf("setup --memory memsearch requires the memsearch binary on PATH; install memsearch or rerun with --memory basic/off")
-		}
-		if err := ensureMemsearchConfig(root, home); err != nil {
-			return fmt.Errorf("configure memsearch: %w", err)
-		}
-		removeManagedMemoryHooks(cfg)
-		if len(startTargets) > 0 {
-			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-session-start", Enabled: true, Event: "SessionStart", Command: managedMemoryHookCommand(root, home, "session-start.sh"), Timeout: 15, Agents: startTargets})
-		}
-		if len(stopTargets) > 0 {
-			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-stop", Enabled: true, Event: "Stop", Command: managedMemoryHookCommand(root, home, "stop.sh"), Timeout: 15, Agents: stopTargets})
-		}
-		if len(endTargets) > 0 {
-			cfg.Hooks = append(cfg.Hooks, hookConfig{Name: "memory-session-end", Enabled: true, Event: "SessionEnd", Command: managedMemoryHookCommand(root, home, "session-end.sh"), Timeout: 30, Agents: endTargets})
-		}
-		return nil
-	default:
-		return fmt.Errorf("unknown memory tier %q (want off, basic, or memsearch)", tier)
-	}
-}
-
-func managedMemoryHookCommand(root string, home string, script string) string {
-	rel := filepath.Join("memory", "hooks", script)
-	if filepath.Clean(root) == filepath.Clean(filepath.Join(home, ".agents")) {
-		return filepath.Join("~", ".agents", rel)
-	}
-	return filepath.Join(root, rel)
-}
-
-func memoryHookAgents(cfg config, event string) []string {
-	var agents []string
-	for _, agent := range cfg.Agents {
-		if !agent.Enabled {
-			continue
-		}
-		if _, ok := hookTargetForHarness(agent.Name); !ok {
-			continue
-		}
-		if _, unsupported := memoryHookReplyUnsupported[agent.Name]; unsupported {
-			continue
-		}
-		agents = append(agents, agent.Name)
-	}
-	sort.Strings(agents)
-	return agents
-}
-
-// warnSkippedMemoryHookAgents says which enabled agents the memory tier leaves
-// out, so a skipped hook is never silent.
-func warnSkippedMemoryHookAgents(cfg config) {
-	for _, agent := range cfg.Agents {
-		if !agent.Enabled {
-			continue
-		}
-		if _, unsupported := memoryHookReplyUnsupported[agent.Name]; !unsupported {
-			continue
-		}
-		fmt.Fprintf(os.Stderr, "warning: memory hooks skipped for %s: the memory scripts reply in Claude Code's hookSpecificOutput.additionalContext, and %s reads injectSteps instead\n", agent.Name, agent.Name)
-	}
-}
-
-func normalizeMemoryTier(tier string) string {
-	trimmed := strings.ToLower(strings.TrimSpace(tier))
-	if trimmed == "" {
-		return memoryTierOff
-	}
-	return trimmed
-}
-
-func removeManagedMemoryHooks(cfg *config) {
-	kept := cfg.Hooks[:0]
-	for _, hook := range cfg.Hooks {
-		if _, managed := managedMemoryHookNames[hook.Name]; managed {
-			continue
-		}
-		kept = append(kept, hook)
-	}
-	cfg.Hooks = kept
-}
-
-func ensureMemoryHookExecutables(root string) error {
-	return filepath.WalkDir(filepath.Join(root, "memory", "hooks"), func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			if errors.Is(err, fs.ErrNotExist) {
-				return nil
-			}
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		info, err := d.Info()
-		if err != nil {
-			return err
-		}
-		return os.Chmod(path, info.Mode().Perm()|0o755)
-	})
 }
 
 func scanNativeImports(cfg config, detected []agentConfig, root string, home string) ([]nativeSkillCandidate, []nativeRoleCandidate, []nativeMCPCandidate, error) {

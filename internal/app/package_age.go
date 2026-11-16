@@ -163,7 +163,6 @@ func packageReferenceFiles(repoRoot string) []string {
 		}
 	}
 	addIfFile(filepath.Join(repoRoot, "scripts", "setup-macbook.sh"))
-	addIfFile(filepath.Join(repoRoot, "memory", "README.md"))
 	skillsRoot := filepath.Join(repoRoot, "skills")
 	_ = filepath.WalkDir(skillsRoot, func(path string, d os.DirEntry, err error) error {
 		if err != nil {

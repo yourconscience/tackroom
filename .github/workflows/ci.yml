@@ -68,18 +68,6 @@ jobs:
         with:
           version: v2.15.0
 
-  memory-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Test memory hooks and lib
-        run: python3 -m unittest discover -s memory/tests
-
   release-script:
     runs-on: ubuntu-latest
     steps:

@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Devin, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Factory Droid, OpenCode, Qwen Code, Pi, OMP, and Amp. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, memory-tier, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Devin, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Factory Droid, OpenCode, Qwen Code, Pi, OMP, and Amp. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, or config-root workflows.
 ---
 
 # tackroom
@@ -18,7 +18,7 @@ Never infer configuration from the current project. Never replace a user's confi
 ## Commands
 
 ```bash
-tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]
+tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--agents ...] [--no-cron] [--dry-run] [--json]
 tackroom status [--verbose] [--exit-code] [--agents ...]
 tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]
 tackroom sync --plan-digest DIGEST              # sync only if the plan and the config are still the ones sync --dry-run --json showed
@@ -44,6 +44,8 @@ tackroom mcp <list|add|import|remove> [options]
 tackroom restore [<backup> | latest] [--dry-run]
 tackroom tern [--config PATH] [--dry-run]       # open a tackroom workspace in the Tern terminal
 tackroom rex [--config PATH] [--dry-run]        # open a tackroom workspace in the Rex terminal
+tackroom tmux [--config PATH] [--dry-run]       # open a tackroom workspace in tmux
+tackroom zellij [--config PATH] [--dry-run]     # open a tackroom workspace in zellij
 tackroom pull [options]        # git pull --ff-only, then sync; what the periodic job runs
 tackroom cron [--interval 15m|--deps|--remove]   # periodic sync job, installed by setup; default 15m
 tackroom hosts [HOST...] [--json] [--config PATH]      # tackroom on each machine in crons.hosts: version, sync state, config commit, fix
@@ -78,19 +80,19 @@ Run `tackroom help --all` for maintenance commands.
 `tackroom setup` asks nothing and never reads stdin. It:
 
 1. Creates the canonical config root when absent.
-2. Extracts the public starter assets into a config root that has no `tackroom.yaml` yet. An existing config root gets no starter files, so a starter role, skill or `plugin.json` the user deleted stays deleted; only a memory tier that is on gets its missing files under `memory/`.
+2. Extracts the public starter assets into a config root that has no `tackroom.yaml` yet. An existing config root gets no starter files, so a starter role, skill or `plugin.json` the user deleted stays deleted.
 3. Detects supported harness binaries.
 4. Copies every native skill, role, and MCP server into the config root. Where harnesses have different copies of a skill, the first detected harness's copy is kept. A role is shared only when every harness's copy would come back unchanged from the shared one (same fields and values, same instructions, nothing added); a role with a field tackroom cannot write, without frontmatter, with differing copies, or that is a symlink stays each harness's own, and no starter role of that name is added. Imports are copy or conversion only and add no fields.
-5. Registers the memory tier (`off` on a new config; an existing config keeps its tier unless `--memory` is given). `tackroom.yaml` is rewritten only when its content changes.
+5. Records the detected harnesses in `tackroom.yaml`, which is rewritten only when its content changes.
 6. Patches only the required native harness settings.
 7. Runs the first sync: every native file or skill folder it replaces, identical or not, is backed up to `~/.local/state/tackroom/backups/<time>/` first, so `tackroom restore latest` undoes it; a native role is replaced only when the rewritten role is the same role, never a symlinked one, and a role conflict leaves only that file alone while the rest of the harness syncs. Removals or overwrites of content an earlier tackroom run wrote are left for `tackroom sync`. Instructions merged from several agents are listed as needing attention.
 8. Initializes and commits git on a first setup (no `tackroom.yaml` before, not already under git).
 9. Installs the periodic sync job (`tackroom pull` every 15 minutes), unless `--no-cron`.
 10. Prints a short summary ending in `Everything is synced.` or a list of what needs the user, each with its fix command, and then exits 1 (the sync, commit and job may already be done). A rerun on a set-up machine prints `Already set up; everything is synced.` or what changed.
 
-`--review` brings back the interactive review screen (share, keep harness-specific, or skip per item) and a prompt before git init, conflict replacement and destructive changes; without a terminal it falls back to sequential `[y/N]` prompts. `--verbose` prints every step and the full sync report. `--dry-run` prints what the run would import, whose copy it keeps and which roles stay each harness's own, and changes nothing; `--json` emits the detection result and exits. `--yes` is accepted as a no-op.
+`--review` brings back the interactive review screen (share, keep harness-specific, or skip per item) and a prompt before git init, conflict replacement and destructive changes; without a terminal it falls back to sequential `[y/N]` prompts. `--verbose` prints every step and the full sync report. `--dry-run` prints what the run would import, whose copy it keeps and which roles stay each harness's own, and changes nothing; `--json` emits the detection result and exits. `--yes` and `--memory` are accepted as no-ops.
 
-On another machine, `tackroom setup --from <git url>` clones the user's config repository into the config root when it is missing or empty, or pulls it with `git pull --ff-only` when it is already a clone of that URL, then sets up from its `tackroom.yaml` without adding starter files. A root with other content, another origin, or no origin is refused unchanged. Without `--memory`, setup never changes an existing config's memory tier; a memsearch config on a machine without `memsearch` keeps its hooks and the summary lists the install command.
+On another machine, `tackroom setup --from <git url>` clones the user's config repository into the config root when it is missing or empty, or pulls it with `git pull --ff-only` when it is already a clone of that URL, then sets up from its `tackroom.yaml` without adding starter files. A root with other content, another origin, or no origin is refused unchanged.
 
 For a machine of a known kind (a cloud VM, say), `tackroom setup --from <git url> --overlay cloud --no-cron` also copies the committed `overlays/cloud.yaml`, a complete `tackroom.local.yaml`, into place before the first sync. An unknown name stops setup before it syncs anything and lists the overlays the repository has. An existing `tackroom.local.yaml` that differs is never overwritten: setup syncs with it, lists it as needing the user and exits 1. `periodic_sync` is not compared, so a rerun after `--no-cron` reports nothing to do. Only `setup --overlay` reads `overlays/`.
 
@@ -108,13 +110,9 @@ tackroom status --json              # verify; exit 0 = everything synced
 
 Exit codes: `status` and `sync` exit 1 when anything is out of sync or conflicting; `doctor` exits 1 when any check fails or warns. All exit 0 otherwise. Warnings are advisory (for example a package younger than three days, or a registry that could not be reached); to gate on real failures, read `failed` from `doctor --json`. `--json` output on those three is a stable contract: `synced`, `agents[].conflicts`, `agents[].skills|mcp|roles|hooks.{managed,missing,drifted}`, plus `agents[].mcp.stale` and `agents[].hooks.stale` when present. When `sync` reports conflicts, show the listed paths to the user before running `tackroom sync --replace-conflicts`.
 
-The public starter contains `tackroom`, six generic roles (`architect` `builder` `general` `researcher` `reviewer` `tester`), and reusable memory scripts. Personal skills, hooks, MCP servers, secrets, and memory data belong only in the private config repository.
+The public starter contains `tackroom` and six generic roles (`architect` `builder` `general` `researcher` `reviewer` `tester`). Personal skills, hooks, MCP servers, secrets, and memory data belong only in the private config repository.
 
-Memory tiers:
-
-- `off` (default on a new config): no managed memory hooks.
-- `basic`: Python-3-only bounded Markdown digests under `$KNOWLEDGE_DIR/sessions/` plus recent context at session start.
-- `memsearch`: the indexed SessionStart, Stop, and SessionEnd pipeline; requires `memsearch` on `PATH`.
+Memory: tackroom runs no memory system. A memory file listed under `instructions:` reaches every harness that gets a root file (not Cursor, OpenCode or Kimi Code). Capture tools such as rem are separate and registered as ordinary hooks. Native memory switches go under `settings:`: Claude Code `autoMemoryEnabled`, Codex `features.memories`, OMP `memory.backend`. Memory hooks from older releases stay and sync as ordinary hooks, and `memory/` in the config root stays while a hook runs a script there.
 
 Verify the complete setup with `tackroom doctor --e2e`.
 

@@ -23,9 +23,10 @@ const starterManifestName = ".tackroom-starter.json"
 
 const starterManifestVersion = 1
 
-// starterManagedPrefixes are the starter paths tackroom owns as code. It
-// refreshes them while they are unmodified and removes them once a release
-// stops shipping them. Everything else in the starter set (AGENTS.md,
+// starterManagedPrefixes are the starter paths tackroom owned as code: the
+// memory scripts earlier releases scaffolded. No release ships them any more,
+// so sync removes them while they are unmodified, unless a hook still runs
+// one (see memoryHooksInUse). Everything else in the starter set (AGENTS.md,
 // tackroom.yaml, agents/*.md, skills/) is user content: tackroom only ever
 // creates those when missing.
 var starterManagedPrefixes = []string{"memory/hooks/", "memory/lib/"}
@@ -68,6 +69,9 @@ type starterChanges struct {
 	Updated      []string
 	Removed      []string
 	KeptModified []string
+	// Released is set when this pass handed memory/ over to the user: the
+	// manifest listed memory files and no longer does.
+	Released bool
 }
 
 func (c starterChanges) empty() bool {
@@ -225,8 +229,13 @@ func writeStarterFile(root, path string, data []byte) error {
 // running release: missing files are scaffolded, files tackroom wrote and the
 // user did not touch are refreshed to the shipped version, files a release
 // stopped shipping are removed, and anything the user modified is reported and
-// left alone.
-func reconcileStarterFiles(root string, streams setupIO, confirm bool) (starterChanges, error) {
+// left alone. With keepMemory (a hook still runs a memory script) nothing under
+// memory/ is touched and the manifest stops listing those files.
+func reconcileStarterFiles(root string, streams setupIO, confirm bool, keepMemory bool) (starterChanges, error) {
+	if keepMemory {
+		released, err := releaseMemoryFiles(root)
+		return starterChanges{Released: released}, err
+	}
 	shipped, err := shippedStarterFiles()
 	if err != nil {
 		return starterChanges{}, err
@@ -240,7 +249,10 @@ func reconcileStarterSet(root string, shipped map[string][]byte, legacy map[stri
 
 // previewStarterFiles reports what reconcileStarterFiles would change without
 // writing, removing or saving anything.
-func previewStarterFiles(root string) (starterChanges, error) {
+func previewStarterFiles(root string, keepMemory bool) (starterChanges, error) {
+	if keepMemory {
+		return starterChanges{}, nil
+	}
 	shipped, err := shippedStarterFiles()
 	if err != nil {
 		return starterChanges{}, err
@@ -250,7 +262,7 @@ func previewStarterFiles(root string) (starterChanges, error) {
 
 func reconcileStarterSetMode(root string, shipped map[string][]byte, legacy map[string][]string, streams setupIO, confirm bool, dryRun bool) (starterChanges, error) {
 	var changes starterChanges
-	manifest, _, err := loadStarterManifest(root)
+	manifest, existed, err := loadStarterManifest(root)
 	if err != nil {
 		return changes, err
 	}
@@ -316,7 +328,12 @@ func reconcileStarterSetMode(root string, shipped map[string][]byte, legacy map[
 			next[path] = manifest.Files[path]
 		}
 	}
+	// The legacy hashes bridge roots from before the manifest existed; once a
+	// root has one, a managed file it does not list is not tackroom's.
 	for _, path := range sortedKeysNative(legacy) {
+		if existed {
+			break
+		}
 		if _, stillShipped := shipped[path]; stillShipped {
 			continue
 		}
@@ -335,7 +352,7 @@ func reconcileStarterSetMode(root string, shipped map[string][]byte, legacy map[
 		}
 	}
 
-	if dryRun {
+	if dryRun || (!existed && len(next) == 0) {
 		return changes, nil
 	}
 	manifest.Files = next
@@ -370,4 +387,40 @@ func retireStarterFile(root, path, recorded string, legacy []string, streams set
 		return false, false, fmt.Errorf("remove %s: %w", path, err)
 	}
 	return true, false, nil
+}
+
+// releaseMemoryFiles hands memory/ over to the user: every file stays as it
+// is, and the manifest stops listing them, so tackroom never updates or
+// removes them again. It reports whether the manifest listed any.
+func releaseMemoryFiles(root string) (bool, error) {
+	manifest, existed, err := loadStarterManifest(root)
+	if err != nil || !existed || len(manifest.Files) == 0 {
+		return false, err
+	}
+	manifest.Files = map[string]string{}
+	return true, saveStarterManifest(root, manifest)
+}
+
+// memoryHooksInUse reports whether a hook in cfg runs a script under
+// memory/hooks/ in the config root or in ~/.agents, where earlier releases put
+// the memory scripts.
+func memoryHooksInUse(cfg config, root string, home string) bool {
+	dirs := []string{filepath.Join(root, "memory", "hooks"), filepath.Join(home, ".agents", "memory", "hooks")}
+	for _, hook := range cfg.Hooks {
+		for _, field := range strings.Fields(hook.Command) {
+			field = strings.Trim(field, `"'`)
+			for _, prefix := range []string{"$HOME/", "${HOME}/"} {
+				if strings.HasPrefix(field, prefix) {
+					field = "~/" + strings.TrimPrefix(field, prefix)
+				}
+			}
+			path := filepath.Clean(expandPath(field, home))
+			for _, dir := range dirs {
+				if strings.HasPrefix(path, dir+string(filepath.Separator)) {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

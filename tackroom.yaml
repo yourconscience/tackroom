@@ -3,4 +3,4 @@ agents: [] # populated by tackroom setup
 
 external_skills: [] # add third-party skill repos with `tackroom skill sources add`
 
-hooks: [] # `tackroom setup --memory basic` adds the memory hooks
+hooks: []

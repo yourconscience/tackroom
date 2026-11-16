@@ -6,15 +6,12 @@ __pycache__/
 # Canonical user-config runtime state
 external/
 tackroom.local.yaml
-memsearch.conf
 .skill-lock.json
 
 # Local development
 /tackroom
 npm/bin/*
 !npm/bin/tackroom.js
-memory/local/
-memory/apply-local.sh
 npm/node_modules/
 
 # Editor type hints herdr-app check writes into a mod folder

@@ -1,6 +1,6 @@
 # Skills
 
-A skill is a directory under `~/.agents/skills/` with a `SKILL.md` that has `name` and `description` frontmatter ([agentskills.io](https://agentskills.io) convention). Skills you write sync everywhere; skills from other people's repos are treated as dependencies: pinned to a commit, audited and held until they are 72 hours old.
+A skill is a directory under `~/.agents/skills/` with a `SKILL.md` that has `name` and `description` frontmatter ([agentskills.io](https://agentskills.io) convention). Skills you write sync everywhere; skills from other people's repos are treated as dependencies: pinned to a commit, audited and held until they are 72 hours old. This page covers writing, adding and publishing them.
 
 ## Write your own
 
@@ -13,7 +13,7 @@ tackroom skill info <name>   # one skill across harnesses
 
 Harnesses that read `~/.agents/skills/` natively (OpenCode, Cursor, Devin, GitHub Copilot CLI, Grok Build, Kimi Code, DeepSeek Harness) get a mirror in their own skill root only when the config root is not `~/.agents`. Qwen Code and Amp read the canonical folder through their own settings (`skills.directories`, `amp.skills.path`), so no mirror is created.
 
-## Where a skill came from
+## See where a skill came from
 
 ```bash
 tackroom skill list [--agents a,b]   # every entry in each harness skill root, with provenance
@@ -49,13 +49,15 @@ tackroom skill sources add owner/repo --all
 tackroom skill sources add owner/repo/path/in/repo --skills a   # a folder inside a repo
 ```
 
-`add` pins the newest commit that is at least 3 days old; `--latest` pins the branch head instead. A head younger than 72 hours is held like any new pin: `add` records the hold and no pin, sync skips the source, and `--allow-fresh` on `add` (or a later `sync --allow-fresh=<item>`) releases it. Without `--skills` or `--all`, an attended run shows a numbered list. Then it syncs; `--no-sync` skips that. Other flags: `--branch`, `--name`.
+`add` pins the newest commit that is at least 3 days old; `--latest` pins the branch head instead. Then it syncs; `--no-sync` skips that.
 
+- A head younger than 72 hours is held like any new pin: `add` records the hold and no pin, sync skips the source, and `--allow-fresh` on `add` (or a later `sync --allow-fresh=<item>`) releases it.
+- Without `--skills` or `--all`, an attended run shows a numbered list. Other flags: `--branch`, `--name`.
 - `--all` keeps no allowlist, so skills upstream adds later in the same folders arrive on `skill update`. A skill in a new folder needs another `add` or a `skill_dirs` edit.
 - If `~/.agents/skills/<name>` already exists, `add` adopts it only when it is identical to the source (as `npx skills add` leaves it) and stops otherwise.
 - `skill sources` also reads Claude Code's plugin registry and the `npx skills` lock. A source Claude Code already loads as a plugin is added with `exclude_agents: [claude]`, so Claude Code does not see its skills twice.
 
-## What `add` writes
+### What `add` writes
 
 ```yaml
 external_skills:
@@ -82,11 +84,22 @@ tackroom sync --allow-fresh=<item> --reason "checked the diff"
 tackroom skill update --allow-fresh
 ```
 
-A new or changed external skill pin, and a new or changed reference to an exact npm or PyPI version (in an MCP server command or a Pi `packages` entry), is held until 72 hours after its publish time. The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means held. Local sources (`file://` URLs and paths) have no publish time and are never held; the audit gate still applies to them.
+A new or changed external skill pin, and a new or changed reference to an exact npm or PyPI version (in an MCP server command or a Pi `packages` entry), is held until 72 hours after its publish time. A held item is skipped and what is already in the harness stays.
 
-A held item is skipped and what is already in the harness stays. `--allow-fresh` releases it and records the decision in `tackroom.lock` under `holds:`. A release applies to the held commit only: while a new source is held, sync keeps it on that commit even if upstream moves, and a newer head is gated as a new pin once the hold ends. A held `skill update` keeps the previous pin; sync never moves a pin, so it is released with `tackroom skill update <name> --allow-fresh=<item>`.
+- The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means held.
+- Local sources (`file://` URLs and paths) have no publish time and are never held; the audit gate still applies to them.
 
-The lock records an npm or PyPI version while its hold is in force, while its publish time is unknown, or once you release it. A version already older than 72 hours when it is first looked up adds nothing to the lock, so the first sync on a new machine leaves it unchanged. Pi packages are looked up only on a machine where Pi is detected; elsewhere a decision already in the lock still applies.
+To release a hold:
+
+- `--allow-fresh` releases it and records the decision in `tackroom.lock` under `holds:`.
+- A release applies to the held commit only: while a new source is held, sync keeps it on that commit even if upstream moves, and a newer head is gated as a new pin once the hold ends.
+- A held `skill update` keeps the previous pin; sync never moves a pin, so it is released with `tackroom skill update <name> --allow-fresh=<item>`.
+
+What the lock records:
+
+- The lock records an npm or PyPI version while its hold is in force, while its publish time is unknown, or once you release it.
+- A version already older than 72 hours when it is first looked up adds nothing to the lock, so the first sync on a new machine leaves it unchanged.
+- Pi packages are looked up only on a machine where Pi is detected; elsewhere a decision already in the lock still applies.
 
 ## The audit gate
 
@@ -96,9 +109,24 @@ tackroom doctor audit accept skill:<name> <rule> --reason "..."
 tackroom doctor audit revoke skill:<name> <rule>
 ```
 
-New or changed external content with an unaccepted CRITICAL finding is skipped by sync, and the previous pin stays. `skill sources add` applies the same gate: a blocked source is added to `tackroom.yaml` without a pin, and the first sync after `accept` pins it. CRITICAL means a prompt-injection phrase, a secret sent out or a credential file read, invisible tag characters, or a download piped into a shell (rule `remote-exec`). A match inside a Markdown code fence or a script comment counts one level lower, so a documented example is HIGH and does not block. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
+New or changed external content with an unaccepted CRITICAL finding is skipped by sync, and the previous pin stays. `skill sources add` applies the same gate: a blocked source is added to `tackroom.yaml` without a pin, and the first sync after `accept` pins it.
 
-Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing. A git commit date is a weaker time source than a registry publish time.
+CRITICAL means one of these:
+
+- a prompt-injection phrase;
+- a secret sent out or a credential file read;
+- invisible tag characters;
+- a download piped into a shell (rule `remote-exec`).
+
+A match inside a Markdown code fence or a script comment counts one level lower, so a documented example is HIGH and does not block. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
+
+Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing.
+
+What the gate and the hold do not cover:
+
+- A git commit date is a weaker time source than a registry publish time. A commit pushed today with an older date passes at once.
+- The npm package `@openai/codex` is exempt from the cooldown.
+- A PyPI pre-release version such as `1.0rc1` is not recognised as an exact version, so it is not gated.
 
 ## Plugins
 
@@ -123,4 +151,6 @@ publish_targets:
     version_strategy: new-version # or set-default, which also makes the new version the default
 ```
 
-A skill whose bundle is unchanged since the last run is skipped; a changed one gets a new version. `tackroom.lock` records the returned id and version under `published_skills`. A real upload prints a warning that the registry is US-only with no Zero Data Retention, even with `--yes`; without `--yes` it then shows the plan and asks `Proceed? [y/N]`. Do not publish skills that carry secrets or private notes.
+A skill whose bundle is unchanged since the last run is skipped; a changed one gets a new version. `tackroom.lock` records the returned id and version under `published_skills`.
+
+A real upload prints a warning that the registry is US-only with no Zero Data Retention, even with `--yes`; without `--yes` it then shows the plan and asks `Proceed? [y/N]`. Do not publish skills that carry secrets or private notes.

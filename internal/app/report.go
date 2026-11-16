@@ -622,9 +622,6 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, ui.Dim.Render("checks"))
 	checks := []checkResult{checkExternalSkillLock(repoRoot, cfg, home)}
-	if memsearchSetUp(repoRoot, home) {
-		checks = append(checks, checkMemsearchIndex(repoRoot, home))
-	}
 	nameWidth := 0
 	for _, chk := range checks {
 		nameWidth = max(nameWidth, len(chk.name))

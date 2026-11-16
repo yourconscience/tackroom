@@ -89,19 +89,6 @@ func runSetup(opts runOptions) error {
 	if err != nil {
 		return err
 	}
-	// Without --memory, an existing config keeps the tier it already uses, and
-	// setup never changes it. A machine that lacks memsearch for a memsearch
-	// config leaves the hooks as they are and says what to install.
-	tier := opts.MemoryTier
-	keepTier := false
-	if tier == "" && configExisted {
-		tier = configuredMemoryTier(cfg)
-		if tier == memoryTierMemsearch {
-			if _, err := exec.LookPath("memsearch"); err != nil {
-				keepTier = true
-			}
-		}
-	}
 	detected, err := detectDefaultAgents(opts.Agents)
 	if err != nil {
 		return err
@@ -109,11 +96,9 @@ func runSetup(opts runOptions) error {
 	if len(detected) == 0 {
 		return errors.New("no supported agents detected on PATH")
 	}
-	priorCfg := cfg
 	upsertSetupAgents(&cfg, detected)
 
-	// --json and --dry-run must exit before any mutation, including the
-	// memory-tier setup below which creates directories and config files.
+	// --json and --dry-run must exit before any mutation.
 	planned := setupPlannedActions(opts)
 	if overlay != nil {
 		planned = append([]string{overlay.action()}, planned...)
@@ -179,12 +164,6 @@ func runSetup(opts runOptions) error {
 		summary.problem("%s", overlayProblem)
 	}
 
-	if keepTier {
-		summary.problem("this config's memory hooks use memsearch, which is not installed here. Install it (uv tool install memsearch), then run: tackroom setup")
-	} else if err := applyMemoryTier(&cfg, tier, repoRoot, home); err != nil {
-		return err
-	}
-
 	fmt.Fprintln(chatter, "tackroom setup")
 	fmt.Fprintf(chatter, "config root: %s\n\n", repoRoot)
 
@@ -245,21 +224,11 @@ func runSetup(opts runOptions) error {
 	}
 	// Starter files go only into a config root with no tackroom.yaml before
 	// this run, so a starter role, skill or plugin.json the user deleted stays
-	// deleted. An existing root gets just the memory layer a tier that is on
-	// needs; a root cloned with --from is adopted as it is unless --memory
-	// asks for a tier, which needs that layer too.
-	switch {
-	case !configExisted:
-		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, skipRoles, false); err != nil {
+	// deleted.
+	if !configExisted {
+		if err := ensureStarterAssetsExcept(repoRoot, configPath, skipRoles); err != nil {
 			return err
 		}
-	case (from == nil || opts.MemoryTier != "") && normalizeMemoryTier(tier) != memoryTierOff:
-		if err := ensureStarterAssetsExcept(repoRoot, configPath, tier, nil, true); err != nil {
-			return err
-		}
-	}
-	if err := ensureMemoryHookExecutables(repoRoot); err != nil {
-		return err
 	}
 	if err := writeSetupConfig(configPath, cfg, home); err != nil {
 		return err
@@ -279,26 +248,6 @@ func runSetup(opts runOptions) error {
 			fmt.Fprintf(chatter, "%s: config already set\n", agent.Name)
 		}
 	}
-	migrated, err := migrateLegacyMemoryHookPaths(home, repoRoot)
-	if err != nil {
-		fmt.Fprintf(chatter, "memory hooks: legacy path migration failed: %v\n", err)
-		summary.hookProblems = append(summary.hookProblems, fmt.Sprintf("could not update old memory hook paths: %v. Fix the file, then run: tackroom setup", err))
-	} else if migrated > 0 {
-		summary.changed = true
-		fmt.Fprintf(chatter, "memory hooks: migrated legacy paths in %d config file(s)\n\n", migrated)
-	}
-	// The config the sync below applies, local overlay included; when it does
-	// not load, nothing is kept and every managed memory hook is cleaned.
-	effective, _ := loadConfig(repoRoot, home, configPath)
-	cleaned, err := removeNativeManagedMemoryHooks(home, repoRoot, priorCfg, cfg, effective)
-	if err != nil {
-		fmt.Fprintf(chatter, "memory hooks: native cleanup failed: %v\n", err)
-		summary.hookProblems = append(summary.hookProblems, fmt.Sprintf("could not remove old memory hooks: %v. Fix the file, then run: tackroom setup", err))
-	} else if cleaned > 0 {
-		summary.changed = true
-		fmt.Fprintf(chatter, "memory hooks: removed previous managed commands from %d native config file(s)\n\n", cleaned)
-	}
-
 	syncOpts := opts
 	syncOpts.ConfigPath = configPath
 	syncOpts.ConfirmRemovals = true
@@ -313,7 +262,6 @@ func runSetup(opts runOptions) error {
 		return syncErr
 	}
 	summary.noteDiffered(before, detection, decisions)
-	summary.memory = memorySummary(cfg, tier, keepTier)
 	// After the sync, so the first commit holds everything sync wrote too.
 	// Without --review, git init is only for a first setup: no tackroom.yaml
 	// before this run (and offerGitInit skips a root already under git). A
@@ -359,45 +307,6 @@ func setupPeriodicSync(opts runOptions, configPath, repoRoot, home string, summa
 		return "", false
 	}
 	return "Sync runs every 15 minutes (tackroom pull)", true
-}
-
-// memorySummary is the setup summary's memory line.
-func memorySummary(cfg config, tier string, notInstalled bool) string {
-	tier = normalizeMemoryTier(tier)
-	if notInstalled {
-		return tier + " (memsearch is not installed here)"
-	}
-	var events []string
-	for _, hook := range cfg.Hooks {
-		if _, managed := managedMemoryHookNames[hook.Name]; managed && hook.Enabled {
-			events = append(events, map[string]string{"SessionStart": "session start", "Stop": "stop", "SessionEnd": "session end"}[hook.Event])
-		}
-	}
-	if tier == memoryTierOff {
-		return "off (turn on with: tackroom setup --memory basic)"
-	}
-	if len(events) == 0 {
-		return "off"
-	}
-	return fmt.Sprintf("%s (hooks at %s)", tier, joinAnd(events))
-}
-
-// configuredMemoryTier reads the memory tier an existing config uses from its
-// managed memory hooks, so a rerun or a second machine keeps it.
-func configuredMemoryTier(cfg config) string {
-	tier := memoryTierOff
-	for _, hook := range cfg.Hooks {
-		if _, managed := managedMemoryHookNames[hook.Name]; !managed {
-			continue
-		}
-		switch {
-		case strings.Contains(hook.Command, "basic-session-"):
-			return memoryTierBasic
-		case strings.Contains(hook.Command, "session-start.sh"), strings.Contains(hook.Command, "session-end.sh"), strings.Contains(hook.Command, "stop.sh"):
-			tier = memoryTierMemsearch
-		}
-	}
-	return tier
 }
 
 // offerGitInit versions a fresh config root: it asks with --review and

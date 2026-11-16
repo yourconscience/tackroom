@@ -212,7 +212,6 @@ type runOptions struct {
 	Pull           bool
 	E2E            bool
 	SkipPackageAge bool
-	MemoryTier     string
 	JSONOutput     bool
 	DryRun         bool
 	AssumeYes      bool
@@ -301,6 +300,10 @@ func run(args []string) error {
 		return runTernCommand(args[1:])
 	case "rex":
 		return runRexCommand(args[1:])
+	case "tmux":
+		return runTmuxCommand(args[1:])
+	case "zellij":
+		return runZellijCommand(args[1:])
 	case "hosts":
 		return runHostsCommand(args[1:])
 	case "cron":
@@ -328,8 +331,6 @@ func run(args []string) error {
 			return err
 		}
 		return runPull(opts)
-	case "memsearch":
-		return runDeprecatedMemsearch(args[1:])
 	case "version", "--version":
 		if len(args) != 1 {
 			return errors.New("usage: tackroom version")
@@ -359,12 +360,6 @@ func run(args []string) error {
 }
 
 func runSetupCommand(args []string) error {
-	if len(args) > 0 {
-		switch args[0] {
-		case "memsearch":
-			return runMemsearch(append([]string{"setup"}, args[1:]...))
-		}
-	}
 	opts, err := parseSetupFlags(args)
 	if err != nil {
 		return err
@@ -373,13 +368,6 @@ func runSetupCommand(args []string) error {
 }
 
 func runStatusCommand(args []string) error {
-	if len(args) > 0 {
-		switch args[0] {
-		case "memsearch":
-			printRenameNotice("status memsearch", "status")
-			return runMemsearch(append([]string{"status"}, args[1:]...))
-		}
-	}
 	opts, err := parseStatusFlags(args)
 	if err != nil {
 		return err
@@ -498,25 +486,6 @@ func runSkillCommand(args []string) error {
 	}
 }
 
-func runDeprecatedMemsearch(args []string) error {
-	if len(args) > 0 {
-		switch args[0] {
-		case "setup":
-			printRenameNotice("memsearch setup", "setup memsearch")
-			return runSetupCommand(append([]string{"memsearch"}, args[1:]...))
-		case "status":
-			printRenameNotice("memsearch status", "status memsearch")
-			return runStatusCommand(append([]string{"memsearch"}, args[1:]...))
-		}
-	}
-	printRenameNotice("memsearch", "setup memsearch or status memsearch")
-	return runMemsearch(args)
-}
-
-func printRenameNotice(oldCommand string, newCommand string) {
-	fmt.Fprintf(os.Stderr, "tackroom: %q was renamed to %q\n", oldCommand, newCommand)
-}
-
 func parseSubcommandFlags(name string, args []string) (runOptions, error) {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
@@ -543,8 +512,10 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	var assumeYes bool
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
-	// Empty means: keep the tier an existing tackroom.yaml uses, else off.
-	fs.StringVar(&opts.MemoryTier, "memory", "", "Memory tier: off, basic, or memsearch (default off; an existing config keeps its tier)")
+	// --memory chose a memory tier. tackroom no longer sets up memory, so it is
+	// accepted for old scripts and does nothing.
+	var memoryTier string
+	fs.StringVar(&memoryTier, "memory", "", "Deprecated: does nothing. tackroom no longer sets up memory")
 	fs.StringVar(&opts.From, "from", "", "Clone this git repository into the config root (or pull it there) and set up from it")
 	fs.StringVar(&opts.Overlay, "overlay", "", "Copy overlays/NAME.yaml from the config root to tackroom.local.yaml before the first sync")
 	fs.BoolVar(&opts.Review, "review", false, "Review what to import and confirm each step instead of taking the defaults")
@@ -556,7 +527,7 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	// accepted for old scripts and left out of the help.
 	fs.BoolVar(&assumeYes, "yes", false, "")
 	fs.Usage = func() {
-		fmt.Fprintln(fs.Output(), "usage: tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]")
+		fmt.Fprintln(fs.Output(), "usage: tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--agents ...] [--no-cron] [--dry-run] [--json]")
 		fs.VisitAll(func(f *flag.Flag) {
 			if f.Name == "yes" {
 				return
@@ -573,6 +544,9 @@ func parseSetupFlags(args []string) (runOptions, error) {
 	// A name, never a path: it must not reach outside overlays/.
 	if strings.ContainsAny(opts.Overlay, `/\`) || strings.Contains(opts.Overlay, "..") {
 		return runOptions{}, fmt.Errorf("--overlay takes a name from overlays/ (cloud for overlays/cloud.yaml), not a path: %q", opts.Overlay)
+	}
+	if tier := strings.TrimSpace(memoryTier); tier != "" && !strings.EqualFold(tier, "off") {
+		fmt.Fprintln(os.Stderr, "tackroom no longer sets up memory. See https://yourconscience.github.io/tackroom/docs/memory/")
 	}
 	return opts, nil
 }
@@ -644,7 +618,7 @@ func printUsage() {
 	fmt.Println()
 	fmt.Println("Commands:")
 	fmt.Println("  setup    Set up this machine; on another machine: setup --from <git url>")
-	fmt.Println("  status   Show harness, external lock, and memsearch state")
+	fmt.Println("  status   Show harness and external lock state")
 	fmt.Println("  sync     Regenerate committed artifacts and reconcile harnesses")
 	fmt.Println("  doctor   Check pins, dependencies, and local health")
 	fmt.Println("  config   Validate or print the canonical YAML")
@@ -663,7 +637,7 @@ func printUsage() {
 
 // canonicalForms is the full command reference; group --help prints its lines.
 var canonicalForms = []string{
-	"  tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--memory off|basic|memsearch] [--agents ...] [--no-cron] [--dry-run] [--json]",
+	"  tackroom setup [--from GIT_URL] [--overlay NAME] [--review] [--verbose] [--agents ...] [--no-cron] [--dry-run] [--json]",
 	"  tackroom status [--verbose] [--exit-code] [--agents ...]",
 	"  tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]",
 	"  tackroom sync --plan-digest DIGEST        # sync only if the plan is still the one sync --dry-run --json showed",
@@ -689,6 +663,8 @@ var canonicalForms = []string{
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
 	"  tackroom rex [--config PATH] [--dry-run]          # open a tackroom workspace in the Rex terminal",
+	"  tackroom tmux [--config PATH] [--dry-run]         # open a tackroom workspace in tmux",
+	"  tackroom zellij [--config PATH] [--dry-run]       # open a tackroom workspace in zellij",
 	"  tackroom hosts [HOST...] [--json] [--config PATH]   # tackroom on each machine in crons.hosts: version, sync state, config commit",
 	"  tackroom hosts fix [HOST...] [--dry-run] [--config PATH]   # run the fix hosts names (setup, pull or sync there); never commits or pushes",
 	"  tackroom hosts setup HOST [--from GIT_URL] [--overlay NAME] [--no-cron] [--install] [--dry-run] [--config PATH]   # tackroom setup --from on HOST over SSH",
@@ -727,6 +703,5 @@ func printAllUsage() {
 	fmt.Println("  tackroom pull [options]          # git pull --ff-only (a failure only warns), then sync; what the job runs")
 	fmt.Println("  tackroom doctor <audit|deps> [options]")
 	fmt.Println("  tackroom sync deps [options]")
-	fmt.Println("  tackroom memsearch <setup|status> [options]")
 	fmt.Println("  tackroom version                 # also --version")
 }

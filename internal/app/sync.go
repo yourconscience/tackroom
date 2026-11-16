@@ -265,18 +265,13 @@ func runSync(opts runOptions) error {
 		// Setup prints its own summary instead of the report.
 		reportOut = io.Discard
 	}
-	starterChanges, err := reconcileStarterFiles(repoRoot, streams, opts.ConfirmRemovals)
+	starterChanges, err := reconcileStarterFiles(repoRoot, streams, opts.ConfirmRemovals, memoryHooksInUse(cfg, repoRoot, home))
 	if err != nil {
 		return err
 	}
 	starterChanges.report(reportOut)
-
-	toolInstalls, err := installMemoryTools(repoRoot)
-	if err != nil {
-		return err
-	}
-	if len(toolInstalls) > 0 {
-		fmt.Fprintf(reportOut, "memory tools installed: %s\n", strings.Join(toolInstalls, ", "))
+	if starterChanges.Released {
+		fmt.Fprintf(os.Stderr, "memory/ in %s is yours now: tackroom no longer ships or updates it. See https://yourconscience.github.io/tackroom/docs/memory/\n", displayPath(repoRoot, home))
 	}
 
 	inspectCfg, err := configForInspection(cfg, sources, gated, repoRoot, home)
@@ -499,7 +494,7 @@ func runSyncDryRun(opts runOptions) error {
 	}
 
 	// Starter files a real sync would scaffold, refresh or retire.
-	starterPlan, err := previewStarterFiles(repoRoot)
+	starterPlan, err := previewStarterFiles(repoRoot, memoryHooksInUse(cfg, repoRoot, home))
 	if err != nil {
 		return err
 	}
