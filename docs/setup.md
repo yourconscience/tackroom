@@ -9,13 +9,13 @@ tackroom setup --review               # review imports and confirm each step ins
 tackroom setup --dry-run              # what the run would import, whose copy it keeps; changes nothing
 ```
 
-Other flags: `--overlay NAME` to start this machine from a committed `tackroom.local.yaml` (see [Machine overlays](#machine-overlays)), `--memory off|basic|memsearch` (default `off` on a new config; an existing config keeps its tier, see [memory.md](memory.md)), `--agents a,b` to limit the run to named harnesses, `--no-cron` to skip the periodic job, `--verbose` for every step and the full sync report, `--json` for the detection result, `--config PATH`. `--yes` is still accepted and does nothing: it is the default now.
+Other flags: `--overlay NAME` to start this machine from a committed `tackroom.local.yaml` (see [Machine overlays](#machine-overlays)), `--agents a,b` to limit the run to named harnesses, `--no-cron` to skip the periodic job, `--verbose` for every step and the full sync report, `--json` for the detection result, `--config PATH`. `--yes` is still accepted and does nothing: it is the default now. `--memory` is still accepted and does nothing too: tackroom no longer sets up memory ([memory.md](memory.md)).
 
 Harnesses are named by these keys in `tackroom.yaml`, in `--agents` and in `agents:` lists: Claude Code `claude`, Codex `codex`, Factory Droid `droid`, OMP `omp`, OpenCode `opencode`, Pi `pi`, Qwen Code `qwen-code`, Cursor `cursor`, Devin `devin`, GitHub Copilot CLI `copilot`, Grok Build `grok`, DeepSeek Harness `dsh`, Antigravity CLI `agy`, Kimi Code `kimi`, Amp `amp`. The former key `claude-code` still works. Gemini CLI's key `gemini` is ignored with a warning ([upgrading.md](upgrading.md)). What each harness gets, and the executable that detects it, is in [harnesses.md](harnesses.md).
 
 ## What setup does
 
-1. Creates the config root and, when it has no `tackroom.yaml` yet, copies in the starter content: the `tackroom` skill, six roles, `tackroom.yaml`, `tackroom.lock`, `.gitignore`, `plugin.json`, `.agnix.toml` and the memory code layer under `memory/`. No instructions file and no third-party skills ship. On a new config, memory is off unless you pass `--memory basic` or `--memory memsearch`: with it off, setup leaves out the Go sources under `memory/tools/` and registers no memory hooks. A config root that already has `tackroom.yaml` (a rerun, or a clone on another machine) gets no starter files, so a starter role, skill or `plugin.json` you deleted stays deleted; only a memory tier that is on gets the files it needs under `memory/` that are missing. A clone gets them when you pass `--memory`.
+1. Creates the config root and, when it has no `tackroom.yaml` yet, copies in the starter content: the `tackroom` skill, six roles, `tackroom.yaml`, `tackroom.lock`, `.gitignore`, `plugin.json` and `.agnix.toml`. No instructions file and no third-party skills ship. A config root that already has `tackroom.yaml` (a rerun, or a clone on another machine) gets no starter files, so a starter role, skill or `plugin.json` you deleted stays deleted.
 2. Detects harnesses by their executable on `PATH` and records them in `tackroom.yaml`. Amp is not auto-detected; add it with `--agents amp`. A `tackroom.yaml` whose content does not change is not rewritten, so its formatting stays as you wrote it.
 3. Copies every skill, role and MCP server your harnesses already have into the config root. When two harnesses have different copies of a skill, the first detected harness's copy is kept and the summary says which. A role is shared only when every harness's copy would come back unchanged from the shared one: same fields, same values, same instructions, nothing added. A role with a field tackroom cannot write (for example `permissionMode` or `sandbox_mode`), without the frontmatter a shared role needs, with different copies in different harnesses, or that is a link to a file elsewhere stays each harness's own, and no starter role of that name is added. Import is copy-only and adds nothing to what it copies; nothing is moved yet.
 4. Imports existing root instructions into `AGENTS.md`: one file is copied as is, several different ones are kept in full under a `## From <agent> (<file>)` heading each. Every agent then reads all of them, so each `setup` run lists them under what needs your attention until you merge them and delete those headings. With none, no `AGENTS.md` is created and every harness keeps its own file.
@@ -53,9 +53,7 @@ tackroom setup --from <your-private-repository>
 
 `--from` clones the repository into the config root when that folder is missing or empty, or runs `git pull --ff-only` when it is already a clone of the same repository (ssh and https forms of one repository match, and so do `url.<base>.insteadOf` aliases), then sets up from it: its `tackroom.yaml` is used as it is and no starter files are added. A folder with other content, or a clone of another repository, is refused and left untouched. A git repository with no origin is refused too, with the two commands that connect it if it is a copy of that repository. A repository without `tackroom.yaml` is set up like a first machine, and the summary says so. What this machine's harnesses already have is imported as on a first machine; an item the repository already has keeps the repository's copy.
 
-Setup never changes the memory tier of an existing `tackroom.yaml` unless you pass `--memory`. When the shared tier is `memsearch` and this machine has no `memsearch`, setup leaves the memory hooks as they are, sets up everything else and lists the install command.
-
-`tackroom sync --pull` pulls the repo first, then reconciles. List the machines under `crons.hosts` in `tackroom.local.yaml` (SSH aliases, plus `local` for this one) and `tackroom hosts` shows each one's tackroom version, sync state and config commit, with the command that fixes what is wrong. Machines without a Go toolchain skip building the memory tools; everything else syncs normally.
+`tackroom sync --pull` pulls the repo first, then reconciles. List the machines under `crons.hosts` in `tackroom.local.yaml` (SSH aliases, plus `local` for this one) and `tackroom hosts` shows each one's tackroom version, sync state and config commit, with the command that fixes what is wrong.
 
 ### Machine overlays
 
@@ -134,7 +132,7 @@ Without `AGENTS.md`, tackroom leaves every harness's instructions file alone. `t
 
 ### Extra instruction files
 
-List voice, profile or other always-on notes under `instructions:`:
+List voice, profile, memory ([memory.md](memory.md)) or other always-on notes under `instructions:`:
 
 ```yaml
 instructions:
@@ -148,9 +146,9 @@ Generated files start with a `Generated by tackroom` comment that names their so
 
 ## Managed starter files
 
-`setup` copies the starter content into a new config root only. The memory code layer under `memory/hooks/` and `memory/lib/` stays managed: on every `sync`, tackroom scaffolds missing files, refreshes files it wrote that you have not modified, removes files a release stopped shipping, and reports without touching anything you edited.
+`setup` copies the starter content into a new config root only. The starter set (`tackroom.yaml`, `tackroom.lock`, `agents/*.md`, `skills/`, `plugin.json`, `.agnix.toml`, `.gitignore`) is yours: only `setup` on a config root without `tackroom.yaml` creates it, so a starter file you delete stays deleted. `AGENTS.md` is not a starter file; setup creates it only to import your harnesses' own instructions.
 
-Ownership is recorded in `.tackroom-starter.json` at the config root; commit it with `tackroom.yaml`. Everything else in the starter set (`tackroom.yaml`, `agents/*.md`, `skills/`, `plugin.json`, `.gitignore`) is yours: only `setup` on a config root without `tackroom.yaml` creates it, so a starter file you delete stays deleted. `AGENTS.md` is not a starter file; setup creates it only to import your harnesses' own instructions.
+Releases up to 2.8 also managed memory scripts under `memory/` and recorded them in `.tackroom-starter.json`. What `sync` does with them now is in [memory.md](memory.md#coming-from-the-bundled-memory).
 
 ## Periodic sync
 

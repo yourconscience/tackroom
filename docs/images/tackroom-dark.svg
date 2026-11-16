@@ -8,7 +8,7 @@
   <rect x="1" y="1" width="686" height="3" rx="1.5" fill="#303035"/>
   <text x="24" y="30" class="d">~/.agents</text>
   <line x1="0" y1="40" x2="688" y2="40" stroke="#303035"/>
-  <text x="24" y="66"><tspan class="d">$</tspan> tackroom setup --yes --memory off --no-cron</text>
+  <text x="24" y="66"><tspan class="d">$</tspan> tackroom setup --yes --no-cron</text>
   <text x="24" y="83">tackroom setup</text>
   <text x="24" y="100">config root: ~/.agents</text>
   <text x="24" y="117"><tspan class="d">...</tspan></text>

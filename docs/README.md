@@ -15,7 +15,7 @@ Guides and reference for the tackroom CLI, in reading order. Start with setup; t
 - [MCP servers](mcp.md): add, import and remove servers, remote servers, secrets and which harnesses get what.
 - [Hooks](hooks.md): declare a hook, the events each harness takes, and list or remove native registrations.
 - [Plugins](plugins.md): Claude Code plugins, agent-plugins-spec sources and the Claude Code and Pi panels.
-- [Memory](memory.md): the three tiers, the `rem` capture and review workflow, and why it is review-first.
+- [Memory](memory.md): deliver a memory file to every harness, native memory settings, and separate tools such as rem.
 - [Scheduled jobs](crons.md): inventory every job on every host, run and pause launchd jobs, declare your own.
 - [Web view](view.md): the loopback dashboard, its token, remote access and what it can change.
 - [Terminal view](tui.md): `tackroom tui`, deprecated and removed in 3.0; use the web view.

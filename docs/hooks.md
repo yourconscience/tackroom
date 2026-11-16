@@ -27,25 +27,7 @@ hooks:
 - `agents` uses [harness keys](harnesses.md#config-keys-and-detection). Without it, harnesses that have no hook surface are skipped silently.
 - Event names are Claude Code's. Each harness below gets its own name for the event, or reports it as unsupported.
 
-`tackroom setup` writes hooks of this shape for the memory tier. This is what `setup --memory basic` adds for Claude Code and Codex:
-
-```yaml
-hooks:
-  - name: memory-session-start
-    enabled: true
-    event: SessionStart
-    command: ~/.agents/memory/hooks/basic-session-start.py
-    timeout: 15
-    agents: [claude, codex]
-  - name: memory-session-end
-    enabled: true
-    event: SessionEnd
-    command: ~/.agents/memory/hooks/basic-session-end.py
-    timeout: 30
-    agents: [claude, codex]
-```
-
-The memory hooks go to every enabled harness with a hook surface except Antigravity CLI ([memory.md](memory.md#tiers)).
+A memory tool's hook is declared the same way; [memory.md](memory.md#capture-with-rem) has one. Memory hooks that an older `tackroom setup --memory` wrote are ordinary hooks now.
 
 ## Which harnesses run hooks
 
@@ -87,7 +69,7 @@ tackroom hook list [--agents a,b] [query]
 
 ```
 agy	Stop	managed	~/.agents/hooks/notify.sh
-claude	SessionStart	managed	~/.agents/memory/hooks/basic-session-start.py
+claude	SessionStart	managed	~/.agents/hooks/session-context.sh
 claude	Stop	unmanaged stale=/path/to/old-tool/hook.sh	/path/to/old-tool/hook.sh
 unsupported hook surfaces: amp, dsh, opencode
 3 native hook registration(s)
@@ -113,6 +95,6 @@ Put flags before the query. `remove` prints the matching registrations, removes 
 
 `remove` does not check ownership and writes no backup, so preview first. It also removes registrations of hooks that are still declared and enabled; the next `sync` writes those again.
 
-`sync` adds and updates registrations, and removes one when the hook is still declared but no longer wanted for that agent: `enabled: false`, or an `agents` list that no longer names it. `status` shows it as `hooks stale` until then. The registration is matched by event and command, and stays when another enabled hook for that agent has the same event and command. `sync` never removes the native entry of a hook that is no longer declared at all. It shows up as `unmanaged` in `hook list` until you remove it. The memory hooks are the exception: `setup` removes the native memory registrations it managed before, then syncs the current set.
+`sync` adds and updates registrations, and removes one when the hook is still declared but no longer wanted for that agent: `enabled: false`, or an `agents` list that no longer names it. `status` shows it as `hooks stale` until then. The registration is matched by event and command, and stays when another enabled hook for that agent has the same event and command. `sync` never removes the native entry of a hook that is no longer declared at all. It shows up as `unmanaged` in `hook list` until you remove it.
 
 To retire a hook you declared, set `enabled: false` and run `tackroom sync`; delete the entry afterwards if you like. If you deleted the entry first, run `hook remove`. Use the same steps for hooks left behind by a tool you uninstalled ([troubleshooting.md](troubleshooting.md#hooks)).
