@@ -437,7 +437,7 @@ func tuiLockTable(opts runOptions) (tuiTable, error) {
 }
 
 // tuiGatedState words an item in cooldown or blocked. A cooldown's age is how much of the
-// freshness window has passed: the window minus the time left until it ends.
+// minimum release age has passed: the minimum release age minus the time left until it ends.
 func tuiGatedState(h gatedItem, now time.Time) string {
 	if h.Kind == "blocked" {
 		return tuiState("fail", "blocked")

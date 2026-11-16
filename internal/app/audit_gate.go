@@ -89,7 +89,7 @@ func gateExternalSources(sources []externalSkillSource, home string, lock *lockF
 			continue
 		}
 		if isLocalSourceURL(src.URL) {
-			continue // freshness applies to remote content only
+			continue // the cooldown applies to remote content only
 		}
 		if h, ok := gateSourceFreshness(src, home, item.ID(), lock, opts); ok {
 			gated[name] = h

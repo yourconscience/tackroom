@@ -34,7 +34,7 @@ type statusGates struct {
 	gated    map[string]gatedItem // gated sources by name; packages in cooldown as "package-gate:"+item
 }
 
-// loadStatusGates reads the config and the lock and applies the freshness and
+// loadStatusGates reads the config and the lock and applies the cooldown and
 // audit gates with no registry lookup and no lock write. createPluginData
 // keeps the plugin data directories status has always created; a read-only
 // caller passes false.
