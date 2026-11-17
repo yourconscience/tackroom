@@ -534,7 +534,7 @@ func discoverExternalSourceSkills(src externalSkillSource, home string) ([]disco
 		if resolvedBase != resolvedCache && !strings.HasPrefix(resolvedBase, resolvedCache+string(os.PathSeparator)) {
 			return nil, fmt.Errorf("skill directory %q escapes the external repository through a symlink", clean)
 		}
-		candidates, err := discoverSkillsAtExternalRoot(src, name, skillBase, origin)
+		candidates, err := discoverSkillsAtExternalRoot(src, name, skillBase, origin, clean == ".")
 		if err != nil {
 			return nil, err
 		}
@@ -560,13 +560,18 @@ func discoverExternalSourceSkills(src externalSkillSource, home string) ([]disco
 	return discoveredSkillValues(discovered), nil
 }
 
-func discoverSkillsAtExternalRoot(src externalSkillSource, repo string, skillBase string, origin string) ([]discoveredSkill, error) {
+// discoverSkillsAtExternalRoot lists the skills of one skill_dirs entry: the
+// entry itself when it holds a SKILL.md, else its subfolders that do. atRepoRoot
+// marks the entry as the repository root.
+func discoverSkillsAtExternalRoot(src externalSkillSource, repo string, skillBase string, origin string, atRepoRoot bool) ([]discoveredSkill, error) {
 	if hasFile(filepath.Join(skillBase, "SKILL.md")) {
 		name := filepath.Base(skillBase)
 		// Preserve the legacy single-skill convention, where skill_dir names the
 		// repository's skill and therefore uses the repository basename.
 		if len(src.SkillDirs) == 0 {
 			name = repo
+		} else if atRepoRoot {
+			name = rootSkillName(skillBase)
 		}
 		return []discoveredSkill{{Name: name, Path: skillBase, Origin: origin, Root: skillBase}}, nil
 	}
@@ -831,6 +836,8 @@ func cleanupMaterializationStages(changes []stagedMaterialization) {
 	}
 }
 
+// copyTreeExact copies source to target, leaving out a top-level .git: a skill
+// that is a whole repository checkout carries one.
 func copyTreeExact(source string, target string) error {
 	type copiedDir struct {
 		Path string
@@ -844,6 +851,12 @@ func copyTreeExact(source string, target string) error {
 		rel, err := filepath.Rel(source, path)
 		if err != nil {
 			return err
+		}
+		if rel == ".git" {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		destination := target
 		if rel != "." {
