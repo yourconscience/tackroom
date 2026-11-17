@@ -531,7 +531,7 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 				issues = append(issues, fmt.Sprintf("%s canonical copy missing", skill.Name))
 			} else if err != nil {
 				issues = append(issues, fmt.Sprintf("%s canonical copy unreadable: %v", skill.Name, err))
-			} else if equal, err := externalSkillTreesEqual(skill.Path, canonical); err != nil {
+			} else if equal, err := externalTreesEqual(skill.Path, canonical, true); err != nil {
 				issues = append(issues, fmt.Sprintf("%s drift check failed: %v", skill.Name, err))
 			} else if !equal {
 				issues = append(issues, fmt.Sprintf("%s canonical copy drifted from lock", skill.Name))
