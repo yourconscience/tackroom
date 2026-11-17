@@ -7,7 +7,7 @@ Guides and reference for the tackroom CLI, in reading order. Philosophy says wha
 - [Philosophy](philosophy.md): what tackroom believes and refuses to do.
 - [Setup](setup.md): first run, `--review`, more machines with `--from` and `--overlay`, settings, root instructions, upgrades with the release notes, and uninstalling.
 - [Commands](commands.md): every command by task, exit codes, config lookup order and output rules.
-- [Harnesses](harnesses.md): what each of the 15 agents gets, the key that names it and where its files land.
+- [Harnesses](harnesses.md): what each of the 16 agents gets, the key that names it and where its files land.
 
 ## Guides
 

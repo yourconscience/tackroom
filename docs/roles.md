@@ -40,6 +40,7 @@ You review code changes. Report findings; do not edit files.
 | Cursor | Markdown | `~/.cursor/agents/<name>.md` |
 | GitHub Copilot CLI | Markdown | `~/.copilot/agents/<name>.agent.md` |
 | Grok Build | Markdown | `~/.grok/agents/<name>.md` |
+| Gemini CLI | Markdown, `kind: local` | `~/.gemini/agents/<name>.md` |
 | Kimi Code | Markdown | `~/.kimi-code/agents/<name>.md` |
 
 Paths follow each harness's `agent_root` in `tackroom.yaml`.
@@ -58,23 +59,23 @@ Paths follow each harness's `agent_root` in `tackroom.yaml`.
 | Factory Droid | `custom:gpt-5.5(low)`, `(medium)` or `(high)`; no model gives `inherit` | `droid.model` |
 | Codex | omitted, so Codex uses its own default | `codex.model` |
 | OMP | written as given | `omp.model` |
-| Pi, OpenCode, GitHub Copilot CLI, Grok Build | omitted, so the harness inherits | `pi.model`, `opencode.model`, `copilot.model`, `grok.model` |
+| Pi, OpenCode, GitHub Copilot CLI, Grok Build, Gemini CLI | omitted, so the harness inherits | `pi.model`, `opencode.model`, `copilot.model`, `grok.model`, `gemini.model` |
 | Cursor, Qwen Code | `inherit` | `cursor.model`, `qwen.model` |
 | Kimi Code | no model is written | none |
 
 An exact id in `model` is passed through to every harness except Kimi Code. To pin one model for all roles that declare none, set `role_model` on the agent entry in `tackroom.yaml`; a role's own `model` or per-harness override always wins.
 
-Other per-harness keys: `codex.model_reasoning_effort`, `omp.thinking-level`, `pi.thinking`, `droid.reasoning_effort`, `droid.tools`, `opencode.temperature`, `opencode.mode`, `qwen.approval_mode`, `qwen.tools`, `cursor.readonly`.
+Other per-harness keys: `codex.model_reasoning_effort`, `omp.thinking-level`, `pi.thinking`, `droid.reasoning_effort`, `droid.tools`, `opencode.temperature`, `opencode.mode`, `qwen.approval_mode`, `qwen.tools`, `cursor.readonly`, `gemini.tools`.
 
 ## Tools
 
 Canonical tool names are mapped per harness. Claude Code and Grok Build keep the names as written (Grok Build resolves them itself).
 
-Qwen Code, GitHub Copilot CLI, Pi, OMP, Factory Droid and Kimi Code get their own built-in names, for example `read`, `edit` and `execute` for GitHub Copilot CLI. Names without an equivalent are dropped; Factory Droid falls back to read-only tools when none map.
+Gemini CLI, Qwen Code, GitHub Copilot CLI, Pi, OMP, Factory Droid and Kimi Code get their own built-in names, for example `read_file`, `replace` and `run_shell_command` for Gemini CLI, and `read`, `edit` and `execute` for GitHub Copilot CLI. Names without an equivalent are dropped; Factory Droid falls back to read-only tools when none map.
 
 Kimi Code grants every tool to an agent with no `tools` key, so a role whose tools all lack a Kimi Code equivalent fails to render instead of widening. Cursor has no per-agent tool list; `cursor.readonly: true` is its only restriction.
 
 `tools: []` (or `tools: ""`) gives a role no tools, for example a judge that only reads the text it is given. Leaving `tools` out gives the harness default, which is usually every tool.
 
-- Claude Code, GitHub Copilot CLI, Kimi Code and OMP get `tools: []`, and Pi gets a bare `tools:`.
+- Claude Code, GitHub Copilot CLI, Gemini CLI, Kimi Code and OMP get `tools: []`, and Pi gets a bare `tools:`.
 - Codex, Cursor, Factory Droid, OpenCode, Qwen Code and Grok Build have no way to give an agent no tools, so their copy of such a role gets that harness's default.

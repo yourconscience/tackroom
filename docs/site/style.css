@@ -217,6 +217,7 @@ footer nav a { min-height: 44px; display: inline-flex; align-items: center; }
   .hero h1 { font-size: var(--tr-fs-display); }
   .hero-copy { padding-top: 8px; }
   .wall { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .wall-harnesses { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .lock-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; align-items: start; }
   .lock-grid .term { position: sticky; top: 24px; }
 }
