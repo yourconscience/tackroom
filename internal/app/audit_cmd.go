@@ -193,7 +193,7 @@ func auditExternalSkill(name string, src externalSkillSource, cacheRoot string) 
 				findings = append(findings, auditFinding{auditInfo, name, filepath.Join("external", name, clean), "selected external skill directory not in cache; run tackroom sync"})
 				continue
 			}
-			candidates, err := discoverSkillsAtExternalRoot(src, name, skillDir, "")
+			candidates, err := discoverSkillsAtExternalRoot(src, name, skillDir, "", clean == ".")
 			if err != nil {
 				findings = append(findings, auditFinding{auditWarn, name, filepath.Join("external", name, clean), err.Error()})
 				continue

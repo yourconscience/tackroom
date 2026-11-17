@@ -22,6 +22,10 @@ type config struct {
 	// profile kept elsewhere) that every agent's root doc carries after
 	// AGENTS.md, in order. Relative paths resolve against the config root.
 	Instructions []string `yaml:"instructions,omitempty"`
+	// TrustedPackages lists packages (npm:<name> or pypi:<name>) whose new
+	// versions skip the cooldown. Absent (nil) uses defaultTrustedPackages;
+	// present, even empty, replaces them.
+	TrustedPackages *[]string `yaml:"trusted_packages,omitempty"`
 
 	// cooldownMCP names MCP servers whose package version is in cooldown.
 	// desiredMCPServersForAgent keeps what each harness already has for

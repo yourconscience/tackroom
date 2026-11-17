@@ -54,6 +54,8 @@ tackroom skill sources add owner/repo/path/in/repo --skills a   # a folder insid
 - A head younger than 72 hours is in cooldown like any new pin: `add` records the cooldown and no pin, sync skips the source, and `--allow-fresh` on `add` (or a later `sync --allow-fresh=<item>`) skips the cooldown.
 - Without `--skills` or `--all`, an attended run shows a numbered list. Other flags: `--branch`, `--name`.
 - `--all` keeps no allowlist, so skills upstream adds later in the same folders arrive on `skill update`. A skill in a new folder needs another `add` or a `skill_dirs` edit.
+- `--all` adds every skill whose name is in one folder only. A name that two folders both hold is skipped, with one line on stderr that names the folders, and `add` exits 0 as long as it added something; it fails only when nothing is left. `--skills` cannot choose between two skills of one name: add the source by path (`owner/repo/path/in/repo`) to take one. A folder that holds a skipped skill next to others is recorded skill by skill (`skill_dirs: [a/foo]`), so skills upstream adds there later need another `add`.
+- A repo that is itself one skill, with a `SKILL.md` at its root, is added as that one skill (`add owner/repo --all`) and recorded as `skill_dirs: [.]`. The skill is named by the `name:` in that `SKILL.md`, else by the source name. The copy in `~/.agents/skills/` leaves out the repo's `.git`. A root `SKILL.md` makes the whole repo that skill, as for any skill folder: skill folders inside it are part of it, and `add owner/repo/folder` takes one of them instead.
 - If `~/.agents/skills/<name>` already exists, `add` adopts it only when it is identical to the source (as `npx skills add` leaves it) and stops otherwise.
 - `skill sources` also reads Claude Code's plugin registry and the `npx skills` lock. A source Claude Code already loads as a plugin is added with `exclude_agents: [claude]`, so Claude Code does not see its skills twice.
 
@@ -88,6 +90,7 @@ A new or changed external skill pin, and a new or changed reference to an exact 
 
 - The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means cooldown.
 - Local sources (`file://` URLs and paths) have no publish time and are never in cooldown; the audit gate still applies to them.
+- A package in `trusted_packages` is never in cooldown: no registry lookup and nothing in the lock. The list holds `npm:<name>` or `pypi:<name>` entries in `tackroom.yaml` or `tackroom.local.yaml`. Without the key it is `npm:@openai/codex`, `npm:@anthropic-ai/claude-code` and `npm:@earendil-works/pi-coding-agent`. A key you write replaces that list, so `trusted_packages: []` gates every package. Any other entry is a config error, and `tackroom doctor` names the trusted packages it skipped in its package age check.
 
 To skip the cooldown:
 
@@ -119,15 +122,22 @@ CRITICAL means one of these:
 - invisible tag characters;
 - a download piped into a shell (rule `remote-exec`).
 
-A match inside a Markdown code fence or a script comment counts one level lower, so a documented example is HIGH and does not block. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
+Some matches count one level lower, so they show as HIGH and do not block:
+
+- Markdown text outside a code fence that warns against the pattern or quotes it: the match sits inside double quotation marks, or one of these words comes before it in the same clause: never, do not, don't, avoid, instead of, for example, such as, flag, detect, warn. A clause ends at a comma, a semicolon or the end of a sentence. So "Do not run `curl ... | sh`" is HIGH, while "Run `curl ... | sh`" and "If you don't have it, run `curl ... | sh`" are CRITICAL.
+- A Markdown code fence, as before.
+- A script comment or docstring.
+
+Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
 
 Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing.
 
 What the gate and the cooldown do not cover:
 
 - A git commit date is a weaker time source than a registry publish time. A commit pushed today with an older date passes at once.
-- The npm package `@openai/codex` is exempt from the cooldown.
-- A PyPI pre-release version such as `1.0rc1` is not recognised as an exact version, so it is not gated.
+- A package in `trusted_packages` is exempt from the cooldown, by default the three npm CLIs above; set `trusted_packages: []` to gate them too.
+- A PyPI version that is a single number followed by a pre-release tag (`2a3`), or that uses an underscore (`1.0_rc1`) or an epoch (`1!2.0`), is not recognised as an exact version, so it is not gated. A pre-release such as `1.0rc1` is.
+- The words that lower a Markdown match do not have to govern it: "Do not worry and run `curl ... | sh`" is HIGH, and so is a command written in double quotation marks. The finding still shows in `doctor audit`.
 
 ## Plugins
 
