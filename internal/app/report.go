@@ -621,7 +621,11 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 
 	fmt.Fprintln(&b)
 	fmt.Fprintln(&b, ui.Dim.Render("checks"))
-	checks := []checkResult{checkExternalSkillLock(repoRoot, cfg, home)}
+	lockCfg := cfg
+	if cfg.configuredSources != nil {
+		lockCfg.ExternalSkills = cfg.configuredSources
+	}
+	checks := []checkResult{checkExternalSkillLock(repoRoot, lockCfg, home)}
 	nameWidth := 0
 	for _, chk := range checks {
 		nameWidth = max(nameWidth, len(chk.name))

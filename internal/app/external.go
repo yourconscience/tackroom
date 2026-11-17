@@ -184,6 +184,7 @@ func updateExternalRepos(sources []externalSkillSource, home string, repoRoot st
 	// keeps the previous pin and skips the source.
 	original := lock
 	gated := gateUpdatedSources(staged, home, &lock, gate)
+	warnUnmatchedAllowFresh(os.Stderr, gate, gated)
 	restoreGatedCaches(selected, home, original, gated)
 	var updated []externalSkillSource
 	for _, candidate := range staged {
@@ -782,13 +783,19 @@ func applyMaterializedSkills(plan []materializedSkill) error {
 	}
 	for i := range changes {
 		change := &changes[i]
+		// A copy identical to the one it replaced changed nothing; say nothing.
+		unchanged := false
+		if change.Backup != "" && !change.Skill.Remove {
+			same, err := externalSkillTreesEqual(change.Backup, change.Skill.TargetPath)
+			unchanged = err == nil && same
+		}
 		if change.Backup != "" {
 			_ = os.RemoveAll(change.Backup)
 			change.Backup = ""
 		}
 		if change.Skill.Remove {
 			fmt.Fprintf(os.Stderr, "removed stale materialized skill %s\n", change.Skill.Name)
-		} else {
+		} else if !unchanged {
 			// stderr: sync --json owns stdout.
 			fmt.Fprintf(os.Stderr, "materialized %s -> %s\n", change.Skill.SourcePath, change.Skill.TargetPath)
 		}

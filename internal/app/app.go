@@ -28,6 +28,10 @@ type config struct {
 	// them and writes nothing new. Set by gatePackages; never from YAML.
 	cooldownMCP  map[string]bool
 	cooldownHome string
+	// configuredSources is every external source as configured, set by
+	// applyStatusGates where ExternalSkills drops the ones in cooldown or blocked,
+	// so the status lock check still counts them. Never from YAML.
+	configuredSources []externalSkillSource
 	// codexPluginMCP names plugin MCP servers Codex loads from its native
 	// plugin, so desiredMCPServersForAgent writes no [mcp_servers] row for them.
 	// Set by injectPluginMCPServersMode; never from YAML.

@@ -3,10 +3,13 @@ package app
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -54,6 +57,9 @@ type gateOptions struct {
 	allowAll   bool
 	allowItems map[string]bool
 	reason     string
+	// matched collects the --allow-fresh names that met an item in cooldown, so
+	// warnUnmatchedAllowFresh can name the rest. Shared by every copy of the options.
+	matched map[string]bool
 	// dry is set by sync --dry-run to collect what the run cannot decide
 	// without a registry lookup, and what --allow-fresh would let through.
 	dry *dryGateNotes
@@ -71,6 +77,51 @@ func newDryGateNotes() *dryGateNotes {
 }
 
 func (o gateOptions) allows(item string) bool { return o.allowAll || o.allowItems[item] }
+
+// noteMatch records that the --allow-fresh name for item met an item in cooldown.
+func (o gateOptions) noteMatch(item string) {
+	if o.matched != nil && o.allowItems[item] {
+		o.matched[item] = true
+	}
+}
+
+// warnUnmatchedAllowFresh prints one line per --allow-fresh name that matched no
+// item in cooldown, with the items that are in cooldown. A name that is in
+// cooldown but that this command cannot skip (a pending skill update, for sync)
+// gets the command that does. It never fails the run: a script that names an
+// item must keep working once its cooldown ends.
+func warnUnmatchedAllowFresh(w io.Writer, opts gateOptions, gated map[string]gatedItem) {
+	var names []string
+	for name := range opts.allowItems {
+		if !opts.matched[name] {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		return
+	}
+	sort.Strings(names)
+	byItem := map[string]gatedItem{}
+	var inCooldown []string
+	for _, h := range gated {
+		if h.Kind == "cooldown" {
+			byItem[h.Item] = h
+			inCooldown = append(inCooldown, h.Item)
+		}
+	}
+	list := "none"
+	if len(inCooldown) > 0 {
+		sort.Strings(inCooldown)
+		list = strings.Join(slices.Compact(inCooldown), ", ")
+	}
+	for _, name := range names {
+		if h, ok := byItem[name]; ok {
+			fmt.Fprintf(w, "--allow-fresh: %q is in cooldown but this command does not skip it; run: %s\n", name, h.Command)
+			continue
+		}
+		fmt.Fprintf(w, "--allow-fresh: nothing in cooldown is named %q; in cooldown: %s\n", name, list)
+	}
+}
 
 // allowFreshFlag is `--allow-fresh` (all items) or `--allow-fresh=a,b`.
 type allowFreshFlag struct{ opts *runOptions }
@@ -99,7 +150,7 @@ func addAllowFreshFlags(fs *flag.FlagSet, opts *runOptions) {
 }
 
 func gateOptionsFor(opts runOptions) gateOptions {
-	g := gateOptions{now: timeNow(), allowAll: opts.AllowFreshAll, reason: opts.AllowFreshReason, allowItems: map[string]bool{}}
+	g := gateOptions{now: timeNow(), allowAll: opts.AllowFreshAll, reason: opts.AllowFreshReason, allowItems: map[string]bool{}, matched: map[string]bool{}}
 	for _, item := range opts.AllowFreshItems {
 		g.allowItems[item] = true
 	}
@@ -145,6 +196,7 @@ func decideCooldown(item, ref string, lock *lockFile, opts gateOptions, lookup f
 	idx := cooldownIndex(*lock, item, ref)
 	if idx < 0 && lookup == nil && opts.dry != nil {
 		if opts.allows(item) {
+			opts.noteMatch(item)
 			opts.dry.released[item] = ref
 		} else {
 			opts.dry.unchecked[item] = ref
@@ -176,8 +228,11 @@ func decideCooldown(item, ref string, lock *lockFile, opts gateOptions, lookup f
 	}
 	entry := &lock.Cooldowns[idx]
 	if entry.Allowed == nil && opts.allows(item) {
-		if opts.dry != nil && cooldownInForce(*entry, opts.now) {
-			opts.dry.released[item] = ref
+		if cooldownInForce(*entry, opts.now) {
+			opts.noteMatch(item)
+			if opts.dry != nil {
+				opts.dry.released[item] = ref
+			}
 		}
 		entry.Allowed = &cooldownAllowed{At: opts.now.UTC().Format(time.RFC3339), Reason: opts.reason}
 	}
