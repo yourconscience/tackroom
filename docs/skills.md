@@ -88,6 +88,7 @@ A new or changed external skill pin, and a new or changed reference to an exact 
 
 - The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means cooldown.
 - Local sources (`file://` URLs and paths) have no publish time and are never in cooldown; the audit gate still applies to them.
+- A package in `trusted_packages` is never in cooldown: no registry lookup and nothing in the lock. The list holds `npm:<name>` or `pypi:<name>` entries in `tackroom.yaml` or `tackroom.local.yaml`. Without the key it is `npm:@openai/codex`, `npm:@anthropic-ai/claude-code` and `npm:@earendil-works/pi-coding-agent`. A key you write replaces that list, so `trusted_packages: []` gates every package. Any other entry is a config error, and `tackroom doctor` names the trusted packages it skipped in its package age check.
 
 To skip the cooldown:
 
@@ -126,8 +127,8 @@ Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing 
 What the gate and the cooldown do not cover:
 
 - A git commit date is a weaker time source than a registry publish time. A commit pushed today with an older date passes at once.
-- The npm package `@openai/codex` is exempt from the cooldown.
-- A PyPI pre-release version such as `1.0rc1` is not recognised as an exact version, so it is not gated.
+- A package in `trusted_packages` is exempt from the cooldown, by default the three npm CLIs above; set `trusted_packages: []` to gate them too.
+- A PyPI version that is a single number followed by a pre-release tag (`2a3`), or that uses an underscore (`1.0_rc1`) or an epoch (`1!2.0`), is not recognised as an exact version, so it is not gated. A pre-release such as `1.0rc1` is.
 
 ## Plugins
 

@@ -69,6 +69,10 @@ func mergeConfig(base *config, overlay config) {
 	if overlay.Instructions != nil {
 		base.Instructions = append([]string(nil), overlay.Instructions...)
 	}
+	if overlay.TrustedPackages != nil {
+		trusted := append([]string(nil), *overlay.TrustedPackages...)
+		base.TrustedPackages = &trusted
+	}
 	if overlay.UI != nil {
 		copyUI := *overlay.UI
 		copyUI.Links = append([]uiLink(nil), overlay.UI.Links...)
@@ -381,6 +385,16 @@ func validateConfig(cfg *config, home string, expand bool) error {
 			return fmt.Errorf("config instructions lists %q more than once", path)
 		}
 		seenInstructions[path] = struct{}{}
+	}
+
+	if cfg.TrustedPackages != nil {
+		trusted := *cfg.TrustedPackages
+		for i := range trusted {
+			trusted[i] = strings.TrimSpace(trusted[i])
+			if !validTrustedPackage(trusted[i]) {
+				return fmt.Errorf("config trusted_packages entry %q must be npm:<name> or pypi:<name>", trusted[i])
+			}
+		}
 	}
 
 	return nil
