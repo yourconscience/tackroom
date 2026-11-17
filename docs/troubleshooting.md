@@ -5,7 +5,7 @@ Start with `tackroom doctor`, then `tackroom status`. This page lists the messag
 ```bash
 tackroom doctor                  # health checks, one line each
 tackroom status --verbose        # full per-harness lists and native paths
-tackroom sync --dry-run          # what a real sync would change, including held and blocked items
+tackroom sync --dry-run          # what a real sync would change, including items in cooldown and blocked items
 ```
 
 `doctor` validates skill frontmatter, roles, the lock and materialized copies, native hook registrations and the periodic sync job, and audits external sources. `--json` works on `status`, `sync` and `doctor`.
@@ -38,7 +38,7 @@ Backups live in `$XDG_STATE_HOME/tackroom/backups/<time>/` (default `~/.local/st
 
 ## External content
 
-**An item is "held".** A new or changed external skill pin, or exact npm or PyPI version, waits 72 hours after its publish time. `tackroom status` shows the reason, the hold end and the override; `tackroom sync --allow-fresh` (or `--allow-fresh=<item> --reason "..."`) releases it. See [skills.md](skills.md#the-72-hour-hold).
+**An item is "in cooldown".** A new or changed external skill pin, or exact npm or PyPI version, waits 72 hours after its publish time. `tackroom status` shows the reason, the cooldown end and the override; `tackroom sync --allow-fresh` (or `--allow-fresh=<item> --reason "..."`) skips the cooldown. See [skills.md](skills.md#the-72-hour-cooldown).
 
 **An item is "blocked".** Sync skips new or changed external content with an unaccepted CRITICAL audit finding and keeps the previous pin. Run `tackroom doctor audit`, then `accept` the finding or fix the source. See [skills.md](skills.md#the-audit-gate).
 

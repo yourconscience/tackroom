@@ -62,7 +62,7 @@ In `mcp.json`, tackroom takes stdio servers only:
 - `${PLUGIN_ROOT}` and `${PLUGIN_DATA}` expand in `args` and `env`, and both are also set as environment variables. The data folder is `~/.agents/external-data/<source name>`.
 - A server with the same name as one in your own `mcp_servers:` is skipped, and so are servers that two plugin sources both declare.
 
-The pin, the 72 hour hold and the audit gate apply as for any external source ([skills.md](skills.md#the-72-hour-hold)). Servers a plugin adds are written and listed like your own ([mcp.md](mcp.md)).
+The pin, the 72 hour cooldown and the audit gate apply as for any external source ([skills.md](skills.md#the-72-hour-cooldown)). Servers a plugin adds are written and listed like your own ([mcp.md](mcp.md)).
 
 - The audit names the source `plugin:<name>`.
 - It also scans its stdio MCP servers and the raw `mcp.json` (every transport), `plugin.json`, `.codex-plugin/plugin.json` and `hooks/hooks.json`.
@@ -76,7 +76,7 @@ Codex loads a plugin from its own cache, so tackroom drives Codex's CLI (`codex 
 - The cached source has a valid `plugin.json` at its root.
 - Codex is an MCP target (`mcp_agents` is empty or lists `codex`) and `exclude_agents` does not list `codex`.
 - The source keeps the default skill layout: no `skills:`, `skill_dir:` or `skill_dirs:`, because a plugin carries all of its `skills/` folder.
-- The pin is not held or blocked.
+- The pin is not in cooldown or blocked.
 
 For such a source Codex gets the skills and every MCP server, `streamable-http` ones included, from the plugin alone. `sync` links no skills and writes no `[mcp_servers]` rows for it into Codex. Other harnesses are unchanged, and a source without `mcp: true` keeps its skill links.
 

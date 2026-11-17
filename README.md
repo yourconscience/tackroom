@@ -6,7 +6,7 @@ tackroom syncs one `~/.agents` repo into 15 coding agents and pins every outside
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/tackroom-dark.svg">
-  <img src="docs/images/tackroom-light.svg" width="688" alt="Output of tackroom setup and tackroom sync: config root ~/.agents, seven agents synced, the acme/agent-skills source pinned at b09718b, one item blocked and one held.">
+  <img src="docs/images/tackroom-light.svg" width="688" alt="Output of tackroom setup and tackroom sync: config root ~/.agents, seven agents synced, the acme/agent-skills source pinned at b09718b, one item blocked and one in cooldown.">
 </picture>
 
 [Website](https://yourconscience.github.io/tackroom/) · [Docs](https://yourconscience.github.io/tackroom/docs/) · [Releases](https://github.com/yourconscience/tackroom/releases)
@@ -24,9 +24,9 @@ With npm: `npm install -g tackroom && tackroom setup`. Both install the same che
 After that, you work in the view; the commands do the same from a shell or a script:
 
 ```bash
-tackroom view     # the dashboard: sync state, pins, holds, crons; desktop or phone
+tackroom view     # the dashboard: sync state, pins, cooldowns, crons; desktop or phone
 tackroom sync     # write each agent's native config from the repo
-tackroom status   # what is synced, held or blocked
+tackroom status   # what is synced, in cooldown or blocked
 tackroom doctor   # check skills, roles, pins, audits and hooks
 tackroom hosts    # every machine in crons.hosts: version, sync state, config commit
 ```
@@ -45,7 +45,7 @@ Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GE
 
 - **Pin**: each external skill source is locked to a commit in `tackroom.lock`. Only `tackroom skill update` moves it.
 - **Audit**: outside content is scanned. An unaccepted CRITICAL finding stops it from syncing and the previous pin stays.
-- **Hold**: a new pin, or a new exact npm or PyPI version, waits until it is 72 hours old. `tackroom sync --allow-fresh` releases it.
+- **Cooldown**: a new pin, or a new exact npm or PyPI version, waits until it is 72 hours old. `tackroom sync --allow-fresh` skips the cooldown.
 
 ## Agents
 
@@ -59,7 +59,7 @@ Terminals: a `tackroom tmux` workspace for [tmux](https://yourconscience.github.
 - [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from` and `--overlay`, settings, upgrade and uninstall
 - [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
 - [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
-- [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and holds
+- [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and cooldowns
 - [Roles](https://yourconscience.github.io/tackroom/docs/roles/): role format, model tiers, per-agent output
 - [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
 - [Plugins](https://yourconscience.github.io/tackroom/docs/plugins/): Claude Code plugins, agent-plugins-spec sources and the Claude Code and Pi panels

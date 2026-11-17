@@ -14,7 +14,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 | `tackroom setup` | Creates the config root, imports what your harnesses have, runs the first sync, installs the periodic job and prints a short summary. See [setup.md](setup.md). |
 | `tackroom sync` | Writes each harness's native config from the repo. |
 | `tackroom sync --plan-digest DIGEST` | Syncs only if the plan is still the one a dry run printed. |
-| `tackroom status` | Shows per harness what is synced, drifted, held or blocked. |
+| `tackroom status` | Shows per harness what is synced, drifted, in cooldown or blocked. |
 | `tackroom pull` | Runs `git pull --ff-only` in the config root, then `sync`. This is what the periodic job runs. |
 | `tackroom restore` | Lists the backups of native files, newest first, or puts one back. |
 | `tackroom cron` | Installs, replaces or removes the periodic sync job. |
@@ -112,9 +112,9 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 `tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents a,b] [--json] [--allow-fresh[=item,...]] [--reason TEXT]`
 
 - `--pull` runs `tackroom pull` first.
-- `--dry-run` prints the plan, including held and blocked items, and writes nothing.
+- `--dry-run` prints the plan, including items in cooldown and blocked items, and writes nothing.
 - `--replace-conflicts` replaces a native file that differs from the shared copy, after a backup ([troubleshooting.md](troubleshooting.md#conflicts)).
-- `--allow-fresh` releases held items, and `--reason` records why ([skills.md](skills.md#the-72-hour-hold)).
+- `--allow-fresh` skips the cooldown of items, and `--reason` records why ([skills.md](skills.md#the-72-hour-cooldown)).
 - With `--json`, a dry run also lists:
   - `plan`, one line per harness plus one for starter files a sync would add, update or remove;
   - the `destructive` items: every skill, role, MCP server, hook, plugin, Pi package and starter file the sync removes, and every role it overwrites;
@@ -175,7 +175,7 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 - `tackroom skill new <name> [--description TEXT]`
 - `tackroom skill list [--agents a,b]`
 - `tackroom skill sources [--json]`
-- `tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync] [--allow-fresh[=item,...]]`: a `--latest` head younger than 72 hours is held until it is 72 hours old or `--allow-fresh` releases it.
+- `tackroom skill sources add <owner/repo[/path]> [--skills a,b | --all] [--latest] [--no-sync] [--allow-fresh[=item,...]]`: a `--latest` head younger than 72 hours is in cooldown until it is 72 hours old or `--allow-fresh` skips the cooldown.
 - `tackroom skill update [name ...] [--allow-fresh[=item,...]]`
 - `tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]`: see [skills.md](skills.md#publish-skills).
 
@@ -247,7 +247,7 @@ The config root cannot be, or sit inside, a linked git worktree. Machine-local s
 | `hosts fix` | Every fix it ran worked and left its host with no further fix, and none is left for you to run; always with `--dry-run` | A fix failed, a host still names a fix after it, or a fix is left for you to run |
 | `hosts setup` | Setup ran on the host, or `--dry-run` printed the commands | The host is unreachable, has no tackroom (and no `--install`), already has a config, or a command there failed |
 
-`status --exit-code` is the only form that returns 2: 0 when in sync, 1 on drift, 2 on any other error, such as a missing config. It does not count held or blocked items, hooks reported as unsupported, or the periodic sync warning as drift. `--help` exits 0.
+`status --exit-code` is the only form that returns 2: 0 when in sync, 1 on drift, 2 on any other error, such as a missing config. It does not count items in cooldown or blocked items, hooks reported as unsupported, or the periodic sync warning as drift. `--help` exits 0.
 
 ### Output
 

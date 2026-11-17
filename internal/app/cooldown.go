@@ -9,21 +9,41 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
-// holdEntry records the freshness decision for one immutable external
+// cooldownEntry records the minimum release age decision for one immutable external
 // reference, so it is looked up at most once and every machine sharing the lock
 // sees the same decision.
-type holdEntry struct {
-	Item        string       `yaml:"item"`
-	Ref         string       `yaml:"ref"`
-	PublishedAt string       `yaml:"published_at,omitempty"`
-	TimeSource  string       `yaml:"time_source"`
-	HoldUntil   string       `yaml:"hold_until,omitempty"`
-	Allowed     *holdAllowed `yaml:"allowed,omitempty"`
+type cooldownEntry struct {
+	Item          string           `yaml:"item"`
+	Ref           string           `yaml:"ref"`
+	PublishedAt   string           `yaml:"published_at,omitempty"`
+	TimeSource    string           `yaml:"time_source"`
+	CooldownUntil string           `yaml:"cooldown_until,omitempty"`
+	Allowed       *cooldownAllowed `yaml:"allowed,omitempty"`
 }
 
-type holdAllowed struct {
+// UnmarshalYAML also reads hold_until, the key tackroom 2.x wrote, so an entry
+// keeps its end time; cooldown_until wins when both are set.
+func (e *cooldownEntry) UnmarshalYAML(node *yaml.Node) error {
+	type plain cooldownEntry
+	var raw struct {
+		plain     `yaml:",inline"`
+		HoldUntil string `yaml:"hold_until"`
+	}
+	if err := node.Decode(&raw); err != nil {
+		return err
+	}
+	*e = cooldownEntry(raw.plain)
+	if e.CooldownUntil == "" {
+		e.CooldownUntil = raw.HoldUntil
+	}
+	return nil
+}
+
+type cooldownAllowed struct {
 	At     string `yaml:"at"`
 	Reason string `yaml:"reason,omitempty"`
 }
@@ -35,12 +55,12 @@ type gateOptions struct {
 	allowItems map[string]bool
 	reason     string
 	// dry is set by sync --dry-run to collect what the run cannot decide
-	// without a registry lookup, and what --allow-fresh would release.
+	// without a registry lookup, and what --allow-fresh would let through.
 	dry *dryGateNotes
 }
 
 // dryGateNotes maps item to lock ref for the two cases a dry run reports apart
-// from held items.
+// from items in cooldown.
 type dryGateNotes struct {
 	unchecked map[string]string
 	released  map[string]string
@@ -74,7 +94,7 @@ func (f allowFreshFlag) Set(v string) error {
 }
 
 func addAllowFreshFlags(fs *flag.FlagSet, opts *runOptions) {
-	fs.Var(allowFreshFlag{opts}, "allow-fresh", "Release held fresh items: all, or --allow-fresh=item[,item...]")
+	fs.Var(allowFreshFlag{opts}, "allow-fresh", "Skip the cooldown: all items, or --allow-fresh=item[,item...]")
 	fs.StringVar(&opts.AllowFreshReason, "reason", "", "Reason recorded with --allow-fresh (optional)")
 }
 
@@ -86,16 +106,16 @@ func gateOptionsFor(opts runOptions) gateOptions {
 	return g
 }
 
-// holdsChanged reports whether lock.Holds differs from what is on disk.
-func holdsChanged(repoRoot string, lock lockFile) bool {
+// cooldownsChanged reports whether lock.Cooldowns differs from what is on disk.
+func cooldownsChanged(repoRoot string, lock lockFile) bool {
 	disk, err := readLockFile(repoRoot)
 	if err != nil {
 		return true
 	}
-	if len(disk.Holds) == 0 && len(lock.Holds) == 0 {
+	if len(disk.Cooldowns) == 0 && len(lock.Cooldowns) == 0 {
 		return false
 	}
-	return !reflect.DeepEqual(disk.Holds, lock.Holds)
+	return !reflect.DeepEqual(disk.Cooldowns, lock.Cooldowns)
 }
 
 const (
@@ -105,11 +125,11 @@ const (
 	timeSourceUnknown = "unknown"
 )
 
-// holdResolver looks up a package release; tests and demos can replace it.
-var holdResolver packageAgeResolver = resolvePackageRelease
+// cooldownResolver looks up a package release; tests and demos can replace it.
+var cooldownResolver packageAgeResolver = resolvePackageRelease
 
-func holdIndex(lock lockFile, item, ref string) int {
-	for i, h := range lock.Holds {
+func cooldownIndex(lock lockFile, item, ref string) int {
+	for i, h := range lock.Cooldowns {
 		if h.Item == item && h.Ref == ref {
 			return i
 		}
@@ -117,85 +137,85 @@ func holdIndex(lock lockFile, item, ref string) int {
 	return -1
 }
 
-// decideHold applies the freshness rule to one reference. A reference with a
+// decideCooldown applies the minimum release age to one reference. A reference with a
 // decision in the lock costs no lookup, except "unknown", which is retried.
 // lookup is nil when the caller may not reach the network (status): an
-// undecided reference is then not held.
-func decideHold(item, ref string, lock *lockFile, opts gateOptions, lookup func() (time.Time, string, error)) (heldItem, bool) {
-	idx := holdIndex(*lock, item, ref)
+// undecided reference is then not in cooldown.
+func decideCooldown(item, ref string, lock *lockFile, opts gateOptions, lookup func() (time.Time, string, error)) (gatedItem, bool) {
+	idx := cooldownIndex(*lock, item, ref)
 	if idx < 0 && lookup == nil && opts.dry != nil {
 		if opts.allows(item) {
 			opts.dry.released[item] = ref
 		} else {
 			opts.dry.unchecked[item] = ref
 		}
-		return heldItem{}, false
+		return gatedItem{}, false
 	}
-	if idx < 0 || (lock.Holds[idx].TimeSource == timeSourceUnknown && lock.Holds[idx].Allowed == nil && lookup != nil) {
+	if idx < 0 || (lock.Cooldowns[idx].TimeSource == timeSourceUnknown && lock.Cooldowns[idx].Allowed == nil && lookup != nil) {
 		if lookup == nil {
-			return heldItem{}, false
+			return gatedItem{}, false
 		}
-		entry := holdEntry{Item: item, Ref: ref, TimeSource: timeSourceUnknown}
+		entry := cooldownEntry{Item: item, Ref: ref, TimeSource: timeSourceUnknown}
 		if published, source, err := lookup(); err == nil && !published.IsZero() {
 			entry.PublishedAt = published.UTC().Format(time.RFC3339)
 			entry.TimeSource = source
-			entry.HoldUntil = published.Add(defaultPackageAgeMinimum).UTC().Format(time.RFC3339)
+			entry.CooldownUntil = published.Add(defaultPackageAgeMinimum).UTC().Format(time.RFC3339)
 		}
 		if idx < 0 {
-			// A registry reference whose hold already ended guards nothing;
+			// A registry reference whose cooldown already ended guards nothing;
 			// recording it would only change the lock on every new machine.
-			if !holdInForce(entry, opts.now) && !opts.allows(item) && !strings.HasPrefix(ref, "git:") {
-				return heldItem{}, false
+			if !cooldownInForce(entry, opts.now) && !opts.allows(item) && !strings.HasPrefix(ref, "git:") {
+				return gatedItem{}, false
 			}
-			lock.Holds = append(lock.Holds, entry)
-			idx = len(lock.Holds) - 1
+			lock.Cooldowns = append(lock.Cooldowns, entry)
+			idx = len(lock.Cooldowns) - 1
 		} else {
-			entry.Allowed = lock.Holds[idx].Allowed
-			lock.Holds[idx] = entry
+			entry.Allowed = lock.Cooldowns[idx].Allowed
+			lock.Cooldowns[idx] = entry
 		}
 	}
-	entry := &lock.Holds[idx]
+	entry := &lock.Cooldowns[idx]
 	if entry.Allowed == nil && opts.allows(item) {
-		if opts.dry != nil && holdInForce(*entry, opts.now) {
+		if opts.dry != nil && cooldownInForce(*entry, opts.now) {
 			opts.dry.released[item] = ref
 		}
-		entry.Allowed = &holdAllowed{At: opts.now.UTC().Format(time.RFC3339), Reason: opts.reason}
+		entry.Allowed = &cooldownAllowed{At: opts.now.UTC().Format(time.RFC3339), Reason: opts.reason}
 	}
 	if entry.Allowed != nil {
-		return heldItem{}, false
+		return gatedItem{}, false
 	}
 	command := "tackroom sync --allow-fresh=" + item
 	if entry.TimeSource == timeSourceUnknown {
-		return heldItem{Item: item, Kind: "held", Reason: "publish time unknown for " + ref, Command: command}, true
+		return gatedItem{Item: item, Kind: "cooldown", Reason: "publish time unknown for " + ref, Command: command}, true
 	}
-	until, err := time.Parse(time.RFC3339, entry.HoldUntil)
+	until, err := time.Parse(time.RFC3339, entry.CooldownUntil)
 	if err != nil || !opts.now.Before(until) {
-		return heldItem{}, false
+		return gatedItem{}, false
 	}
-	return heldItem{Item: item, Kind: "held", Reason: fmt.Sprintf("%s published %s (%s)", ref, entry.PublishedAt, entry.TimeSource),
-		Until: entry.HoldUntil, Command: command}, true
+	return gatedItem{Item: item, Kind: "cooldown", Reason: fmt.Sprintf("%s published %s (%s)", ref, entry.PublishedAt, entry.TimeSource),
+		Until: entry.CooldownUntil, Command: command}, true
 }
 
-// holdInForce reports whether an undecided-or-unexpired hold still blocks sync.
-func holdInForce(entry holdEntry, now time.Time) bool {
+// cooldownInForce reports whether an undecided-or-unexpired cooldown still blocks sync.
+func cooldownInForce(entry cooldownEntry, now time.Time) bool {
 	if entry.TimeSource == timeSourceUnknown {
 		return true
 	}
-	until, err := time.Parse(time.RFC3339, entry.HoldUntil)
+	until, err := time.Parse(time.RFC3339, entry.CooldownUntil)
 	return err == nil && now.Before(until)
 }
 
-// gateSourceFreshness holds a new external skill pin until 72 hours after the
+// gateSourceFreshness keeps a new external skill pin in cooldown until 72 hours after the
 // committer date of its commit, read from the local clone. Commit dates are
 // author-controlled, so this is weaker than a registry publish time.
-func gateSourceFreshness(src externalSkillSource, home string, item string, lock *lockFile, opts gateOptions) (heldItem, bool) {
+func gateSourceFreshness(src externalSkillSource, home string, item string, lock *lockFile, opts gateOptions) (gatedItem, bool) {
 	cachePath := filepath.Join(externalCacheDir(home), sourceName(src))
 	commit := externalSkillCommitFull(cachePath)
 	if commit == "" {
-		return heldItem{}, false
+		return gatedItem{}, false
 	}
 	ref := "git:" + src.URL + "@" + commit
-	return decideHold(item, ref, lock, opts, func() (time.Time, string, error) {
+	return decideCooldown(item, ref, lock, opts, func() (time.Time, string, error) {
 		out, err := exec.Command("git", "-C", cachePath, "show", "-s", "--format=%cI", commit).Output()
 		if err != nil {
 			return time.Time{}, "", err
@@ -205,13 +225,13 @@ func gateSourceFreshness(src externalSkillSource, home string, item string, lock
 	})
 }
 
-// heldSourceCommit is the commit of an unpinned source's hold that is still in
-// force and not released, or "" when there is none.
-func heldSourceCommit(lock lockFile, src externalSkillSource, now time.Time) string {
+// cooldownSourceCommit is the commit of an unpinned source's cooldown that is still in
+// force and not skipped, or "" when there is none.
+func cooldownSourceCommit(lock lockFile, src externalSkillSource, now time.Time) string {
 	prefix := "git:" + src.URL + "@"
 	commit := ""
-	for _, h := range lock.Holds {
-		if strings.HasSuffix(h.Item, ":"+sourceName(src)) && strings.HasPrefix(h.Ref, prefix) && h.Allowed == nil && holdInForce(h, now) {
+	for _, h := range lock.Cooldowns {
+		if strings.HasSuffix(h.Item, ":"+sourceName(src)) && strings.HasPrefix(h.Ref, prefix) && h.Allowed == nil && cooldownInForce(h, now) {
 			commit = strings.TrimPrefix(h.Ref, prefix)
 		}
 	}
@@ -240,9 +260,9 @@ func lockRef(r packageReference) string {
 	return "npm:" + r.Package + "@" + r.Version
 }
 
-func holdLookup(r packageReference, source string) func() (time.Time, string, error) {
+func cooldownLookup(r packageReference, source string) func() (time.Time, string, error) {
 	return func() (time.Time, string, error) {
-		rel, err := holdResolver(r)
+		rel, err := cooldownResolver(r)
 		if err != nil {
 			return time.Time{}, "", err
 		}
@@ -267,19 +287,19 @@ func piPackageReference(spec, source string) (packageReference, bool) {
 	return packageReference{Ecosystem: ecosystemNPM, Package: pkg, Version: version, Source: source}, true
 }
 
-// gatePackages holds new exact-version references of MCP servers and Pi
-// packages. "New" means neither decided in the lock nor already present in a
-// harness config, so an upgrade of tackroom never holds what is already synced.
+// gatePackages puts new exact-version references of MCP servers and Pi
+// packages in cooldown. "New" means neither decided in the lock nor already present in a
+// harness config, so an upgrade of tackroom never puts what is already synced in cooldown.
 // With resolve false (status) nothing touches the network or the lock file.
-func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, opts gateOptions, resolve bool) (map[string]heldItem, error) {
+func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, opts gateOptions, resolve bool) (map[string]gatedItem, error) {
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
 		return nil, err
 	}
-	held := map[string]heldItem{}
+	gated := map[string]gatedItem{}
 	newRefs := map[string]bool{}
-	cfg.heldMCP = map[string]bool{}
-	cfg.heldHome = home
+	cfg.cooldownMCP = map[string]bool{}
+	cfg.cooldownHome = home
 
 	for _, server := range cfg.MCPServers {
 		if !server.Enabled {
@@ -294,11 +314,11 @@ func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, op
 			newRefs[item+"|"+ref] = true
 			var lookup func() (time.Time, string, error)
 			if resolve {
-				lookup = holdLookup(r, timeSourceFor(r))
+				lookup = cooldownLookup(r, timeSourceFor(r))
 			}
-			if h, ok := decideHold(item, ref, &lock, opts, lookup); ok {
-				held[item] = h
-				cfg.heldMCP[server.Name] = true
+			if h, ok := decideCooldown(item, ref, &lock, opts, lookup); ok {
+				gated[item] = h
+				cfg.cooldownMCP[server.Name] = true
 			}
 		}
 	}
@@ -326,14 +346,14 @@ func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, op
 			// Sync installs packages only for a detected agent, so one not on
 			// this machine needs no lookup; a decision in the lock still applies.
 			if resolve && isDetected(agent) {
-				lookup = holdLookup(r, timeSourceNPM)
+				lookup = cooldownLookup(r, timeSourceNPM)
 			}
-			h, isHeld := decideHold(item, ref, &lock, opts, lookup)
-			if !isHeld {
+			h, inCooldown := decideCooldown(item, ref, &lock, opts, lookup)
+			if !inCooldown {
 				kept = append(kept, spec)
 				continue
 			}
-			held[item] = h
+			gated[item] = h
 			// The previously synced version of the package stays as it is.
 			for _, old := range actual {
 				if o, ok := piPackageReference(old, ""); ok && o.Package == r.Package {
@@ -346,22 +366,22 @@ func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, op
 	}
 
 	// Drop decisions that expired unallowed and no longer guard anything.
-	var keep []holdEntry
-	for _, h := range lock.Holds {
-		until, err := time.Parse(time.RFC3339, h.HoldUntil)
+	var keep []cooldownEntry
+	for _, h := range lock.Cooldowns {
+		until, err := time.Parse(time.RFC3339, h.CooldownUntil)
 		expired := err == nil && !opts.now.Before(until)
 		if h.Allowed == nil && expired && !newRefs[h.Item+"|"+h.Ref] && !strings.HasPrefix(h.Ref, "git:") {
 			continue
 		}
 		keep = append(keep, h)
 	}
-	lock.Holds = keep
-	if resolve && holdsChanged(repoRoot, lock) {
+	lock.Cooldowns = keep
+	if resolve && cooldownsChanged(repoRoot, lock) {
 		if err := writeLockFile(repoRoot, lock); err != nil {
 			return nil, err
 		}
 	}
-	return held, nil
+	return gated, nil
 }
 
 // mcpRefSynced reports whether any harness already carries this server at the

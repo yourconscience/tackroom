@@ -118,7 +118,7 @@ Skills that skillshare linked into a harness are relinked to the canonical copy 
 ### Verify
 
 - `tackroom status` shows every harness synced with no drift.
-- `tackroom doctor` has no failures, and any held or blocked item has a reason in `status`.
+- `tackroom doctor` has no failures, and any item in cooldown or blocked has a reason in `status`.
 - `tackroom hook list` and `tackroom mcp list` match what skillshare used to write.
 
 ### Clean up

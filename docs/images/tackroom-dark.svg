@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="688" height="495" viewBox="0 0 688 495" role="img" aria-labelledby="t">
-  <title id="t">tackroom setup and tackroom sync output: seven agents synced, one external skill source pinned at b09718b, one item blocked and one held</title>
+  <title id="t">tackroom setup and tackroom sync output: seven agents synced, one external skill source pinned at b09718b, one item blocked and one in cooldown</title>
   <style>
     text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", "DejaVu Sans Mono", monospace; font-size: 14px; fill: #e8e8ea; white-space: pre; }
     .d { fill: #9d9da3; } .o { fill: #55c38f; } .y { fill: #f0a54a; } .h { fill: #6aaef0; font-weight: 600; }
@@ -29,5 +29,5 @@
   <text x="24" y="423">│ grok    │ <tspan class="o">✓ synced</tspan> │ 3      │ 6      │ -   │ -     │ -       │ -        │</text>
   <text x="24" y="440">╰─────────┴──────────┴────────┴────────┴─────┴───────┴─────────┴──────────╯</text>
   <text x="24" y="457"><tspan class="d">...</tspan></text>
-  <text x="24" y="474"><tspan class="y">skipped 1 blocked and 1 held item(s)</tspan>; see tackroom status</text>
+  <text x="24" y="474"><tspan class="y">skipped 1 blocked item(s) and 1 item(s) in cooldown</tspan>; see tackroom status</text>
 </svg>

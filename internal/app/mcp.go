@@ -56,7 +56,7 @@ func desiredMCPServersForAgent(cfg config, agentName string) []mcpServerConfig {
 		if agentName == agentCodex && cfg.codexPluginMCP[server.Name] {
 			continue
 		}
-		// Apply agent targeting before the freshness hold, so a held server is
+		// Apply agent targeting before the cooldown, so a server in cooldown is
 		// not retained for an agent that no longer targets it.
 		if len(server.Agents) == 0 {
 			if !hasMCPSupport(agentName) {
@@ -65,9 +65,9 @@ func desiredMCPServersForAgent(cfg config, agentName string) []mcpServerConfig {
 		} else if !stringInSlice(agentName, server.Agents) {
 			continue
 		}
-		if cfg.heldMCP[server.Name] {
-			// Inside its freshness hold: keep the entry the harness already has.
-			if existing, err := readNativeMCPServer(agentName, server.Name, cfg.heldHome); err == nil {
+		if cfg.cooldownMCP[server.Name] {
+			// In cooldown: keep the entry the harness already has.
+			if existing, err := readNativeMCPServer(agentName, server.Name, cfg.cooldownHome); err == nil {
 				existing.Enabled, existing.Agents = true, server.Agents
 				servers = append(servers, existing)
 			}

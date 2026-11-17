@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>tackroom: one ~/.agents repo for 15 coding agents, every outside skill pinned</title>
-<meta name="description" content="tackroom syncs one ~/.agents repo into 15 coding agents and pins every outside skill to a commit. It audits them and holds anything newer than 72 hours.">
+<meta name="description" content="tackroom syncs one ~/.agents repo into 15 coding agents and pins every outside skill to a commit. It audits them and puts anything newer than 72 hours in cooldown.">
 <link rel="canonical" href="https://yourconscience.github.io/tackroom/">
 <meta name="color-scheme" content="light dark">
 <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
@@ -71,7 +71,7 @@
       </div>
       <figure class="vw-frame">
         <figcaption>tackroom view, Overview at tablet width (demo home, excerpt)</figcaption>
-        <div class="vw" role="img" aria-label="The Overview tab of tackroom view: all synced. Outside sources: agent-skills pinned at b09718b; lint-skills held until Saturday, with the command that takes it now; shell-kit blocked by one critical audit finding, with the command that accepts it. Agents claude, codex and pi synced.">
+        <div class="vw" role="img" aria-label="The Overview tab of tackroom view: all synced. Outside sources: agent-skills pinned at b09718b; lint-skills in cooldown until Saturday, with the command that skips the cooldown; shell-kit blocked by one critical audit finding, with the command that accepts it. Agents claude, codex and pi synced.">
           <div class="vw-bar"><img src="logo.svg" width="24" height="24" alt=""><b>tackroom</b><svg class="ico vw-menu" aria-hidden="true"><use href="#i-menu"/></svg></div>
           <div class="vw-body">
             <div class="vw-top"><b class="vw-h">Overview</b><span class="vw-chip"><svg class="ico ok" aria-hidden="true"><use href="#i-ok"/></svg>All synced</span><span class="vw-btn">Sync</span></div>
@@ -82,7 +82,7 @@
                 <span class="vw-meta">github.com/acme/agent-skills</span>
               </li>
               <li>
-                <div class="vw-head"><svg class="ico warn" aria-hidden="true"><use href="#i-timer"/></svg><b>lint-skills</b><span class="tag t-warn"><span class="g">!</span><span class="w">held until <code>Sat 23:38</code></span></span><span class="tag t-ok"><span class="g">✓</span><span class="w">audit pass</span></span></div>
+                <div class="vw-head"><svg class="ico warn" aria-hidden="true"><use href="#i-timer"/></svg><b>lint-skills</b><span class="tag t-warn"><span class="g">!</span><span class="w">cooldown until <code>Sat 23:38</code></span></span><span class="tag t-ok"><span class="g">✓</span><span class="w">audit pass</span></span></div>
                 <span class="vw-meta">github.com/example/lint-skills · new 6100a81</span>
                 <code class="vw-cmd">tackroom sync --allow-fresh=skill:lint-skills</code>
               </li>
@@ -107,7 +107,7 @@
     <div class="wrap">
       <div class="head">
         <h2 id="video-title">tackroom in 24 seconds</h2>
-        <p id="video-desc">A tour set to music: outside skills pinned, audited and held, a sync from the web view, the 15 agents, and the install command.</p>
+        <p id="video-desc">A tour set to music: outside skills pinned, audited and in cooldown, a sync from the web view, the 15 agents, and the install command.</p>
       </div>
       <video controls preload="none" playsinline poster="brag.jpg" width="1920" height="1080" aria-describedby="video-desc"><source src="brag.mp4" type="video/mp4"></video>
       <p class="credit">Music: <a href="https://freemusicarchive.org/music/C_Scott/Stage_Theory_Beats_vol_3/CScott_-_Stage_Theory_Beats_vol_3_-_06_Belview1/">Belview</a> by C. Scott, <a href="https://creativecommons.org/licenses/by/3.0/">CC BY 3.0</a>, cut to 24 seconds and faded.</p>
@@ -153,7 +153,7 @@
     <div class="wrap">
       <div class="head">
         <h2 id="lock-title">Outside skills are dependencies</h2>
-        <p>A skill from someone else's repo is code your agents will run. tackroom pins it in <code>tackroom.lock</code>, audits it, and holds anything under 72 hours old.</p>
+        <p>A skill from someone else's repo is code your agents will run. tackroom pins it in <code>tackroom.lock</code>, audits it, and puts anything under 72 hours old in cooldown.</p>
       </div>
       <div class="lock-grid">
         <figure class="term">
@@ -164,13 +164,13 @@
       branch: main
       commit: <span class="h">b09718b944a55af3ffc686d6914b7e77b5a77775</span>
 <span class="d">      ...</span>
-holds:
+cooldowns:
 <span class="d">      ...</span>
     - item: <span class="y">skill:lint-skills</span>
       ref: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599
       published_at: "2026-11-11T23:38:13Z"
       time_source: git-commit-date
-      hold_until: <span class="y">"2026-11-14T23:38:13Z"</span></pre>
+      cooldown_until: <span class="y">"2026-11-14T23:38:13Z"</span></pre>
           <details class="full"><summary>Show the whole file</summary>
 <pre><span class="d"># Managed by tackroom sync / tackroom skill update. Pins commits and materialized skill ownership.</span>
 version: 1
@@ -182,17 +182,17 @@ external_skills:
       materialized:
         - code-review
         - pr-shepherd
-holds:
+cooldowns:
     - item: skill:agent-skills
       ref: git:https://github.com/acme/agent-skills@b09718b944a55af3ffc686d6914b7e77b5a77775
       published_at: "2026-10-02T11:00:00Z"
       time_source: git-commit-date
-      hold_until: "2026-10-05T11:00:00Z"
+      cooldown_until: "2026-10-05T11:00:00Z"
     - item: <span class="y">skill:lint-skills</span>
       ref: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599
       published_at: "2026-11-11T23:38:13Z"
       time_source: git-commit-date
-      hold_until: <span class="y">"2026-11-14T23:38:13Z"</span></pre>
+      cooldown_until: <span class="y">"2026-11-14T23:38:13Z"</span></pre>
           </details>
         </figure>
         <ul class="states">
@@ -208,11 +208,11 @@ holds:
           <li>
             <svg class="ico" aria-hidden="true"><use href="#i-timer"/></svg>
             <div class="state-body">
-              <span class="tag t-warn"><span class="g">!</span><span class="w">held <code>41h of 72h</code></span></span>
-              <div class="hold"><div class="hold-track" role="img" aria-label="41 of 72 hours elapsed"><i></i><b></b></div><span class="hold-meta">31h left</span></div>
+              <span class="tag t-warn"><span class="g">!</span><span class="w">cooldown <code>41h of 72h</code></span></span>
+              <div class="cooldown"><div class="cooldown-track" role="img" aria-label="41 of 72 hours elapsed"><i></i><b></b></div><span class="cooldown-meta">31h left</span></div>
               <span class="real"><span class="d">$ tackroom status</span>
-  held skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); hold ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</span>
-              <p>Sync skips it and agents keep what they have. Wait, or release it now with <code>tackroom sync --allow-fresh=skill:lint-skills</code>.</p>
+  cooldown skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); cooldown ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</span>
+              <p>Sync skips it and agents keep what they have. Wait, or skip the cooldown now with <code>tackroom sync --allow-fresh=skill:lint-skills</code>.</p>
             </div>
           </li>
           <li>
@@ -244,7 +244,7 @@ holds:
           </li>
         </ul>
       </div>
-      <p class="lock-foot">New exact npm and PyPI versions in MCP servers and Pi packages get the same hold. Your own skills, roles, hooks and MCP entries are reported, never blocked. Demo output, captured 2026-11-13. <a href="docs/skills/">How it works</a></p>
+      <p class="lock-foot">New exact npm and PyPI versions in MCP servers and Pi packages get the same cooldown. Your own skills, roles, hooks and MCP entries are reported, never blocked. Demo output, captured 2026-11-13. <a href="docs/skills/">How it works</a></p>
     </div>
   </section>
 
@@ -273,7 +273,7 @@ holds:
         <li>
           <div class="say">
             <h3>Sync</h3>
-            <p>Writes each agent's native config from the repo. Run it again any time; it changes only what drifted, and skips what is held or blocked.</p>
+            <p>Writes each agent's native config from the repo. Run it again any time; it changes only what drifted, and skips what is in cooldown or blocked.</p>
           </div>
           <figure class="term">
             <figcaption>after adding three skill sources and one MCP server</figcaption>
@@ -296,13 +296,13 @@ sources  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>
 │ grok    │ <span class="o">✓ synced</span> │ 3      │ 6      │ -   │ -     │ -       │ -        │
 ╰─────────┴──────────┴────────┴────────┴─────┴───────┴─────────┴──────────╯
 <span class="d">...</span>
-skipped 1 blocked and 1 held item(s); see tackroom status</pre>
+skipped 1 blocked item(s) and 1 item(s) in cooldown; see tackroom status</pre>
           </figure>
         </li>
         <li>
           <div class="say">
             <h3>Check</h3>
-            <p><code>tackroom view</code> opens the dashboard you work in: every agent's sync state, each outside source as pinned, held or blocked, and your scheduled jobs, on a desktop or a phone. From a shell, <code>tackroom status</code> shows what is synced, held or blocked and <code>tackroom doctor</code> checks skills, roles, pins, audits and hooks.</p>
+            <p><code>tackroom view</code> opens the dashboard you work in: every agent's sync state, each outside source as pinned, in cooldown or blocked, and your scheduled jobs, on a desktop or a phone. From a shell, <code>tackroom status</code> shows what is synced, in cooldown or blocked and <code>tackroom doctor</code> checks skills, roles, pins, audits and hooks.</p>
           </div>
           <figure class="term">
             <figcaption>$ tackroom status (excerpt, demo home)</figcaption>
@@ -315,9 +315,9 @@ claude   <span class="o">✓ synced</span>
 <span class="d">...</span>
 Everything is synced.
 
-held or blocked (skipped by sync)
+in cooldown or blocked (skipped by sync)
   <span class="r"><b>blocked</b></span> skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."
-  <span class="y"><b>held</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); hold ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
+  <span class="y"><b>cooldown</b></span> skill:lint-skills: git:https://github.com/example/lint-skills@6100a8179fa54931e4930385f1b0aded4afac599 published 2026-11-11T23:38:13Z (git-commit-date); cooldown ends 2026-11-14T23:38:13Z; override: tackroom sync --allow-fresh=skill:lint-skills</pre>
           </figure>
         </li>
       </ol>
@@ -334,7 +334,7 @@ held or blocked (skipped by sync)
       </div>
       <dl class="vs">
         <div><dt>One lockfile for every machine</dt><dd>External skills are pinned in <code>tackroom.lock</code>, which lives in your user-level config repo and is shared by every machine.</dd></div>
-        <div><dt>A 72-hour hold</dt><dd>New pins and new exact package versions wait 72 hours. A held item is skipped until you release it.</dd></div>
+        <div><dt>A 72-hour cooldown</dt><dd>New pins and new exact package versions wait 72 hours. An item in cooldown is skipped until the cooldown ends or you pass <code>--allow-fresh</code>.</dd></div>
         <div><dt>An audit gate</dt><dd>An unaccepted critical finding blocks the update, and the previous pin stays.</dd></div>
       </dl>
       <p class="more"><a href="docs/comparison/">Full comparison</a></p>

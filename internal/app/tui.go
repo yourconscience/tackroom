@@ -414,7 +414,7 @@ func tuiLockTable(opts runOptions) (tuiTable, error) {
 	for _, row := range lockRows(g) {
 		source, commit, audit := ui.Dim.Render(strings.TrimPrefix(row.Source, "https://")), ui.Dim.Render("-"), ui.Dim.Render("-")
 		if row.Source == "" {
-			source = ui.Dim.Render(oneLine(row.Reason)) // a held package
+			source = ui.Dim.Render(oneLine(row.Reason)) // a package in cooldown
 		}
 		if row.Commit != "" {
 			commit = row.Commit
@@ -426,8 +426,8 @@ func tuiLockTable(opts runOptions) (tuiTable, error) {
 			audit = tuiAuditCell(row.Findings, row.Critical)
 		}
 		state := tuiState("ok", "pinned")
-		if row.State == "held" || row.State == "blocked" {
-			state = tuiHeldState(heldItem{Kind: row.State, Until: row.Until}, now)
+		if row.State == "cooldown" || row.State == "blocked" {
+			state = tuiGatedState(gatedItem{Kind: row.State, Until: row.Until}, now)
 		} else if row.State != "pinned" {
 			state = tuiState("warn", row.State)
 		}
@@ -436,18 +436,18 @@ func tuiLockTable(opts runOptions) (tuiTable, error) {
 	return t, nil
 }
 
-// tuiHeldState words a held or blocked item. A hold's age is how much of the
-// freshness window has passed: the window minus the time left until it ends.
-func tuiHeldState(h heldItem, now time.Time) string {
+// tuiGatedState words an item in cooldown or blocked. A cooldown's age is how much of the
+// minimum release age has passed: the minimum release age minus the time left until it ends.
+func tuiGatedState(h gatedItem, now time.Time) string {
 	if h.Kind == "blocked" {
 		return tuiState("fail", "blocked")
 	}
 	until, err := time.Parse(time.RFC3339, h.Until)
 	if err != nil {
-		return tuiState("warn", "held, age unknown")
+		return tuiState("warn", "cooldown, age unknown")
 	}
 	age := min(max(defaultPackageAgeMinimum-until.Sub(now), 0), defaultPackageAgeMinimum)
-	return tuiState("warn", fmt.Sprintf("held %dh of %dh", int(age.Hours()), int(defaultPackageAgeMinimum.Hours())))
+	return tuiState("warn", fmt.Sprintf("cooldown %dh of %dh", int(age.Hours()), int(defaultPackageAgeMinimum.Hours())))
 }
 
 // tuiAuditCell words the findings `doctor audit` lists for an item that the

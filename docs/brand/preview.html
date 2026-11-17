@@ -362,12 +362,12 @@
   .vocab { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
   .vocab li { display: grid; gap: 6px; }
   .vocab p { color: var(--tr-muted); }
-  .hold { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; width: 100%; max-width: 358px; }
-  .hold-track { position: relative; height: var(--tr-rail-width); background: var(--tr-line); }
-  .hold-track i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p); background: var(--tr-warn); }
-  .hold-track b { position: absolute; top: -5px; width: 1px; height: 13px; background: var(--tr-line-strong); }
-  .hold-track b:nth-of-type(1) { left: 33.33%; } .hold-track b:nth-of-type(2) { left: 66.66%; } .hold-track b:nth-of-type(3) { right: 0; width: 2px; background: var(--tr-text); }
-  .hold-meta { font: 400 var(--tr-fs-caption)/1 var(--tr-font-mono); color: var(--tr-muted); }
+  .cooldown { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; width: 100%; max-width: 358px; }
+  .cooldown-track { position: relative; height: var(--tr-rail-width); background: var(--tr-line); }
+  .cooldown-track i { position: absolute; left: 0; top: 0; bottom: 0; width: var(--p); background: var(--tr-warn); }
+  .cooldown-track b { position: absolute; top: -5px; width: 1px; height: 13px; background: var(--tr-line-strong); }
+  .cooldown-track b:nth-of-type(1) { left: 33.33%; } .cooldown-track b:nth-of-type(2) { left: 66.66%; } .cooldown-track b:nth-of-type(3) { right: 0; width: 2px; background: var(--tr-text); }
+  .cooldown-meta { font: 400 var(--tr-fs-caption)/1 var(--tr-font-mono); color: var(--tr-muted); }
 
   /* lock list, used by the hero and the dashboard tile */
   .locks { list-style: none; margin: 0; padding: 0; border-top: var(--tr-rail-width) solid var(--tr-rail); }
@@ -505,7 +505,7 @@
       <div><span class="spec">H2 28</span><h2>Every agent on one rail</h2></div>
       <div><span class="spec">H3 21</span><h3>External skills wait 72 hours</h3></div>
       <div><span class="spec">Lead 18</span><p style="font-size: var(--tr-fs-lead)">One <code>~/.agents</code> repo, synced into each agent's own config format.</p></div>
-      <div><span class="spec">Body 16</span><p>A new external skill pin is held until it is 72 hours old. <code>sync --allow-fresh</code> releases it early and records that you did.</p></div>
+      <div><span class="spec">Body 16</span><p>A new external skill pin is in cooldown until it is 72 hours old. <code>sync --allow-fresh</code> skips the cooldown and records that you did.</p></div>
       <div><span class="spec">Mono 14</span><code>code-review  pinned  a1f9c02  acme/agent-skills</code></div>
     </div>
   </section>
@@ -537,8 +537,8 @@
     <ul class="vocab">
       <li><span><span class="tag t-ok"><span class="g">✓</span><span class="w">synced</span></span></span><p>The agent's native config matches the repo.</p></li>
       <li><span><span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>a1f9c02</code></span></span></span><p>An external skill is locked to this commit in <code>tackroom.lock</code>.</p></li>
-      <li><span><span class="tag t-warn"><span class="g">!</span><span class="w">held <code>41h of 72h</code></span></span></span>
-        <div class="hold"><div class="hold-track" role="img" aria-label="41 of 72 hours elapsed"><i style="--p: 56.9%"></i><b></b><b></b><b></b></div><span class="hold-meta">31h left</span></div>
+      <li><span><span class="tag t-warn"><span class="g">!</span><span class="w">cooldown <code>41h of 72h</code></span></span></span>
+        <div class="cooldown"><div class="cooldown-track" role="img" aria-label="41 of 72 hours elapsed"><i style="--p: 56.9%"></i><b></b><b></b><b></b></div><span class="cooldown-meta">31h left</span></div>
         <p>A new pin is younger than 72 hours. It syncs on its own when the time runs out.</p></li>
       <li><span><span class="tag t-ok"><span class="g">✓</span><span class="w">audit pass</span></span></span><p>No findings in the pinned content.</p></li>
       <li><span><span class="tag t-warn"><span class="g">!</span><span class="w">audit finding <code>net-fetch</code></span></span></span><p>A finding is open. An unaccepted critical finding becomes <span class="bad mono">✗</span> blocked and the previous pin stays.</p></li>
@@ -554,14 +554,14 @@
       <div class="hero">
         <div class="hero-nav"><svg aria-hidden="true"><use href="#mark"/></svg><span class="wm">tackroom</span><a href="#">GitHub</a></div>
         <h1>Your agent setup, pinned to a commit.</h1>
-        <p class="line">One <code>~/.agents</code> repo for skills, MCP servers, hooks, roles and plugins, synced into 15 coding agents. Outside skills are pinned, audited and held 72 hours before any agent sees them.</p>
+        <p class="line">One <code>~/.agents</code> repo for skills, MCP servers, hooks, roles and plugins, synced into 15 coding agents. Outside skills are pinned, audited and in cooldown for 72 hours before any agent sees them.</p>
         <div class="cmd"><code>brew install yourconscience/tap/tackroom</code><button type="button"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg>Copy</button></div>
         <div class="lockview">
           <div class="lockview-head">tackroom.lock<span>4 external skills</span></div>
           <ul class="locks">
             <li><svg class="ico pin" aria-hidden="true"><use href="#i-pin"/></svg><div><div class="nm">code-review</div><div class="src">acme/agent-skills</div></div><div class="st"><span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>a1f9c02</code></span></span></div></li>
             <li><svg class="ico pin" aria-hidden="true"><use href="#i-pin"/></svg><div><div class="nm">pr-shepherd</div><div class="src">acme/agent-skills</div></div><div class="st"><span class="tag t-pin"><span class="g">✓</span><span class="w">pinned <code>7be4d10</code></span></span></div></li>
-            <li><svg class="ico" aria-hidden="true"><use href="#i-timer"/></svg><div><div class="nm">lint-guard</div><div class="src">example/lint-skills</div></div><div class="st"><span class="tag t-warn"><span class="g">!</span><span class="w">held <code>41h of 72h</code></span></span><div class="hold"><div class="hold-track" role="img" aria-label="41 of 72 hours elapsed"><i style="--p: 56.9%"></i><b></b><b></b><b></b></div><span class="hold-meta">31h left</span></div></div></li>
+            <li><svg class="ico" aria-hidden="true"><use href="#i-timer"/></svg><div><div class="nm">lint-guard</div><div class="src">example/lint-skills</div></div><div class="st"><span class="tag t-warn"><span class="g">!</span><span class="w">cooldown <code>41h of 72h</code></span></span><div class="cooldown"><div class="cooldown-track" role="img" aria-label="41 of 72 hours elapsed"><i style="--p: 56.9%"></i><b></b><b></b><b></b></div><span class="cooldown-meta">31h left</span></div></div></li>
             <li><svg class="ico" aria-hidden="true"><use href="#i-audit"/></svg><div><div class="nm">shell-runner</div><div class="src">example/shell-kit</div></div><div class="st"><span class="tag t-warn"><span class="g">!</span><span class="w">audit finding <code>net-fetch</code></span></span></div></li>
           </ul>
         </div>
@@ -573,10 +573,10 @@
     <h2>Dashboard tile</h2>
     <div class="tile">
       <div class="tile-head"><h3>External skills</h3><span>checked 4 min ago</span></div>
-      <div class="seg-bar" role="img" aria-label="12 pinned, 1 held, 1 with a finding"><span style="flex: 12"></span><span class="w" style="flex: 1"></span><span class="w" style="flex: 1"></span></div>
+      <div class="seg-bar" role="img" aria-label="12 pinned, 1 in cooldown, 1 with a finding"><span style="flex: 12"></span><span class="w" style="flex: 1"></span><span class="w" style="flex: 1"></span></div>
       <ul class="counts">
         <li><b class="pin">12</b><span>pinned</span></li>
-        <li><b class="warn">1</b><span>held</span></li>
+        <li><b class="warn">1</b><span>cooldown</span></li>
         <li><b class="warn">1</b><span>finding</span></li>
       </ul>
       <ul class="locks">
@@ -599,10 +599,10 @@ cursor   <span class="y">! drifted</span>   <span class="d">2 files edited outsi
 dsh      <span class="r">✗ missing</span>   <span class="d">skills/code-review</span>
 
 <b>external skills</b>  <span class="d">tackroom.lock</span>
-  code-review    <span class="o">✓</span> pinned  <span class="h">a1f9c02</span>
-  pr-shepherd    <span class="o">✓</span> pinned  <span class="h">7be4d10</span>
-  lint-guard     <span class="y">! held</span>    <span class="d">41h of 72h</span>
-  shell-runner   <span class="y">! audit</span>   <span class="d">net-fetch in scripts/get.sh</span>
+  code-review    <span class="o">✓</span> pinned   <span class="h">a1f9c02</span>
+  pr-shepherd    <span class="o">✓</span> pinned   <span class="h">7be4d10</span>
+  lint-guard     <span class="y">! cooldown</span> <span class="d">41h of 72h</span>
+  shell-runner   <span class="y">! audit</span>    <span class="d">net-fetch in scripts/get.sh</span>
 
 <b>needs attention</b>  cursor, dsh, lint-guard, shell-runner</pre>
   </section>
@@ -614,7 +614,7 @@ dsh      <span class="r">✗ missing</span>   <span class="d">skills/code-review
       <div class="readme">
         <svg class="lg" role="img" aria-label="tackroom logo"><use href="#mark"/></svg>
         <h1>tackroom</h1>
-        <p>One <code>~/.agents</code> repo for every coding agent. Outside skills are pinned to a commit, audited, and held 72 hours.</p>
+        <p>One <code>~/.agents</code> repo for every coding agent. Outside skills are pinned to a commit, audited, and in cooldown for 72 hours.</p>
         <pre>brew install yourconscience/tap/tackroom
 tackroom setup</pre>
         <div class="links"><a href="#">Website</a><a href="#">Docs</a><a href="#">Releases</a></div>

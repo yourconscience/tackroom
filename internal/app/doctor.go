@@ -498,14 +498,14 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 			lockedNames[name] = true
 		}
 	}
-	held := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
+	gated := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
 	for _, src := range cfg.ExternalSkills {
 		if !src.Materialize {
 			continue
 		}
 		name := sourceName(src)
-		if _, ok := held[name]; ok {
-			continue // held or blocked: not materialized by design, not a defect
+		if _, ok := gated[name]; ok {
+			continue // in cooldown or blocked: not materialized by design, not a defect
 		}
 		pin := lockEntryFor(lock, src)
 		if pin == nil {
@@ -576,19 +576,19 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 	if len(issues) > 0 {
 		sort.Strings(issues)
 		detail := strings.Join(issues, "; ")
-		if note := heldBlockedNote(held); note != "" {
+		if note := gatedNote(gated); note != "" {
 			detail += "; " + note
 		}
 		return checkResult{"materialized external skills", checkStatusFail, detail}
 	}
 	if checked == 0 {
-		if note := heldBlockedNote(held); note != "" {
+		if note := gatedNote(gated); note != "" {
 			return checkResult{"materialized external skills", checkStatusPass, note}
 		}
 		return checkResult{"materialized external skills", checkStatusPass, "none configured"}
 	}
 	detail := fmt.Sprintf("%d canonical copies match lock", checked)
-	if note := heldBlockedNote(held); note != "" {
+	if note := gatedNote(gated); note != "" {
 		detail += "; " + note
 	}
 	return checkResult{"materialized external skills", checkStatusPass, detail}

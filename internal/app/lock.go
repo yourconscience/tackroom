@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -17,11 +18,34 @@ type lockFile struct {
 	Version         int                  `yaml:"version"`
 	ExternalSkills  []externalLockEntry  `yaml:"external_skills"`
 	PublishedSkills []publishedLockEntry `yaml:"published_skills,omitempty"`
-	// Accepted records audit findings the user accepted per item. Holds records
-	// the freshness decision for each new external reference. Older tackroom
+	// Accepted records audit findings the user accepted per item. Cooldowns records
+	// the minimum release age decision for each new external reference. Older tackroom
 	// versions ignore both keys on read and drop them when they rewrite the lock.
-	Accepted []acceptedFinding `yaml:"accepted,omitempty"`
-	Holds    []holdEntry       `yaml:"holds,omitempty"`
+	Accepted  []acceptedFinding `yaml:"accepted,omitempty"`
+	Cooldowns []cooldownEntry   `yaml:"cooldowns,omitempty"`
+}
+
+// UnmarshalYAML also reads the holds: key tackroom 2.x wrote, so every entry
+// in cooldown under the old key stays in cooldown. For an item and ref under
+// both keys the cooldowns: entry wins outright: an allowed on the old entry
+// alone is not carried over. Writes use cooldowns: only.
+func (l *lockFile) UnmarshalYAML(node *yaml.Node) error {
+	type plain lockFile
+	var raw struct {
+		plain `yaml:",inline"`
+		Holds []cooldownEntry `yaml:"holds"`
+	}
+	if err := node.Decode(&raw); err != nil {
+		return err
+	}
+	*l = lockFile(raw.plain)
+	current := len(l.Cooldowns)
+	for _, legacy := range raw.Holds {
+		if !slices.ContainsFunc(l.Cooldowns[:current], func(e cooldownEntry) bool { return e.Item == legacy.Item && e.Ref == legacy.Ref }) {
+			l.Cooldowns = append(l.Cooldowns, legacy)
+		}
+	}
+	return nil
 }
 
 // publishedLockEntry pins one skill pushed to a remote skill registry. It is the

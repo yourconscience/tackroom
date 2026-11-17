@@ -445,7 +445,7 @@ button.cell:disabled { cursor: default; }
 .verb.update { color: var(--text); }
 .verb.remove, .verb.conflict { color: var(--negative); }
 .verb.note { color: var(--faint); }
-.verb.held { color: var(--warning); }
+.verb.cooldown { color: var(--warning); }
 .verb.blocked { color: var(--negative); }
 .destructive { display: grid; gap: 8px; padding: 12px 14px; border-radius: var(--radius-card); background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
 .destructive label { display: flex; align-items: flex-start; gap: 10px; font-size: var(--fs-body); cursor: pointer; }

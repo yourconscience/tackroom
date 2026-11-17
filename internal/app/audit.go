@@ -116,13 +116,13 @@ func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResul
 	if err != nil {
 		return checkResult{checkName, checkStatusWarn, err.Error()}
 	}
-	held := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
+	gated := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
 	cacheRoot := externalCacheDir(home)
 	var issues []string
 	pinned := 0
 	for _, src := range cfg.ExternalSkills {
-		if _, ok := held[sourceName(src)]; ok {
-			continue // held or blocked: not an unpinned defect
+		if _, ok := gated[sourceName(src)]; ok {
+			continue // in cooldown or blocked: not an unpinned defect
 		}
 		if _, issue := sourcePinIssue(lock, src, cacheRoot); issue != "" {
 			issues = append(issues, sourceName(src)+" "+issue)
@@ -134,7 +134,7 @@ func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResul
 		return checkResult{checkName, checkStatusWarn, strings.Join(issues, "; ")}
 	}
 	detail := fmt.Sprintf("%d sources pinned and in sync", pinned)
-	if note := heldBlockedNote(held); note != "" {
+	if note := gatedNote(gated); note != "" {
 		detail += "; " + note
 	}
 	return checkResult{checkName, checkStatusPass, detail}

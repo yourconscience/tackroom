@@ -118,7 +118,7 @@ agents:
       - npm:pi-subagents@<exact-version>
 ```
 
-An exact npm version in `packages` is held until it is 72 hours old ([skills.md](skills.md#the-72-hour-hold)).
+An exact npm version in `packages` is in cooldown until it is 72 hours old ([skills.md](skills.md#the-72-hour-cooldown)).
 
 ### Grok Build and Cursor
 
