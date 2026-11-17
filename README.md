@@ -2,7 +2,7 @@
 
 # tackroom
 
-tackroom syncs one `~/.agents` repo into 15 coding agents and pins every outside skill to a commit.
+One repo for everything your coding agents read, including the parts that never port: MCP servers, hooks and subagents. 15 harnesses, each in its own format.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/tackroom-dark.svg">
