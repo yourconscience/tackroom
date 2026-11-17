@@ -131,8 +131,8 @@ func isMarkdownFile(file string) bool {
 	return ext == ".md" || ext == ".markdown"
 }
 
-// proseLines marks the lines of a Markdown file outside a code fence. Code in
-// a fence is what an agent runs, so only prose can be lowered, per match.
+// proseLines marks the lines of a Markdown file outside a code fence, where a
+// match is lowered one by one, when it is framed.
 func proseLines(file string, lines []string) []bool {
 	out := make([]bool, len(lines))
 	if !isMarkdownFile(file) {
@@ -200,11 +200,14 @@ func ruleMatch(rule auditRule, line string, prose bool) (match string, lowered b
 	return match, lowered
 }
 
-// loweredLines marks lines inside a comment or docstring of a script. A match
-// there is usually documentation. Markdown has no such lines.
+// loweredLines marks lines inside a Markdown code fence (for .md files) or a
+// comment or docstring (for scripts). A match there is usually documentation.
 func loweredLines(file string, lines []string) []bool {
 	out := make([]bool, len(lines))
 	if isMarkdownFile(file) {
+		for i, prose := range proseLines(file, lines) {
+			out[i] = !prose
+		}
 		return out
 	}
 	ext := strings.ToLower(filepath.Ext(file))
@@ -239,7 +242,8 @@ func loweredLines(file string, lines []string) []bool {
 
 // scanText applies every rule line by line. file is the path relative to the
 // item, used for lowering decisions and the evidence hash. A lowered match
-// counts one level lower: a script comment, or a framed match in Markdown prose.
+// counts one level lower: a script comment, a Markdown code fence, or a framed
+// match in Markdown prose.
 func scanText(file, text string) []ruleFinding {
 	var out []ruleFinding
 	seen := map[string]int{}

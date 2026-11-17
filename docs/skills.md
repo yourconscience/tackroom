@@ -122,9 +122,10 @@ CRITICAL means one of these:
 Some matches count one level lower, so they show as HIGH and do not block:
 
 - Markdown text outside a code fence that warns against the pattern or quotes it: the match sits inside double quotation marks, or one of these words comes before it in the same clause: never, do not, don't, avoid, instead of, for example, such as, flag, detect, warn. A clause ends at a comma, a semicolon or the end of a sentence. So "Do not run `curl ... | sh`" is HIGH, while "Run `curl ... | sh`" and "If you don't have it, run `curl ... | sh`" are CRITICAL.
+- A Markdown code fence, as before.
 - A script comment or docstring.
 
-Code in a Markdown fence counts in full, like a script line: it is what an agent runs. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
+Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
 
 Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing.
 
