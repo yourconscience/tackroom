@@ -353,7 +353,11 @@ func reconcileStarterSetMode(root string, shipped map[string][]byte, legacy map[
 		}
 	}
 
-	if dryRun || (!existed && len(next) == 0) {
+	// A root with no manifest and nothing to track gets none, unless this pass
+	// retired or kept a legacy file: the manifest then records that it was
+	// decided, so the next sync does not report it again.
+	decided := len(changes.Removed)+len(changes.KeptModified) > 0
+	if dryRun || (!existed && len(next) == 0 && !decided) {
 		return changes, nil
 	}
 	manifest.Files = next
@@ -392,10 +396,13 @@ func retireStarterFile(root, path, recorded string, legacy []string, streams set
 
 // releaseMemoryFiles hands memory/ over to the user: every file stays as it
 // is, and the manifest stops listing them, so tackroom never updates or
-// removes them again. It reports whether the manifest listed any.
+// removes them again. It reports whether this pass did the handover. A root
+// from before the manifest existed gets an empty one, which records the
+// handover: without it a later sync would retire the scripts by their legacy
+// hashes once the hook is gone.
 func releaseMemoryFiles(root string) (bool, error) {
 	manifest, existed, err := loadStarterManifest(root)
-	if err != nil || !existed || len(manifest.Files) == 0 {
+	if err != nil || (existed && len(manifest.Files) == 0) {
 		return false, err
 	}
 	manifest.Files = map[string]string{}
