@@ -12,7 +12,7 @@ instructions:
 Each harness's root file carries `AGENTS.md` followed by the files under `instructions:`, in order ([setup.md](setup.md#extra-instruction-files)).
 
 - Claude Code gets a short `~/.claude/CLAUDE.md` of `@path` import lines, so your edits reach it without a sync.
-- Codex, Factory Droid, Pi, OMP, Qwen Code, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Devin and Amp get a generated copy. Run `tackroom sync` after you edit a listed file. `tackroom status` reports the copy as drifted until you do, and the periodic job runs that sync for you.
+- Codex, Factory Droid, Pi, OMP, Qwen Code, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Devin, Gemini CLI and Amp get a generated copy. Run `tackroom sync` after you edit a listed file. `tackroom status` reports the copy as drifted until you do, and the periodic job runs that sync for you.
 - Cursor and OpenCode get no root file from tackroom, so a listed file does not reach them.
 - Kimi Code reads `~/.agents/AGENTS.md` itself and gets no root file, so a listed file does not reach it either.
 

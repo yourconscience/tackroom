@@ -8,7 +8,7 @@ Your skills, roles, hooks and instructions live in a folder of yours: `--config`
 Check: `tackroom config validate` prints the file it used; `tackroom setup` puts a new config root under git.
 
 ## One config for every harness, plus what makes each one itself
-You declare skills, MCP servers, hooks, roles and plugins once in `tackroom.yaml`, and every harness gets them in its own format: roles as TOML for Codex and Markdown elsewhere, hooks under each harness's event names, GitHub Copilot CLI with its own tool names.
+You declare skills, MCP servers, hooks, roles and plugins once in `tackroom.yaml`, and every harness gets them in its own format: roles as TOML for Codex and Markdown elsewhere, hooks under each harness's event names, Gemini CLI with its own tool names.
 
 The harnesses with features worth keeping get their own block next to the shared one: `settings:` keys written into the native settings files of Claude Code, Codex, Pi and OMP, Claude Code plugins loaded in place, a pinned `packages` list for Pi. Where a harness has no surface, tackroom writes nothing: Antigravity CLI gets no roles, OpenCode no hooks.
 

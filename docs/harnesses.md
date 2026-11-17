@@ -1,10 +1,10 @@
 # Harnesses
 
-tackroom writes your setup into 15 coding agents, called harnesses, each in its own native format. This page is the capability matrix: what each harness gets today, the key that names it in `tackroom.yaml`, and where its files land. Look here before you rely on a surface in one harness.
+tackroom writes your setup into 16 coding agents, called harnesses, each in its own native format. This page is the capability matrix: what each harness gets today, the key that names it in `tackroom.yaml`, and where its files land. Look here before you rely on a surface in one harness.
 
 ```bash
 tackroom status                       # per harness: synced, drifted, or not detected
-tackroom sync --agents codex,agy   # limit a run to some harnesses, by key
+tackroom sync --agents codex,gemini   # limit a run to some harnesses, by key
 ```
 
 ## Capability matrix
@@ -20,6 +20,7 @@ tackroom sync --agents codex,agy   # limit a run to some harnesses, by key
 | Qwen Code | ✓ | ✓ | ~ | ✓ | - | ✓ | - |
 | Cursor | ✓ | ✓ | ✓ | ✓ | - | - | - |
 | Devin | ✓ | - | ✓ | - | - | ✓ | - |
+| Gemini CLI | ✓ | ✓ | ✓ | ✓ | - | ✓ | - |
 | GitHub Copilot CLI | ✓ | ✓ | ~ | ✓ | - | ✓ | - |
 | Grok Build | ✓ | ✓ | ✓ | ✓ | - | ✓ | - |
 | DeepSeek Harness | ✓ | - | ~ | - | - | ✓ | - |
@@ -32,7 +33,7 @@ tackroom sync --agents codex,agy   # limit a run to some harnesses, by key
 What each `~` means:
 
 - **Roles, Pi.** The files are written to `~/.pi/agent/agents/`, but Pi uses them only with the `pi-subagents` package. Declare it under `packages:` (see [Pi](#pi)).
-- **MCP.** Stdio servers only. Remote servers (`mcp add --url`) reach the six harnesses marked `✓`: Claude Code, Codex, Pi, Cursor, Devin and Grok Build. See [mcp.md](mcp.md).
+- **MCP.** Stdio servers only. Remote servers (`mcp add --url`) reach the seven harnesses marked `✓`: Claude Code, Codex, Pi, Cursor, Devin, Gemini CLI and Grok Build. See [mcp.md](mcp.md).
 - **Hooks, OMP and Pi.** Only `SessionStart` and `SessionEnd` map. Other events are reported as unsupported. See [hooks.md](hooks.md#which-harnesses-run-hooks).
 - **Plugins, Codex.** Only agent-plugins-spec sources with `mcp: true`, installed through `codex plugin add` ([plugins.md](plugins.md#codex-plugins)). Codex has no plugin layout for your own plugins in the config root.
 
@@ -57,6 +58,7 @@ The key is what you write in `tackroom.yaml`, in `--agents`, and in the `agents:
 | Qwen Code | `qwen-code` | `qwen` | `~/.qwen/skills` |
 | Cursor | `cursor` | `cursor-agent` | `~/.cursor/skills` |
 | Devin | `devin` | `devin` | `~/.config/devin/skills` |
+| Gemini CLI | `gemini` | `gemini` | `~/.gemini/skills` |
 | GitHub Copilot CLI | `copilot` | `copilot` | `~/.copilot/skills` |
 | Grok Build | `grok` | `grok` | `~/.grok/skills` |
 | DeepSeek Harness | `dsh` | `dsh` | `~/.dsh/skills` |
@@ -67,7 +69,6 @@ The key is what you write in `tackroom.yaml`, in `--agents`, and in the `agents:
 - `setup` detects every harness above except Amp; add that with `--agents amp`.
 - Pi and OMP are separate harnesses: `pi` is not counted as detected when its `--version` output starts with `omp/`.
 - Claude Code is `claude`. The former key `claude-code` is still accepted and read as `claude`. A tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config ([release notes](upgrading.md#the-claude-key)).
-- Gemini CLI (`gemini`) is no longer supported. A config that still names it loads and syncs: the `gemini` agent entry and every `agents:` list item naming it are ignored, with one warning ([release notes](upgrading.md)).
 
 ## Where each surface lands
 
@@ -84,6 +85,7 @@ Roles follow each harness's `agent_root`; the paths are in [roles.md](roles.md#w
 | Qwen Code | `~/.qwen/settings.json` | `~/.qwen/settings.json` | `~/.qwen/QWEN.md` | none |
 | Cursor | `~/.cursor/mcp.json` | `~/.cursor/hooks.json` | none | none |
 | Devin | `~/.config/devin/mcp_config.json` | none | `~/.config/devin/AGENTS.md` | none |
+| Gemini CLI | `~/.gemini/settings.json` | `~/.gemini/settings.json` | `~/.gemini/GEMINI.md` | none |
 | GitHub Copilot CLI | `~/.copilot/mcp-config.json` | `~/.copilot/hooks/tackroom.json` | `~/.copilot/copilot-instructions.md` | none |
 | Grok Build | `~/.grok/config.toml` | `~/.grok/hooks/tackroom.json` | `~/.grok/AGENTS.md` | none |
 | DeepSeek Harness | `~/.dsh/cordis.patch.yml` | none | `~/.dsh/AGENTS.md` | none |
@@ -99,7 +101,7 @@ The root files are links to `~/.agents/AGENTS.md`, or generated files when you l
 
 ### Skills
 
-OpenCode, Cursor, Devin, GitHub Copilot CLI, Grok Build, Kimi Code and DeepSeek Harness read `~/.agents/skills` themselves. tackroom mirrors skills into their own skill root only when your config root is not `~/.agents`.
+OpenCode, Cursor, Devin, Gemini CLI, GitHub Copilot CLI, Grok Build, Kimi Code and DeepSeek Harness read `~/.agents/skills` themselves. tackroom mirrors skills into their own skill root only when your config root is not `~/.agents`.
 
 Qwen Code and Amp are config-driven: `setup` adds the skills folder to `skills.directories` in `~/.qwen/settings.json` and to `amp.skills.path` in Amp's settings, so no mirror is needed. More in [skills.md](skills.md#write-your-own).
 
@@ -130,9 +132,7 @@ MCP servers are written as `tackroom-mcp-<name>` rows in `~/.dsh/cordis.patch.ym
 
 ### Antigravity CLI
 
-Skills go to `~/.gemini/antigravity-cli/skills`. MCP servers and hooks go to `~/.gemini/config/`. Only stdio MCP servers are written, roles are not rendered yet, and hooks cover `SessionStart`, `Stop`, `PreToolUse` and `PostToolUse`. Its root file is `~/.gemini/GEMINI.md`.
-
-Antigravity CLI also reads `~/.gemini/skills`, where releases that supported Gemini CLI could mirror your skills. tackroom no longer writes there and does not clean it up; `tackroom doctor` warns when a skill is in both folders.
+Skills go to `~/.gemini/antigravity-cli/skills` (this CLI only, not Gemini CLI's `~/.gemini/skills`). MCP servers and hooks go to `~/.gemini/config/`, which Gemini CLI does not read. Only stdio MCP servers are written, roles are not rendered yet, and hooks cover `SessionStart`, `Stop`, `PreToolUse` and `PostToolUse`. It shares `~/.gemini/GEMINI.md` with Gemini CLI.
 
 ### Devin
 

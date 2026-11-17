@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Antigravity CLI keeps its user config under ~/.gemini:
+// Antigravity CLI keeps its user config under ~/.gemini, next to Gemini CLI:
 // ~/.gemini/config holds MCP servers and hooks, ~/.gemini/antigravity-cli the
 // CLI-only skills and settings (https://antigravity.google/docs/settings).
 
@@ -265,9 +265,8 @@ func agyHookHandlerMatches(event string, handler map[string]interface{}, entries
 }
 
 // checkAgyDuplicateSkills warns when a skill sits in both skill roots the CLI
-// loads that tackroom may have written: ~/.gemini/skills (the Gemini CLI
-// mirror of releases before Gemini CLI support was removed, which Antigravity
-// CLI also reads) and ~/.gemini/antigravity-cli/skills.
+// loads that tackroom may write: ~/.gemini/skills (Gemini CLI's mirror, read
+// by Antigravity CLI too) and ~/.gemini/antigravity-cli/skills.
 func checkAgyDuplicateSkills(_ string, home string, cfg config) checkResult {
 	const name = "agy duplicate skills"
 	if !isAgentDetected(cfg, agentAgy) {

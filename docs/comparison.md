@@ -45,7 +45,7 @@ Memory goes the other way. Since v0.24.0 (2026-10-03), skillshare keeps shared M
 
 It changes each agent's files in place and keeps no config repo of its own. Its documentation describes no lockfile, no minimum release age for new versions, no scheduled sync and no way to sync two machines. A [Kit](https://harness-kit.dev/docs/guides/kits) carries a setup instead: a snapshot of skills, MCP servers, rules and memory files exported as a zip, applied to projects only. The [`hk` CLI](https://harness-kit.dev/docs/reference/cli) lists, audits, enables and disables, and does not install.
 
-tackroom is the other shape: one config repo you edit and commit, written into 15 agents, with pins in a lockfile, a 72-hour cooldown, an audit gate, per-harness settings, roles and root instructions it writes, and a periodic job that keeps machines in sync. The two can run on one machine; HarnessKit then shows what tackroom wrote.
+tackroom is the other shape: one config repo you edit and commit, written into 16 agents, with pins in a lockfile, a 72-hour cooldown, an audit gate, per-harness settings, roles and root instructions it writes, and a periodic job that keeps machines in sync. The two can run on one machine; HarnessKit then shows what tackroom wrote.
 
 ## dotagents vs tackroom
 
