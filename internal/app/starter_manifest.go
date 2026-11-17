@@ -416,6 +416,11 @@ func memoryHooksInUse(cfg config, root string, home string) bool {
 				}
 			}
 			path := filepath.Clean(expandPath(field, home))
+			if !filepath.IsAbs(path) {
+				// A relative script path is relative to the config root, as
+				// in hookScriptPath.
+				path = filepath.Join(root, path)
+			}
 			for _, dir := range dirs {
 				if strings.HasPrefix(path, dir+string(filepath.Separator)) {
 					return true
