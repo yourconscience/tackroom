@@ -1,6 +1,6 @@
 # MCP servers
 
-Declare an MCP server once in `tackroom.yaml` and `sync` writes it into each harness's own config file. Stdio servers reach every harness; remote servers reach six of them.
+Declare an MCP server once in `tackroom.yaml` and `sync` writes it into each harness's own config file. Stdio servers reach every harness; remote servers reach seven of them.
 
 ```bash
 tackroom mcp add docs --command npx --arg -y --arg @acme/docs-mcp --env 'DOCS_TOKEN=${DOCS_TOKEN}'
@@ -28,7 +28,7 @@ mcp_servers:
     args: [-y, "@acme/docs-mcp"]
     env:
       DOCS_TOKEN: ${DOCS_TOKEN}
-    agents: [claude, codex, agy]
+    agents: [claude, codex, gemini]
   - name: tracker
     enabled: true
     url: https://mcp.acme.example/tracker
@@ -62,6 +62,7 @@ Secrets do not come along. Each env value that is not already a `${VAR}` referen
 | Pi | `url` and `headers` |
 | Cursor | `url` and `headers`, with `${NAME}` rewritten as `${env:NAME}` |
 | Devin | `url` and `headers` |
+| Gemini CLI | `httpUrl` and `headers` |
 | Grok Build | `url` and `headers` |
 
 Factory Droid, OMP, OpenCode, Qwen Code, GitHub Copilot CLI, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp get stdio servers only. A remote server is skipped for them, and `mcp add` says which harnesses it will not reach.

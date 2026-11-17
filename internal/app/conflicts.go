@@ -82,7 +82,8 @@ func replaceConflicts(report *agentReport, backupDir string, home string) ([]str
 
 // backupIdenticalCopies moves every native copy that matches the shared one
 // into backupDir before sync links it, so `tackroom restore` can put the
-// machine back exactly. A path two agents share is moved once.
+// machine back exactly. A path two agents share (Gemini CLI and Antigravity
+// CLI's GEMINI.md) is moved once.
 func backupIdenticalCopies(reports []agentReport, backupDir string, home string) ([]string, error) {
 	var moved []string
 	done := map[string]bool{}

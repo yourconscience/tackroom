@@ -6,7 +6,7 @@ The site, docs pages, README pictures and `tackroom view` use Graphite (`tokens-
 
 ## Positioning
 
-tackroom is the strict one: one `~/.agents` repo synced into 15 coding agents, with every external skill pinned to a commit in `tackroom.lock`, audited, and in cooldown until it is 72 hours old.
+tackroom is the strict one: one `~/.agents` repo synced into 16 coding agents, with every external skill pinned to a commit in `tackroom.lock`, audited, and in cooldown until it is 72 hours old.
 
 ## Two directions
 
@@ -67,7 +67,7 @@ Rules:
 - No initial-letter tiles or other shapes that stand in for a logo.
 - On the site each agent is one item: its mark at 28px on the silver tile `--tr-mark-bg` (`#aeb1b8`, same in light and dark) with a `--tr-mark-line` hairline, then its display name. Keys live on the capability matrix page.
 - Show a mark unmodified and in its own colours. Never recolour, mask, redraw, crop or animate one, and never put one on the brand accent.
-- Only marks whose terms clearly allow this use go in the slot. Five products (Claude Code, Codex, GitHub Copilot CLI, Antigravity CLI, Grok Build) need permission first, and two have no official mark. Until a mark is cleared, its plate ships without one.
+- Only marks whose terms clearly allow this use go in the slot. Six products (Claude Code, Codex, GitHub Copilot CLI, Gemini CLI, Antigravity CLI, Grok Build) need permission first, and two have no official mark. Until a mark is cleared, its plate ships without one.
 - The identity must work with every slot empty. No layout, colour or icon decision depends on a vendor mark.
 - Each mark that ships is recorded with source, version and licence in `THIRD_PARTY_NOTICES.md`.
 
@@ -86,6 +86,7 @@ Use these exact names in every surface. The CLI prints the key.
 | Qwen Code | `qwen-code` |
 | Cursor | `cursor` |
 | Devin | `devin` |
+| Gemini CLI | `gemini` |
 | GitHub Copilot CLI | `copilot` |
 | Grok Build | `grok` |
 | DeepSeek Harness | `dsh` |
@@ -93,7 +94,7 @@ Use these exact names in every surface. The CLI prints the key.
 | Kimi Code | `kimi` |
 | Amp | `amp` |
 
-Terminals: Herdr (panel), Tern (workspace), Rex (workspace). They sit in their own row and are never counted among the 15 harnesses.
+Terminals: Herdr (panel), Tern (workspace), Rex (workspace). They sit in their own row and are never counted among the 16 harnesses.
 
 ## Icons
 

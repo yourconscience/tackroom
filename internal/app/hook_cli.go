@@ -181,6 +181,8 @@ func nativeHookConfigPaths(agent string, home string) ([]string, bool, bool) {
 		return []string{droidHooksConfigPath(home), droidLegacyHooksConfigPath(home)}, false, true
 	case agentQwenCode:
 		return []string{qwenSettingsPath(home)}, false, true
+	case agentGemini:
+		return []string{geminiSettingsPath(home)}, false, true
 	case agentAgy:
 		return []string{agyHooksConfigPath(home)}, false, true
 	case agentKimi:
@@ -268,6 +270,8 @@ func nativeHookIsManaged(entry nativeHookEntry, cfg config) bool {
 		switch entry.Agent {
 		case agentCursor:
 			event, ok = cursorHookEvent(event)
+		case agentGemini:
+			event, ok = geminiHookEvent(event)
 		default:
 			ok = true
 		}

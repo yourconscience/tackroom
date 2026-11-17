@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Devin, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Factory Droid, OpenCode, Qwen Code, Pi, OMP, and Amp. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Devin, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Factory Droid, OpenCode, Qwen Code, Pi, OMP, and Amp. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, or config-root workflows.
 ---
 
 # tackroom
@@ -130,7 +130,7 @@ Missing, drifted, conflicting, stale managed, and unrelated external entries are
 
 Reconciles only configured managed entries. Unrelated native content remains untouched.
 
-For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Qwen Code uses `skills.directories: ["~/.agents/skills"]` and consumes the canonical tree without creating a duplicate mirror. OpenCode, Cursor, Devin, GitHub Copilot CLI, Grok Build and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
+For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Qwen Code uses `skills.directories: ["~/.agents/skills"]` and consumes the canonical tree without creating a duplicate mirror. OpenCode, Cursor, Devin, Gemini CLI, GitHub Copilot CLI, Grok Build and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
 
 Agent roles are canonical Markdown files under `~/.agents/agents/` and render to:
 
@@ -144,6 +144,7 @@ Agent roles are canonical Markdown files under `~/.agents/agents/` and render to
 - Cursor: `~/.cursor/agents/<name>.md`
 - GitHub Copilot CLI: `~/.copilot/agents/<name>.agent.md`
 - Grok Build: `~/.grok/agents/<name>.md`
+- Gemini CLI: `~/.gemini/agents/<name>.md` (local subagents)
 
 Pi always has managed skills. With `pi-subagents` installed, tackroom renders canonical roles into Pi's user agent directory. It patches canonical and Agent Plugin MCP entries into `~/.pi/agent/mcp.json`, which Pi 1.0 and later read natively (older Pi needs `pi-mcp-adapter`). Put pinned package sources under the Pi target's `packages` list to make `sync` reconcile `~/.pi/agent/settings.json`; Pi installs missing declared packages at startup. Tackroom does not install the Pi executable. The role files remain inert without `pi-subagents`. OMP is a separate target.
 
@@ -195,7 +196,7 @@ publish_targets:
 ```bash
 tackroom mcp list
 tackroom mcp add local --command uvx --arg pkg@1.2.3 --env KEY=value
-tackroom mcp add docs --url https://mcp.example.com/mcp --header 'Authorization: Bearer ${DOCS_TOKEN}'  # remote: Claude Code, Codex, Pi, Grok, Cursor, Devin
+tackroom mcp add docs --url https://mcp.example.com/mcp --header 'Authorization: Bearer ${DOCS_TOKEN}'  # remote: Claude Code, Codex, Pi, Grok, Cursor, Devin, Gemini CLI
 tackroom mcp import claude local --agents=codex,droid,pi,omp
 tackroom sync
 tackroom mcp remove local
@@ -243,10 +244,9 @@ tackroom view --ssh-host me@box                      # remote: print an ssh -L t
 | Kimi Code | yes | yes | yes, `~/.kimi-code/mcp.json` | yes, `~/.kimi-code/config.toml` |
 | Grok Build | yes | yes | yes, `~/.grok/config.toml` | yes, `~/.grok/hooks/tackroom.json` |
 | Devin | yes | no | yes, `~/.config/devin/mcp_config.json` | no; Devin loads Claude Code's hooks itself |
+| Gemini CLI | yes | yes | yes, `~/.gemini/settings.json` | yes, `~/.gemini/settings.json` |
 | Antigravity CLI | yes | no | yes, `~/.gemini/config/mcp_config.json` | yes, `~/.gemini/config/hooks.json` |
 | DeepSeek Harness | yes | no | yes, `tackroom-mcp-*` rows in `~/.dsh/cordis.patch.yml` | no |
 | Amp | yes, config-driven | no | yes, `amp.mcpServers` in Amp settings | no |
-
-Gemini CLI (`gemini`) is no longer supported: a config entry or `agents:` list item naming it is ignored with one warning, and is not read as `agy`.
 
 Do not add a surface without a verified native adapter and focused tests.
