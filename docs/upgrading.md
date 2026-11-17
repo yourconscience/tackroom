@@ -23,6 +23,12 @@ What changed in each release since 2.0, newest first, with what to do on every m
 - Fixed: `sync` reported a memory script you had edited on every run. It lists the script once, stops tracking it and leaves the file alone.
 - Fixed: a command that edits `tackroom.yaml` or `tackroom.local.yaml` (`skill sources add`, `mcp add` and `remove`, `config set`, `setup`, the web view) changes only the lines of the entry it touches. Blank lines, comments, an empty list such as `hooks: []`, CRLF line endings and a missing final newline are kept, and untouched entries no longer gain `agents: []`. Before, every such write reformatted the whole file.
 - Changed: a first `tackroom setup` writes the starter `tackroom.yaml` as it ships, with the detected agents filled in: it keeps `hooks: []` and its blank lines, and no longer adds `mcp_servers: []`.
+- New: `trusted_packages` in `tackroom.yaml` or `tackroom.local.yaml` lists the packages, as `npm:<name>` or `pypi:<name>`, whose new versions skip the cooldown. Without the key the list is `npm:@openai/codex`, `npm:@anthropic-ai/claude-code` and `npm:@earendil-works/pi-coding-agent`; a key you write replaces it, so `trusted_packages: []` gates every package. Before, `@openai/codex` was exempt in code and nothing else could be.
+- Changed: the audit no longer blocks Markdown text that only describes a risk. A CRITICAL pattern counts one level lower, and so does not block, when it sits in double quotation marks or follows never, do not, don't, avoid, instead of, for example, such as, flag, detect or warn in the same clause. `doctor audit` still lists it as HIGH. A script that pipes a download into a shell blocks as before ([skills.md](skills.md)).
+- New: `tackroom skill sources add` accepts a repository that is itself one skill, with `SKILL.md` at its root. It is recorded as `skill_dirs: [.]` and named by the `name:` in that file, else by the source name.
+- Changed: `skill sources add --all` skips a skill name that two folders both hold, prints one line per skipped name and adds the rest. Before, it refused the whole repository.
+- Changed: a source you wrote by hand with `skill_dirs: [.]` on a repository with a root `SKILL.md` is now named by the `name:` in that file. If that differs from the source name, the next sync installs the skill under the new name and removes the old copy.
+- Changed: the first line of the README and the landing page now leads with what does not port between agents: MCP servers, hooks and subagents.
 
 ## To 2.8
 
