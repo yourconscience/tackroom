@@ -6,8 +6,6 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 - A workspace command opens a session in the terminal with a shell, `tackroom status` and `tackroom cron collect --table`.
 - A recipe is a snippet you add or run yourself.
 
-The old full-screen terminal view is at the end.
-
 | Tool | Panel | Workspace command | Recipe |
 | --- | --- | --- | --- |
 | <img src="site/marks/tmux.svg" alt="tmux logo" width="20" height="20"> [tmux](#tmux) | - | `tackroom tmux` | [popup](#popup) with `tackroom status` |
@@ -235,41 +233,6 @@ By default cmux accepts commands only from processes started inside cmux, so run
 ## Other terminals
 
 WezTerm, kitty, Ghostty, iTerm2 and Warp can each run the tmux or zellij workspace above: open a tab and run `tackroom tmux` or `tackroom zellij`. tackroom has no integration of its own for them and has not tested them.
-
-## Terminal view (deprecated)
-
-> **Deprecated.** `tackroom tui` prints a notice on every run and will be removed in 3.0. Use [`tackroom view`](view.md), which works on a desktop, on a phone and in a side panel, or the [Herdr panel](#herdr-panel). In a terminal or over SSH, `tackroom status`, `tackroom cron collect --table` and `tackroom doctor` print the same facts.
-
-`tackroom tui` is a full-screen, read-only view of what `status`, the lock, `cron collect` and `doctor` already report. It changes nothing, so it is safe to leave open while you work.
-
-```bash
-tackroom tui [--config PATH]
-```
-
-It needs a terminal on both stdin and stdout; otherwise it prints `tackroom tui needs a terminal; use tackroom status` and exits non-zero. It follows `NO_COLOR` and the terminal's own colors. Rows are cut with `…` instead of wrapped, so a wider terminal shows more.
-
-### Tabs
-
-| Tab | Shows |
-| --- | --- |
-| Agents | One row per enabled harness: product name, config key, sync state (synced, drifted, not detected, config unreadable) and managed counts. The facts of `tackroom status`. |
-| Lock | Every external skill source and every package in cooldown: name, source, pinned commit, state (pinned, cooldown with its age against the 72 hour minimum release age, blocked, or why the pin is off) and audit result (pass, findings, critical). The facts of `tackroom.lock`, the minimum release age and `doctor audit`. |
-| Crons | The jobs of `tackroom cron collect`: host, source, id, schedule, state, last run and result. |
-| Doctor | The checks of `tackroom doctor` with their marks, and the summary line. |
-
-Each tab loads in the background and shows `loading…` until it is ready. A tab that fails to load shows the error in place and the other tabs keep working.
-
-### Keys
-
-| Key | Action |
-| --- | --- |
-| `tab`, `shift+tab`, `1` to `4` | Switch tab |
-| `j`, `k`, `↓`, `↑` | Move down and up |
-| `r` | Reload every tab |
-| `?` | Show or hide the key help |
-| `q`, `ctrl+c` | Quit |
-
-The Doctor tab runs the same checks as `tackroom doctor`, including the package age lookup, which asks the npm and PyPI registries about the packages your MCP servers and Pi packages reference. `r` runs the checks again.
 
 ## Credits
 

@@ -184,6 +184,7 @@ func updateExternalRepos(sources []externalSkillSource, home string, repoRoot st
 	// keeps the previous pin and skips the source.
 	original := lock
 	gated := gateUpdatedSources(staged, home, &lock, gate)
+	warnUnmatchedAllowFresh(os.Stderr, gate, gated)
 	restoreGatedCaches(selected, home, original, gated)
 	var updated []externalSkillSource
 	for _, candidate := range staged {
@@ -410,22 +411,24 @@ func restoreMaterializationLock(repoRoot string, previous lockFile, materializeE
 	return materializeErr
 }
 
+// git's own progress and result lines go to stderr in these helpers: stdout
+// belongs to the report, and to the JSON document under --json.
 func gitClone(url string, branch string, dest string) error {
 	cmd := exec.Command("git", "clone", "--depth", "1", "--branch", branch, url, dest)
-	cmd.Stdout = os.Stdout
+	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
 func gitFetchReset(repoPath string, branch string) error {
 	fetch := exec.Command("git", "-C", repoPath, "fetch", "origin", branch)
-	fetch.Stdout = os.Stdout
+	fetch.Stdout = os.Stderr
 	fetch.Stderr = os.Stderr
 	if err := fetch.Run(); err != nil {
 		return err
 	}
 	reset := exec.Command("git", "-C", repoPath, "reset", "--hard", "origin/"+branch)
-	reset.Stdout = os.Stdout
+	reset.Stdout = os.Stderr
 	reset.Stderr = os.Stderr
 	return reset.Run()
 }
@@ -439,7 +442,7 @@ func gitCheckoutCommit(repoPath string, commit string, branch string) error {
 	if !gitHasCommit(repoPath, commit) {
 		// Hosts like GitHub allow shallow fetches of an exact commit.
 		fetchSHA := exec.Command("git", "-C", repoPath, "fetch", "--depth", "1", "origin", commit)
-		fetchSHA.Stdout = os.Stdout
+		fetchSHA.Stdout = os.Stderr
 		fetchSHA.Stderr = os.Stderr
 		if err := fetchSHA.Run(); err != nil {
 			// Fall back to fetching the branch history; --unshallow is only
@@ -449,7 +452,7 @@ func gitCheckoutCommit(repoPath string, commit string, branch string) error {
 				fetchArgs = []string{"-C", repoPath, "fetch", "--unshallow", "origin", branch}
 			}
 			fetchAll := exec.Command("git", fetchArgs...)
-			fetchAll.Stdout = os.Stdout
+			fetchAll.Stdout = os.Stderr
 			fetchAll.Stderr = os.Stderr
 			if fallbackErr := fetchAll.Run(); fallbackErr != nil {
 				return fmt.Errorf("fetch pinned commit: sha fetch: %v; branch fetch: %w", err, fallbackErr)
@@ -457,7 +460,7 @@ func gitCheckoutCommit(repoPath string, commit string, branch string) error {
 		}
 	}
 	reset := exec.Command("git", "-C", repoPath, "reset", "--hard", commit)
-	reset.Stdout = os.Stdout
+	reset.Stdout = os.Stderr
 	reset.Stderr = os.Stderr
 	return reset.Run()
 }
@@ -782,13 +785,19 @@ func applyMaterializedSkills(plan []materializedSkill) error {
 	}
 	for i := range changes {
 		change := &changes[i]
+		// A copy identical to the one it replaced changed nothing; say nothing.
+		unchanged := false
+		if change.Backup != "" && !change.Skill.Remove {
+			same, err := externalSkillTreesEqual(change.Backup, change.Skill.TargetPath)
+			unchanged = err == nil && same
+		}
 		if change.Backup != "" {
 			_ = os.RemoveAll(change.Backup)
 			change.Backup = ""
 		}
 		if change.Skill.Remove {
 			fmt.Fprintf(os.Stderr, "removed stale materialized skill %s\n", change.Skill.Name)
-		} else {
+		} else if !unchanged {
 			// stderr: sync --json owns stdout.
 			fmt.Fprintf(os.Stderr, "materialized %s -> %s\n", change.Skill.SourcePath, change.Skill.TargetPath)
 		}

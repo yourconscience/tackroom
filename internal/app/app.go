@@ -28,6 +28,10 @@ type config struct {
 	// them and writes nothing new. Set by gatePackages; never from YAML.
 	cooldownMCP  map[string]bool
 	cooldownHome string
+	// configuredSources is every external source as configured, set by
+	// applyStatusGates where ExternalSkills drops the ones in cooldown or blocked,
+	// so the status lock check still counts them. Never from YAML.
+	configuredSources []externalSkillSource
 	// codexPluginMCP names plugin MCP servers Codex loads from its native
 	// plugin, so desiredMCPServersForAgent writes no [mcp_servers] row for them.
 	// Set by injectPluginMCPServersMode; never from YAML.
@@ -284,8 +288,6 @@ func run(args []string) error {
 		return runConfigCommand(args[1:])
 	case "view":
 		return runView(args[1:])
-	case "tui":
-		return runTUICommand(args[1:])
 	case "skill":
 		return runSkillCommand(args[1:])
 	case "restore":
@@ -355,6 +357,9 @@ func run(args []string) error {
 		return nil
 	default:
 		printUsage()
+		if args[0] == "tui" {
+			fmt.Fprintln(os.Stderr, "tackroom tui was removed in 3.0. Use tackroom view, or tackroom status in a terminal.")
+		}
 		return fmt.Errorf("unknown subcommand %q", args[0])
 	}
 }
@@ -648,7 +653,6 @@ var canonicalForms = []string{
 	"  tackroom config <validate|print|inventory> [--config PATH]   # inventory prints the web view's inventory as JSON",
 	"  tackroom config set [--config PATH] <section/name/field> <value>   # e.g. mcp_servers/exa/enabled false; then tackroom sync",
 	"  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
-	"  tackroom tui [--config PATH]               # deprecated, removed in 3.0: use tackroom view",
 	"  tackroom skill new <name> [--description ...]",
 	"  tackroom skill list [--agents ...]",
 	"  tackroom skill info <name>",

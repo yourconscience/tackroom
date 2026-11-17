@@ -87,7 +87,6 @@ func runDoctor(opts runOptions) error {
 }
 
 // runDoctorChecks runs every doctor check in the order doctor prints them.
-// Shared by `tackroom doctor` and the terminal view.
 func runDoctorChecks(skipPackageAge bool, repoRoot, home string, cfg config, selected []agentConfig) []checkResult {
 	var results []checkResult
 

@@ -590,14 +590,20 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 
 	// A --latest head is in cooldown like any new pin until it is 72 hours old; an
 	// older commit never is, and a local source has no publish time.
+	freshGate := gateOptionsFor(fresh)
 	var gate *gateOptions
 	if *latest && !isLocalSourceURL(src.URL) {
-		gate = ptrGate(gateOptionsFor(fresh))
+		gate = &freshGate
 	}
 	verdict, gated, err := writeSourceEntry(*configPath, repoRoot, home, src, commit, names, selected, cachePath, gate)
 	if err != nil {
 		return err
 	}
+	inCooldown := map[string]gatedItem{}
+	if gated {
+		inCooldown[sourceName(src)] = verdict
+	}
+	warnUnmatchedAllowFresh(os.Stderr, freshGate, inCooldown)
 	label := repoURL
 	if sub != "" {
 		label += " (" + sub + ")"

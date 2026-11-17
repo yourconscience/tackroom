@@ -324,8 +324,9 @@ func reconcileStarterSetMode(root string, shipped map[string][]byte, legacy map[
 		case removed:
 			changes.Removed = append(changes.Removed, path)
 		case kept:
+			// Reported once, then untracked: no release ships this file any
+			// more, so it is the user's and the next sync leaves it alone.
 			changes.KeptModified = append(changes.KeptModified, path)
-			next[path] = manifest.Files[path]
 		}
 	}
 	// The legacy hashes bridge roots from before the manifest existed; once a

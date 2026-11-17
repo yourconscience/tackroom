@@ -364,7 +364,7 @@ function machineItem(host) {
 }
 
 // Outside sources: each pin, and what sync puts in cooldown or blocks with the command that lets it through.
-// The same rows as the lock tab of `tackroom tui` and the cooldown lines of `tackroom status`, drawn
+// The same rows as the cooldown lines of `tackroom status`, drawn
 // with the site's lock stamps: pinned solid, cooldown dashed, blocked a 2px fill, audit pass outlined.
 const LOCK_STATES = {pinned: ['t-pin', '✓', 'i-pin'], cooldown: ['t-warn', '!', 'i-timer'], blocked: ['t-bad', '✗', 'i-audit']};
 function lockTag(cls, glyph, word, code) {

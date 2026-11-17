@@ -379,7 +379,7 @@ func printRuleFindings(w io.Writer, items []auditItem, lock lockFile, asJSON boo
 	return blocked
 }
 
-// lockRow is one line of the lock as the TUI and the view show it: an external
+// lockRow is one line of the lock as the view shows it: an external
 // source with its pin, gate state and audit, or a package in cooldown.
 type lockRow struct {
 	Name     string `json:"name"`
