@@ -92,6 +92,7 @@ A new or changed external skill pin, and a new or changed reference to an exact 
 To skip the cooldown:
 
 - `--allow-fresh` skips it and records the decision in `tackroom.lock` under `cooldowns:`.
+- `--allow-fresh=<item>` takes the item as `status` prints it, for example `skill:lint-skills`. A name that matches nothing in cooldown gets a warning on stderr that lists the items that are, and the run goes on.
 - Skipping the cooldown applies to the commit in cooldown only: while a new source is in cooldown, sync keeps it on that commit even if upstream moves, and a newer head is gated as a new pin once the cooldown ends.
 - A `skill update` in cooldown keeps the previous pin; sync never moves a pin, so its cooldown is skipped with `tackroom skill update <name> --allow-fresh=<item>`.
 
