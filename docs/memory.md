@@ -106,8 +106,8 @@ Releases up to 2.8 shipped memory tiers (`setup --memory basic` or `memsearch`),
 A config set up with an older release keeps working:
 
 - The `memory-session-start`, `memory-session-end` and `memory-stop` entries in `tackroom.yaml` are ordinary hooks now. `sync` keeps registering them as listed and never adds, edits or removes them.
-- While a hook runs a script under `memory/hooks/` (in the config root or in `~/.agents`), every file under `memory/` stays. The first `sync` or `setup` drops those files from `.tackroom-starter.json` and prints `memory/ in <root> is yours now`. tackroom no longer updates or removes them.
-- Without such a hook, `sync` removes the scripts under `memory/hooks/` and `memory/lib/` that you never edited, and keeps and lists the ones you did.
+- While a hook entry in `tackroom.yaml` points at a script under `memory/hooks/` (in the config root or in `~/.agents`), every file under `memory/` stays, whether the hook is enabled or not. The first `sync` or `setup` drops those files from `.tackroom-starter.json` and prints `memory/ in <root> is yours now`. tackroom no longer updates or removes them, and deleting the hook entries later does not change that: remove the files yourself.
+- If you delete those hook entries before the first `sync` or `setup` with this release, `sync` removes the scripts under `memory/hooks/` and `memory/lib/` that you never edited. It lists each script you did edit once, as `kept (modified by you)`, and leaves it alone from then on.
 - Go sources under `memory/tools/`, the `rem` and `knowledge-sync` binaries in `~/.local/bin` and `memsearch.conf` stay where they are. Nothing builds or updates them.
 
 `rem` and `knowledge-sync` now come from the [rem repository](https://github.com/yourconscience/rem). To stop an old memory hook, set `enabled: false` on it and run `tackroom sync` ([hooks.md](hooks.md#remove-native-registrations)).

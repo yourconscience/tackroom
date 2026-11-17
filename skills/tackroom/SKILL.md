@@ -112,7 +112,7 @@ Exit codes: `status` and `sync` exit 1 when anything is out of sync or conflicti
 
 The public starter contains `tackroom` and six generic roles (`architect` `builder` `general` `researcher` `reviewer` `tester`). Personal skills, hooks, MCP servers, secrets, and memory data belong only in the private config repository.
 
-Memory: tackroom runs no memory system. A memory file listed under `instructions:` reaches every harness that gets a root file (not Cursor, OpenCode or Kimi Code). Capture tools such as rem are separate and registered as ordinary hooks. Native memory switches go under `settings:`: Claude Code `autoMemoryEnabled`, Codex `features.memories`, OMP `memory.backend`. Memory hooks from older releases stay and sync as ordinary hooks, and `memory/` in the config root stays while a hook runs a script there.
+Memory: tackroom runs no memory system. A memory file listed under `instructions:` reaches every harness that gets a root file (not Cursor, OpenCode or Kimi Code). Capture tools such as rem are separate and registered as ordinary hooks. Native memory switches go under `settings:`: Claude Code `autoMemoryEnabled`, Codex `features.memories`, OMP `memory.backend`. Memory hooks from older releases stay and sync as ordinary hooks, and `memory/` in the config root stays while a hook entry in `tackroom.yaml` points at a script there, enabled or not.
 
 Verify the complete setup with `tackroom doctor --e2e`.
 
