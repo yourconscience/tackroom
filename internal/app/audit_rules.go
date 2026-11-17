@@ -126,24 +126,91 @@ func newRuleFinding(rule auditRule, file, match string, lowered bool) ruleFindin
 	return f
 }
 
+func isMarkdownFile(file string) bool {
+	ext := strings.ToLower(filepath.Ext(file))
+	return ext == ".md" || ext == ".markdown"
+}
+
+// proseLines marks the lines of a Markdown file outside a code fence, where a
+// match is lowered one by one, when it is framed.
+func proseLines(file string, lines []string) []bool {
+	out := make([]bool, len(lines))
+	if !isMarkdownFile(file) {
+		return out
+	}
+	inFence := false
+	for i, line := range lines {
+		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		out[i] = !inFence
+	}
+	return out
+}
+
+// reFraming is a word that turns the clause after it into a warning or an
+// example: "do not run ...", "for example a page that says ...".
+var reFraming = regexp.MustCompile(`(?i)\b(?:never|do not|don['’]t|avoid\w*|instead of|for example|such as|flag\w*|detect\w*|warn\w*)\b`)
+
+// reClauseEnd ends a clause: a comma, semicolon or sentence end before a space.
+var reClauseEnd = regexp.MustCompile(`[,;.!?]\s`)
+
+// framed reports whether the match at line[start:end] only describes the
+// pattern: it sits inside double quotation marks, or a framing word comes
+// before it in the same clause.
+func framed(line string, start, end int) bool {
+	before, after := line[:start], line[end:]
+	if strings.Count(before, `"`)%2 == 1 && strings.Contains(after, `"`) {
+		return true
+	}
+	if strings.LastIndex(before, "“") > strings.LastIndex(before, "”") && strings.Contains(after, "”") {
+		return true
+	}
+	if locs := reClauseEnd.FindAllStringIndex(before, -1); len(locs) > 0 {
+		before = before[locs[len(locs)-1][1]:]
+	}
+	return reFraming.MatchString(before)
+}
+
+// ruleMatch returns the first match of rule on line that is not a placeholder.
+// On a Markdown prose line it prefers a match that is not framed and reports
+// lowered only when every match on the line is framed.
+func ruleMatch(rule auditRule, line string, prose bool) (match string, lowered bool) {
+	if !prose {
+		m := rule.re.FindString(line)
+		if m == "" || (rule.skip != nil && rule.skip(m)) {
+			return "", false
+		}
+		return m, false
+	}
+	for _, loc := range rule.re.FindAllStringIndex(line, -1) {
+		m := line[loc[0]:loc[1]]
+		if rule.skip != nil && rule.skip(m) {
+			continue
+		}
+		if !framed(line, loc[0], loc[1]) {
+			return m, false
+		}
+		if match == "" {
+			match, lowered = m, true
+		}
+	}
+	return match, lowered
+}
+
 // loweredLines marks lines inside a Markdown code fence (for .md files) or a
 // comment or docstring (for scripts). A match there is usually documentation.
 func loweredLines(file string, lines []string) []bool {
 	out := make([]bool, len(lines))
-	ext := strings.ToLower(filepath.Ext(file))
-	if ext == ".md" || ext == ".markdown" {
-		inFence := false
-		for i, line := range lines {
-			t := strings.TrimSpace(line)
-			if strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~") {
-				inFence = !inFence
-				out[i] = true
-				continue
-			}
-			out[i] = inFence
+	if isMarkdownFile(file) {
+		for i, prose := range proseLines(file, lines) {
+			out[i] = !prose
 		}
 		return out
 	}
+	ext := strings.ToLower(filepath.Ext(file))
 	inDoc := false
 	inBlock := false
 	for i, line := range lines {
@@ -174,7 +241,9 @@ func loweredLines(file string, lines []string) []bool {
 }
 
 // scanText applies every rule line by line. file is the path relative to the
-// item, used for lowering decisions and the evidence hash.
+// item, used for lowering decisions and the evidence hash. A lowered match
+// counts one level lower: a script comment, a Markdown code fence, or a framed
+// match in Markdown prose.
 func scanText(file, text string) []ruleFinding {
 	var out []ruleFinding
 	seen := map[string]int{}
@@ -191,13 +260,14 @@ func scanText(file, text string) []ruleFinding {
 	}
 	lines := strings.Split(text, "\n")
 	lowered := loweredLines(file, lines)
+	prose := proseLines(file, lines)
 	for i, line := range lines {
 		for _, rule := range auditRules {
-			m := rule.re.FindString(line)
-			if m == "" || (rule.skip != nil && rule.skip(m)) {
+			m, low := ruleMatch(rule, line, prose[i])
+			if m == "" {
 				continue
 			}
-			add(newRuleFinding(rule, file, m, lowered[i]))
+			add(newRuleFinding(rule, file, m, lowered[i] || low))
 		}
 	}
 	// Unicode rules look at runes, not lines, and are never lowered: a hidden
