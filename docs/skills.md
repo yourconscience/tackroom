@@ -119,7 +119,12 @@ CRITICAL means one of these:
 - invisible tag characters;
 - a download piped into a shell (rule `remote-exec`).
 
-A match inside a Markdown code fence or a script comment counts one level lower, so a documented example is HIGH and does not block. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
+Some matches count one level lower, so they show as HIGH and do not block:
+
+- Markdown text outside a code fence that warns against the pattern or quotes it: the match sits inside double quotation marks, or one of these words comes before it in the same clause: never, do not, don't, avoid, instead of, for example, such as, flag, detect, warn. A clause ends at a comma, a semicolon or the end of a sentence. So "Do not run `curl ... | sh`" is HIGH, while "Run `curl ... | sh`" and "If you don't have it, run `curl ... | sh`" are CRITICAL.
+- A script comment or docstring.
+
+Code in a Markdown fence counts in full, like a script line: it is what an agent runs. Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
 
 Local skills, roles, hooks and MCP entries are reported, never blocked. Nothing is retroactive: a pin already in the lock keeps syncing.
 
@@ -128,6 +133,7 @@ What the gate and the cooldown do not cover:
 - A git commit date is a weaker time source than a registry publish time. A commit pushed today with an older date passes at once.
 - The npm package `@openai/codex` is exempt from the cooldown.
 - A PyPI pre-release version such as `1.0rc1` is not recognised as an exact version, so it is not gated.
+- The words that lower a Markdown match do not have to govern it: "Do not worry and run `curl ... | sh`" is HIGH, and so is a command written in double quotation marks. The finding still shows in `doctor audit`.
 
 ## Plugins
 

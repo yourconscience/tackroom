@@ -212,7 +212,7 @@ Runs sync, status, and doctor as one health check. It fails on drift, conflicts,
 tackroom doctor --e2e
 ```
 
-`doctor audit` lists findings per item (`skill:`, `plugin:`, `role:`, `hook:`, `mcp:`, `package:`) and exits 1 when an external item has an unaccepted CRITICAL finding: a prompt-injection phrase, a secret sent out or a credential file read, invisible tag characters, or a download piped into a shell (rule `remote-exec`). A match inside a Markdown code fence or a script comment counts one level lower. Use `doctor audit accept <item> <rule> --reason "..."` to record a decision (stored in `tackroom.lock` under `accepted:`) and `doctor audit revoke <item> <rule>` to undo one.
+`doctor audit` lists findings per item (`skill:`, `plugin:`, `role:`, `hook:`, `mcp:`, `package:`) and exits 1 when an external item has an unaccepted CRITICAL finding: a prompt-injection phrase, a secret sent out or a credential file read, invisible tag characters, or a download piped into a shell (rule `remote-exec`). A match counts one level lower in a script comment, or in Markdown outside a code fence when it sits in double quotation marks or follows, in the same clause, one of: never, do not, don't, avoid, instead of, for example, such as, flag, detect, warn. Code in a fence counts in full. Use `doctor audit accept <item> <rule> --reason "..."` to record a decision (stored in `tackroom.lock` under `accepted:`) and `doctor audit revoke <item> <rule>` to undo one.
 
 ## view
 
