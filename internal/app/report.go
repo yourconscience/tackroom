@@ -625,7 +625,11 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 	if cfg.configuredSources != nil {
 		lockCfg.ExternalSkills = cfg.configuredSources
 	}
-	checks := []checkResult{checkExternalSkillLock(repoRoot, lockCfg, home)}
+	lockCheck := checkExternalSkillLock(repoRoot, lockCfg, home)
+	// The items and their commands are listed below, so the pointer back to
+	// this command and the advice that follows it are dropped here.
+	lockCheck.detail, _, _ = strings.Cut(lockCheck.detail, "; see tackroom status")
+	checks := []checkResult{lockCheck}
 	nameWidth := 0
 	for _, chk := range checks {
 		nameWidth = max(nameWidth, len(chk.name))
