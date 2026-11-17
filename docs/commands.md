@@ -255,7 +255,7 @@ The config root cannot be, or sit inside, a linked git worktree. Machine-local s
 
 - `NO_COLOR` set to any non-empty value drops the color on a terminal; bold and dim stay. `CLICOLOR_FORCE=1` keeps the styling in a pipe.
 - `sync` prints a summary of what the run changed, with harnesses that changed alike grouped, then a table with one row per harness and the managed items per harness. `status` stays compact and `--verbose` adds the full lists and native paths.
-- `--json` on `status`, `sync`, `doctor`, `doctor audit`, `setup`, `publish`, `hosts` and `skill sources` prints one JSON document on stdout. `cron collect` and `config inventory` print JSON by default. `hook list` prints tab-separated lines.
+- `--json` on `status`, `sync`, `doctor`, `doctor audit`, `setup`, `publish`, `hosts` and `skill sources` prints one JSON document on stdout. `cron collect` and `config inventory` print JSON by default. `hook list` prints tab-separated lines. `status --json`, `sync --json` and `sync --dry-run --json` list the items sync skips (in cooldown or blocked) under `skipped`, `[]` when there are none.
 - Warnings and notes go to stderr, so a pipe sees only the report.
 
 ### Related tools

@@ -56,6 +56,7 @@ func applyStatusGates(repoRoot, home string, cfg config, selected []agentConfig,
 	sources := cfg.ExternalSkills
 	gated := gateExternalSources(sources, home, &statusLock, gateOptions{now: timeNow()})
 	cfg.ExternalSkills = filterGatedSources(sources, gated)
+	cfg.configuredSources = sources
 	injectPluginMCPServersMode(&cfg, home, createPluginData)
 	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gateOptions{now: timeNow()}, false)
 	if err != nil {
@@ -105,6 +106,7 @@ func statusReport(opts runOptions) error {
 
 	if opts.JSONOutput {
 		view := buildStatusJSON(repoRoot, repoReport, reports)
+		view.Skipped = skippedJSON(gated)
 		if err := encodeJSON(setupStreams(opts).out, view); err != nil {
 			return err
 		}
@@ -229,14 +231,15 @@ func runSync(opts runOptions) error {
 	}
 
 	sources := cfg.ExternalSkills
-	gated, err := syncExternalReposGated(sources, home, repoRoot, ptrGate(gateOptionsFor(opts)))
+	gate := gateOptionsFor(opts)
+	gated, err := syncExternalReposGated(sources, home, repoRoot, ptrGate(gate))
 	if err != nil {
 		return err
 	}
 	cfg.ExternalSkills = filterGatedSources(sources, gated)
 	// Re-inject after clone so first sync picks up newly fetched plugins.
 	injectPluginMCPServers(&cfg, home)
-	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gateOptionsFor(opts), true)
+	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gate, true)
 	if err != nil {
 		return err
 	}
@@ -250,6 +253,7 @@ func runSync(opts runOptions) error {
 	for k, v := range pendingUpdateGates(sources, home, lock, timeNow()) {
 		gated[k] = v
 	}
+	warnUnmatchedAllowFresh(os.Stderr, gate, gated)
 	if err := renderCommittedArtifacts(repoRoot); err != nil {
 		return err
 	}
@@ -384,6 +388,7 @@ func runSync(opts runOptions) error {
 	}
 	if opts.JSONOutput {
 		view := buildStatusJSON(repoRoot, repoReport, reports)
+		view.Skipped = skippedJSON(gated)
 		for _, c := range conflicts {
 			view.Synced = false
 			view.Agents = appendConflict(view.Agents, c)
@@ -456,6 +461,10 @@ func runSyncDryRun(opts runOptions) error {
 	for k, v := range pendingUpdateGates(sources, home, lock, gate.now) {
 		gated[k] = v
 	}
+	if opts.PlanDigest == "" {
+		// With --plan-digest this is the plan check; the sync that follows warns.
+		warnUnmatchedAllowFresh(os.Stderr, gate, gated)
+	}
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
 	if err != nil {
@@ -483,6 +492,7 @@ func runSyncDryRun(opts runOptions) error {
 	if err != nil {
 		return err
 	}
+	expected = withPendingMaterialized(expected, cfg.ExternalSkills, home)
 	reports, err := inspectAgents(selected, expected, repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
@@ -639,6 +649,16 @@ type gatedItemJSON struct {
 	Command string `json:"command"`
 }
 
+// skippedJSON lists the items sync skips, in the order of their keys in gated;
+// an empty list is [], never null.
+func skippedJSON(gated map[string]gatedItem) []gatedItemJSON {
+	out := []gatedItemJSON{}
+	for _, name := range sortedKeysNative(gated) {
+		out = append(out, gatedItemJSON(gated[name]))
+	}
+	return out
+}
+
 func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agentReport, starter starterChanges, gated map[string]gatedItem, notes *dryGateNotes, notFetched []string, replaceable []string, changes, harnesses int) syncDryRunJSON {
 	status := buildStatusJSON(repoRoot, repoReport, reports)
 	out := syncDryRunJSON{
@@ -655,13 +675,9 @@ func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agent
 			Removed:      nonNil(starter.Removed),
 			KeptModified: nonNil(starter.KeptModified),
 		},
-		Skipped:     []gatedItemJSON{},
+		Skipped:     skippedJSON(gated),
 		NotFetched:  nonNil(notFetched),
 		Replaceable: nonNil(replaceable),
-	}
-	for _, name := range sortedKeysNative(gated) {
-		h := gated[name]
-		out.Skipped = append(out.Skipped, gatedItemJSON(h))
 	}
 	if len(notes.unchecked) > 0 {
 		out.FreshnessUnchecked = notes.unchecked
@@ -706,6 +722,29 @@ func configForInspection(cfg config, sources []externalSkillSource, gated map[st
 		out.ExternalSkills = append(out.ExternalSkills, src)
 	}
 	return out, nil
+}
+
+// withPendingMaterialized adds the skills a real sync would copy into the config
+// root from a materialized source's checkout and that are not there yet, so the
+// plan links them as the sync will. Their path is the checkout's, because the
+// copy does not exist before the sync. A source whose checkout is absent adds
+// nothing: a real sync clones it first.
+func withPendingMaterialized(expected map[string]string, sources []externalSkillSource, home string) map[string]string {
+	for _, src := range sources {
+		if !src.Materialize {
+			continue
+		}
+		skills, err := discoverExternalSourceSkills(src, home)
+		if err != nil {
+			continue
+		}
+		for _, skill := range skills {
+			if _, ok := expected[skill.Name]; !ok {
+				expected[skill.Name] = skill.Path
+			}
+		}
+	}
+	return expected
 }
 
 // withoutMissingSources drops non-materialized external sources whose cache is

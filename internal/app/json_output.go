@@ -44,7 +44,9 @@ type statusJSON struct {
 	Synced     bool              `json:"synced"`
 	RepoLink   string            `json:"repo_link"`
 	Agents     []agentStatusJSON `json:"agents"`
-	Hint       string            `json:"hint,omitempty"`
+	// Skipped lists what sync skips: items in cooldown and blocked items.
+	Skipped []gatedItemJSON `json:"skipped"`
+	Hint    string          `json:"hint,omitempty"`
 }
 
 func nonNil(items []string) []string {
@@ -59,7 +61,7 @@ func surface(managed, missing, drifted []string) surfaceJSON {
 }
 
 func buildStatusJSON(repoRoot string, repoReport repoLinkReport, reports []agentReport) statusJSON {
-	out := statusJSON{ConfigRoot: repoRoot, RepoLink: repoReport.State, Synced: repoReport.State == stateSynced, Agents: []agentStatusJSON{}}
+	out := statusJSON{ConfigRoot: repoRoot, RepoLink: repoReport.State, Synced: repoReport.State == stateSynced, Agents: []agentStatusJSON{}, Skipped: []gatedItemJSON{}}
 	for _, r := range reports {
 		agent := agentStatusJSON{
 			Name:      r.Name,
