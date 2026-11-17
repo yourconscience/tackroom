@@ -48,6 +48,20 @@ const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 // Items sync skips, in cooldown or blocked; a tackroom older than 3.0 names the list `held`.
 const skippedItems = (d) => d.skipped ?? d.held ?? [];
 
+// A cooldown row's short line: "owner/repo@4b4c947 · 37h left of 72h". The reason reads
+// "<git|npm|pypi>:<source>@<version> published <time> (...)"; with no usable `until`, the reason itself.
+function cooldownLine(h) {
+  const until = Date.parse(h.until);
+  const ref = /^(git|npm|pypi):(\S+)@(\S+)/.exec(h.reason ?? "");
+  if (!until || !ref) return h.reason;
+  const source = ref[1] === "git" ? (/([^/:]+\/[^/]+?)(?:\.git)?$/.exec(ref[2])?.[1] ?? ref[2]) : ref[2];
+  const version = ref[1] === "git" ? ref[3].slice(0, 7) : ref[3];
+  const published = Date.parse(/ published (\S+)/.exec(h.reason)?.[1]);
+  const left = Math.max(0, Math.ceil((until - Date.now()) / 36e5));
+  const of = published && until > published ? ` of ${Math.round((until - published) / 36e5)}h` : "";
+  return `${source}@${version} · ${left}h left${of}`;
+}
+
 function ago(iso) {
   const t = Date.parse(iso);
   if (!t) return "";
@@ -353,7 +367,7 @@ export default class Tackroom extends View {
         [this.dot(h.kind === "blocked" ? t.ansi1 : t.ansi3),
           v_flex().flex_1().min_w(0)
             .child(div().truncate().text_size(12).child(h.item))
-            .child(div().text_size(11).text_color(t.dim).child(h.reason)),
+            .child(div().text_size(11).text_color(t.dim).child(h.kind === "cooldown" ? cooldownLine(h) : h.reason)),
           div().flex_none().text_size(11).text_color(t.dim).child(h.kind)],
         () => v_flex().ml(22).mb(6).gap(3).text_size(11)
           .when(Boolean(h.until), (el) => el.child(this.field("Cooldown ends", h.until, t)))
