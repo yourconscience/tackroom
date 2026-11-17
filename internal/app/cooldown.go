@@ -296,11 +296,11 @@ func cooldownSourceCommit(lock lockFile, src externalSkillSource, now time.Time)
 var reExactVersion = regexp.MustCompile(`^v?\d+(\.\d+)*([-+.][0-9A-Za-z.+-]*)?$`)
 
 // exactRefs returns the exact-version registry references of a package list,
-// as lock refs keyed to the package reference.
-func exactRefs(refs []packageReference) []packageReference {
+// as lock refs keyed to the package reference. A trusted package is left out.
+func exactRefs(cfg *config, refs []packageReference) []packageReference {
 	var out []packageReference
 	for _, r := range refs {
-		if r.Version == "" || r.Version == packageVersionLatest || !reExactVersion.MatchString(r.Version) || isPackageAgeException(r) {
+		if r.Version == "" || r.Version == packageVersionLatest || !reExactVersion.MatchString(r.Version) || cfg.trustedPackage(r) {
 			continue
 		}
 		out = append(out, r)
@@ -361,7 +361,7 @@ func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, op
 			continue
 		}
 		item := "mcp:" + server.Name
-		for _, r := range exactRefs(packageReferencesFromCommand(server.Command, server.Args, item)) {
+		for _, r := range exactRefs(cfg, packageReferencesFromCommand(server.Command, server.Args, item)) {
 			ref := lockRef(r)
 			if mcpRefSynced(cfg, server, ref, home) {
 				continue
@@ -386,7 +386,7 @@ func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, op
 		var kept []string
 		for _, spec := range *agent.Packages {
 			r, ok := piPackageReference(spec, agent.Name)
-			if !ok || len(exactRefs([]packageReference{r})) == 0 {
+			if !ok || len(exactRefs(cfg, []packageReference{r})) == 0 {
 				kept = append(kept, spec)
 				continue
 			}
@@ -450,7 +450,7 @@ func mcpRefSynced(cfg *config, server mcpServerConfig, ref, home string) bool {
 		if err != nil {
 			continue
 		}
-		for _, r := range exactRefs(packageReferencesFromCommand(existing.Command, existing.Args, "")) {
+		for _, r := range exactRefs(cfg, packageReferencesFromCommand(existing.Command, existing.Args, "")) {
 			if lockRef(r) == ref {
 				return true
 			}
