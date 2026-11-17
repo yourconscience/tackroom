@@ -119,7 +119,7 @@ Nothing to migrate: `tackroom.yaml` and `tackroom.lock` keep their formats.
 - The Hermes memory bridge is gone. The next `tackroom sync` deletes `memory/hooks/sync.sh`, `sync-memory-to-vault.sh`, `sync-vault-to-memory.sh` and `memory/lib/sync.py` from your config root if you never edited them. Edited copies are reported and left alone. `tackroom setup` removes the old sync hook commands from native configs.
 - `tackroom doctor` no longer fails because an external skill is held or blocked. It passes, counts them and says what to do next.
 - Install with Homebrew or npm. The install script is no longer offered.
-- New: `tackroom tui`, a read-only terminal view. See [terminals.md](terminals.md#terminal-view-deprecated).
+- New: `tackroom tui`, a read-only terminal view. It was removed in 3.0.
 
 ## To 2.0
 
