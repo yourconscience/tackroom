@@ -1,6 +1,6 @@
 # MCP servers
 
-Declare an MCP server once in `tackroom.yaml` and `sync` writes it into each harness's own config file. Stdio servers reach every harness; remote servers reach six of them.
+Declare an MCP server once in `tackroom.yaml` and `sync` writes it into each harness's own config file. Stdio servers reach every harness; remote servers reach seven of them.
 
 ```bash
 tackroom mcp add docs --command npx --arg -y --arg @acme/docs-mcp --env 'DOCS_TOKEN=${DOCS_TOKEN}'
