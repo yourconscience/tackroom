@@ -202,6 +202,39 @@ func sequenceEntrySchema() map[string]map[string]bool {
 	}
 }
 
+// schemaListKeys returns the YAML keys of a config struct whose field is a
+// plain slice. For those a missing key, `key: []` and a bare `key:` read back
+// the same, so a typed write keeps whichever of them the file has. Pointer
+// fields (packages, ui) are left out: there an empty value means something.
+func schemaListKeys(v interface{}) map[string]bool {
+	t := reflect.TypeOf(v)
+	keys := make(map[string]bool)
+	for i := 0; i < t.NumField(); i++ {
+		name := strings.Split(t.Field(i).Tag.Get("yaml"), ",")[0]
+		if name != "" && name != "-" && t.Field(i).Type.Kind() == reflect.Slice {
+			keys[name] = true
+		}
+	}
+	return keys
+}
+
+// sequenceEntryListKeys maps each top-level config sequence section to the
+// plain list keys of its entry type.
+func sequenceEntryListKeys() map[string]map[string]bool {
+	return map[string]map[string]bool{
+		"agents":          schemaListKeys(agentConfig{}),
+		"mcp_servers":     schemaListKeys(mcpServerConfig{}),
+		"external_skills": schemaListKeys(externalSkillSource{}),
+		"hooks":           schemaListKeys(hookConfig{}),
+		"publish_targets": schemaListKeys(publishTarget{}),
+	}
+}
+
+// emptyListValue reports whether node is `[]` or a bare null.
+func emptyListValue(node *yaml.Node) bool {
+	return (node.Kind == yaml.SequenceNode && len(node.Content) == 0) || (node.Kind == yaml.ScalarNode && node.Tag == "!!null")
+}
+
 // pruneOmittedSchemaKeys removes known schema keys from dst that the marshaled
 // typed source omitted, at the document level, per sequence entry, and inside
 // the ui block. Unknown keys (not part of the schema) are left in place. This
@@ -212,7 +245,8 @@ func pruneOmittedSchemaKeys(dst, src *yaml.Node) {
 	if dstRoot == nil || srcRoot == nil || dstRoot.Kind != yaml.MappingNode || srcRoot.Kind != yaml.MappingNode {
 		return
 	}
-	removeKnownAbsent(dstRoot, srcRoot, schemaYAMLKeys(config{}))
+	removeKnownAbsent(dstRoot, srcRoot, schemaYAMLKeys(config{}), schemaListKeys(config{}))
+	entryLists := sequenceEntryListKeys()
 	for section, entryKeys := range sequenceEntrySchema() {
 		dstSeq := mappingValue(dstRoot, section)
 		srcSeq := mappingValue(srcRoot, section)
@@ -227,21 +261,24 @@ func pruneOmittedSchemaKeys(dst, src *yaml.Node) {
 			if idx < 0 {
 				continue
 			}
-			removeKnownAbsent(dstEntry, srcSeq.Content[idx], entryKeys)
+			removeKnownAbsent(dstEntry, srcSeq.Content[idx], entryKeys, entryLists[section])
 		}
 	}
 	if dstUI := mappingValue(dstRoot, "ui"); dstUI != nil && dstUI.Kind == yaml.MappingNode {
 		if srcUI := mappingValue(srcRoot, "ui"); srcUI != nil && srcUI.Kind == yaml.MappingNode {
-			removeKnownAbsent(dstUI, srcUI, schemaYAMLKeys(uiConfig{}))
+			removeKnownAbsent(dstUI, srcUI, schemaYAMLKeys(uiConfig{}), schemaListKeys(uiConfig{}))
 		}
 	}
 }
 
 // removeKnownAbsent drops the key/value pairs of dst whose key is a known schema
-// key not present in src, leaving unknown keys untouched.
-func removeKnownAbsent(dst, src *yaml.Node, known map[string]bool) {
+// key not present in src, leaving unknown keys untouched. An empty list the
+// file spells out (`hooks: []`) reads the same as the omitted key, so it stays
+// as written, with the comment above it.
+func removeKnownAbsent(dst, src *yaml.Node, known, lists map[string]bool) {
 	for i := 0; i+1 < len(dst.Content); {
-		if key := dst.Content[i].Value; known[key] && mappingIndex(src, key) < 0 {
+		key := dst.Content[i].Value
+		if known[key] && mappingIndex(src, key) < 0 && (!lists[key] || !emptyListValue(dst.Content[i+1])) {
 			dst.Content = append(dst.Content[:i], dst.Content[i+2:]...)
 			continue
 		}
@@ -427,6 +464,7 @@ func (d *configDocument) operationsRawLocked(layer configLayer, operations []con
 	if err != nil {
 		return nil, fmt.Errorf("marshal config: %w", err)
 	}
+	raw = keepFileFormat(d.bytesLocked(layer), raw)
 	if _, err := d.validateRawLocked(layer, raw); err != nil {
 		return nil, err
 	}
@@ -489,7 +527,7 @@ func (d *configDocument) replaceTyped(layer configLayer, expectedRevision string
 	if err := yaml.Unmarshal(sourceData, &source); err != nil {
 		return configSave{}, err
 	}
-	mergeKnownMapping(rootMapping(&node), rootMapping(&source))
+	mergeKnownMapping(rootMapping(&node), rootMapping(&source), schemaListKeys(config{}))
 	// The marshaled typed config is the authoritative, complete value for every
 	// known schema key. Drop known keys the source omitted (empty omitempty
 	// fields such as a cleared MCP args/env, or a removed hooks/ui block) so a
@@ -500,7 +538,132 @@ func (d *configDocument) replaceTyped(layer configLayer, expectedRevision string
 	if err != nil {
 		return configSave{}, fmt.Errorf("marshal config: %w", err)
 	}
-	return d.saveRaw(layer, expectedRevision, raw)
+	return d.saveRaw(layer, expectedRevision, keepFileFormat(d.bytes(layer), raw))
+}
+
+// keepFileFormat returns the re-encoded config after with the rest of the file
+// as before had it. yaml.v3 drops blank lines and re-indents, re-spaces and
+// re-flows everything it encodes, so every stretch of changed lines whose old
+// text reads back as the same YAML data gets its old text back, and a stretch
+// that really changed keeps the blank lines that opened and closed it. Line
+// endings and a missing final newline follow before. The result always reads
+// back as the same data as after, and is before itself when the data did not
+// change.
+func keepFileFormat(before, after []byte) []byte {
+	want, err := yamlData(after)
+	if err != nil {
+		return after
+	}
+	if got, err := yamlData(before); err == nil && reflect.DeepEqual(got, want) {
+		return append([]byte(nil), before...)
+	}
+	oldLines, newLines := splitDiffLines(before), splitDiffLines(after)
+	if bytes.Contains(before, []byte("\r\n")) {
+		for i := range newLines {
+			newLines[i] += "\r"
+		}
+	}
+	type stretch struct {
+		changed       bool
+		old, new, use []string
+	}
+	// A blank line never anchors the diff: in after it only sits inside a block
+	// scalar, and matching it to a blank line elsewhere in before would pull a
+	// changed stretch out of shape. Marked blank lines differ on each side.
+	mark := func(lines []string, side string) []string {
+		out := append([]string(nil), lines...)
+		for i, line := range out {
+			if strings.TrimSpace(line) == "" {
+				out[i] = "\x00" + side + line
+			}
+		}
+		return out
+	}
+	var stretches []*stretch
+	for _, line := range diffLines(mark(oldLines, "-"), mark(newLines, "+")) {
+		changed := line[0] != ' '
+		if len(stretches) == 0 || stretches[len(stretches)-1].changed != changed {
+			stretches = append(stretches, &stretch{changed: changed})
+		}
+		s, text := stretches[len(stretches)-1], line[1:]
+		if strings.HasPrefix(text, "\x00") {
+			text = text[2:]
+		}
+		switch line[0] {
+		case ' ':
+			s.use = append(s.use, text)
+		case '-':
+			s.old = append(s.old, text)
+		default:
+			s.new = append(s.new, text)
+			s.use = s.new
+		}
+	}
+	finalNewline := len(before) == 0 || bytes.HasSuffix(before, []byte("\n"))
+	render := func() []byte {
+		var out bytes.Buffer
+		for _, s := range stretches {
+			for _, line := range s.use {
+				out.WriteString(line)
+				out.WriteByte('\n')
+			}
+		}
+		if !finalNewline {
+			return bytes.TrimRight(out.Bytes(), "\r\n")
+		}
+		return out.Bytes()
+	}
+	same := func() bool {
+		got, err := yamlData(render())
+		return err == nil && reflect.DeepEqual(got, want)
+	}
+	if !same() {
+		return after
+	}
+	for _, s := range stretches {
+		if !s.changed {
+			continue
+		}
+		for _, candidate := range [][]string{s.old, withEdgeBlankLines(s.old, s.new)} {
+			s.use = candidate
+			if same() {
+				break
+			}
+			s.use = s.new
+		}
+	}
+	return render()
+}
+
+// withEdgeBlankLines puts the blank lines that opened and closed the old text
+// of a changed stretch around its new text. A stretch of blank lines only
+// goes after the new text, where an appended entry leaves it; a removed
+// stretch keeps only the blank lines above it, so separators do not double.
+func withEdgeBlankLines(old, new []string) []string {
+	lead := 0
+	for lead < len(old) && strings.TrimSpace(old[lead]) == "" {
+		lead++
+	}
+	if lead == len(old) {
+		return append(append([]string(nil), new...), old...)
+	}
+	if len(new) == 0 {
+		return append([]string(nil), old[:lead]...)
+	}
+	trail := len(old)
+	for strings.TrimSpace(old[trail-1]) == "" {
+		trail--
+	}
+	out := append(append([]string(nil), old[:lead]...), new...)
+	return append(out, old[trail:]...)
+}
+
+// yamlData decodes YAML into plain values, the data a config file carries
+// without its comments and formatting.
+func yamlData(data []byte) (interface{}, error) {
+	var value interface{}
+	err := yaml.Unmarshal(data, &value)
+	return value, err
 }
 
 func atomicConfigWrite(path string, data []byte, mode fs.FileMode) error {
@@ -658,24 +821,35 @@ func findSequenceEntry(sequence *yaml.Node, section string, key string) int {
 	return -1
 }
 
-func mergeKnownMapping(dst, src *yaml.Node) {
+// mergeKnownMapping merges the typed src into the file's dst. lists names the
+// plain list keys at this level: an empty one the file leaves out or already
+// has empty is left alone, so an untouched entry does not gain `agents: []`.
+func mergeKnownMapping(dst, src *yaml.Node, lists map[string]bool) {
 	if dst == nil || src == nil || dst.Kind != yaml.MappingNode || src.Kind != yaml.MappingNode {
 		return
 	}
 	for i := 0; i+1 < len(src.Content); i += 2 {
 		key, value := src.Content[i], src.Content[i+1]
 		idx := mappingIndex(dst, key.Value)
+		if lists[key.Value] && emptyListValue(value) && (idx < 0 || emptyListValue(dst.Content[idx+1])) {
+			continue
+		}
 		if idx < 0 {
 			dst.Content = append(dst.Content, cloneNodePtr(key), cloneNodePtr(value))
 			continue
 		}
 		existing := dst.Content[idx+1]
 		if existing.Kind == yaml.MappingNode && value.Kind == yaml.MappingNode {
-			mergeKnownMapping(existing, value)
+			mergeKnownMapping(existing, value, nil)
 			continue
 		}
 		if existing.Kind == yaml.SequenceNode && value.Kind == yaml.SequenceNode {
 			mergeKnownSequence(existing, value, key.Value)
+			// yaml.v3 does not write the line comment of a block list, so the
+			// note of an `x: [] # note` that now holds entries moves to the key.
+			if existing.Style&yaml.FlowStyle == 0 && existing.LineComment != "" && dst.Content[idx].LineComment == "" {
+				dst.Content[idx].LineComment, existing.LineComment = existing.LineComment, ""
+			}
 			continue
 		}
 		preserveNodeStyle(existing, value)
@@ -698,6 +872,7 @@ func mergeKnownSequence(dst, src *yaml.Node, section string) {
 	}
 	old := append([]*yaml.Node(nil), dst.Content...)
 	dst.Content = nil
+	lists := sequenceEntryListKeys()[section]
 	for _, sourceItem := range src.Content {
 		key := stableNodeKey(sourceItem, section)
 		matched := -1
@@ -709,7 +884,7 @@ func mergeKnownSequence(dst, src *yaml.Node, section string) {
 		}
 		if matched >= 0 {
 			item := cloneNodePtr(old[matched])
-			mergeKnownMapping(item, sourceItem)
+			mergeKnownMapping(item, sourceItem, lists)
 			dst.Content = append(dst.Content, item)
 		} else {
 			dst.Content = append(dst.Content, cloneNodePtr(sourceItem))
@@ -717,10 +892,12 @@ func mergeKnownSequence(dst, src *yaml.Node, section string) {
 	}
 }
 
+// preserveNodeStyle replaces dst with src but keeps the style and the comments
+// the file gave dst.
 func preserveNodeStyle(dst, src *yaml.Node) {
-	style := dst.Style
+	kept := *dst
 	*dst = *cloneNodePtr(src)
-	dst.Style = style
+	dst.Style, dst.HeadComment, dst.LineComment, dst.FootComment = kept.Style, kept.HeadComment, kept.LineComment, kept.FootComment
 }
 
 func cloneNodePtr(node *yaml.Node) *yaml.Node {
