@@ -13,7 +13,7 @@ tackroom is a user-level dotfiles manager for coding agents. It syncs skills, MC
 | Roles | ✓ native | ✓ | - lists, does not write | ✓ subagents | ✓ | ~ | - | - | ~ per target |
 | Root instructions | ✓ | ✓ | - lists, does not write | - | ✓ | ✓ | - | - | ~ per target |
 | Memory | ~ delivers files you list | ✓ shared Markdown notes | ~ lists files; a Kit can carry them | - | - | - | - | - | - |
-| Pin + audit externals | ✓ lock + audit | ~ audit; commit pins in project mode | ~ trust score; no lockfile | ~ trust allowlist, ref pins; no audit | ~ lockfile; no audit | - | - | ~ lock with commit and content hash; no audit gate | ✓ lock; install blocks hidden Unicode |
+| Pin + audit externals | ✓ lock + audit | ~ audit; commit pins in project mode | ~ trust score; no lockfile | ~ trust allowlist, ref pins; no audit | ~ lockfile; no audit | - | - | ~ lock: content hash, commit for Git sources; no audit gate | ✓ lock; install blocks hidden Unicode |
 | Cooldown (72h minimum release age) | ✓ | - | - | ~ opt-in, git sources only | - | - | - | - | - |
 | Per-harness settings | ✓ | - | - | - | - | - | - | - | - |
 | Periodic sync | ✓ | - | - | - | - | - | - | - | - |
@@ -57,9 +57,9 @@ tackroom pins commits in a lock shared by every machine, audits what it pins, an
 
 ## The rest
 
-rulesync and ruler generate config per repository; rulesync also has a `--global` mode, and ruler a global config used when a repository has no `.ruler/` folder. rulesync pins each declared source to a commit in `rulesync.lock` and installs from it with `--frozen`. Its documentation describes no audit of what it pins and no minimum release age.
+rulesync and ruler generate config per repository; rulesync also has a `--global` mode, and ruler a global config used when a repository has no `.ruler/` folder. rulesync pins each declared Git source to a commit in `rulesync.lock`, and each npm source to a version and integrity hash in `rulesync-npm.lock.json`, and installs from those with `--frozen`. Its documentation describes no audit of what it pins and no minimum release age.
 
-[`npx skills`](https://github.com/vercel-labs/skills) and openskills install skills only. `npx skills` installs into a project or, with `-g`, for the user. It records each project skill's commit and a content hash in `skills-lock.json`, and `install --frozen-lockfile` checks them. openskills has had no release since v1.5.0 on 2026-01-17.
+[`npx skills`](https://github.com/vercel-labs/skills) and openskills install skills only. `npx skills` installs into a project or, with `-g`, for the user. It records a content hash for each project skill in `skills-lock.json`, and for a skill from a Git source the commit it came from; `install --frozen-lockfile` checks them. A skill from a direct download has no commit to pin. openskills has had no release since v1.5.0 on 2026-01-17.
 
 [APM](https://github.com/microsoft/apm) is Microsoft's package manager for agent setup. `apm.yml` declares a repository's instructions, skills, prompts, agents, hooks, plugins and MCP servers, `apm.lock.yaml` pins the resolved tree with content hashes, and every install scans for hidden Unicode and blocks a package with a critical finding. The scan looks for nothing else: prompt-injection text, secrets and piped downloads are outside it. It is built for a team's repository and an organisation's policy file, with a user scope beside it, and its [target matrix](https://github.com/microsoft/apm/blob/main/docs/src/content/docs/reference/targets-matrix.md) shows which agent gets which surface. Its documentation describes no minimum release age and no periodic sync.
 
