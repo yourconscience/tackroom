@@ -4,24 +4,24 @@ tackroom is a user-level dotfiles manager for coding agents. It syncs skills, MC
 
 ## At a glance
 
-| | **tackroom** | [skillshare](https://github.com/runkids/skillshare) | [HarnessKit](https://github.com/RealZST/HarnessKit) | [dotagents](https://github.com/getsentry/dotagents) | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) |
-|---|---|---|---|---|---|---|---|
-| Scope | user | user, and per project | user, and per project | user, and per project | project, and a global mode | project | user + project |
-| Skills | ✓ | ✓ | ✓ | ✓ | ✓ | ~ | ✓ |
-| MCP | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - |
-| Hooks | ✓ | ✓ | ~ 10 of 17 agents | ~ 3 of 8 agents | ✓ | - | - |
-| Roles | ✓ native | ✓ | - lists, does not write | ✓ subagents | ✓ | ~ | - |
-| Root instructions | ✓ | ✓ | - lists, does not write | - | ✓ | ✓ | - |
-| Memory | ~ delivers files you list | ✓ shared Markdown notes | ~ lists files; a Kit can carry them | - | - | - | - |
-| Pin + audit externals | ✓ lock + audit | ~ audit; commit pins in project mode | ~ trust score; no lockfile | ~ trust allowlist, ref pins; no audit | - | - | - |
-| Cooldown (72h minimum release age) | ✓ | - | - | ~ opt-in, git sources only | - | - | - |
-| Per-harness settings | ✓ | - | - | - | - | - | - |
-| Periodic sync | ✓ | - | - | - | - | - | - |
-| Desktop app | - (web view) | ✓ | ✓ | - | - | - | - |
-| Terminal panels | ✓ Herdr panel · Tern crons panel and workspace command · Rex workspace command and palette actions · tmux and zellij workspace commands | ✓ Herdr panel | - | - | - | - | - |
-| Harness depth | deep | broad | broad | broad | broad | broad | narrow |
+| | **tackroom** | [skillshare](https://github.com/runkids/skillshare) | [HarnessKit](https://github.com/RealZST/HarnessKit) | [dotagents](https://github.com/getsentry/dotagents) | [rulesync](https://github.com/dyoshikawa/rulesync) | [ruler](https://github.com/intellectronica/ruler) | [openskills](https://github.com/numman-ali/openskills) | [`npx skills`](https://github.com/vercel-labs/skills) | [APM](https://github.com/microsoft/apm) |
+|---|---|---|---|---|---|---|---|---|---|
+| Scope | user | user, and per project | user, and per project | user, and per project | project, and a global mode | project | user + project | project, and per user with `-g` | project, and a user scope |
+| Skills | ✓ | ✓ | ✓ | ✓ | ✓ | ~ | ✓ | ✓ | ✓ |
+| MCP | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | - | - | ✓ |
+| Hooks | ✓ | ✓ | ~ 10 of 17 agents | ~ 3 of 8 agents | ✓ | - | - | - | ~ per target |
+| Roles | ✓ native | ✓ | - lists, does not write | ✓ subagents | ✓ | ~ | - | - | ~ per target |
+| Root instructions | ✓ | ✓ | - lists, does not write | - | ✓ | ✓ | - | - | ~ per target |
+| Memory | ~ delivers files you list | ✓ shared Markdown notes | ~ lists files; a Kit can carry them | - | - | - | - | - | - |
+| Pin + audit externals | ✓ lock + audit | ~ audit; commit pins in project mode | ~ trust score; no lockfile | ~ trust allowlist, ref pins; no audit | ~ lockfile; no audit | - | - | ~ lock with commit and content hash; no audit gate | ✓ lock + content scan |
+| Cooldown (72h minimum release age) | ✓ | - | - | ~ opt-in, git sources only | - | - | - | - | - |
+| Per-harness settings | ✓ | - | - | - | - | - | - | - | - |
+| Periodic sync | ✓ | - | - | - | - | - | - | - | - |
+| Desktop app | - (web view) | ✓ | ✓ | - | - | - | - | - | - |
+| Terminal panels | ✓ Herdr panel · Tern crons panel and workspace command · Rex workspace command and palette actions · tmux and zellij workspace commands | ✓ Herdr panel | - | - | - | - | - | - | - |
+| Harness depth | deep | broad | broad | broad | broad | broad | narrow | broad | broad |
 
-`✓` full, `~` partial, `-` none. The other tools' cells follow their public READMEs and documentation as read on 2026-11-13, HarnessKit's its [docs](https://harness-kit.dev/docs/) and dotagents' its README and docs as read on 2026-11-16, and skillshare's memory cell its [v0.24.0 release notes](https://github.com/runkids/skillshare/releases/tag/v0.24.0) as read on 2026-11-16; check them before you rely on one.
+`✓` full, `~` partial, `-` none. The other tools' cells follow their public READMEs and documentation as read on 2026-11-13, HarnessKit's its [docs](https://harness-kit.dev/docs/) and dotagents' its README and docs as read on 2026-11-16, skillshare's memory cell its [v0.24.0 release notes](https://github.com/runkids/skillshare/releases/tag/v0.24.0) as read on 2026-11-16, rulesync's pin cell its [declarative sources guide](https://github.com/dyoshikawa/rulesync/blob/main/docs/guide/declarative-sources.md) as read on 2026-11-17, and the `npx skills` and APM columns their READMEs and docs as read on 2026-11-18; check them before you rely on one.
 
 ## skillshare vs tackroom
 
@@ -57,7 +57,13 @@ tackroom pins commits in a lock shared by every machine, audits what it pins, an
 
 ## The rest
 
-rulesync and ruler generate config per repository; rulesync also has a `--global` mode, and ruler a global config used when a repository has no `.ruler/` folder. openskills installs skills only. None of them treats a personal setup as a dependency-managed dotfiles repo. For what tackroom refuses to do, read [philosophy.md](philosophy.md).
+rulesync and ruler generate config per repository; rulesync also has a `--global` mode, and ruler a global config used when a repository has no `.ruler/` folder. rulesync pins each declared source to a commit in `rulesync.lock` and installs from it with `--frozen`. Its documentation describes no audit of what it pins and no minimum release age.
+
+[`npx skills`](https://github.com/vercel-labs/skills) and openskills install skills only. `npx skills` installs into a project or, with `-g`, for the user. It records each project skill's commit and a content hash in `skills-lock.json`, and `install --frozen-lockfile` checks them. openskills has had no release since v1.5.0 on 2026-01-17.
+
+[APM](https://github.com/microsoft/apm) is Microsoft's package manager for agent setup. `apm.yml` declares a repository's instructions, skills, prompts, agents, hooks, plugins and MCP servers, `apm.lock.yaml` pins the resolved tree with content hashes, and every install scans for hidden Unicode. It is built for a team's repository and an organisation's policy file, with a user scope beside it, and its [target matrix](https://github.com/microsoft/apm/blob/main/docs/src/content/docs/reference/targets-matrix.md) shows which agent gets which surface. Its documentation describes no minimum release age and no periodic sync.
+
+None of them treats a personal setup as a dependency-managed dotfiles repo. For what tackroom refuses to do, read [philosophy.md](philosophy.md).
 
 ## Moving from skillshare
 

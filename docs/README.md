@@ -23,5 +23,5 @@ Guides and reference for the tackroom CLI, in reading order. Philosophy says wha
 
 ## More
 
-- [Comparison](comparison.md): how tackroom differs from skillshare, HarnessKit, dotagents, rulesync, ruler and openskills, and how to move from skillshare.
+- [Comparison](comparison.md): how tackroom differs from skillshare, HarnessKit, dotagents, rulesync, ruler, openskills, `npx skills` and APM, and how to move from skillshare.
 - [Troubleshooting](troubleshooting.md): conflicts, items in cooldown and blocked items, hooks, Pi, periodic sync.
