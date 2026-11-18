@@ -13,7 +13,7 @@ tackroom is a user-level dotfiles manager for coding agents. It syncs skills, MC
 | Roles | ✓ native | ✓ | - lists, does not write | ✓ subagents | ✓ | ~ | - | - | ~ per target |
 | Root instructions | ✓ | ✓ | - lists, does not write | - | ✓ | ✓ | - | - | ~ per target |
 | Memory | ~ delivers files you list | ✓ shared Markdown notes | ~ lists files; a Kit can carry them | - | - | - | - | - | - |
-| Pin + audit externals | ✓ lock + audit | ~ audit; commit pins in project mode | ~ trust score; no lockfile | ~ trust allowlist, ref pins; no audit | ~ lockfile; no audit | - | - | ~ lock with commit and content hash; no audit gate | ✓ lock + content scan |
+| Pin + audit externals | ✓ lock + audit | ~ audit; commit pins in project mode | ~ trust score; no lockfile | ~ trust allowlist, ref pins; no audit | ~ lockfile; no audit | - | - | ~ lock with commit and content hash; no audit gate | ✓ lock; install blocks hidden Unicode |
 | Cooldown (72h minimum release age) | ✓ | - | - | ~ opt-in, git sources only | - | - | - | - | - |
 | Per-harness settings | ✓ | - | - | - | - | - | - | - | - |
 | Periodic sync | ✓ | - | - | - | - | - | - | - | - |
@@ -61,7 +61,7 @@ rulesync and ruler generate config per repository; rulesync also has a `--global
 
 [`npx skills`](https://github.com/vercel-labs/skills) and openskills install skills only. `npx skills` installs into a project or, with `-g`, for the user. It records each project skill's commit and a content hash in `skills-lock.json`, and `install --frozen-lockfile` checks them. openskills has had no release since v1.5.0 on 2026-01-17.
 
-[APM](https://github.com/microsoft/apm) is Microsoft's package manager for agent setup. `apm.yml` declares a repository's instructions, skills, prompts, agents, hooks, plugins and MCP servers, `apm.lock.yaml` pins the resolved tree with content hashes, and every install scans for hidden Unicode. It is built for a team's repository and an organisation's policy file, with a user scope beside it, and its [target matrix](https://github.com/microsoft/apm/blob/main/docs/src/content/docs/reference/targets-matrix.md) shows which agent gets which surface. Its documentation describes no minimum release age and no periodic sync.
+[APM](https://github.com/microsoft/apm) is Microsoft's package manager for agent setup. `apm.yml` declares a repository's instructions, skills, prompts, agents, hooks, plugins and MCP servers, `apm.lock.yaml` pins the resolved tree with content hashes, and every install scans for hidden Unicode and blocks a package with a critical finding. The scan looks for nothing else: prompt-injection text, secrets and piped downloads are outside it. It is built for a team's repository and an organisation's policy file, with a user scope beside it, and its [target matrix](https://github.com/microsoft/apm/blob/main/docs/src/content/docs/reference/targets-matrix.md) shows which agent gets which surface. Its documentation describes no minimum release age and no periodic sync.
 
 None of them treats a personal setup as a dependency-managed dotfiles repo. For what tackroom refuses to do, read [philosophy.md](philosophy.md).
 
