@@ -252,22 +252,37 @@ func loweredLines(file string, lines []string) []bool {
 }
 
 // pyDocstringOpens reports whether line i opens a Python docstring: a string
-// that starts the line and is the first statement of the module or follows a
-// line ending in a colon (def, class, or another block opener). Any other
-// triple-quoted string is data the script can run, so it is not lowered.
+// that starts the line and is the first statement of the module, or of a
+// function or class whose header is the statement just before it. Any other
+// triple-quoted string, a dictionary value or an argument for one, is data the
+// script can run, so it is not lowered.
 func pyDocstringOpens(lines []string, i int) bool {
 	t := strings.TrimLeft(strings.TrimSpace(lines[i]), "rRuUbB")
 	if !strings.HasPrefix(t, `"""`) && !strings.HasPrefix(t, `'''`) {
 		return false
 	}
+	depth := 0
+	seen := false
 	for j := i - 1; j >= 0; j-- {
 		prev := strings.TrimSpace(lines[j])
 		if prev == "" || strings.HasPrefix(prev, "#") {
 			continue
 		}
-		return strings.HasSuffix(prev, ":")
+		if !seen {
+			// The statement before the string has to end a header.
+			if !strings.HasSuffix(prev, ":") {
+				return false
+			}
+			seen = true
+		}
+		// Walk back over a header that spans lines until its brackets balance.
+		depth += strings.Count(prev, ")") + strings.Count(prev, "]") - strings.Count(prev, "(") - strings.Count(prev, "[")
+		if depth > 0 {
+			continue
+		}
+		return strings.HasPrefix(prev, "def ") || strings.HasPrefix(prev, "async def ") || strings.HasPrefix(prev, "class ")
 	}
-	return true
+	return !seen
 }
 
 // scanText applies every rule line by line. file is the path relative to the
