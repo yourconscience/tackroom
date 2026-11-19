@@ -6,7 +6,7 @@ A side panel for [tackroom](https://github.com/yourconscience/tackroom), which k
 
 ## What you see
 
-- **A tackroom button** at the right end of the tab bar, after Files and Changes: a 14px dashboard icon and "tackroom", 12px, in a 104px block that continues the tab bar's `chrome` background and bottom border. It reads `foreground` on `selected` while the tackroom panel shows, `muted` otherwise.
+- **A tackroom button** at the right end of the tab bar, after Files and Changes: a 14px tackroom logo mark and "tackroom", 12px, in a 104px block that continues the tab bar's `chrome` background and bottom border. It reads `foreground` on `selected` while the tackroom panel shows, `muted` otherwise.
 - **The tackroom panel** in the right column (368px, 280 to 900, hidden until opened), the third child of the `panel-body` stack after Files and Changes.
 - **Header**, 36px: the tackroom icon, "tackroom", the time the open tab's data was loaded (or "loading…"), then two buttons: Refresh, which reloads the open tab's data at once, and Web, which opens the same tab of the running `tackroom view`.
 - **Tab strip**: Overview, Skills, Roles, MCP & hooks and Crons, 12px, on `selected` for the open tab and `muted` for the rest. The strip wraps when the panel is too narrow for one line. A 6px dot after a label marks a tab that needs attention: `ansi1` for something failing, conflicting or unreadable, `ansi3` for something drifted, missing, in cooldown or out of sync. The dot shows from the first load, whichever tab is open.
@@ -58,7 +58,7 @@ Two mods, `mods/tackroom/` and `mods/tackroom-toggle/`, both `place: "none"`. Th
 ### The mods
 
 - `mods/tackroom-toggle`: reads `layout()` for the `panel` column and `panel-body` stack and runs `layout.select {stack: "panel-body", child: "tackroom"}` with `layout.show {id: "panel"}`, or `layout.hide {id: "panel"}`. Its icon is `mods/tackroom/tackroom.svg`, so it needs the `tackroom` mod beside it.
-- `mods/tackroom`: `main.js` the panel, `form.js` the dialog, `tackroom.svg` the icon (tinted). Props, all optional: `tackroom`, the program (default `tackroom` on the PATH Herdr runs programs with, for example `"~/.local/bin/tackroom"`); `config`, a config file other than tackroom's default (for example `"~/.agents/tackroom.yaml"`); `refresh`, seconds between loads.
+- `mods/tackroom`: `main.js` the panel, `form.js` the dialog, `tackroom.svg` the icon, the mono logo mark from `docs/brand/logo-a-mono.svg` (tinted). Props, all optional: `tackroom`, the program (default `tackroom` on the PATH Herdr runs programs with, for example `"~/.local/bin/tackroom"`); `config`, a config file other than tackroom's default (for example `"~/.agents/tackroom.yaml"`); `refresh`, seconds between loads.
 - Data, each with `--config` when the prop is set:
   - Overview: `exec(tackroom, ["sync", "--dry-run", "--json"])`: `agents` (per harness, per surface: `managed`, `missing`, `drifted`; `conflicts`, `error`, `root_instructions`), `changes`, `synced`, `repo_link`, `skipped` (`held` from a tackroom older than 3.0), `not_fetched`. It writes and fetches nothing.
   - Overview's Machines: `exec(tackroom, ["hosts", "--json"])`: `hosts`, each with `host`, `health`, `summary` and `fix`, 5-minute timeout.
