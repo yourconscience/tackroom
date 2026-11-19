@@ -77,6 +77,7 @@ crons:
       created_by: human
       connectors: [git, ssh]
       effect: nightly commit pushed to the backup remote
+      output: $KNOWLEDGE_DIR/research/backup/*.html   # optional: where results land, a path or glob
 ```
 
 A declared job that `collect` cannot find is reported as `state: missing`, but only when every place it could live was read: the host was reached and its `source` came back `found` or `empty`, or, with no `source`, no source on that host came back `unreadable`.
@@ -114,8 +115,8 @@ Then run `tackroom cron apply`. It loads the config, takes a lock at `~/.local/s
 ## Add, edit and remove owned jobs
 
 ```bash
-tackroom cron add ID --schedule "MIN HOUR DOM MON DOW" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--local]
-tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT]
+tackroom cron add ID --schedule "MIN HOUR DOM MON DOW" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--output PATH] [--local]
+tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--output PATH]
 tackroom cron remove ID
 ```
 
@@ -123,7 +124,7 @@ All three take `--dry-run`, `--no-apply` and `--config PATH`; the id may come be
 
 - A command is `--command` plus one `--arg` per argument, in order, stored as a YAML list: `--command /usr/bin/git --arg -C --arg /srv/notes --arg pull` becomes `command: [/usr/bin/git, -C, /srv/notes, pull]`. `edit --command` replaces the whole list.
 - `add` writes `crons.jobs.<id>` to `tackroom.yaml`, or to `tackroom.local.yaml` with `--local`.
-- `edit` changes only the fields you pass, in the file that declares the job (`tackroom.local.yaml` when it has the id). `--host ""` and `--effect ""` remove the field.
+- `edit` changes only the fields you pass, in the file that declares the job (`tackroom.local.yaml` when it has the id). `--host ""`, `--effect ""` and `--output ""` remove the field.
 - `remove` deletes the declaration, from both files when both declare it, with the comment lines directly above it. When that was the last job, the `jobs:` and `crons:` keys that held it go too, so an `add` followed by a `remove` leaves the file as it was; a `crons:` block with another key or any comment keeps its place.
 - If `apply` fails after the write, the declaration stays saved and the error says so; fix the cause and run `tackroom cron apply`.
 
@@ -193,6 +194,7 @@ Each job is one JSON record. Main fields:
 | `state` | `scheduled`, `service`, `disabled`, `paused`, `not_loaded`, `dead` or `missing`. |
 | `health` | `ok`, `warn`, `fail`, `idle` or `paused`, computed once for every view. |
 | `created_by`, `connectors`, `effect` | From the manifest ([Record who made a job](#record-who-made-a-job)), or inferred. |
+| `output`, `output_expanded` | Where the job's results land: the declared path or glob, and the same with `~` and environment variables expanded. `--table` lists them under "Outputs". |
 | `declared_schedule`, `declared_command` | The `schedule` and `command` list a `crons.jobs` entry declares, as written. |
 | `editable`, `edit_note` | `editable` is true for a job `cron edit` and `cron remove` can change from this machine; otherwise `edit_note` says why not (a job tackroom did not install, one on another host, a note-only entry). |
 | `problems`, `inferred` | Findings, and the names of fields tackroom derived rather than read. |
@@ -230,7 +232,7 @@ The body is JSON. Unknown fields are refused.
 | --- | --- |
 | `action` | `add`, `edit` or `remove` |
 | `id` | The job id |
-| `schedule`, `command`, `host`, `effect`, `local`, `dry_run`, `no_apply` | As the CLI flags above; `command` is a list, executable first |
+| `schedule`, `command`, `host`, `effect`, `output`, `local`, `dry_run`, `no_apply` | As the CLI flags above; `command` is a list, executable first |
 
 The answer carries:
 

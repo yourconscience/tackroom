@@ -60,7 +60,11 @@ type cronJob struct {
 	CreatedBy        string   `json:"created_by,omitempty"`
 	Connectors       []string `json:"connectors,omitempty"`
 	Effect           string   `json:"effect,omitempty"`
-	Problems         []string `json:"problems,omitempty"`
+	// Output is where the job's results land, as declared; OutputExpanded has ~ and
+	// environment variables expanded.
+	Output         string   `json:"output,omitempty"`
+	OutputExpanded string   `json:"output_expanded,omitempty"`
+	Problems       []string `json:"problems,omitempty"`
 	// Inferred names the fields derived by tackroom rather than read from the
 	// scheduler or declared in the manifest.
 	Inferred []string `json:"inferred,omitempty"`
@@ -102,6 +106,7 @@ type cronManifestJob struct {
 	CreatedBy  string   `yaml:"created_by"`
 	Connectors []string `yaml:"connectors"`
 	Effect     string   `yaml:"effect"`
+	Output     string   `yaml:"output"`
 	// Schedule and Command make the job owned: `cron apply` installs it.
 	Schedule string   `yaml:"schedule"`
 	Command  []string `yaml:"command"`
@@ -277,6 +282,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 				job.Inferred = removeString(job.Inferred, "connectors")
 			}
 			job.Effect = entry.Effect
+			job.Output, job.OutputExpanded = entry.Output, expandCronOutput(entry.Output)
 			job.DeclaredSchedule, job.DeclaredCommand = entry.Schedule, entry.Command
 		}
 		if matched || !manifestEntryRead(entry, access, sameHost) {
@@ -284,7 +290,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 		}
 		jobs = append(jobs, cronJob{
 			Host: entry.Host, Source: entry.Source, ID: id, State: "missing", CreatedBy: entry.CreatedBy,
-			Connectors: entry.Connectors, Effect: entry.Effect, DeclaredSchedule: entry.Schedule, DeclaredCommand: entry.Command,
+			Connectors: entry.Connectors, Effect: entry.Effect, Output: entry.Output, OutputExpanded: expandCronOutput(entry.Output), DeclaredSchedule: entry.Schedule, DeclaredCommand: entry.Command,
 			Problems: []string{"declared in crons.jobs but not found on any scanned host"},
 		})
 	}
@@ -1374,6 +1380,15 @@ func cronResultAndLastRun(j cronJob) (result, lastRun string) {
 	return result, lastRun
 }
 
+// expandCronOutput expands ~ and environment variables in a declared output path or glob.
+func expandCronOutput(output string) string {
+	if output == "" {
+		return ""
+	}
+	home, _ := os.UserHomeDir()
+	return expandPath(os.ExpandEnv(output), home)
+}
+
 func printCronsTable(result cronsScanResult) {
 	out := ui.Writer(os.Stdout)
 	newTable := func(headers ...string) *table.Table {
@@ -1407,6 +1422,20 @@ func printCronsTable(result cronsScanResult) {
 		access.Row(a.Host, a.Source, a.State, strconv.Itoa(a.Jobs), truncate(a.Detail, 90))
 	}
 	fmt.Fprintln(out, access.String())
+
+	var outputs []string
+	for _, j := range result.Jobs {
+		if j.Output != "" {
+			outputs = append(outputs, fmt.Sprintf("%s %s %s: %s", j.Host, j.Source, j.ID, j.OutputExpanded))
+		}
+	}
+	if len(outputs) > 0 {
+		fmt.Fprintln(out)
+		fmt.Fprintln(out, "Outputs:")
+		for _, o := range outputs {
+			fmt.Fprintln(out, "  "+o)
+		}
+	}
 
 	var problems []string
 	for _, j := range result.Jobs {

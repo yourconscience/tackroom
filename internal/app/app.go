@@ -680,8 +680,8 @@ var canonicalForms = []string{
 	"  tackroom cron apply [--dry-run] [--config PATH]",
 	"  tackroom cron run|pause|resume [--host HOST] [--config PATH] ID",
 	"  tackroom cron schedule [--config PATH] ID \"MIN HOUR DOM MON DOW\"",
-	"  tackroom cron add ID --schedule \"MIN HOUR DOM MON DOW\" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--local] [--dry-run] [--no-apply] [--config PATH]",
-	"  tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--dry-run] [--no-apply] [--config PATH]",
+	"  tackroom cron add ID --schedule \"MIN HOUR DOM MON DOW\" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--output PATH] [--local] [--dry-run] [--no-apply] [--config PATH]",
+	"  tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--output PATH] [--dry-run] [--no-apply] [--config PATH]",
 	"  tackroom cron remove ID [--dry-run] [--no-apply] [--config PATH]",
 }
 

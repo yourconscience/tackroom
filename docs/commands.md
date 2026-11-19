@@ -208,8 +208,8 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 - `tackroom cron apply [--dry-run]`
 - `tackroom cron run|pause|resume [--host HOST] ID`
 - `tackroom cron schedule ID "MIN HOUR DOM MON DOW"`
-- `tackroom cron add ID --schedule "MIN HOUR DOM MON DOW" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--local] [--dry-run] [--no-apply]`
-- `tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--dry-run] [--no-apply]`
+- `tackroom cron add ID --schedule "MIN HOUR DOM MON DOW" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--output PATH] [--local] [--dry-run] [--no-apply]`
+- `tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--output PATH] [--dry-run] [--no-apply]`
 - `tackroom cron remove ID [--dry-run] [--no-apply]`
 
 What each flag does is in [crons.md](crons.md).

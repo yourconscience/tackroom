@@ -35,6 +35,7 @@ type cronJobChange struct {
 	Command  []string `json:"command"` // the executable and its arguments
 	Host     *string  `json:"host"`    // on an edit, "" removes the field
 	Effect   *string  `json:"effect"`  // on an edit, "" removes the field
+	Output   *string  `json:"output"`  // on an edit, "" removes the field
 	Local    bool     `json:"local"`   // add: write tackroom.local.yaml, not tackroom.yaml
 	DryRun   bool     `json:"dry_run"`
 	NoApply  bool     `json:"no_apply"`
@@ -146,10 +147,10 @@ func planCronJobChange(shared, home string, manifest cronsManifest, ch cronJobCh
 	if ch.Local && ch.Action != "add" {
 		return nil, errors.New("local applies to add only; an edit or removal changes the file that declares the job")
 	}
-	if ch.Action == "remove" && (ch.Schedule != nil || ch.Command != nil || ch.Host != nil || ch.Effect != nil) {
+	if ch.Action == "remove" && (ch.Schedule != nil || ch.Command != nil || ch.Host != nil || ch.Effect != nil || ch.Output != nil) {
 		return nil, errors.New("remove takes no fields")
 	}
-	for _, field := range []**string{&ch.Schedule, &ch.Host, &ch.Effect} {
+	for _, field := range []**string{&ch.Schedule, &ch.Host, &ch.Effect, &ch.Output} {
 		if *field != nil {
 			trimmed := strings.TrimSpace(**field)
 			*field = &trimmed
@@ -221,8 +222,8 @@ func planCronJobChange(shared, home string, manifest cronsManifest, ch cronJobCh
 				return nil, err
 			}
 		}
-		if ch.Action == "edit" && ch.Schedule == nil && ch.Command == nil && ch.Host == nil && ch.Effect == nil {
-			return nil, errors.New("nothing to change: pass a schedule, command, host or effect")
+		if ch.Action == "edit" && ch.Schedule == nil && ch.Command == nil && ch.Host == nil && ch.Effect == nil && ch.Output == nil {
+			return nil, errors.New("nothing to change: pass a schedule, command, host, effect or output")
 		}
 		for _, file := range files {
 			file.changeable = file.job != nil && (ch.Action == "remove" || file == declared)
@@ -370,7 +371,10 @@ func setCronJobFields(job *yaml.Node, ch cronJobChange, id, path string) error {
 			setMappingNode(job, "command", &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq", Style: yaml.FlowStyle, Content: items})
 		}
 	}
-	return setScalar("effect", ch.Effect, 0)
+	if err := setScalar("effect", ch.Effect, 0); err != nil {
+		return err
+	}
+	return setScalar("output", ch.Output, 0)
 }
 
 // spliceCronJob returns data with crons.jobs.<id> set to job, or removed when
@@ -651,7 +655,7 @@ func runCronJobCommand(action string, args []string) error {
 	configPath := fs.String("config", "", "Path to tackroom YAML config")
 	dryRun := fs.Bool("dry-run", false, "Print the YAML change and the apply plan, write nothing")
 	noApply := fs.Bool("no-apply", false, "Change the YAML only; run tackroom cron apply later")
-	var schedule, command, host, effect string
+	var schedule, command, host, effect, output string
 	var commandArgs stringListFlag
 	var local bool
 	if action != "remove" {
@@ -660,6 +664,7 @@ func runCronJobCommand(action string, args []string) error {
 		fs.Var(&commandArgs, "arg", "Argument for the command, one per --arg (repeatable, in order)")
 		fs.StringVar(&host, "host", "", "Machine the job runs on, matched against crons.self; omit to run on every machine")
 		fs.StringVar(&effect, "effect", "", "What the job changes, shown in the Crons tab")
+		fs.StringVar(&output, "output", "", "Path or glob where the job writes its results; ~ and $VARS are expanded on display")
 	}
 	if action == "add" {
 		fs.BoolVar(&local, "local", false, "Write tackroom.local.yaml instead of tackroom.yaml")
@@ -707,6 +712,9 @@ func runCronJobCommand(action string, args []string) error {
 		}
 		if given["effect"] {
 			ch.Effect = &effect
+		}
+		if given["output"] {
+			ch.Output = &output
 		}
 	}
 	res, err := changeCronJob(*configPath, ch)
