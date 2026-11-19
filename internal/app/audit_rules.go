@@ -212,16 +212,27 @@ func loweredLines(file string, lines []string) []bool {
 	}
 	ext := strings.ToLower(filepath.Ext(file))
 	inDoc := false
+	inStr := false // inside a multi-line Python string that is data, not a docstring
 	inBlock := false
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
+		odd := ext == ".py" && (strings.Count(t, `"""`)+strings.Count(t, `'''`))%2 == 1
 		switch {
-		case ext == ".py" && (strings.Count(t, `"""`)+strings.Count(t, `'''`))%2 == 1:
+		case inStr:
+			inStr = !odd
+		case odd && inDoc:
 			out[i] = true
-			inDoc = !inDoc
+			inDoc = false
+		case odd:
+			if pyDocstringOpens(lines, i) {
+				out[i] = true
+				inDoc = true
+			} else {
+				inStr = true
+			}
 		case inDoc:
 			out[i] = true
-		case ext == ".py" && (strings.HasPrefix(t, `"""`) || strings.HasPrefix(t, `'''`)):
+		case ext == ".py" && pyDocstringOpens(lines, i):
 			out[i] = true // one-line docstring
 		case inBlock:
 			out[i] = true
@@ -238,6 +249,25 @@ func loweredLines(file string, lines []string) []bool {
 		}
 	}
 	return out
+}
+
+// pyDocstringOpens reports whether line i opens a Python docstring: a string
+// that starts the line and is the first statement of the module or follows a
+// line ending in a colon (def, class, or another block opener). Any other
+// triple-quoted string is data the script can run, so it is not lowered.
+func pyDocstringOpens(lines []string, i int) bool {
+	t := strings.TrimLeft(strings.TrimSpace(lines[i]), "rRuUbB")
+	if !strings.HasPrefix(t, `"""`) && !strings.HasPrefix(t, `'''`) {
+		return false
+	}
+	for j := i - 1; j >= 0; j-- {
+		prev := strings.TrimSpace(lines[j])
+		if prev == "" || strings.HasPrefix(prev, "#") {
+			continue
+		}
+		return strings.HasSuffix(prev, ":")
+	}
+	return true
 }
 
 // scanText applies every rule line by line. file is the path relative to the
