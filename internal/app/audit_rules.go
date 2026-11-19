@@ -213,6 +213,7 @@ func loweredLines(file string, lines []string) []bool {
 	ext := strings.ToLower(filepath.Ext(file))
 	inDoc := false
 	inStr := false // inside a multi-line Python string that is data, not a docstring
+	docStart := 0
 	inBlock := false
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -223,16 +224,23 @@ func loweredLines(file string, lines []string) []bool {
 		case odd && inDoc:
 			out[i] = true
 			inDoc = false
+			if !pyStringEndsStatement(t) {
+				// The string goes on as an expression, so it was never a docstring.
+				for k := docStart; k <= i; k++ {
+					out[k] = false
+				}
+			}
 		case odd:
 			if pyDocstringOpens(lines, i) {
 				out[i] = true
 				inDoc = true
+				docStart = i
 			} else {
 				inStr = true
 			}
 		case inDoc:
 			out[i] = true
-		case ext == ".py" && pyDocstringOpens(lines, i):
+		case ext == ".py" && pyDocstringOpens(lines, i) && pyStringEndsStatement(t):
 			out[i] = true // one-line docstring
 		case inBlock:
 			out[i] = true
@@ -283,6 +291,21 @@ func pyDocstringOpens(lines []string, i int) bool {
 		return strings.HasPrefix(prev, "def ") || strings.HasPrefix(prev, "async def ") || strings.HasPrefix(prev, "class ")
 	}
 	return !seen
+}
+
+// pyStringEndsStatement reports whether nothing but a comment follows the last
+// triple quote on the line. A docstring is a whole statement: one that goes on
+// (`""" % x`, `""".strip()`, a line continuation) is an expression.
+func pyStringEndsStatement(t string) bool {
+	idx := strings.LastIndex(t, `"""`)
+	if j := strings.LastIndex(t, `'''`); j > idx {
+		idx = j
+	}
+	if idx < 0 {
+		return false
+	}
+	rest := strings.TrimSpace(t[idx+3:])
+	return rest == "" || strings.HasPrefix(rest, "#")
 }
 
 // scanText applies every rule line by line. file is the path relative to the
