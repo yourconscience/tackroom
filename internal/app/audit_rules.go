@@ -211,37 +211,13 @@ func loweredLines(file string, lines []string) []bool {
 		return out
 	}
 	ext := strings.ToLower(filepath.Ext(file))
-	inDoc := false
-	inStr := false // inside a multi-line Python string that is data, not a docstring
-	docStart := 0
+	if ext == ".py" {
+		return pyLoweredLines(lines)
+	}
 	inBlock := false
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
-		odd := ext == ".py" && (strings.Count(t, `"""`)+strings.Count(t, `'''`))%2 == 1
 		switch {
-		case inStr:
-			inStr = !odd
-		case odd && inDoc:
-			out[i] = true
-			inDoc = false
-			if !pyStringEndsStatement(t) {
-				// The string goes on as an expression, so it was never a docstring.
-				for k := docStart; k <= i; k++ {
-					out[k] = false
-				}
-			}
-		case odd:
-			if pyDocstringOpens(lines, i) {
-				out[i] = true
-				inDoc = true
-				docStart = i
-			} else {
-				inStr = true
-			}
-		case inDoc:
-			out[i] = true
-		case ext == ".py" && pyDocstringOpens(lines, i) && pyStringEndsStatement(t):
-			out[i] = true // one-line docstring
 		case inBlock:
 			out[i] = true
 			if strings.Contains(t, "*/") {
@@ -257,6 +233,99 @@ func loweredLines(file string, lines []string) []bool {
 		}
 	}
 	return out
+}
+
+// pyLoweredLines marks the lines of a Python file that are comments or
+// docstrings. It follows triple-quoted strings by their own delimiter, so a
+// quote inside a comment or inside another string does not move a boundary.
+// A triple-quoted string that is not a docstring is data the script can run:
+// its lines are not lowered.
+func pyLoweredLines(lines []string) []bool {
+	out := make([]bool, len(lines))
+	delim := "" // the delimiter of the triple-quoted string the line starts in
+	doc := false
+	docStart := 0
+	for i, line := range lines {
+		t := strings.TrimSpace(line)
+		if delim != "" {
+			idx := strings.Index(t, delim)
+			if idx < 0 {
+				out[i] = doc
+				continue
+			}
+			rest := t[idx+3:]
+			if doc {
+				out[i] = true
+				if !pyOnlyComment(rest) {
+					// The string goes on as an expression (`""" % x`, a
+					// method call, a continuation), so it was never a docstring.
+					for k := docStart; k <= i; k++ {
+						out[k] = false
+					}
+				}
+			}
+			doc = false
+			delim = pyOpenString(rest)
+			continue
+		}
+		if strings.HasPrefix(t, "#") {
+			out[i] = !strings.HasPrefix(t, "#!")
+			continue
+		}
+		if !pyDocstringOpens(lines, i) {
+			delim = pyOpenString(t)
+			continue
+		}
+		body := strings.TrimLeft(t, "rRuUbB")
+		d := body[:3]
+		end := strings.Index(body[3:], d)
+		if end < 0 {
+			delim, doc, docStart = d, true, i
+			out[i] = true
+			continue
+		}
+		rest := body[3+end+3:]
+		out[i] = pyOnlyComment(rest) // a one-line docstring is a whole statement
+		delim = pyOpenString(rest)
+	}
+	return out
+}
+
+// pyOnlyComment reports whether the rest of a line is empty or a comment.
+func pyOnlyComment(rest string) bool {
+	rest = strings.TrimSpace(rest)
+	return rest == "" || strings.HasPrefix(rest, "#")
+}
+
+// pyOpenString scans Python code that starts outside a string and returns the
+// delimiter of a triple-quoted string still open at the end of the line, or "".
+// It stops at a comment and steps over strings that close on the line.
+func pyOpenString(code string) string {
+	for i := 0; i < len(code); {
+		switch c := code[i]; {
+		case c == '#':
+			return ""
+		case strings.HasPrefix(code[i:], `"""`) || strings.HasPrefix(code[i:], `'''`):
+			d := code[i : i+3]
+			end := strings.Index(code[i+3:], d)
+			if end < 0 {
+				return d
+			}
+			i += 3 + end + 3
+		case c == '"' || c == '\'':
+			j := i + 1
+			for j < len(code) && code[j] != c {
+				if code[j] == '\\' {
+					j++
+				}
+				j++
+			}
+			i = j + 1
+		default:
+			i++
+		}
+	}
+	return ""
 }
 
 // pyDocstringOpens reports whether line i opens a Python docstring: a string
@@ -291,21 +360,6 @@ func pyDocstringOpens(lines []string, i int) bool {
 		return strings.HasPrefix(prev, "def ") || strings.HasPrefix(prev, "async def ") || strings.HasPrefix(prev, "class ")
 	}
 	return !seen
-}
-
-// pyStringEndsStatement reports whether nothing but a comment follows the last
-// triple quote on the line. A docstring is a whole statement: one that goes on
-// (`""" % x`, `""".strip()`, a line continuation) is an expression.
-func pyStringEndsStatement(t string) bool {
-	idx := strings.LastIndex(t, `"""`)
-	if j := strings.LastIndex(t, `'''`); j > idx {
-		idx = j
-	}
-	if idx < 0 {
-		return false
-	}
-	rest := strings.TrimSpace(t[idx+3:])
-	return rest == "" || strings.HasPrefix(rest, "#")
 }
 
 // scanText applies every rule line by line. file is the path relative to the
