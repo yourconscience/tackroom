@@ -90,6 +90,7 @@ A new or changed external skill pin, and a new or changed reference to an exact 
 
 - The time comes from npm `time[version]`, the latest PyPI upload, or the git committer date; an unknown time means cooldown.
 - Local sources (`file://` URLs and paths) have no publish time and are never in cooldown; the audit gate still applies to them.
+- A security fix skips the cooldown on its own: when sync finds an exact npm or PyPI version in cooldown, it asks [OSV](https://osv.dev) (which carries the reviewed GitHub advisories) whether a published, not withdrawn advisory names that version as its fix. If one does, sync takes the version at once, prints `cooldown skipped for <item> (<ref>): security fix: GHSA-...` and records the decision in `tackroom.lock` as if `--allow-fresh` had been passed, with the advisory ids as the reason. `status` makes no lookup. Git skill sources are not covered: an advisory names a version, not a commit.
 - A package in `trusted_packages` is never in cooldown: no registry lookup and nothing in the lock. The list holds `npm:<name>` or `pypi:<name>` entries in `tackroom.yaml` or `tackroom.local.yaml`. Without the key it is `npm:@openai/codex`, `npm:@anthropic-ai/claude-code` and `npm:@earendil-works/pi-coding-agent`. A key you write replaces that list, so `trusted_packages: []` gates every package. Any other entry is a config error, and `tackroom doctor` names the trusted packages it skipped in its package age check.
 
 To skip the cooldown:

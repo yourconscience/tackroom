@@ -51,4 +51,4 @@ Check: `tackroom help --all` lists the whole command set.
 - Not a skills marketplace. `skill sources search` queries skills.sh; you choose what to add.
 - Not an editor of your harnesses' own settings. It writes the keys you declare and leaves the rest.
 - Not a memory system. It delivers the files you list and writes none of them.
-- Not hosted, and not instrumented. Its network calls are git, npm and PyPI lookups for the cooldown, skills.sh search and the registry you configure for `publish`. It sends no telemetry.
+- Not hosted, and not instrumented. Its network calls are git, npm and PyPI lookups for the cooldown, an OSV advisory lookup for a version in cooldown, skills.sh search and the registry you configure for `publish`. It sends no telemetry.
