@@ -118,13 +118,14 @@ func fixesVersion(v osvVuln, pkg, ecosystem, version string) bool {
 
 var pypiSeparators = regexp.MustCompile(`[-_.]+`)
 
-// samePackage compares names the way the registry does: PyPI treats any run
-// of "-", "_" and "." as one separator (PEP 503), so my_tool is my-tool.
+// samePackage compares names the way the registry does: npm names are
+// case-sensitive, and PyPI ignores case and treats any run of "-", "_" and "."
+// as one separator (PEP 503), so My_Tool is my-tool.
 func samePackage(a, b, ecosystem string) bool {
-	if ecosystem == "PyPI" {
-		a, b = pypiSeparators.ReplaceAllString(a, "-"), pypiSeparators.ReplaceAllString(b, "-")
+	if ecosystem != "PyPI" {
+		return a == b
 	}
-	return strings.EqualFold(a, b)
+	return strings.EqualFold(pypiSeparators.ReplaceAllString(a, "-"), pypiSeparators.ReplaceAllString(b, "-"))
 }
 
 // advisoryID prefers the GHSA id, which is what release notes cite.
