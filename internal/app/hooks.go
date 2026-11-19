@@ -47,9 +47,10 @@ func desiredHooksForAgent(cfg config, agentName string) ([]hookConfig, bool) {
 
 // staleHooksForAgent finds the agent's native registrations of hooks the
 // config still declares but has turned off or no longer aims at this agent,
-// and returns those hooks' names and the registrations. A registration that a
-// hook wanted for this agent also matches stays, and so does every command
-// the config does not declare.
+// and, when sync sets cfg.retiredMemoryHook, registrations that run a retired
+// memory script. It returns the hook (or script) names and the registrations.
+// A registration that a hook wanted for this agent also matches stays, and so
+// does every other command the config does not declare.
 func staleHooksForAgent(agentName string, cfg config, home string) ([]string, []nativeHookEntry, error) {
 	agentName = normalizeAgentName(agentName)
 	var off []hookConfig
