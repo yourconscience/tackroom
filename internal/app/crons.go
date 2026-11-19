@@ -1388,7 +1388,11 @@ func expandCronOutput(output, host string) string {
 		return ""
 	}
 	home, _ := os.UserHomeDir()
-	return expandPath(os.ExpandEnv(output), home)
+	output = os.ExpandEnv(output)
+	if output == "~" || strings.HasPrefix(output, "~/") {
+		output = home + output[1:] // not filepath.Join: it would clean ".." away
+	}
+	return output
 }
 
 func printCronsTable(result cronsScanResult) {
