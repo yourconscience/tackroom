@@ -40,6 +40,11 @@ type config struct {
 	// plugin, so desiredMCPServersForAgent writes no [mcp_servers] row for them.
 	// Set by injectPluginMCPServersMode; never from YAML.
 	codexPluginMCP map[string]bool
+	// retiredMemoryHook returns the retired memory script a native hook
+	// command runs, or "": such a registration is stale even though no
+	// configured hook names it. Set by sync when no configured hook runs a
+	// memory script; never from YAML.
+	retiredMemoryHook func(command string) string
 	// ContextNoteTokens is the estimated skill-listing token threshold above
 	// which `tackroom doctor` prints a soft context advisory note. Absent
 	// (nil) uses contextNoteTokensDefault; 0 (or negative) disables the note.

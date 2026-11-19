@@ -269,9 +269,13 @@ func runSync(opts runOptions) error {
 		// Setup prints its own summary instead of the report.
 		reportOut = io.Discard
 	}
-	starterChanges, err := reconcileStarterFiles(repoRoot, streams, opts.ConfirmRemovals, memoryHooksInUse(cfg, repoRoot, home))
+	keepMemory := memoryHooksInUse(cfg, repoRoot, home)
+	starterChanges, err := reconcileStarterFiles(repoRoot, streams, opts.ConfirmRemovals, keepMemory)
 	if err != nil {
 		return err
+	}
+	if !keepMemory {
+		cfg.retiredMemoryHook = retiredMemoryScripts(repoRoot, home, starterChanges.Removed)
 	}
 	starterChanges.report(reportOut)
 	if starterChanges.Released {
@@ -484,6 +488,17 @@ func runSyncDryRun(opts runOptions) error {
 
 	repoReport.Linked = repoReport.State != stateSynced
 
+	// Starter files a real sync would scaffold, refresh or retire. Read before
+	// the harnesses, since a retired memory script retires its hooks too.
+	keepMemory := memoryHooksInUse(cfg, repoRoot, home)
+	starterPlan, err := previewStarterFiles(repoRoot, keepMemory)
+	if err != nil {
+		return err
+	}
+	if !keepMemory {
+		cfg.retiredMemoryHook = retiredMemoryScripts(repoRoot, home, starterPlan.Removed)
+	}
+
 	inspectCfg, err := configForInspection(cfg, sources, gated, repoRoot, home)
 	if err != nil {
 		return err
@@ -501,12 +516,6 @@ func runSyncDryRun(opts runOptions) error {
 		// A real sync links or rewrites the root doc; say so in the plan headline.
 		r := &reports[i]
 		r.RootLinked = r.Detected && len(blockingConflicts(*r)) == 0 && r.RootPath != "" && (r.RootState == stateMissing || r.RootState == stateDrifted)
-	}
-
-	// Starter files a real sync would scaffold, refresh or retire.
-	starterPlan, err := previewStarterFiles(repoRoot, memoryHooksInUse(cfg, repoRoot, home))
-	if err != nil {
-		return err
 	}
 
 	changes, harnesses := countSyncChanges(repoReport, reports, opts.ReplaceConflicts)
