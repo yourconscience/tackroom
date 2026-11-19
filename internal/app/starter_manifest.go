@@ -413,27 +413,58 @@ func releaseMemoryFiles(root string) (bool, error) {
 // memory/hooks/ in the config root or in ~/.agents, where earlier releases put
 // the memory scripts.
 func memoryHooksInUse(cfg config, root string, home string) bool {
-	dirs := []string{filepath.Join(root, "memory", "hooks"), filepath.Join(home, ".agents", "memory", "hooks")}
 	for _, hook := range cfg.Hooks {
-		for _, field := range strings.Fields(hook.Command) {
-			field = strings.Trim(field, `"'`)
-			for _, prefix := range []string{"$HOME/", "${HOME}/"} {
-				if strings.HasPrefix(field, prefix) {
-					field = "~/" + strings.TrimPrefix(field, prefix)
-				}
-			}
-			path := filepath.Clean(expandPath(field, home))
-			if !filepath.IsAbs(path) {
-				// A relative script path is relative to the config root, as
-				// in hookScriptPath.
-				path = filepath.Join(root, path)
-			}
-			for _, dir := range dirs {
-				if strings.HasPrefix(path, dir+string(filepath.Separator)) {
-					return true
-				}
-			}
+		if memoryScript(hook.Command, root, home) != "" {
+			return true
 		}
 	}
 	return false
+}
+
+// memoryScript returns the script under memory/hooks/ (in the config root or
+// in ~/.agents) that command runs, or "".
+func memoryScript(command string, root string, home string) string {
+	dirs := []string{filepath.Join(root, "memory", "hooks"), filepath.Join(home, ".agents", "memory", "hooks")}
+	for _, field := range strings.Fields(command) {
+		field = strings.Trim(field, `"'`)
+		for _, prefix := range []string{"$HOME/", "${HOME}/"} {
+			if strings.HasPrefix(field, prefix) {
+				field = "~/" + strings.TrimPrefix(field, prefix)
+			}
+		}
+		path := filepath.Clean(expandPath(field, home))
+		if !filepath.IsAbs(path) {
+			// A relative script path is relative to the config root, as
+			// in hookScriptPath.
+			path = filepath.Join(root, path)
+		}
+		for _, dir := range dirs {
+			if strings.HasPrefix(path, dir+string(filepath.Separator)) {
+				return path
+			}
+		}
+	}
+	return ""
+}
+
+// retiredMemoryScripts returns the check sync uses to find hook registrations
+// an older config left behind (memory hooks replaced by others, say): they run
+// a memory script that is already gone or that removed, the starter paths this
+// sync takes away, includes. A script the user modified stays, and so does a
+// registration that runs it.
+func retiredMemoryScripts(root string, home string, removed []string) func(command string) string {
+	gone := make(map[string]bool, len(removed))
+	for _, path := range removed {
+		gone[filepath.Join(root, filepath.FromSlash(path))] = true
+	}
+	return func(command string) string {
+		script := memoryScript(command, root, home)
+		if script == "" {
+			return ""
+		}
+		if _, err := os.Stat(script); gone[script] || errors.Is(err, fs.ErrNotExist) {
+			return script
+		}
+		return ""
+	}
 }

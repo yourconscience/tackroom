@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -57,7 +58,7 @@ func staleHooksForAgent(agentName string, cfg config, home string) ([]string, []
 			off = append(off, hook)
 		}
 	}
-	if len(off) == 0 {
+	if len(off) == 0 && cfg.retiredMemoryHook == nil {
 		return nil, nil, nil
 	}
 	entries, _, err := collectNativeHooks(home, cfg, []agentConfig{{Name: agentName}})
@@ -79,6 +80,20 @@ func staleHooksForAgent(agentName string, cfg config, home string) ([]string, []
 		}
 		if found {
 			names = append(names, hook.Name)
+		}
+	}
+	// A memory hook that was deleted from the config, not turned off, is not
+	// in off: its registrations are found by the script they run instead.
+	if cfg.retiredMemoryHook != nil {
+		for _, entry := range entries {
+			script := cfg.retiredMemoryHook(entry.Command)
+			if entry.Managed || script == "" {
+				continue
+			}
+			stale = append(stale, entry)
+			if name := filepath.Base(script); !slices.Contains(names, name) {
+				names = append(names, name)
+			}
 		}
 	}
 	return names, stale, nil
