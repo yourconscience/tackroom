@@ -371,7 +371,7 @@ func gatePackages(cfg *config, selected []agentConfig, repoRoot, home string, op
 			if resolve {
 				lookup = cooldownLookup(r, timeSourceFor(r))
 			}
-			if h, ok := decideCooldown(item, ref, &lock, opts, lookup); ok && !(resolve && allowSecurityFix(&lock, item, ref, r, opts.now)) {
+			if h, ok := decideCooldown(item, ref, &lock, opts, lookup); ok && (!resolve || !allowSecurityFix(&lock, item, ref, r, opts.now)) {
 				gated[item] = h
 				cfg.cooldownMCP[server.Name] = true
 			}

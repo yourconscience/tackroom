@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -101,7 +102,7 @@ func osvFixedAdvisories(r packageReference) ([]string, error) {
 
 func fixesVersion(v osvVuln, pkg, ecosystem, version string) bool {
 	for _, a := range v.Affected {
-		if a.Package.Ecosystem != ecosystem || !strings.EqualFold(a.Package.Name, pkg) {
+		if a.Package.Ecosystem != ecosystem || !samePackage(a.Package.Name, pkg, ecosystem) {
 			continue
 		}
 		for _, rg := range a.Ranges {
@@ -113,6 +114,17 @@ func fixesVersion(v osvVuln, pkg, ecosystem, version string) bool {
 		}
 	}
 	return false
+}
+
+var pypiSeparators = regexp.MustCompile(`[-_.]+`)
+
+// samePackage compares names the way the registry does: PyPI treats any run
+// of "-", "_" and "." as one separator (PEP 503), so my_tool is my-tool.
+func samePackage(a, b, ecosystem string) bool {
+	if ecosystem == "PyPI" {
+		a, b = pypiSeparators.ReplaceAllString(a, "-"), pypiSeparators.ReplaceAllString(b, "-")
+	}
+	return strings.EqualFold(a, b)
 }
 
 // advisoryID prefers the GHSA id, which is what release notes cite.
