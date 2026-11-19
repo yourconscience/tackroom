@@ -61,7 +61,7 @@ type cronJob struct {
 	Connectors       []string `json:"connectors,omitempty"`
 	Effect           string   `json:"effect,omitempty"`
 	// Output is where the job's results land, as declared; OutputExpanded has ~ and
-	// environment variables expanded.
+	// environment variables expanded, for a job on this machine only.
 	Output         string   `json:"output,omitempty"`
 	OutputExpanded string   `json:"output_expanded,omitempty"`
 	Problems       []string `json:"problems,omitempty"`
@@ -282,7 +282,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 				job.Inferred = removeString(job.Inferred, "connectors")
 			}
 			job.Effect = entry.Effect
-			job.Output, job.OutputExpanded = entry.Output, expandCronOutput(entry.Output)
+			job.Output, job.OutputExpanded = entry.Output, expandCronOutput(entry.Output, job.Host)
 			job.DeclaredSchedule, job.DeclaredCommand = entry.Schedule, entry.Command
 		}
 		if matched || !manifestEntryRead(entry, access, sameHost) {
@@ -290,7 +290,7 @@ func mergeCronsManifest(jobs []cronJob, manifest cronsManifest, access []cronAcc
 		}
 		jobs = append(jobs, cronJob{
 			Host: entry.Host, Source: entry.Source, ID: id, State: "missing", CreatedBy: entry.CreatedBy,
-			Connectors: entry.Connectors, Effect: entry.Effect, Output: entry.Output, OutputExpanded: expandCronOutput(entry.Output), DeclaredSchedule: entry.Schedule, DeclaredCommand: entry.Command,
+			Connectors: entry.Connectors, Effect: entry.Effect, Output: entry.Output, OutputExpanded: expandCronOutput(entry.Output, entry.Host), DeclaredSchedule: entry.Schedule, DeclaredCommand: entry.Command,
 			Problems: []string{"declared in crons.jobs but not found on any scanned host"},
 		})
 	}
@@ -1380,9 +1380,11 @@ func cronResultAndLastRun(j cronJob) (result, lastRun string) {
 	return result, lastRun
 }
 
-// expandCronOutput expands ~ and environment variables in a declared output path or glob.
-func expandCronOutput(output string) string {
-	if output == "" {
+// expandCronOutput expands ~ and environment variables in a declared output
+// path or glob. Only a local job is expanded: another host's home and
+// environment are not known here, so its path stays as declared.
+func expandCronOutput(output, host string) string {
+	if output == "" || (host != "" && host != "local") {
 		return ""
 	}
 	home, _ := os.UserHomeDir()
@@ -1426,7 +1428,11 @@ func printCronsTable(result cronsScanResult) {
 	var outputs []string
 	for _, j := range result.Jobs {
 		if j.Output != "" {
-			outputs = append(outputs, fmt.Sprintf("%s %s %s: %s", j.Host, j.Source, j.ID, j.OutputExpanded))
+			path := j.OutputExpanded
+			if path == "" {
+				path = j.Output
+			}
+			outputs = append(outputs, fmt.Sprintf("%s %s %s: %s", j.Host, j.Source, j.ID, path))
 		}
 	}
 	if len(outputs) > 0 {

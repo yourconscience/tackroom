@@ -194,7 +194,7 @@ Each job is one JSON record. Main fields:
 | `state` | `scheduled`, `service`, `disabled`, `paused`, `not_loaded`, `dead` or `missing`. |
 | `health` | `ok`, `warn`, `fail`, `idle` or `paused`, computed once for every view. |
 | `created_by`, `connectors`, `effect` | From the manifest ([Record who made a job](#record-who-made-a-job)), or inferred. |
-| `output`, `output_expanded` | Where the job's results land: the declared path or glob, and the same with `~` and environment variables expanded. `--table` lists them under "Outputs". |
+| `output`, `output_expanded` | Where the job's results land: the declared path or glob, and, for a job on this machine, the same with `~` and environment variables expanded (empty for another host, whose home and environment are not known). `--table` lists them under "Outputs". |
 | `declared_schedule`, `declared_command` | The `schedule` and `command` list a `crons.jobs` entry declares, as written. |
 | `editable`, `edit_note` | `editable` is true for a job `cron edit` and `cron remove` can change from this machine; otherwise `edit_note` says why not (a job tackroom did not install, one on another host, a note-only entry). |
 | `problems`, `inferred` | Findings, and the names of fields tackroom derived rather than read. |
