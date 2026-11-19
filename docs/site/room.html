@@ -15,9 +15,11 @@
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="style.css">
 <style>
-/* The tack room: one setup drawn as a room. Flat and structural, as BRAND.md asks: boards, pegs, plates,
-   a shelf and a door; no wood grain, leather or stitching. Colours are --tr-* tokens; state colour always
-   follows a glyph and a shape (solid pin, dashed cooldown, 2px blocked, outlined pass). */
+/* The tack room: one setup drawn as a room you could walk into. The scene (wood, iron, lamp light, the doorway)
+   is the one place on the site that goes past BRAND.md's flat rule; its warm colours live only in the --scene
+   variables below. Everything that carries meaning stays Graphite: nameplates, books, labels, stamps and the
+   status vocabulary, each on its own Graphite surface with a mat ring, so contrast never depends on the wood.
+   State colour always follows a glyph and a shape (solid pin, dashed cooldown, 2px blocked, outlined pass). */
 .intro { display: grid; gap: 14px; padding: 32px 0 20px; }
 .intro h1 { font-size: 34px; }
 .intro .lead { max-width: 60ch; }
@@ -25,28 +27,85 @@
 .legend { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .tag .w code, .cooldown-meta { font-size: 16px; }
 
-.room { --rail-y: 18px; --row: 232px; display: grid; grid-template-columns: minmax(0, 1fr); margin-bottom: 40px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-card); overflow: hidden; }
-.zone { min-width: 0; padding: 16px 16px 0; }
-.zone-title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font: 600 var(--tr-fs-body)/1.3 var(--tr-font-body); letter-spacing: 0; color: var(--tr-muted); }
-.zone-title .ico { color: var(--tr-faint); }
+/* Scene materials. Day by default; evening in dark mode, where the lamp does the work. Checked pairs (3:1 for
+   graphics): plate, book and label surfaces against the wall with and without lamp light, the cord against
+   the wall, and the mat edge against the doorway light and the floor spill. */
+.room {
+  --rail-y: 22px; --row: 236px; --lamp-x: 82%; --door-x: 50%;
+  --wall: #a2744a; --wall-b: #9d7046; --seam: #74502f; --grain: rgba(70, 42, 20, .22); --grain-hi: rgba(255, 232, 196, .12);
+  --glow: rgba(255, 226, 170, .10); --glow-core: rgba(255, 240, 208, 0); --shade: rgba(60, 34, 14, .10); --bulb: #fff1cf; --bloom: rgba(255, 220, 160, .5);
+  --cord: #3e2818; --cord-under: transparent;
+  --rail-hi: #c08e5c; --rail-wood: #8c5d35; --rail-lo: #5e3c20; --rail-shadow: rgba(40, 22, 8, .34);
+  --iron-hi: #b4b7bd; --iron: #45474c; --iron-lo: #232427;
+  --shelf-top: #c39463; --shelf-lip: #8a5a32; --shelf-lo: #5e3c20; --shelf-shadow: rgba(40, 22, 8, .4);
+  --trim: #6e4729; --trim-hi: #a0703f; --door: #96663c; --door-seam: #6e4729;
+  --outside-top: #fdf3e1; --outside-bottom: #f6dcac; --light: rgba(255, 236, 190, .95); --light-h: 96px; --spill: rgba(255, 228, 170, .12);
+  --floor: #7a5030; --floor-seam: #5a3a20; --skirting: #5e3c20; --pool: rgba(255, 228, 170, .55);
+  --mat: var(--tr-surface); --mat-edge: #6b6b71; --edge: var(--tr-line-strong); --drop: rgba(30, 16, 6, .45);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .room {
+    --wall: #3b2a1e; --wall-b: #37271b; --seam: #22170f; --grain: rgba(0, 0, 0, .3); --grain-hi: rgba(255, 214, 160, .05);
+    --glow: rgba(255, 186, 105, .18); --glow-core: rgba(255, 196, 120, .35); --shade: rgba(10, 6, 3, .55); --bulb: #ffd59a; --bloom: rgba(255, 190, 110, .9);
+    --cord: #c2a07c; --cord-under: rgba(20, 12, 6, .75);
+    --rail-hi: #6a4a33; --rail-wood: #4a3221; --rail-lo: #24180f; --rail-shadow: rgba(0, 0, 0, .5);
+    --iron-hi: #9a9da4; --iron: #3a3c40; --iron-lo: #17181a;
+    --shelf-top: #5f412b; --shelf-lip: #3f2a1b; --shelf-lo: #24180f; --shelf-shadow: rgba(0, 0, 0, .55);
+    --trim: #24180f; --trim-hi: #4f3624; --door: #4a3222; --door-seam: #2a1b11;
+    --outside-top: #4a321d; --outside-bottom: #6e4a28; --light: rgba(255, 184, 103, .95); --light-h: 14px; --spill: rgba(255, 180, 90, .22);
+    --floor: #2b1d13; --floor-seam: #1a110b; --skirting: #24180f; --pool: rgba(255, 176, 90, .4);
+    --mat-edge: #b9b9be; --edge: #b9b9be; --drop: rgba(0, 0, 0, .6);
+  }
+}
+:root[data-theme="dark"] .room {
+  --wall: #3b2a1e; --wall-b: #37271b; --seam: #22170f; --grain: rgba(0, 0, 0, .3); --grain-hi: rgba(255, 214, 160, .05);
+  --glow: rgba(255, 186, 105, .18); --glow-core: rgba(255, 196, 120, .35); --shade: rgba(10, 6, 3, .55); --bulb: #ffd59a; --bloom: rgba(255, 190, 110, .9);
+  --cord: #c2a07c; --cord-under: rgba(20, 12, 6, .75);
+  --rail-hi: #6a4a33; --rail-wood: #4a3221; --rail-lo: #24180f; --rail-shadow: rgba(0, 0, 0, .5);
+  --iron-hi: #9a9da4; --iron: #3a3c40; --iron-lo: #17181a;
+  --shelf-top: #5f412b; --shelf-lip: #3f2a1b; --shelf-lo: #24180f; --shelf-shadow: rgba(0, 0, 0, .55);
+  --trim: #24180f; --trim-hi: #4f3624; --door: #4a3222; --door-seam: #2a1b11;
+  --outside-top: #4a321d; --outside-bottom: #6e4a28; --light: rgba(255, 184, 103, .95); --light-h: 14px; --spill: rgba(255, 180, 90, .22);
+  --floor: #2b1d13; --floor-seam: #1a110b; --skirting: #24180f; --pool: rgba(255, 176, 90, .4);
+  --mat-edge: #b9b9be; --edge: #b9b9be; --drop: rgba(0, 0, 0, .6);
+}
+
+.room { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr); margin-bottom: 40px; background: var(--wall); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-card); overflow: hidden; }
+.wood { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; }
+.w-a { fill: var(--wall); }
+.w-b { fill: var(--wall-b); }
+.w-grain path, .w-knot { fill: none; stroke: var(--grain); stroke-width: 1.2; }
+.w-hi path { fill: none; stroke: var(--grain-hi); stroke-width: 3; }
+.w-seam { fill: var(--seam); }
+.glow { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 240px 150px at var(--lamp-x) 52px, var(--glow-core), transparent), radial-gradient(ellipse 70% 50% at var(--lamp-x) 60px, var(--glow), transparent 72%), radial-gradient(ellipse 140% 110% at var(--lamp-x) 0, transparent 45%, var(--shade)); }
+.lamp { position: absolute; z-index: 1; top: 0; left: var(--lamp-x); width: 60px; height: 64px; margin-left: -30px; pointer-events: none; overflow: visible; }
+.lamp-bulb { filter: drop-shadow(0 4px 8px var(--bloom)); }
+.lamp-cord { stroke: var(--cord); stroke-width: 2; }
+.lamp-shade { fill: var(--iron); stroke: var(--iron-lo); stroke-width: 1; }
+.lamp-bulb { fill: var(--bulb); }
+.zone { min-width: 0; padding: 16px 16px 0; border: 0; }
+/* Words in the room sit on small Graphite plates, never on the wood. */
+.label { display: flex; align-items: center; gap: 8px; width: fit-content; max-width: 100%; margin: 0; padding: 4px 10px; background: var(--tr-surface); color: var(--tr-muted); border: 1px solid var(--edge); border-radius: var(--tr-radius-plate); box-shadow: 0 6px 10px -6px var(--drop); font: 600 var(--tr-fs-body)/1.3 var(--tr-font-body); letter-spacing: 0; }
+.label .ico { color: var(--tr-faint); }
+.zone-title { margin-bottom: 8px; }
 
 /* Every object in the room is a button: hover shows its plate, a click or tap pins it. */
-.obj { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.obj:focus-visible { outline: none; }
-.obj:hover .hl, .obj.on .hl, .obj:focus-visible .hl, .obj.hl:hover, .obj.hl.on, .obj.hl:focus-visible { outline: 2px solid var(--tr-focus); outline-offset: 2px; }
+.obj, .fold { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.obj:focus-visible, .fold:focus-visible { outline: none; }
+.obj:hover .hl, .obj.on .hl, .obj:focus-visible .hl, .obj.hl:hover, .obj.hl.on, .obj.hl:focus-visible, .fold:hover .plate, .fold:focus-visible .plate { outline: 2px solid var(--tr-focus); outline-offset: 5px; }
 
-/* Back wall: one peg rail per row, drawn across the whole wall, so a short last row still hangs on a full rail. */
+/* Back wall: a wooden peg rail per row with iron pegs, drawn across the whole wall so a short last row still has its rail. */
 .pegs { list-style: none; margin: 0 -16px; padding: 0 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: var(--row);
-  background: repeating-linear-gradient(to bottom, transparent 0 var(--rail-y), var(--tr-line-strong) var(--rail-y) calc(var(--rail-y) + 1px), var(--tr-raised) calc(var(--rail-y) + 1px) calc(var(--rail-y) + 11px), var(--tr-line-strong) calc(var(--rail-y) + 11px) calc(var(--rail-y) + 12px), transparent calc(var(--rail-y) + 12px) var(--row)); }
-.peg { position: relative; display: flex; justify-content: center; min-width: 0; padding-top: calc(var(--rail-y) + 6px); }
-.peg::before { content: ""; position: absolute; z-index: 1; top: calc(var(--rail-y) - 1px); left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--tr-rail); }
-.peg.s-none::before { background: var(--tr-surface); box-shadow: inset 0 0 0 2px var(--tr-line-strong); }
-.hang { display: flex; flex-direction: column; align-items: center; width: min(148px, calc(100% - 12px)); }
-.wire { display: block; width: 100%; height: 24px; overflow: visible; fill: none; stroke: var(--tr-line-strong); stroke-width: 1.5; stroke-linecap: round; }
+  background: repeating-linear-gradient(to bottom, transparent 0 var(--rail-y), var(--rail-hi) var(--rail-y) calc(var(--rail-y) + 2px), var(--rail-wood) calc(var(--rail-y) + 2px) calc(var(--rail-y) + 13px), var(--rail-lo) calc(var(--rail-y) + 13px) calc(var(--rail-y) + 16px), var(--rail-shadow) calc(var(--rail-y) + 16px), transparent calc(var(--rail-y) + 26px) var(--row)); }
+.peg { position: relative; display: flex; justify-content: center; min-width: 0; padding-top: calc(var(--rail-y) + 8px); }
+.peg::before { content: ""; position: absolute; z-index: 1; top: var(--rail-y); left: 50%; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--iron-hi), var(--iron) 55%, var(--iron-lo)); box-shadow: 0 3px 3px rgba(0, 0, 0, .4); }
+.hang, .fold { display: flex; flex-direction: column; align-items: center; width: min(148px, calc(100% - 12px)); }
+.wire { display: block; width: 100%; height: 24px; overflow: visible; fill: none; stroke: var(--cord); stroke-width: 1.6; stroke-linecap: round; }
 .s-warn .wire { height: 40px; }
 .s-bad .wire { height: 44px; }
+.wire .under { stroke: var(--cord-under); stroke-width: 3.6; }
 .wire .stub { stroke-dasharray: 3 3; }
-.plate { display: grid; justify-items: center; align-content: start; gap: 4px; width: 100%; padding: 10px 8px 9px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-plate); box-shadow: 0 3px 0 var(--tr-line); text-align: center; }
+.plate { display: grid; justify-items: center; align-content: start; gap: 4px; width: 100%; padding: 10px 8px 9px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-plate); box-shadow: 0 0 0 3px var(--mat), 0 0 0 4px var(--mat-edge), 0 12px 14px -6px var(--drop); text-align: center; }
 .plate img { width: 40px; height: 40px; margin-bottom: 2px; padding: 5px; background: var(--tr-mark-bg); border: 1px solid var(--tr-mark-line); border-radius: var(--tr-radius-card); object-fit: contain; }
 .plate .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
 .plate .key { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.25 var(--tr-font-mono); overflow-wrap: anywhere; }
@@ -57,16 +116,26 @@
 .s-warn .st { color: var(--tr-warn); }
 .s-bad .plate { border: 2px solid var(--tr-bad); }
 .s-bad .st { color: var(--tr-bad); }
-.s-none .plate { background: transparent; border: 1px dashed var(--tr-line-strong); box-shadow: none; }
-.s-off .plate { background: var(--tr-raised); box-shadow: none; }
+.s-none .plate { background: var(--tr-raised); border: 1px dashed var(--tr-line-strong); box-shadow: 0 0 0 3px var(--tr-raised), 0 0 0 4px var(--mat-edge); }
+.s-off .plate { background: var(--tr-raised); box-shadow: 0 0 0 3px var(--tr-raised), 0 0 0 4px var(--mat-edge), 0 12px 14px -6px var(--drop); }
 .s-none .st, .s-off .st { color: var(--tr-muted); font-weight: 400; }
+/* On a phone the synced plates fold into one bundle so the wall stays short; a tap unfolds them. */
+.peg.bundle { display: none; }
+.bundle .plate { position: relative; }
+.bundle .plate::before, .bundle .plate::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: inherit; box-shadow: 0 0 0 3px var(--mat), 0 0 0 4px var(--mat-edge), 0 12px 14px -6px var(--drop); transform: translate(6px, 6px); }
+.bundle .plate::after { transform: translate(12px, 12px); }
+.minis { display: flex; align-items: center; justify-content: center; gap: 4px; }
+.plate .minis img { width: 30px; height: 30px; margin: 0; padding: 3px; }
+.minis .more { color: var(--tr-muted); font: 500 var(--tr-fs-body)/1 var(--tr-font-mono); }
+.fold-hint { color: var(--tr-muted); }
 
-/* Shelf: each stack draws its own board segment; stacks grow to fill a row, so every row is one board. */
+/* Shelf: a wooden board with a top face, a front lip and a shadow; each stack carries its own segment and stacks fill
+   their row, so every row reads as one board. Books stay Graphite. */
 .stacks { list-style: none; margin: 0 -16px; padding: 0 16px; display: flex; flex-wrap: wrap; }
-.stack { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; min-width: 0; max-width: 100%; padding: 20px 14px 0; }
-.stack::after { content: ""; align-self: stretch; height: 12px; margin: 0 -14px; background: var(--tr-raised); border-block: 1px solid var(--tr-line-strong); }
-.pile { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: 100%; }
-.book { position: relative; display: flex; align-items: center; gap: 8px; max-width: calc(100% - var(--o, 0px)); margin: 0 0 -1px var(--o, 0px); padding: 3px calc(10px + var(--x, 0px)) 3px 10px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: 2px; font: 400 var(--tr-fs-body)/1.45 var(--tr-font-mono); }
+.stack { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; min-width: 0; max-width: 100%; padding: 24px 14px 0; }
+.stack::after { content: ""; align-self: stretch; height: 22px; margin: 0 -14px 10px; background: linear-gradient(to bottom, var(--shelf-top) 0 7px, var(--shelf-lip) 7px 19px, var(--shelf-lo) 19px 22px); box-shadow: 0 14px 14px -8px var(--shelf-shadow); }
+.pile { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: 100%; margin-bottom: -4px; filter: drop-shadow(3px 0 1px rgba(0, 0, 0, .22)); }
+.book { position: relative; display: flex; align-items: center; gap: 8px; max-width: calc(100% - var(--o, 0px)); margin: 0 0 -1px var(--o, 0px); padding: 3px calc(10px + var(--x, 0px)) 3px 10px; background: var(--tr-surface); border: 1px solid var(--edge); border-radius: 2px; font: 400 var(--tr-fs-body)/1.45 var(--tr-font-mono); }
 .book.t1 { background: var(--tr-raised); }
 .book.t2 { background: var(--tr-bg); }
 .book:hover, .book.on, .book:focus-visible { z-index: 2; }
@@ -74,36 +143,49 @@
 .g.warn { color: var(--tr-warn); }
 .g.bad { color: var(--tr-bad); }
 .book .g { flex: none; font-weight: 500; }
-.base { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; align-self: stretch; margin-top: 6px; padding: 8px 10px; background: var(--tr-raised); border: 1px solid var(--tr-line-strong); border-bottom: 0; border-radius: var(--tr-radius-plate) var(--tr-radius-plate) 0 0; }
+.base { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; align-self: stretch; margin-top: 6px; padding: 8px 10px; background: var(--tr-raised); border: 1px solid var(--edge); border-radius: var(--tr-radius-plate) var(--tr-radius-plate) 0 0; }
 .base .bn { font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 .base.local .bn { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
 
-/* The door is the gate: the opening shows outside, where new pins wait; the sill is the line sync will not cross. */
+/* The door is the gate: a plank door stands open on outside light, where new pins wait; the sill is the line sync
+   will not cross until the cooldown ends. */
 .door { display: flex; flex-direction: column; gap: 12px; }
 .door-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.sign { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-plate); box-shadow: 0 3px 0 var(--tr-line); font-weight: 600; }
+.sign { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--tr-surface); border: 1px solid var(--edge); border-radius: var(--tr-radius-plate); box-shadow: 0 8px 12px -6px var(--drop); font-weight: 600; }
 .sign .ico { color: var(--tr-muted); }
-.keyhook { display: flex; flex-direction: column; align-items: center; margin-right: 6px; }
-.keyhook::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--tr-rail); }
+.keyhook { display: flex; flex-direction: column; align-items: center; margin-right: 6px; transform-origin: 50% 7px; }
+.keyhook::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--iron-hi), var(--iron) 55%, var(--iron-lo)); box-shadow: 0 2px 3px rgba(0, 0, 0, .4); }
 .keyhook .wire { width: 40px; height: 14px; }
-.keytag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: 999px; font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
+.keytag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--tr-surface); border: 1px solid var(--edge); border-radius: 999px; box-shadow: 0 8px 12px -6px var(--drop); font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
 .keytag .ico { color: var(--tr-muted); }
-.frame { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; min-height: 340px; padding: 14px 12px 12px 48px; background: var(--tr-raised); border: 6px solid var(--tr-line-strong); border-bottom: 0; border-radius: 3px 3px 0 0; }
-.frame .cap { margin-bottom: auto; color: var(--tr-muted); }
-.leaf { position: absolute; top: 0; bottom: 0; left: 0; width: 34px; }
-.leaf svg { display: block; width: 100%; height: 100%; fill: var(--tr-surface); stroke: var(--tr-line-strong); stroke-width: 1.5; }
-.leaf i { position: absolute; top: 52%; right: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--tr-line-strong); }
-.sill { height: 8px; margin: -12px -6px 0; background: var(--tr-line-strong); border-radius: 2px; }
-.ticket { display: grid; justify-items: start; gap: 8px; width: 100%; padding: 10px 12px; background: var(--tr-surface); border: 1px dashed var(--tr-warn); border-radius: var(--tr-radius-plate); }
+.frame { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; min-height: 340px; padding: 14px 14px 18px 68px; background: linear-gradient(to bottom, var(--outside-top), var(--outside-bottom)); border: 10px solid var(--trim); border-bottom: 0; border-radius: 4px 4px 0 0; box-shadow: 0 0 0 2px var(--trim-hi), inset 0 10px 14px -10px rgba(0, 0, 0, .45); }
+.frame::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, var(--light) 0, transparent var(--light-h)); }
+.frame > :not(.leaf) { position: relative; }
+.frame .cap { margin-bottom: auto; font-weight: 400; }
+.leaf { position: absolute; top: 0; bottom: 0; left: 0; width: 52px; filter: drop-shadow(4px 0 4px rgba(0, 0, 0, .35)); }
+.leaf-face { position: absolute; inset: 0; clip-path: polygon(0 0, 100% 4%, 100% 96%, 0 100%); background: repeating-linear-gradient(90deg, transparent 0 4px, var(--grain) 4px 5px, transparent 5px 11px), repeating-linear-gradient(90deg, var(--door) 0 15px, var(--door-seam) 15px 17px); }
+.hinge { position: absolute; left: 0; width: 16px; height: 8px; border-radius: 0 3px 3px 0; background: linear-gradient(to bottom, var(--iron-hi), var(--iron) 40%, var(--iron-lo)); }
+.hinge.h1 { top: 12%; }
+.hinge.h2 { bottom: 12%; }
+.handle { position: absolute; top: 50%; right: 8px; width: 6px; height: 28px; margin-top: -14px; border-radius: 3px; background: linear-gradient(90deg, var(--iron-hi), var(--iron) 60%, var(--iron-lo)); box-shadow: 1px 1px 2px rgba(0, 0, 0, .4); }
+.sill { height: 12px; margin: -12px -12px 0; background: linear-gradient(to bottom, var(--trim-hi) 0 3px, var(--trim) 3px); border-radius: 2px; box-shadow: 0 4px 8px -2px var(--drop); }
+.spill { height: 56px; margin: -12px 0 -56px; clip-path: polygon(4% 0, 96% 0, 100% 100%, 0 100%); background: linear-gradient(to bottom, var(--spill), transparent); pointer-events: none; }
+.ticket { display: grid; justify-items: start; gap: 8px; width: 100%; padding: 10px 12px; background: var(--tr-surface); border: 1px dashed var(--tr-warn); border-radius: var(--tr-radius-plate); box-shadow: 0 0 0 3px var(--mat), 0 0 0 4px var(--mat-edge), 0 10px 14px -6px var(--drop); }
 .ticket.k-bad { border: 2px solid var(--tr-bad); }
 .ticket.k-ok { border: 1px solid var(--tr-ok); }
 .ticket .bn { font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
 .ticket .meta { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.35 var(--tr-font-mono); overflow-wrap: anywhere; }
 .ticket .cooldown { max-width: none; }
-.inside { display: grid; gap: 8px; padding: 4px 0 16px; }
-.inside .cap { color: var(--tr-muted); }
-.floor { grid-column: 1 / -1; height: 18px; background: var(--tr-raised); border-top: 2px solid var(--tr-line-strong); }
+.inside { display: grid; gap: 14px; padding: 18px 4px 20px; }
+.floor { grid-column: 1 / -1; height: 30px; background: radial-gradient(ellipse 150px 24px at var(--door-x) 8px, var(--pool), transparent), linear-gradient(to bottom, var(--skirting) 0 8px, rgba(0, 0, 0, .28) 8px 10px, transparent 10px), repeating-linear-gradient(90deg, var(--floor) 0 140px, var(--floor-seam) 140px 142px); }
 .noscript { margin: 0 0 48px; }
+@media (prefers-reduced-motion: no-preference) {
+  /* One moment of life: the doorway light flickers once after load, from its resting state, and the key swings when touched. */
+  .frame::before, .spill { animation: flicker 1.6s ease-out .5s 1 both; }
+  .keyhook:hover { animation: sway 1.4s ease-in-out; }
+}
+@keyframes flicker { 0%, 100% { opacity: 1; } 10% { opacity: .35; } 16% { opacity: .9; } 24% { opacity: .5; } 34% { opacity: 1; } }
+@keyframes sway { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(7deg); } 45% { transform: rotate(-5deg); } 70% { transform: rotate(2deg); } }
 
 /* The plate for whatever is hovered or tapped: a card by the object, a bottom sheet on touch screens. */
 .card { position: fixed; z-index: 20; top: 0; left: 0; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px 16px 16px; background: var(--tr-surface); color: var(--tr-text); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-card); box-shadow: 0 10px 30px rgb(0 0 0 / .22); }
@@ -126,6 +208,10 @@
 .card p { margin-top: 12px; color: var(--tr-muted); }
 .cmd-line { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--tr-code-bg); color: var(--tr-code-text); font: 400 var(--tr-fs-body)/1.45 var(--tr-font-mono); overflow-wrap: anywhere; }
 
+@media (max-width: 719px) {
+  .peg.bundle { display: flex; }
+  .pegs.folded .peg.s-ok:not(.bundle) { display: none; }
+}
 @media (max-width: 719px), (hover: none) {
   .card { top: auto !important; right: 0; bottom: 0; left: 0 !important; width: auto; max-height: 64vh; border-bottom: 0; border-radius: 12px 12px 0 0; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
 }
@@ -133,7 +219,7 @@
   .intro h1 { font-size: var(--tr-fs-h1); }
 }
 @media (min-width: 900px) {
-  .room { grid-template-columns: minmax(0, 1fr) 300px; }
+  .room { grid-template-columns: minmax(0, 1fr) 300px; --lamp-x: calc((100% - 300px) / 2); --door-x: calc(100% - 150px); }
   .backwall { grid-column: 1; grid-row: 1; }
   .shelf { grid-column: 1; grid-row: 2; }
   .door { grid-column: 2; grid-row: 1 / span 2; padding-left: 0; }
@@ -188,12 +274,33 @@
     </div>
 
     <div class="room" id="room">
+      <svg class="wood" aria-hidden="true" focusable="false">
+        <defs>
+          <pattern id="planks" width="192" height="360" patternUnits="userSpaceOnUse">
+            <rect class="w-a" width="96" height="360"/>
+            <rect class="w-b" x="96" width="96" height="360"/>
+            <g class="w-hi"><path d="M25 0C28 120 21 240 26 360"/><path d="M122 0C119 120 126 240 121 360"/></g>
+            <g class="w-grain">
+              <path d="M14 0C18 90 10 180 15 270S13 350 14 360"/><path d="M37 0C33 70 41 150 36 240S39 330 37 360"/>
+              <path d="M61 0C66 100 57 190 62 280S60 340 61 360"/><path d="M82 0C79 80 86 170 81 250S84 330 82 360"/>
+              <path d="M110 0C114 90 106 170 111 260S108 340 110 360"/><path d="M134 0C129 60 139 150 133 230S137 320 134 360"/>
+              <path d="M157 0C161 100 152 190 158 270S155 340 157 360"/><path d="M178 0C175 80 182 160 177 250S180 330 178 360"/>
+            </g>
+            <ellipse class="w-knot" cx="146" cy="214" rx="5" ry="11"/>
+            <rect class="w-seam" x="94" width="2" height="360"/><rect class="w-seam" x="190" width="2" height="360"/>
+            <rect class="w-seam" width="96" height="2"/><rect class="w-seam" x="96" y="180" width="96" height="2"/>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#planks)"/>
+      </svg>
+      <div class="glow" aria-hidden="true"></div>
+      <svg class="lamp" viewBox="0 0 60 64" aria-hidden="true" focusable="false"><path class="lamp-cord" d="M30 0V27"/><path class="lamp-shade" d="M19 26H41L54 46H6Z"/><ellipse class="lamp-bulb" cx="30" cy="48" rx="9" ry="5"/></svg>
       <section class="zone backwall" aria-labelledby="wall-title">
-        <h2 class="zone-title" id="wall-title"><svg class="ico" aria-hidden="true"><use href="#i-robot"/></svg>Agents, one per peg</h2>
+        <h2 class="zone-title label" id="wall-title"><svg class="ico" aria-hidden="true"><use href="#i-robot"/></svg>Agents, one per peg</h2>
         <ul class="pegs" id="pegs"></ul>
       </section>
       <section class="zone shelf" aria-labelledby="shelf-title">
-        <h2 class="zone-title" id="shelf-title"><svg class="ico" aria-hidden="true"><use href="#i-skills"/></svg>Skills</h2>
+        <h2 class="zone-title label" id="shelf-title"><svg class="ico" aria-hidden="true"><use href="#i-skills"/></svg>Skills</h2>
         <ul class="stacks" id="stacks"></ul>
       </section>
       <section class="zone door" aria-labelledby="door-title">
@@ -203,9 +310,10 @@
           <span id="key"></span>
         </div>
         <div class="frame" id="frame">
-          <span class="leaf" aria-hidden="true"><svg viewBox="0 0 34 100" preserveAspectRatio="none"><path d="M0 0 L34 6 L34 94 L0 100 Z" vector-effect="non-scaling-stroke"/></svg><i></i></span>
+          <span class="leaf" aria-hidden="true"><span class="leaf-face"></span><i class="hinge h1"></i><i class="hinge h2"></i><i class="handle"></i></span>
         </div>
         <div class="sill" aria-hidden="true"></div>
+        <div class="spill" aria-hidden="true"></div>
         <div class="inside" id="inside"></div>
       </section>
       <div class="floor" aria-hidden="true"></div>
@@ -388,7 +496,8 @@
     }[state];
     var h_ = {warn: 40, bad: 44}[state] || 24;
     return s("svg", {"class": "wire", viewBox: "0 0 100 " + h_, preserveAspectRatio: "none", "aria-hidden": "true"},
-      paths.map(function (p) { return s("path", {d: p[0], "class": p[1] || null, "vector-effect": "non-scaling-stroke"}); }));
+      // Each cord is drawn twice, a dark under-stroke first, so it reads on dark wood and under the lamp alike.
+      paths.map(function (p) { return [s("path", {d: p[0], "class": "under", "vector-effect": "non-scaling-stroke"}), s("path", {d: p[0], "class": p[1] || null, "vector-effect": "non-scaling-stroke"})]; }));
   }
 
   function renderPegs() {
@@ -404,6 +513,26 @@
       ]);
       return h("li", {"class": "peg s-" + st.cls}, obj("hang", name + ", " + st.word, "agent", a, [wire(st.cls), plate]));
     }));
+    // Phones show the synced plates as one bundle (CSS hides the bundle on wider screens); a tap unfolds them.
+    var synced = data.agents.filter(function (a) { return agentState(a).cls === "ok"; });
+    if (synced.length < 2) return;
+    var hint = h("span", {"class": "fold-hint", text: "Tap to show"});
+    var fold = h("button", {type: "button", "class": "fold", "aria-expanded": "false", "aria-controls": "pegs", "aria-label": synced.length + " synced agents, show them"}, [
+      wire("ok"),
+      h("span", {"class": "plate"}, [
+        h("span", {"class": "minis"}, [synced.slice(0, 3).map(function (a) { return markFor(a.name); }), synced.length > 3 ? h("span", {"class": "more", text: "+" + (synced.length - 3)}) : null]),
+        h("span", {"class": "st"}, [h("span", {"class": "g", "aria-hidden": "true", text: "✓"}), synced.length + " synced"]),
+        hint
+      ])
+    ]);
+    fold.addEventListener("click", function () {
+      var open = list.classList.toggle("folded") === false;
+      fold.setAttribute("aria-expanded", String(open));
+      fold.setAttribute("aria-label", synced.length + " synced agents, " + (open ? "fold them" : "show them"));
+      hint.textContent = open ? "Tap to fold" : "Tap to show";
+    });
+    list.classList.add("folded");
+    list.insertBefore(h("li", {"class": "peg s-ok bundle"}, fold), list.firstChild);
   }
 
   function skillIssues(skill) {
@@ -477,10 +606,10 @@
     var waiting = data.lock.filter(function (r) { return r.state !== "pinned" && r.state !== "allowed"; });
     var walked = data.lock.filter(function (r) { return r.state === "allowed"; });
     var frame = document.getElementById("frame");
-    add(frame, h("span", {"class": "cap", text: waiting.length ? "Waiting at the door" : "Nobody waiting. New outside skills wait here until they are 72 hours old."}));
+    add(frame, h("span", {"class": "cap label", text: waiting.length ? "Waiting at the door" : "Nobody waiting. New outside skills wait here until they are 72 hours old."}));
     add(frame, waiting.map(function (r) { return ticket(r, r.state === "blocked" ? "k-bad" : "k-warn"); }));
     if (walked.length) {
-      add(document.getElementById("inside"), [h("span", {"class": "cap", text: "Walked straight in"}), walked.map(function (r) { return ticket(r, "k-ok"); })]);
+      add(document.getElementById("inside"), [h("span", {"class": "cap label", text: "Walked straight in"}), walked.map(function (r) { return ticket(r, "k-ok"); })]);
     }
     var hosts = data.hosts || [];
     add(document.getElementById("key"), h("span", {"class": "keyhook"}, [
