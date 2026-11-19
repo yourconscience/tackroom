@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>The tack room: tackroom</title>
+<meta name="description" content="One tackroom setup drawn as a room: each coding agent on its own peg, skills on the shelf, and new outside skills waiting out the 72-hour cooldown at the door.">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/public-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/public-sans-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="style.css">
+<style>
+/* The tack room: one setup drawn as a room. Flat and structural, as BRAND.md asks: boards, pegs, plates,
+   a shelf and a door; no wood grain, leather or stitching. Colours are --tr-* tokens; state colour always
+   follows a glyph and a shape (solid pin, dashed cooldown, 2px blocked, outlined pass). */
+.intro { display: grid; gap: 14px; padding: 32px 0 20px; }
+.intro h1 { font-size: 34px; }
+.intro .lead { max-width: 60ch; }
+.hint { color: var(--tr-muted); }
+.legend { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.tag .w code, .cooldown-meta { font-size: 16px; }
+
+.room { --rail-y: 18px; --row: 232px; display: grid; grid-template-columns: minmax(0, 1fr); margin-bottom: 40px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-card); overflow: hidden; }
+.zone { min-width: 0; padding: 16px 16px 0; }
+.zone-title { display: flex; align-items: center; gap: 8px; margin: 0 0 6px; font: 600 var(--tr-fs-body)/1.3 var(--tr-font-body); letter-spacing: 0; color: var(--tr-muted); }
+.zone-title .ico { color: var(--tr-faint); }
+
+/* Every object in the room is a button: hover shows its plate, a click or tap pins it. */
+.obj { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.obj:focus-visible { outline: none; }
+.obj:hover .hl, .obj.on .hl, .obj:focus-visible .hl, .obj.hl:hover, .obj.hl.on, .obj.hl:focus-visible { outline: 2px solid var(--tr-focus); outline-offset: 2px; }
+
+/* Back wall: one peg rail per row, drawn across the whole wall, so a short last row still hangs on a full rail. */
+.pegs { list-style: none; margin: 0 -16px; padding: 0 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: var(--row);
+  background: repeating-linear-gradient(to bottom, transparent 0 var(--rail-y), var(--tr-line-strong) var(--rail-y) calc(var(--rail-y) + 1px), var(--tr-raised) calc(var(--rail-y) + 1px) calc(var(--rail-y) + 11px), var(--tr-line-strong) calc(var(--rail-y) + 11px) calc(var(--rail-y) + 12px), transparent calc(var(--rail-y) + 12px) var(--row)); }
+.peg { position: relative; display: flex; justify-content: center; min-width: 0; padding-top: calc(var(--rail-y) + 6px); }
+.peg::before { content: ""; position: absolute; z-index: 1; top: calc(var(--rail-y) - 1px); left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: var(--tr-rail); }
+.peg.s-none::before { background: var(--tr-surface); box-shadow: inset 0 0 0 2px var(--tr-line-strong); }
+.hang { display: flex; flex-direction: column; align-items: center; width: min(148px, calc(100% - 12px)); }
+.wire { display: block; width: 100%; height: 24px; overflow: visible; fill: none; stroke: var(--tr-line-strong); stroke-width: 1.5; stroke-linecap: round; }
+.s-warn .wire { height: 40px; }
+.s-bad .wire { height: 44px; }
+.wire .stub { stroke-dasharray: 3 3; }
+.plate { display: grid; justify-items: center; align-content: start; gap: 4px; width: 100%; padding: 10px 8px 9px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-plate); box-shadow: 0 3px 0 var(--tr-line); text-align: center; }
+.plate img { width: 40px; height: 40px; margin-bottom: 2px; padding: 5px; background: var(--tr-mark-bg); border: 1px solid var(--tr-mark-line); border-radius: var(--tr-radius-card); object-fit: contain; }
+.plate .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+.plate .key { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.25 var(--tr-font-mono); overflow-wrap: anywhere; }
+.st { font-weight: 600; line-height: 1.3; text-wrap: balance; }
+.st .g { margin-right: 6px; font-family: var(--tr-font-mono); font-weight: 500; }
+.s-ok .st { color: var(--tr-ok); }
+.s-warn .plate { border: 1px dashed var(--tr-warn); }
+.s-warn .st { color: var(--tr-warn); }
+.s-bad .plate { border: 2px solid var(--tr-bad); }
+.s-bad .st { color: var(--tr-bad); }
+.s-none .plate { background: transparent; border: 1px dashed var(--tr-line-strong); box-shadow: none; }
+.s-off .plate { background: var(--tr-raised); box-shadow: none; }
+.s-none .st, .s-off .st { color: var(--tr-muted); font-weight: 400; }
+
+/* Shelf: each stack draws its own board segment; stacks grow to fill a row, so every row is one board. */
+.stacks { list-style: none; margin: 0 -16px; padding: 0 16px; display: flex; flex-wrap: wrap; }
+.stack { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; min-width: 0; max-width: 100%; padding: 20px 14px 0; }
+.stack::after { content: ""; align-self: stretch; height: 12px; margin: 0 -14px; background: var(--tr-raised); border-block: 1px solid var(--tr-line-strong); }
+.pile { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: 100%; }
+.book { position: relative; display: flex; align-items: center; gap: 8px; max-width: calc(100% - var(--o, 0px)); margin: 0 0 -1px var(--o, 0px); padding: 3px calc(10px + var(--x, 0px)) 3px 10px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: 2px; font: 400 var(--tr-fs-body)/1.45 var(--tr-font-mono); }
+.book.t1 { background: var(--tr-raised); }
+.book.t2 { background: var(--tr-bg); }
+.book:hover, .book.on, .book:focus-visible { z-index: 2; }
+.bn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.g.warn { color: var(--tr-warn); }
+.g.bad { color: var(--tr-bad); }
+.book .g { flex: none; font-weight: 500; }
+.base { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; align-self: stretch; margin-top: 6px; padding: 8px 10px; background: var(--tr-raised); border: 1px solid var(--tr-line-strong); border-bottom: 0; border-radius: var(--tr-radius-plate) var(--tr-radius-plate) 0 0; }
+.base .bn { font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.base.local .bn { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
+
+/* The door is the gate: the opening shows outside, where new pins wait; the sill is the line sync will not cross. */
+.door { display: flex; flex-direction: column; gap: 12px; }
+.door-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.sign { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-plate); box-shadow: 0 3px 0 var(--tr-line); font-weight: 600; }
+.sign .ico { color: var(--tr-muted); }
+.keyhook { display: flex; flex-direction: column; align-items: center; margin-right: 6px; }
+.keyhook::before { content: ""; width: 12px; height: 12px; border-radius: 50%; background: var(--tr-rail); }
+.keyhook .wire { width: 40px; height: 14px; }
+.keytag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: 999px; font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
+.keytag .ico { color: var(--tr-muted); }
+.frame { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; min-height: 340px; padding: 14px 12px 12px 48px; background: var(--tr-raised); border: 6px solid var(--tr-line-strong); border-bottom: 0; border-radius: 3px 3px 0 0; }
+.frame .cap { margin-bottom: auto; color: var(--tr-muted); }
+.leaf { position: absolute; top: 0; bottom: 0; left: 0; width: 34px; }
+.leaf svg { display: block; width: 100%; height: 100%; fill: var(--tr-surface); stroke: var(--tr-line-strong); stroke-width: 1.5; }
+.leaf i { position: absolute; top: 52%; right: 8px; width: 6px; height: 6px; border-radius: 50%; background: var(--tr-line-strong); }
+.sill { height: 8px; margin: -12px -6px 0; background: var(--tr-line-strong); border-radius: 2px; }
+.ticket { display: grid; justify-items: start; gap: 8px; width: 100%; padding: 10px 12px; background: var(--tr-surface); border: 1px dashed var(--tr-warn); border-radius: var(--tr-radius-plate); }
+.ticket.k-bad { border: 2px solid var(--tr-bad); }
+.ticket.k-ok { border: 1px solid var(--tr-ok); }
+.ticket .bn { font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
+.ticket .meta { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.35 var(--tr-font-mono); overflow-wrap: anywhere; }
+.ticket .cooldown { max-width: none; }
+.inside { display: grid; gap: 8px; padding: 4px 0 16px; }
+.inside .cap { color: var(--tr-muted); }
+.floor { grid-column: 1 / -1; height: 18px; background: var(--tr-raised); border-top: 2px solid var(--tr-line-strong); }
+.noscript { margin: 0 0 48px; }
+
+/* The plate for whatever is hovered or tapped: a card by the object, a bottom sheet on touch screens. */
+.card { position: fixed; z-index: 20; top: 0; left: 0; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px 16px 16px; background: var(--tr-surface); color: var(--tr-text); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-card); box-shadow: 0 10px 30px rgb(0 0 0 / .22); }
+.card[hidden] { display: none; }
+.card-head { display: flex; align-items: flex-start; gap: 12px; }
+.card-head img, .card-head .tile { flex: none; width: 40px; height: 40px; padding: 5px; border-radius: var(--tr-radius-card); }
+.card-head img { background: var(--tr-mark-bg); border: 1px solid var(--tr-mark-line); object-fit: contain; }
+.card-head .tile { display: grid; place-items: center; background: var(--tr-raised); color: var(--tr-muted); }
+.card-title { flex: 1; display: grid; gap: 2px; min-width: 0; }
+.card-title b { font-weight: 600; overflow-wrap: anywhere; }
+.card-title code { color: var(--tr-muted); font-size: var(--tr-fs-body); overflow-wrap: anywhere; }
+.card-x { flex: none; display: grid; place-items: center; width: 44px; height: 44px; margin: -10px -10px 0 0; padding: 0; border: 0; border-radius: var(--tr-radius-control); background: none; color: var(--tr-muted); cursor: pointer; }
+.card-x:hover { background: var(--tr-raised); }
+.card-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.card .cooldown { margin-top: 10px; max-width: none; }
+.facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 6px 14px; margin: 12px 0 0; }
+.facts dt { color: var(--tr-muted); }
+.facts dd { margin: 0; overflow-wrap: anywhere; }
+.facts code, .card p code { font-size: var(--tr-fs-body); }
+.card p { margin-top: 12px; color: var(--tr-muted); }
+.cmd-line { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--tr-code-bg); color: var(--tr-code-text); font: 400 var(--tr-fs-body)/1.45 var(--tr-font-mono); overflow-wrap: anywhere; }
+
+@media (max-width: 719px), (hover: none) {
+  .card { top: auto !important; right: 0; bottom: 0; left: 0 !important; width: auto; max-height: 64vh; border-bottom: 0; border-radius: 12px 12px 0 0; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
+}
+@media (min-width: 640px) {
+  .intro h1 { font-size: var(--tr-fs-h1); }
+}
+@media (min-width: 900px) {
+  .room { grid-template-columns: minmax(0, 1fr) 300px; }
+  .backwall { grid-column: 1; grid-row: 1; }
+  .shelf { grid-column: 1; grid-row: 2; }
+  .door { grid-column: 2; grid-row: 1 / span 2; padding-left: 0; }
+}
+</style>
+<script>
+  // Apply a saved theme before first paint. Without a saved choice the page follows the system.
+  try { var t = localStorage.getItem("tackroom-theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
+</script>
+</head>
+<body>
+<!-- Phosphor Icons 2.1.1, regular weight (MIT), copied from internal/app/web/index.html. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<symbol id="i-pin" viewBox="0 0 256 256"><path d="M235.32,81.37,174.63,20.69a16,16,0,0,0-22.63,0L98.37,74.49c-10.66-3.34-35-7.37-60.4,13.14a16,16,0,0,0-1.29,23.78L85,159.71,42.34,202.34a8,8,0,0,0,11.32,11.32L96.29,171l48.29,48.29A16,16,0,0,0,155.9,224c.38,0,.75,0,1.13,0a15.93,15.93,0,0,0,11.64-6.33c19.64-26.1,17.75-47.32,13.19-60L235.33,104A16,16,0,0,0,235.32,81.37ZM224,92.69h0l-57.27,57.46a8,8,0,0,0-1.49,9.22c9.46,18.93-1.8,38.59-9.34,48.62L48,100.08c12.08-9.74,23.64-12.31,32.48-12.31A40.13,40.13,0,0,1,96.81,91a8,8,0,0,0,9.25-1.51L163.32,32,224,92.68Z"/></symbol>
+<symbol id="i-timer" viewBox="0 0 256 256"><path d="M128,40a96,96,0,1,0,96,96A96.11,96.11,0,0,0,128,40Zm0,176a80,80,0,1,1,80-80A80.09,80.09,0,0,1,128,216ZM173.66,90.34a8,8,0,0,1,0,11.32l-40,40a8,8,0,0,1-11.32-11.32l40-40A8,8,0,0,1,173.66,90.34ZM96,16a8,8,0,0,1,8-8h48a8,8,0,0,1,0,16H104A8,8,0,0,1,96,16Z"/></symbol>
+<symbol id="i-audit" viewBox="0 0 256 256"><path d="M220,160a12,12,0,1,1-12-12A12,12,0,0,1,220,160Zm-4.55,39.29A48.08,48.08,0,0,1,168,240H144a48.05,48.05,0,0,1-48-48V151.49A64,64,0,0,1,40,88V40a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56V88a48,48,0,0,0,48.64,48c26.11-.34,47.36-22.25,47.36-48.83V48H136a8,8,0,0,1,0-16h24a8,8,0,0,1,8,8V87.17c0,32.84-24.53,60.29-56,64.31V192a32,32,0,0,0,32,32h24a32.06,32.06,0,0,0,31.22-25,40,40,0,1,1,16.23.27ZM232,160a24,24,0,1,0-24,24A24,24,0,0,0,232,160Z"/></symbol>
+<symbol id="i-ok" viewBox="0 0 256 256"><path d="M173.66,98.34a8,8,0,0,1,0,11.32l-56,56a8,8,0,0,1-11.32,0l-24-24a8,8,0,0,1,11.32-11.32L112,148.69l50.34-50.35A8,8,0,0,1,173.66,98.34ZM232,128A104,104,0,1,1,128,24,104.11,104.11,0,0,1,232,128Zm-16,0a88,88,0,1,0-88,88A88.1,88.1,0,0,0,216,128Z"/></symbol>
+<symbol id="i-key" viewBox="0 0 256 256"><path d="M216.57,39.43A80,80,0,0,0,83.91,120.78L28.69,176A15.86,15.86,0,0,0,24,187.31V216a16,16,0,0,0,16,16H72a8,8,0,0,0,8-8V208H96a8,8,0,0,0,8-8V184h16a8,8,0,0,0,5.66-2.34l9.56-9.57A79.73,79.73,0,0,0,160,176h.1A80,80,0,0,0,216.57,39.43ZM224,98.1c-1.09,34.09-29.75,61.86-63.89,61.9H160a63.7,63.7,0,0,1-23.65-4.51,8,8,0,0,0-8.84,1.68L116.69,168H96a8,8,0,0,0-8,8v16H72a8,8,0,0,0-8,8v16H40V187.31l58.83-58.82a8,8,0,0,0,1.68-8.84A63.72,63.72,0,0,1,96,95.92c0-34.14,27.81-62.8,61.9-63.89A64,64,0,0,1,224,98.1ZM192,76a12,12,0,1,1-12-12A12,12,0,0,1,192,76Z"/></symbol>
+<symbol id="i-close" viewBox="0 0 256 256"><path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"/></symbol>
+<symbol id="i-github" viewBox="0 0 256 256"><path d="M208.31,75.68A59.78,59.78,0,0,0,202.93,28,8,8,0,0,0,196,24a59.75,59.75,0,0,0-48,24H124A59.75,59.75,0,0,0,76,24a8,8,0,0,0-6.93,4,59.78,59.78,0,0,0-5.38,47.68A58.14,58.14,0,0,0,56,104v8a56.06,56.06,0,0,0,48.44,55.47A39.8,39.8,0,0,0,96,192v8H72a24,24,0,0,1-24-24A40,40,0,0,0,8,136a8,8,0,0,0,0,16,24,24,0,0,1,24,24,40,40,0,0,0,40,40H96v16a8,8,0,0,0,16,0V192a24,24,0,0,1,48,0v40a8,8,0,0,0,16,0V192a39.8,39.8,0,0,0-8.44-24.53A56.06,56.06,0,0,0,216,112v-8A58.14,58.14,0,0,0,208.31,75.68ZM200,112a40,40,0,0,1-40,40H112a40,40,0,0,1-40-40v-8a41.74,41.74,0,0,1,6.9-22.48A8,8,0,0,0,80,73.83a43.81,43.81,0,0,1,.79-33.58,43.88,43.88,0,0,1,32.32,20.06A8,8,0,0,0,119.82,64h32.35a8,8,0,0,0,6.74-3.69,43.87,43.87,0,0,1,32.32-20.06A43.81,43.81,0,0,1,192,73.83a8.09,8.09,0,0,0,1,7.65A41.72,41.72,0,0,1,200,104Z"/></symbol>
+<symbol id="i-plug" viewBox="0 0 256 256"><path d="M237.66,66.34a8,8,0,0,0-11.32,0L192,100.69,155.31,64l34.35-34.34a8,8,0,1,0-11.32-11.32L144,52.69,117.66,26.34a8,8,0,0,0-11.32,11.32L112.69,44l-53,53a40,40,0,0,0,0,56.57l15.71,15.71L26.34,218.34a8,8,0,0,0,11.32,11.32l49.09-49.09,15.71,15.71a40,40,0,0,0,56.57,0l53-53,6.34,6.35a8,8,0,0,0,11.32-11.32L203.31,112l34.35-34.34A8,8,0,0,0,237.66,66.34ZM147.72,185a24,24,0,0,1-33.95,0L71,142.23a24,24,0,0,1,0-33.95l53-53L200.69,132Z"/></symbol>
+<symbol id="i-laptop" viewBox="0 0 256 256"><path d="M232,168h-8V72a24,24,0,0,0-24-24H56A24,24,0,0,0,32,72v96H24a8,8,0,0,0-8,8v16a24,24,0,0,0,24,24H216a24,24,0,0,0,24-24V176A8,8,0,0,0,232,168ZM48,72a8,8,0,0,1,8-8H200a8,8,0,0,1,8,8v96H48ZM224,192a8,8,0,0,1-8,8H40a8,8,0,0,1-8-8v-8H224ZM152,88a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h32A8,8,0,0,1,152,88Z"/></symbol>
+<symbol id="i-skills" viewBox="0 0 256 256"><path d="M231.65,194.55,198.46,36.75a16,16,0,0,0-19-12.39L132.65,34.42a16.08,16.08,0,0,0-12.3,19l33.19,157.8A16,16,0,0,0,169.16,224a16.25,16.25,0,0,0,3.38-.36l46.81-10.06A16.09,16.09,0,0,0,231.65,194.55ZM136,50.15c0-.06,0-.09,0-.09l46.8-10,3.33,15.87L139.33,66Zm6.62,31.47,46.82-10.05,3.34,15.9L146,97.53Zm6.64,31.57,46.82-10.06,13.3,63.24-46.82,10.06ZM216,197.94l-46.8,10-3.33-15.87L212.67,182,216,197.85C216,197.91,216,197.94,216,197.94ZM104,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V48A16,16,0,0,0,104,32ZM56,48h48V64H56Zm0,32h48v96H56Zm48,128H56V192h48v16Z"/></symbol>
+<symbol id="i-robot" viewBox="0 0 256 256"><path d="M200,48H136V16a8,8,0,0,0-16,0V48H56A32,32,0,0,0,24,80V192a32,32,0,0,0,32,32H200a32,32,0,0,0,32-32V80A32,32,0,0,0,200,48Zm16,144a16,16,0,0,1-16,16H56a16,16,0,0,1-16-16V80A16,16,0,0,1,56,64H200a16,16,0,0,1,16,16Zm-52-56H92a28,28,0,0,0,0,56h72a28,28,0,0,0,0-56Zm-24,16v24H116V152ZM80,164a12,12,0,0,1,12-12h8v24H92A12,12,0,0,1,80,164Zm84,12h-8V152h8a12,12,0,0,1,0,24ZM72,108a12,12,0,1,1,12,12A12,12,0,0,1,72,108Zm88,0a12,12,0,1,1,12,12A12,12,0,0,1,160,108Z"/></symbol>
+</svg>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="logo.svg" width="30" height="30" alt="">tackroom</a>
+    <nav aria-label="Main">
+      <a href="docs/">Docs</a>
+      <a href="https://github.com/yourconscience/tackroom"><svg class="ico" aria-hidden="true"><use href="#i-github"/></svg><span class="nl">GitHub</span></a>
+    </nav>
+    <button class="theme" type="button" id="theme" hidden>Dark</button>
+  </div>
+</header>
+
+<main id="main">
+  <div class="wrap">
+    <div class="intro">
+      <h1>The tack room</h1>
+      <p class="lead">Each coding agent hangs on its own peg. Skills sit on the shelf, and the ones from outside stand on a plate that names their pin. Anything new from outside waits at the door until it is 72 hours old.</p>
+      <p class="hint" id="hint">Demo data. Hover or tap anything to read its plate.</p>
+      <ul class="legend" aria-label="States">
+        <li class="tag t-ok"><span class="g" aria-hidden="true">✓</span><span class="w">synced</span></li>
+        <li class="tag t-warn"><span class="g" aria-hidden="true">!</span><span class="w">drifted</span></li>
+        <li class="tag t-pin"><span class="g" aria-hidden="true">✓</span><span class="w">pinned <code>b09718b</code></span></li>
+        <li class="tag t-warn"><span class="g" aria-hidden="true">!</span><span class="w">cooldown</span></li>
+        <li class="tag t-bad"><span class="g" aria-hidden="true">✗</span><span class="w">blocked</span></li>
+      </ul>
+    </div>
+
+    <div class="room" id="room">
+      <section class="zone backwall" aria-labelledby="wall-title">
+        <h2 class="zone-title" id="wall-title"><svg class="ico" aria-hidden="true"><use href="#i-robot"/></svg>Agents, one per peg</h2>
+        <ul class="pegs" id="pegs"></ul>
+      </section>
+      <section class="zone shelf" aria-labelledby="shelf-title">
+        <h2 class="zone-title" id="shelf-title"><svg class="ico" aria-hidden="true"><use href="#i-skills"/></svg>Skills</h2>
+        <ul class="stacks" id="stacks"></ul>
+      </section>
+      <section class="zone door" aria-labelledby="door-title">
+        <h2 class="sr" id="door-title">The door</h2>
+        <div class="door-top">
+          <span class="sign"><svg class="ico" aria-hidden="true"><use href="#i-timer"/></svg>cooldown 72h</span>
+          <span id="key"></span>
+        </div>
+        <div class="frame" id="frame">
+          <span class="leaf" aria-hidden="true"><svg viewBox="0 0 34 100" preserveAspectRatio="none"><path d="M0 0 L34 6 L34 94 L0 100 Z" vector-effect="non-scaling-stroke"/></svg><i></i></span>
+        </div>
+        <div class="sill" aria-hidden="true"></div>
+        <div class="inside" id="inside"></div>
+      </section>
+      <div class="floor" aria-hidden="true"></div>
+    </div>
+    <noscript><p class="noscript">The room is drawn from its data with JavaScript.</p></noscript>
+  </div>
+</main>
+
+<aside class="card" id="card" hidden aria-live="polite"></aside>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="./"><img src="logo.svg" width="30" height="30" alt="">tackroom</a>
+    <p>MIT licensed. Agent names and logos belong to their owners and appear here only to say which tools tackroom works with; this does not imply any endorsement or affiliation.</p>
+  </div>
+</footer>
+
+<!-- Demo data in the shape of `tackroom view`'s /api/inventory: agents, skills and lock rows.
+     Additions the view does not emit yet: `now` (a fixed clock, so the cooldowns read the same on any day),
+     lock row state "allowed" with `ref` (a version that skipped the cooldown as a security fix, #305),
+     lock row `pinned_at`, and `hosts` (from /api/hosts). A skill's `states` lists only cells that are not "ok".
+     For a local check against a real snapshot, serve a JSON file beside the page and open room.html?data=<file>. -->
+<script type="application/json" id="room-data">
+{
+  "now": "2026-11-19T18:00:00Z",
+  "repo_state": "synced",
+  "agents": [
+    {"name": "claude", "display_name": "Claude Code", "enabled": true, "detected": true, "synced": true, "pending": 0, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 2, "stale": 0}, "supports_mcp": true, "supports_hooks": true, "supports_roles": true},
+    {"name": "codex", "display_name": "Codex", "enabled": true, "detected": true, "synced": true, "pending": 0, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 0, "stale": 0}, "supports_mcp": true, "supports_hooks": true, "supports_roles": true},
+    {"name": "pi", "display_name": "Pi", "enabled": true, "detected": true, "synced": true, "pending": 0, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 0, "stale": 0}, "supports_mcp": false, "supports_hooks": true, "supports_roles": false},
+    {"name": "opencode", "display_name": "OpenCode", "enabled": true, "detected": true, "synced": true, "pending": 0, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 1, "stale": 0}, "supports_mcp": true, "supports_hooks": true, "supports_roles": true},
+    {"name": "omp", "display_name": "OMP", "enabled": true, "detected": true, "synced": true, "pending": 0, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 0, "stale": 0}, "supports_mcp": true, "supports_hooks": true, "supports_roles": true},
+    {"name": "droid", "display_name": "Factory Droid", "enabled": true, "detected": true, "synced": true, "pending": 0, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 0, "stale": 0}, "supports_mcp": true, "supports_hooks": true, "supports_roles": true},
+    {"name": "cursor", "display_name": "Cursor", "enabled": true, "detected": true, "synced": false, "pending": 2, "tokens": 412, "counts": {"managed": 13, "drifted": 2, "missing": 0, "conflicts": 0, "unmanaged": 0, "stale": 0}, "supports_mcp": true, "supports_hooks": true, "supports_roles": true},
+    {"name": "gemini", "display_name": "Gemini CLI", "enabled": true, "detected": true, "synced": false, "pending": 1, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 0, "stale": 0}, "supports_mcp": true, "supports_hooks": true, "supports_roles": false},
+    {"name": "qwen-code", "display_name": "Qwen Code", "enabled": true, "detected": true, "synced": true, "pending": 0, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 0, "stale": 0}, "supports_mcp": true, "supports_hooks": true, "supports_roles": true},
+    {"name": "amp", "display_name": "Amp", "enabled": true, "detected": true, "synced": true, "pending": 0, "tokens": 412, "counts": {"managed": 15, "drifted": 0, "missing": 0, "conflicts": 0, "unmanaged": 0, "stale": 0}, "supports_mcp": true, "supports_hooks": false, "supports_roles": false},
+    {"name": "kimi", "display_name": "Kimi Code", "enabled": true, "detected": true, "synced": false, "error": "config file could not be parsed (line 12)", "pending": 0, "tokens": 0, "counts": {}, "supports_mcp": true, "supports_hooks": false, "supports_roles": false},
+    {"name": "copilot", "display_name": "GitHub Copilot CLI", "enabled": true, "detected": false, "synced": false, "pending": 0, "tokens": 0, "counts": {}, "supports_mcp": true, "supports_hooks": true, "supports_roles": true},
+    {"name": "devin", "display_name": "Devin", "enabled": false, "detected": true, "synced": false, "pending": 0, "tokens": 0, "counts": {}, "supports_mcp": true, "supports_hooks": false, "supports_roles": false}
+  ],
+  "skills": [
+    {"name": "tackroom", "description": "Manage this config root: add skills, MCP servers, hooks and roles, then sync them to every agent.", "origin": "local", "tokens": 48, "states": {}},
+    {"name": "review", "description": "Review a diff for correctness bugs before it is pushed.", "origin": "local", "tokens": 22, "states": {"cursor": "drift"}},
+    {"name": "commit", "description": "Write a short commit message from the staged diff.", "origin": "local", "tokens": 18, "states": {"cursor": "drift"}},
+    {"name": "research", "description": "Answer a technical question from primary sources, with links.", "origin": "local", "tokens": 25, "states": {}},
+    {"name": "release-notes", "description": "Draft release notes from the pull requests merged since the last tag.", "origin": "local", "tokens": 27, "states": {}},
+    {"name": "debug", "description": "Reproduce a failure, find the cause, fix it and check the fix.", "origin": "local", "tokens": 26, "states": {}},
+    {"name": "plan", "description": "Turn a loose request into a short plan with acceptance checks.", "origin": "local", "tokens": 24, "states": {}},
+    {"name": "write-docs", "description": "Write or update the user docs for a change, in plain verbs.", "origin": "local", "tokens": 22, "states": {}},
+    {"name": "triage", "description": "Sort new issues by impact and ask for the missing details.", "origin": "local", "tokens": 21, "states": {}},
+    {"name": "refactor", "description": "Restructure code in small steps without changing what it does.", "origin": "local", "tokens": 23, "states": {}},
+    {"name": "pdf-tools", "description": "Read, fill and merge PDF files.", "origin": "acme/agent-skills@b09718b", "tokens": 14, "states": {}},
+    {"name": "spreadsheets", "description": "Build and edit spreadsheets with formulas.", "origin": "acme/agent-skills@b09718b", "tokens": 15, "states": {}},
+    {"name": "slides", "description": "Make a slide deck from an outline.", "origin": "acme/agent-skills@b09718b", "tokens": 13, "states": {}},
+    {"name": "lint-fix", "description": "Run the project's linters and fix what they report.", "origin": "example/lint-skills@3f2a1c9", "tokens": 20, "states": {}},
+    {"name": "format-check", "description": "Check formatting before a commit.", "origin": "example/lint-skills@3f2a1c9", "tokens": 12, "states": {}}
+  ],
+  "lock": [
+    {"name": "agent-skills", "source": "https://github.com/acme/agent-skills", "commit": "b09718b", "pinned": true, "pinned_at": "2026-11-02T09:12:00Z", "state": "pinned", "audited": true, "findings": 0, "critical": 0},
+    {"name": "lint-skills", "source": "https://github.com/example/lint-skills", "commit": "3f2a1c9", "pinned": true, "pinned_at": "2026-10-21T14:40:00Z", "state": "cooldown", "reason": "6100a81 published 2026-11-18T01:00:00Z (git committer date)", "until": "2026-11-21T01:00:00Z", "command": "tackroom sync --allow-fresh=skill:lint-skills", "audited": true, "findings": 0, "critical": 0},
+    {"name": "shell-kit", "source": "https://github.com/example/shell-kit", "commit": "9d41e07", "pinned": false, "state": "blocked", "reason": "exfiltration in scripts/install.sh", "command": "tackroom doctor audit accept skill:shell-kit exfiltration --reason \"...\"", "audited": true, "findings": 1, "critical": 1},
+    {"name": "mcp:fetch", "pinned": false, "state": "cooldown", "reason": "npm:@example/fetch-mcp@2.1.0 published 2026-11-19T06:00:00Z (npm time)", "until": "2026-11-22T06:00:00Z", "command": "tackroom sync --allow-fresh=mcp:fetch", "audited": false, "findings": 0, "critical": 0},
+    {"name": "mcp:browser-tools", "pinned": false, "state": "allowed", "ref": "npm:@example/browser-mcp@1.4.3", "reason": "security fix: GHSA-demo-0000-0000", "audited": false, "findings": 0, "critical": 0}
+  ],
+  "hosts": [
+    {"host": "devbox", "reachable": true, "relation": "same", "synced": true, "health": "ok", "summary": "same config commit, all agents synced"}
+  ]
+}
+</script>
+<script>
+(function () {
+  "use strict";
+  var COOLDOWN_MS = 72 * 3600 * 1000;
+  // Vendor marks shipped in marks/, by tackroom.yaml key. A key without a file gets a plate without a mark.
+  var MARKS = ["agy", "amp", "claude", "codex", "copilot", "cursor", "devin", "droid", "dsh", "gemini", "grok", "kimi", "omp", "opencode", "pi", "qwen-code"];
+  var MARK_ALIAS = {qwen: "qwen-code"};
+  // What a skill cell means on one agent (internal/app/web/app.js CELLS), and the glyph it earns.
+  var CELLS = {drift: ["drifted", "!", "warn"], missing: ["missing", "✗", "bad"], conflict: ["conflict", "✗", "bad"], stale: ["stale", "!", "warn"], unknown: ["unknown", "!", "warn"]};
+  var STACK = 8;
+  var SVG = "http://www.w3.org/2000/svg";
+
+  function h(tag, attrs, kids) {
+    var el = document.createElement(tag);
+    set(el, attrs);
+    add(el, kids);
+    return el;
+  }
+  function s(tag, attrs, kids) {
+    var el = document.createElementNS(SVG, tag);
+    set(el, attrs);
+    add(el, kids);
+    return el;
+  }
+  function set(el, attrs) {
+    for (var k in attrs || {}) {
+      var v = attrs[k];
+      if (v == null || v === false) continue;
+      if (k === "text") el.textContent = v;
+      else el.setAttribute(k, v === true ? "" : v);
+    }
+  }
+  function add(el, kids) {
+    [].concat(kids == null ? [] : kids).forEach(function (kid) {
+      if (kid == null || kid === false) return;
+      if (Array.isArray(kid)) add(el, kid);
+      else el.appendChild(typeof kid === "string" ? document.createTextNode(kid) : kid);
+    });
+  }
+  function icon(id) { return s("svg", {"class": "ico", "aria-hidden": "true"}, s("use", {href: "#" + id})); }
+  function tag(cls, glyph, word, code) {
+    return h("span", {"class": "tag " + cls}, [h("span", {"class": "g", "aria-hidden": "true", text: glyph}), h("span", {"class": "w"}, [word, code ? h("code", {text: code}) : null])]);
+  }
+  function markFor(key) {
+    var file = MARK_ALIAS[key] || key;
+    return MARKS.indexOf(file) >= 0 ? h("img", {src: "marks/" + file + ".svg", width: 40, height: 40, alt: ""}) : null;
+  }
+  function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
+  function hash(text) { var x = 0; for (var i = 0; i < text.length; i++) x = (x * 31 + text.charCodeAt(i)) >>> 0; return x; }
+  function ownerRepo(url) { return String(url || "").replace(/^[a-z]+:\/\/[^/]+\//i, "").replace(/\.git$/, "").replace(/\/$/, ""); }
+  function hostless(url) { return String(url || "").replace(/^https:\/\//, ""); }
+
+  var data, now, objects = [];
+
+  function agentState(a) {
+    if (a.error) return {cls: "bad", glyph: "✗", word: "config unreadable"};
+    if (a.enabled === false) return {cls: "off", glyph: "", word: "turned off"};
+    if (!a.detected) return {cls: "none", glyph: "", word: "not detected"};
+    if (a.synced) return {cls: "ok", glyph: "✓", word: "synced"};
+    return {cls: "warn", glyph: "!", word: "drifted"};
+  }
+  function active(a) { return a.enabled !== false && a.detected && !a.error; }
+
+  // Cooldown progress from the row's end time: how much of the 72 hours has passed.
+  function cooldown(row) {
+    var until = Date.parse(row.until || "");
+    if (isNaN(until)) return null;
+    var left = Math.max(0, until - now), age = Math.max(0, COOLDOWN_MS - left);
+    return {until: until, age: Math.floor(age / 3600000), left: Math.ceil(left / 3600000), share: Math.min(1, age / COOLDOWN_MS)};
+  }
+  function rail(c, label) {
+    var fill = h("i");
+    fill.style.width = (c.share * 100).toFixed(1) + "%";
+    return h("div", {"class": "cooldown"}, [h("div", {"class": "cooldown-track"}, [fill, h("b")]), h("span", {"class": "cooldown-meta", text: label})]);
+  }
+  function whenText(ms) { return new Date(ms).toLocaleString([], {weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23"}); }
+  function daysAgo(iso) {
+    var t = Date.parse(iso || "");
+    if (isNaN(t)) return "";
+    var d = Math.round((now - t) / 86400000);
+    return d < 1 ? "today" : plural(d, "day") + " ago";
+  }
+  function auditTag(row) {
+    if (!row.audited) return null;
+    if (row.critical) return tag("t-bad", "✗", "audit", row.critical + " critical");
+    if (row.findings) return tag("t-warn", "!", "audit", plural(row.findings, "finding"));
+    return tag("t-ok", "✓", "audit pass");
+  }
+  function lockTag(row, short) {
+    if (row.state === "pinned") return tag("t-pin", "✓", "pinned", row.commit);
+    if (row.state === "cooldown") { var c = cooldown(row); return tag("t-warn", "!", "cooldown", short ? null : c ? c.age + "h of 72h" : "time unknown"); }
+    if (row.state === "blocked") return tag("t-bad", "✗", "blocked");
+    if (row.state === "allowed") return tag("t-ok", "✓", "security fix");
+    return tag("t-warn", "!", row.state);
+  }
+
+  // Each object is a button; its index points at what the card shows.
+  function obj(cls, label, kind, item, kids) {
+    var b = h("button", {type: "button", "class": "obj " + cls, "aria-label": label, "aria-controls": "card", "aria-expanded": "false", "data-i": objects.length}, kids);
+    objects.push({kind: kind, item: item});
+    return b;
+  }
+  function wire(state) {
+    var paths = {
+      ok: [["M50 0 L14 24"], ["M50 0 L86 24"]],
+      off: [["M50 0 L14 24"], ["M50 0 L86 24"]],
+      warn: [["M50 0 L14 40"], ["M86 40 L79 29", "stub"]],
+      bad: [["M14 44 L21 33", "stub"], ["M86 44 L79 33", "stub"]],
+      none: []
+    }[state];
+    var h_ = {warn: 40, bad: 44}[state] || 24;
+    return s("svg", {"class": "wire", viewBox: "0 0 100 " + h_, preserveAspectRatio: "none", "aria-hidden": "true"},
+      paths.map(function (p) { return s("path", {d: p[0], "class": p[1] || null, "vector-effect": "non-scaling-stroke"}); }));
+  }
+
+  function renderPegs() {
+    var list = document.getElementById("pegs");
+    add(list, data.agents.map(function (a) {
+      var st = agentState(a), name = a.display_name || a.name;
+      var showMark = st.cls !== "none" && st.cls !== "off";
+      var plate = h("span", {"class": "plate hl"}, [
+        showMark ? markFor(a.name) : null,
+        h("span", {"class": "nm", text: name}),
+        h("span", {"class": "key", text: a.name}),
+        h("span", {"class": "st"}, [st.glyph ? h("span", {"class": "g", "aria-hidden": "true", text: st.glyph}) : null, st.word])
+      ]);
+      return h("li", {"class": "peg s-" + st.cls}, obj("hang", name + ", " + st.word, "agent", a, [wire(st.cls), plate]));
+    }));
+  }
+
+  function skillIssues(skill) {
+    var out = [];
+    data.agents.forEach(function (a) {
+      var cell = (skill.states || {})[a.name];
+      if (active(a) && CELLS[cell]) out.push({agent: a.name, cell: cell});
+    });
+    return out;
+  }
+  function book(skill, maxTokens) {
+    var issues = skillIssues(skill), x = hash(skill.name);
+    var worst = issues.some(function (i) { return CELLS[i.cell][2] === "bad"; }) ? "bad" : issues.length ? "warn" : "";
+    var el = obj("book hl t" + (x % 3), skill.name + (issues.length ? ", " + CELLS[issues[0].cell][0] + " on " + issues.map(function (i) { return i.agent; }).join(", ") : ""), "skill", skill, [
+      h("span", {"class": "bn", text: skill.name}),
+      worst ? h("span", {"class": "g " + worst, "aria-hidden": "true", text: worst === "bad" ? "✗" : "!"}) : null
+    ]);
+    el.style.setProperty("--o", (x % 9) + "px");
+    el.style.setProperty("--x", Math.round(36 * Math.min(1, (skill.tokens || 0) / maxTokens)) + "px");
+    return el;
+  }
+
+  function renderShelf() {
+    var lockByRepo = {}, local = [], groups = {}, order = [];
+    data.lock.forEach(function (row) { if (row.source) lockByRepo[ownerRepo(row.source)] = row; });
+    var maxTokens = Math.max.apply(null, [1].concat(data.skills.map(function (k) { return k.tokens || 0; })));
+    data.skills.slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (skill) {
+      var origin = skill.origin || "local";
+      if (origin === "local") { local.push(skill); return; }
+      var repo = origin.replace(/ \(unpinned\)$/, "").replace(/@[^@]*$/, "");
+      if (!groups[repo]) { groups[repo] = {repo: repo, origin: origin, skills: []}; order.push(repo); }
+      groups[repo].skills.push(skill);
+    });
+    // A pinned source stands on the shelf even while its next commit waits at the door or is blocked there.
+    data.lock.forEach(function (row) {
+      var repo = ownerRepo(row.source);
+      if (row.source && row.pinned && !groups[repo]) { groups[repo] = {repo: repo, skills: []}; order.push(repo); }
+    });
+    // A stack is its books on a base plate; the li around it carries the board.
+    function stack(books, base) { return h("li", {"class": "stack"}, h("div", {"class": "pile"}, [books, base])); }
+    var stacks = [], piles = Math.ceil(local.length / STACK), per = Math.ceil(local.length / Math.max(1, piles));
+    for (var i = 0; i < local.length; i += per) {
+      stacks.push(stack(local.slice(i, i + per).map(function (k) { return book(k, maxTokens); }),
+        obj("base local hl", "local skills, " + local.length + " in the config root", "local", {count: local.length}, h("span", {"class": "bn", text: "local"}))));
+    }
+    order.forEach(function (repo) {
+      var g = groups[repo], row = lockByRepo[repo] || {name: repo.split("/").pop(), source: "https://github.com/" + repo, state: "unpinned", pinned: false};
+      if (!row.pinned && row.state !== "unpinned") return;
+      stacks.push(stack(g.skills.map(function (k) { return book(k, maxTokens); }),
+        obj("base hl", row.name + ", " + (row.pinned ? "pinned at " + row.commit : row.state), "source", {row: row, skills: g.skills},
+          [h("span", {"class": "bn", text: row.name}), row.pinned ? tag("t-pin", "✓", "pinned", row.commit) : tag("t-warn", "!", row.state)])));
+    });
+    add(document.getElementById("stacks"), stacks);
+  }
+
+  function ticket(row, cls) {
+    var c = row.state === "cooldown" ? cooldown(row) : null;
+    var meta = row.state === "allowed" ? row.ref
+      : row.state === "cooldown" && row.pinned ? "new " + String(row.reason || "").split(" ")[0]
+      : row.state === "blocked" ? (row.critical ? plural(row.critical, "critical finding") : row.reason)
+      : row.source ? hostless(row.source) : String(row.reason || "").split(" ")[0];
+    return obj("ticket hl " + cls, row.name + ", " + row.state, "gate", row, [
+      h("span", {"class": "bn", text: row.name}),
+      lockTag(row, true),
+      c ? rail(c, c.age + "h of 72h") : null,
+      meta ? h("span", {"class": "meta", text: meta}) : null
+    ]);
+  }
+
+  function renderDoor() {
+    var waiting = data.lock.filter(function (r) { return r.state !== "pinned" && r.state !== "allowed"; });
+    var walked = data.lock.filter(function (r) { return r.state === "allowed"; });
+    var frame = document.getElementById("frame");
+    add(frame, h("span", {"class": "cap", text: waiting.length ? "Waiting at the door" : "Nobody waiting. New outside skills wait here until they are 72 hours old."}));
+    add(frame, waiting.map(function (r) { return ticket(r, r.state === "blocked" ? "k-bad" : "k-warn"); }));
+    if (walked.length) {
+      add(document.getElementById("inside"), [h("span", {"class": "cap", text: "Walked straight in"}), walked.map(function (r) { return ticket(r, "k-ok"); })]);
+    }
+    var hosts = data.hosts || [];
+    add(document.getElementById("key"), h("span", {"class": "keyhook"}, [
+      wire("ok"),
+      obj("keytag hl", "the key, ~/.agents, shared by " + plural(hosts.length + 1, "machine"), "key", {hosts: hosts}, [icon("i-key"), "~/.agents"])
+    ]));
+  }
+
+  // The card: what a plate says when you lean in.
+  function facts(rows) {
+    return h("dl", {"class": "facts"}, rows.filter(Boolean).map(function (r) { return h("div", {style: "display:contents"}, [h("dt", {text: r[0]}), h("dd", {}, r[1])]); }));
+  }
+  function code(text) { return h("code", {text: text}); }
+  function head(lead, title, sub) {
+    return h("div", {"class": "card-head"}, [
+      lead || h("span", {"class": "tile"}, icon("i-skills")),
+      h("div", {"class": "card-title"}, [h("b", {text: title}), sub ? code(sub) : null]),
+      h("button", {type: "button", "class": "card-x", "aria-label": "Close", id: "card-x"}, icon("i-close"))
+    ]);
+  }
+  function tile(id) { return h("span", {"class": "tile"}, icon(id)); }
+
+  function detail(o) {
+    var it = o.item;
+    if (o.kind === "agent") {
+      var st = agentState(it), c = it.counts || {}, takes = ["skills"];
+      if (it.supports_mcp) takes.push("MCP servers");
+      if (it.supports_hooks) takes.push("hooks");
+      if (it.supports_roles) takes.push("roles");
+      var note = {
+        ok: "Hangs straight: its native config matches the repo.",
+        warn: "Hanging loose: its copy changed since the last sync. The next sync puts it back.",
+        bad: "Fell off the peg: tackroom could not read its config, so it changes nothing there.",
+        none: "An empty peg: the binary is not on PATH, so nothing hangs here yet.",
+        off: "Turned to the wall: enabled is false in tackroom.yaml, so sync leaves it alone."
+      }[st.cls];
+      var cmd = {warn: "tackroom sync", bad: "tackroom doctor"}[st.cls];
+      return [
+        head(markFor(it.name) || tile("i-robot"), it.display_name || it.name, it.name),
+        h("div", {"class": "card-tags"}, tag({ok: "t-ok", warn: "t-warn", bad: "t-bad"}[st.cls] || "t-ok", st.glyph || "·", st.word)),
+        facts([
+          active(it) ? ["Skills", plural(c.managed || 0, "skill") + " in place"] : null,
+          c.drifted ? ["Drifted", plural(c.drifted, "link")] : null,
+          c.missing ? ["Missing", plural(c.missing, "skill")] : null,
+          c.conflicts ? ["Conflicts", String(c.conflicts)] : null,
+          it.pending ? ["Next sync", plural(it.pending, "change")] : null,
+          active(it) && it.tokens ? ["Listing", "about " + it.tokens + " tokens"] : null,
+          ["Takes", takes.join(", ")],
+          it.error ? ["Error", it.error] : null
+        ]),
+        h("p", {text: note}),
+        cmd ? h("code", {"class": "cmd-line", text: cmd}) : null
+      ];
+    }
+    if (o.kind === "skill") {
+      var issues = skillIssues(it), on = data.agents.filter(active);
+      var ok = on.filter(function (a) { return !CELLS[(it.states || {})[a.name]]; }).length;
+      return [
+        head(tile("i-skills"), it.name, it.origin === "local" ? "local" : it.origin),
+        it.description ? h("p", {text: it.description}) : null,
+        facts([
+          ["Agents", "in place on " + ok + " of " + on.length],
+          issues.length ? [CELLS[issues[0].cell][0][0].toUpperCase() + CELLS[issues[0].cell][0].slice(1), issues.map(function (i) { return i.agent; }).join(", ")] : null,
+          it.tokens ? ["Listing", "about " + it.tokens + " tokens"] : null
+        ]),
+        issues.length ? h("code", {"class": "cmd-line", text: "tackroom sync"}) : null
+      ];
+    }
+    if (o.kind === "local") {
+      return [
+        head(tile("i-skills"), "Local skills", "skills/"),
+        facts([["Count", plural(it.count, "skill")], ["Pin", "none needed: they live in your repo"]]),
+        h("p", {text: "Canonical skills in your config root. Every enabled agent gets each one in its own format."})
+      ];
+    }
+    if (o.kind === "source") {
+      var row = it.row, upd = row.state === "cooldown" || row.state === "blocked";
+      return [
+        head(tile("i-pin"), row.name, hostless(row.source)),
+        h("div", {"class": "card-tags"}, [row.pinned ? tag("t-pin", "✓", "pinned", row.commit) : lockTag(row), auditTag(row)]),
+        facts([
+          row.commit ? ["Pin", code(row.commit)] : null,
+          row.pinned_at ? ["Pinned", daysAgo(row.pinned_at)] : null,
+          ["On the shelf", plural(it.skills.length, "skill")],
+          upd ? ["At the door", row.state === "cooldown" ? "its next commit, in cooldown" : "its next commit, blocked"] : null
+        ]),
+        h("p", {text: row.pinned ? "Locked to this commit in tackroom.lock. Only tackroom skill update moves it." : "Not pinned yet. The next sync pins it."})
+      ];
+    }
+    if (o.kind === "gate") {
+      var g = it, cd = g.state === "cooldown" ? cooldown(g) : null;
+      var words = {
+        cooldown: cd ? "Sync skips it until " + whenText(cd.until) + " and your agents keep what they have. To take it now:" : "In cooldown: " + g.reason + ". To take it anyway:",
+        blocked: "Sync skips it: " + g.reason + ". Read the finding with tackroom doctor audit; to sync it anyway, accept it:",
+        allowed: "A published advisory names this version as its fix, so sync took it at once instead of waiting 72 hours. tackroom.lock records the decision."
+      }[g.state] || "Sync settles this on its next run.";
+      return [
+        head(tile(g.state === "allowed" ? "i-ok" : g.state === "blocked" ? "i-audit" : g.source ? "i-timer" : "i-plug"), g.name, g.source ? hostless(g.source) : g.ref || null),
+        h("div", {"class": "card-tags"}, [lockTag(g), auditTag(g)]),
+        cd ? rail(cd, cd.left + "h left") : null,
+        facts([
+          cd ? ["Age", cd.age + "h of 72h"] : null,
+          g.pinned && g.commit ? ["Shelf keeps", code(g.commit)] : null,
+          g.state === "allowed" ? ["Advisory", g.reason.replace(/^security fix: /, "")] : ["Reason", g.reason || g.state]
+        ]),
+        h("p", {text: words}),
+        g.command ? h("code", {"class": "cmd-line", text: g.command}) : null
+      ];
+    }
+    if (o.kind === "key") {
+      return [
+        head(tile("i-key"), "One key", "~/.agents"),
+        facts([["Opens", plural(it.hosts.length + 1, "room")], ["This machine", "you are here"]].concat(it.hosts.map(function (m) {
+          return [m.host, [m.synced ? "✓ " : "! ", m.summary || (m.synced ? "synced" : "out of sync")]];
+        }))),
+        h("p", {text: "Every machine that clones your config root opens the same room: same pegs, same shelf, same door."})
+      ];
+    }
+    return [];
+  }
+
+  // Hover shows the card next to the object; a click or tap pins it; Escape, the close button or a click elsewhere clears it.
+  var card = document.getElementById("card"), room = document.getElementById("room");
+  var sheet = window.matchMedia("(max-width: 719px), (hover: none)");
+  var current = null, pinned = false, timer = 0;
+  function show(btn, pin) {
+    clearTimeout(timer);
+    if (current && current !== btn) { current.classList.remove("on"); current.setAttribute("aria-expanded", "false"); }
+    current = btn; pinned = pin;
+    btn.classList.add("on"); btn.setAttribute("aria-expanded", "true");
+    card.replaceChildren();
+    add(card, detail(objects[+btn.dataset.i]));
+    card.hidden = false;
+    place();
+  }
+  function hide(refocus) {
+    clearTimeout(timer);
+    if (!current) return;
+    var was = current;
+    current.classList.remove("on"); current.setAttribute("aria-expanded", "false");
+    current = null; pinned = false; card.hidden = true;
+    if (refocus) was.focus();
+  }
+  function place() {
+    if (!current) return;
+    if (sheet.matches) { card.style.top = ""; card.style.left = ""; return; }
+    var r = current.getBoundingClientRect(), cw = card.offsetWidth, ch = card.offsetHeight, gap = 10;
+    var left = Math.min(Math.max(16, r.left + r.width / 2 - cw / 2), window.innerWidth - cw - 16);
+    var top = r.bottom + gap;
+    if (top + ch > window.innerHeight - 16) top = r.top - gap - ch;
+    if (top < 16) top = Math.max(16, window.innerHeight - ch - 16);
+    card.style.left = left + "px"; card.style.top = top + "px";
+  }
+  function later() { clearTimeout(timer); timer = setTimeout(function () { if (!pinned) hide(false); }, 140); }
+  room.addEventListener("pointerover", function (e) {
+    if (e.pointerType !== "mouse" || sheet.matches || pinned) return;
+    var b = e.target.closest(".obj");
+    if (b && b !== current) show(b, false); else if (b) clearTimeout(timer);
+  });
+  room.addEventListener("pointerout", function (e) {
+    if (e.pointerType !== "mouse" || pinned || !current) return;
+    if (!current.contains(e.relatedTarget) && !card.contains(e.relatedTarget)) later();
+  });
+  card.addEventListener("pointerover", function () { clearTimeout(timer); });
+  card.addEventListener("pointerleave", function (e) { if (e.pointerType === "mouse" && !pinned) later(); });
+  room.addEventListener("click", function (e) {
+    var b = e.target.closest(".obj");
+    if (!b) return;
+    if (b === current && pinned) hide(false); else show(b, true);
+  });
+  card.addEventListener("click", function (e) { if (e.target.closest("#card-x")) hide(true); });
+  document.addEventListener("click", function (e) { if (current && !room.contains(e.target) && !card.contains(e.target)) hide(false); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && current) hide(true); });
+  window.addEventListener("scroll", place, {passive: true});
+  window.addEventListener("resize", place);
+
+  function render(d) {
+    data = {agents: d.agents || [], skills: d.skills || [], lock: d.lock || [], hosts: d.hosts};
+    now = Date.parse(d.now || "") || Date.now();
+    renderPegs();
+    renderShelf();
+    renderDoor();
+  }
+  var demo = JSON.parse(document.getElementById("room-data").textContent);
+  // ?data=<relative path> draws a local snapshot (for example a saved /api/inventory) instead of the demo.
+  var src = new URLSearchParams(window.location.search).get("data");
+  if (src && !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(src)) {
+    fetch(src).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) { document.getElementById("hint").textContent = "Snapshot from " + src + ". Hover or tap anything to read its plate."; render(d); })
+      .catch(function () { render(demo); });
+  } else {
+    render(demo);
+  }
+
+  // Theme toggle, as on the home page: switches to the other theme; picking the system's own theme clears the override.
+  var root = document.documentElement, btn = document.getElementById("theme");
+  var mq = window.matchMedia("(prefers-color-scheme: dark)");
+  function currentTheme() { return root.dataset.theme || (mq.matches ? "dark" : "light"); }
+  function paint() { btn.textContent = currentTheme() === "dark" ? "Light" : "Dark"; btn.setAttribute("aria-label", "Switch to " + btn.textContent.toLowerCase() + " theme"); }
+  btn.hidden = false; paint();
+  btn.addEventListener("click", function () {
+    var next = currentTheme() === "dark" ? "light" : "dark", system = mq.matches ? "dark" : "light";
+    try {
+      if (next === system) { delete root.dataset.theme; localStorage.removeItem("tackroom-theme"); }
+      else { root.dataset.theme = next; localStorage.setItem("tackroom-theme", next); }
+    } catch (e) { root.dataset.theme = next; }
+    paint();
+  });
+  mq.addEventListener("change", paint);
+})();
+</script>
+</body>
+</html>
