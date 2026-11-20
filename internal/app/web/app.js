@@ -44,6 +44,7 @@ const store = {
   configNote: '',
   preview: null,
   previewAt: 0,
+  planChanges: 0,
   crons: null,
   cronsError: '',
   cronsLoading: false,
@@ -1437,6 +1438,7 @@ let planSeq = 0;
 async function loadPlan() {
   const seq = ++planSeq;
   store.preview = null;
+  store.planChanges = 0;
   setApply(false, '');
   document.getElementById('sync-sub').textContent = 'Building the plan…';
   const box = document.getElementById('sync-plan');
@@ -1478,7 +1480,8 @@ function renderPlan() {
       for (const [key, verb, noun] of PLAN_GROUPS) for (const name of report[key] || []) items.push([verb, `${noun} ${name}`]);
       for (const conflict of report.Conflicts || []) items.push(['conflict', `${tilde(conflict)} (left alone)`]);
       if (report.RootState && report.RootState !== 'synced') items.push([report.RootState === 'missing' ? 'add' : 'update', `root instructions (${report.RootState})`]);
-      if (!items.length && !report.Synced) items.push(['note', 'refresh native config']);
+      // A harness out of sync with nothing listed still gets its native config written.
+      if (!items.length && !report.Synced) { changes += 1; items.push(['note', 'refresh native config']); }
     }
     changes += items.filter(([verb]) => ['add', 'update', 'remove'].includes(verb)).length;
     const line = summary[report.Name] || (report.Error ? 'config unreadable' : !report.Detected ? 'not installed, skipped' : items.length ? plural(items.length, 'change') : 'up to date');
@@ -1498,6 +1501,7 @@ function renderPlan() {
   }
   const destructive = plan.destructive || [];
   changes = Math.max(changes, destructive.length);
+  store.planChanges = changes;
   document.getElementById('sync-sub').textContent = changes ? `${plural(changes, 'change')} to apply` : 'Nothing to change';
   mount(box,
     destructive.length ? h('div', {class: 'destructive'},
@@ -1527,6 +1531,8 @@ function renderToggles() {
 }
 function updateApply() {
   const boxes = [...document.querySelectorAll('[data-destructive]')];
+  // Apply stays off while the plan changes nothing, and until every destructive change is ticked.
+  if (!store.planChanges) { setApply(false, 'Nothing to change.'); return; }
   const ready = boxes.every((box) => box.checked);
   setApply(ready, ready ? (boxes.length ? 'All destructive changes confirmed.' : 'Sync writes only what tackroom manages.') : `${boxes.filter((box) => !box.checked).length} left to confirm.`);
 }
