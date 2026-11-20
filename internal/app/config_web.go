@@ -65,6 +65,12 @@ func runConfigServe(opts configServeOptions) error {
 		}
 		return stopView(opts, files)
 	}
+	if !opts.Foreground && !opts.JSON && runByServiceManager(os.Getenv) {
+		// A launchd job or systemd unit that runs plain `tackroom view` keeps
+		// serving, instead of starting a background view and exiting.
+		fmt.Fprintln(os.Stdout, "tackroom view runs under launchd or systemd; serving in the foreground.")
+		opts.Foreground = true
+	}
 	doc, _, err := openConfigDocument(configCommandOptions{ConfigPath: opts.ConfigPath})
 	if err != nil {
 		return err
@@ -142,7 +148,7 @@ func serveView(doc *configDocument, opts configServeOptions, files viewFiles, to
 type runningViewInfo struct {
 	URL  string
 	Addr string
-	// PID and IdleTimeout are empty for a view from before 3.0.
+	// PID and IdleTimeout are empty for a view an older tackroom started.
 	PID         int
 	IdleTimeout string
 }

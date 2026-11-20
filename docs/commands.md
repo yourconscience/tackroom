@@ -204,7 +204,7 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 
 - Without `--foreground` it reports the running view or starts one in the background, which exits after `ui.view.idle_timeout` (default `30m`) without requests, then opens it in the browser.
 - `--json` prints `url`, `addr`, `pid`, `started` and `idle_timeout` as one JSON object and opens no browser; plugins and scripts use it ([caller contract](view.md#starting-stopping-and-the-caller-contract)).
-- `--stop` stops the running view and exits 0 whether or not one ran. `--foreground` serves in this terminal until Ctrl-C.
+- `--stop` stops the running view and exits 0 whether or not one ran. `--foreground` serves in this terminal until Ctrl-C; under launchd or systemd plain `view` does too.
 
 ### Crons in detail
 

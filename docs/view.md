@@ -21,7 +21,8 @@ Flags and reruns:
 - `--addr` is the listen address, default `ui.view.addr`, else `127.0.0.1:8765`. It must be loopback: `127.0.0.1`, `::1` or `localhost`. Anything else is refused. When another program holds that port and `--addr` was not given, `view` takes a free port, says so and prints that URL; later runs reuse the same port while it stays free. An explicit `--addr` that is taken is an error.
 - `--config PATH` opens another config file; without it the file is [resolved as for every command](commands.md#config-resolution).
 - A second `tackroom view` finds the running one, prints its URL and starts nothing. Without `--addr` it looks where the last view recorded its address.
-- `--foreground` serves in the terminal you run it from until Ctrl-C, as `view` did before 3.0, for SSH sessions, `tailscale serve` and debugging. It never exits when idle.
+- `--foreground` serves in the terminal you run it from until Ctrl-C, as `view` used to, for SSH sessions, `tailscale serve` and debugging. It never exits when idle.
+- Under a service manager, plain `tackroom view` serves in the foreground too, so a launchd job or systemd unit written for an older tackroom keeps working. tackroom detects launchd from `XPC_SERVICE_NAME` holding a job label (not empty, `0` or an `application.` name) and systemd from `INVOCATION_ID`. `--foreground` is the explicit form. `--json` and `--stop` never serve.
 
 ## Starting, stopping and the caller contract
 
@@ -38,7 +39,7 @@ Scripts, terminal plugins and editor extensions open the view through the comman
   {"url": "http://127.0.0.1:8765/?token=...", "addr": "127.0.0.1:8765", "pid": 4242, "started": true, "idle_timeout": "30m"}
   ```
 
-  `url` is the signed-in startup URL. `addr` is the address the view listens on, which differs from the configured one after a fallback. `pid` is the view's process. `started` is true only when this call started it. `idle_timeout` is the view's own setting, `"0"` for one that never exits when idle (a `--foreground` view). A view started by tackroom before 3.0 reports `pid` 0. The output is pretty-printed; parse it as JSON.
+  `url` is the signed-in startup URL. `addr` is the address the view listens on, which differs from the configured one after a fallback. `pid` is the view's process. `started` is true only when this call started it. `idle_timeout` is the view's own setting, `"0"` for one that never exits when idle (a `--foreground` view). A view started by an older tackroom reports `pid` 0. The output is pretty-printed; parse it as JSON.
 - Exit codes: 0 when a view answers, 1 when none could be started or a flag or the config is invalid (the reason on stderr).
 
 `tackroom view --stop` stops the view that answers for this token: it sends that process SIGTERM and waits until it stops answering. It exits 0 when it stopped one and when none was running, and says which; 1 when the view still answers 5 seconds later. It does not read the config, so it also works while the config is invalid.

@@ -65,6 +65,17 @@ func applyViewSettings(opts *configServeOptions, ui *uiConfig) string {
 	return defaultViewIdleTimeout
 }
 
+// runByServiceManager reports whether launchd or systemd runs this process.
+// launchd sets XPC_SERVICE_NAME to the job's label; terminals set "0", and
+// apps it opens get "application.<bundle id>...", which the programs they run
+// inherit. systemd sets INVOCATION_ID.
+func runByServiceManager(getenv func(string) string) bool {
+	if name := getenv("XPC_SERVICE_NAME"); name != "" && name != "0" && !strings.HasPrefix(name, "application.") {
+		return true
+	}
+	return getenv("INVOCATION_ID") != ""
+}
+
 func parseViewIdleTimeout(value string) (time.Duration, error) {
 	d, err := time.ParseDuration(value)
 	if err != nil || d < 0 {
@@ -219,7 +230,7 @@ func stopView(opts configServeOptions, files viewFiles) error {
 		return nil
 	}
 	if info.PID == 0 {
-		fmt.Fprintf(os.Stdout, "The tackroom view at %s does not report its process ID (a tackroom before 3.0 started it); stop it where it runs.\n", info.Addr)
+		fmt.Fprintf(os.Stdout, "The tackroom view at %s does not report its process ID (an older tackroom started it); stop it where it runs.\n", info.Addr)
 		return nil
 	}
 	if err := syscall.Kill(info.PID, syscall.SIGTERM); err != nil {
