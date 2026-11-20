@@ -21,7 +21,8 @@ Flags and reruns:
 - `--addr` is the listen address, default `ui.view.addr`, else `127.0.0.1:8765`. It must be loopback: `127.0.0.1`, `::1` or `localhost`. Anything else is refused. When another program holds that port and `--addr` was not given, `view` takes a free port, says so and prints that URL; later runs reuse the same port while it stays free. An explicit `--addr` that is taken is an error.
 - `--config PATH` opens another config file; without it the file is [resolved as for every command](commands.md#config-resolution).
 - A second `tackroom view` finds the running one, prints its URL and starts nothing. Without `--addr` it looks where the last view recorded its address.
-- `--foreground` serves in the terminal you run it from until Ctrl-C, as `view` used to, for SSH sessions, `tailscale serve` and debugging. It never exits when idle.
+- `--foreground` serves in the terminal you run it from until Ctrl-C, as `view` used to, for SSH sessions, `tailscale serve` and debugging. It never exits when idle. Under `nohup` it keeps running after the terminal closes.
+- `--secure-cookie` implies `--foreground`: access through a proxy needs a view that does not exit when idle.
 - Under a service manager, plain `tackroom view` serves in the foreground too, so a launchd job or systemd unit written for an older tackroom keeps working. tackroom detects launchd from `XPC_SERVICE_NAME` holding a job label (not empty, `0` or an `application.` name) and systemd from `INVOCATION_ID`. `--foreground` is the explicit form. `--json` and `--stop` never serve.
 
 ## Starting, stopping and the caller contract
@@ -31,7 +32,7 @@ Scripts, terminal plugins and editor extensions open the view through the comman
 `tackroom view` and `tackroom view --json`:
 
 - If a view for this token answers at the recorded address (or at `--addr`), it reports that view and exits 0 at once.
-- If none answers, it starts `tackroom view --foreground` as a background process in its own session, with its output in `view.log`, so it outlives the caller. It waits until the view answers, reports it and exits 0. If the view does not answer within 10 seconds, it stops that process and exits 1 with the end of `view.log` on stderr.
+- If none answers, it starts `tackroom view --foreground` as a background process in its own session, with its output in `view.log`, so it outlives the caller. The view gets the environment of your login shell (`$SHELL -l`), so it finds your harnesses as a terminal does even when the caller is an app with a minimal `PATH`; without `$SHELL`, or when the shell does not answer within 5 seconds, it gets the caller's environment. It waits until the view answers, reports it and exits 0. If the view does not answer within 10 seconds, it stops that process and exits 1 with the end of `view.log` on stderr.
 - Concurrent calls start one view: the check and the start run under an exclusive lock on `view.lock`, which is removed afterwards.
 - `--json` prints one JSON object on stdout and nothing else, and opens no browser:
 
@@ -44,7 +45,7 @@ Scripts, terminal plugins and editor extensions open the view through the comman
 
 `tackroom view --stop` stops the view that answers for this token: it sends SIGTERM to the process that view reports, only when `view.pid` records the same one, and waits until it stops answering. It exits 0 when it stopped one and when none was running, and says which; 1 when the view still answers 5 seconds later. It does not read the config, so it also works while the config is invalid.
 
-A background view exits when no HTTP request has reached it for `ui.view.idle_timeout` (default `30m`). Every request resets the timer, and an open page sends one every 60 seconds while it is visible, so a view stays up while you have it open and exits after you close the last tab or leave it hidden. `0` keeps it running until `--stop`. Because the page sends its request once a minute, an open page alone does not keep up a view whose `idle_timeout` is under `1m`. It still [restarts on upgrade](#restart-on-upgrade).
+A background view exits when no HTTP request has reached it for `ui.view.idle_timeout` (default `30m`). Every request resets the timer, and an open page sends one every 60 seconds while it is visible, and also while it is hidden with unsaved Config changes, so a view stays up while you have it open and exits after you close the last tab or leave it hidden. When that request fails, the page says `tackroom view stopped; run tackroom view`. `0` keeps it running until `--stop`. Because the page sends its request once a minute, an open page alone does not keep up a view whose `idle_timeout` is under `1m`. It still [restarts on upgrade](#restart-on-upgrade).
 
 State files, in `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`), or beside `--token-file` and named after it:
 
@@ -123,10 +124,10 @@ With `--ssh-host user@host`, or inside an SSH session where it is derived from `
 
 A view started over SSH keeps running after you log out, until it is idle for `ui.view.idle_timeout`; use `--foreground` to tie it to the session.
 
-For HTTPS over a tailnet you expose the loopback port yourself. `--secure-cookie` applies to requests that come through the proxy, so the same view still works at its local `http://127.0.0.1` URL. Run it in the foreground, or set `ui.view.idle_timeout: 0`, so it does not exit while nobody uses it:
+For HTTPS over a tailnet you expose the loopback port yourself. `--secure-cookie` applies to requests that come through the proxy, so the same view still works at its local `http://127.0.0.1` URL. It implies `--foreground`, so the view does not exit while nobody uses it:
 
 ```bash
-tackroom view --foreground --no-open --secure-cookie --addr 127.0.0.1:8765
+tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765
 tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
 tailscale serve status                         # prints the https URL on your tailnet
 ```
@@ -143,9 +144,9 @@ The manifest and icons are served without the token; they carry no config data. 
 
 ## Restart on upgrade
 
-A running view checks every 15 seconds whether the `tackroom` binary it started from has been replaced, by `brew upgrade`, `npm install -g` or `go install`. Once the new file has stayed unchanged for one more check, the view restarts itself with `--no-open` and prints `tackroom binary at <path> changed; restarting view`.
+A running view checks every 15 seconds whether the `tackroom` binary it started from has been replaced, by `brew upgrade`, `npm install -g` or `go install`. Once the new file has stayed unchanged for one more check, the view restarts itself in place with `--foreground` and `--no-open`, each added once, and prints `tackroom binary at <path> changed; restarting view`.
 
-The token file keeps the URL and open sessions valid. If the restart fails, the view keeps serving the old version and says so.
+The token file keeps the URL and open sessions valid. A background view keeps its idle timeout across the restart. If the restart fails, the view keeps serving the old version and says so.
 
 ## What it can change
 

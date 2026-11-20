@@ -134,7 +134,13 @@ func serveView(doc *configDocument, opts configServeOptions, files viewFiles, to
 		httpServer.Handler = exitWhenIdle(httpServer, httpServer.Handler, d)
 	}
 	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	// A signal the caller ignores stays ignored: under nohup SIGHUP, and SIGINT
+	// for a job started with & from a script.
+	for _, sig := range []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP} {
+		if !signal.Ignored(sig) {
+			signal.Notify(signals, sig)
+		}
+	}
 	go func() {
 		<-signals
 		_ = httpServer.Close()
@@ -256,11 +262,15 @@ func restartOnUpgrade() {
 			continue
 		}
 		fmt.Fprintf(os.Stderr, "tackroom binary at %s changed; restarting view\n", path)
-		// --no-open keeps the restart from opening another browser tab. It is
-		// added once, so repeated upgrades do not pile it up.
+		// The restart serves in place (--foreground) without opening another
+		// browser tab (--no-open). Each is added once, so repeated upgrades do
+		// not pile them up. A background view keeps its environment, so it
+		// still exits when idle.
 		args := append([]string{}, os.Args...)
-		if !slices.Contains(args[1:], "--no-open") && !slices.Contains(args[1:], "-no-open") {
-			args = append(args, "--no-open")
+		for _, flag := range []string{"--no-open", "--foreground"} {
+			if !slices.Contains(args[1:], flag) && !slices.Contains(args[1:], flag[1:]) {
+				args = append(args, flag)
+			}
 		}
 		err = syscall.Exec(path, args, os.Environ())
 		fmt.Fprintf(os.Stderr, "view restart failed, still serving the old version: %v\n", err)

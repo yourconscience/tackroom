@@ -1,6 +1,8 @@
 package app
 
 import (
+	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -137,12 +139,21 @@ func startView(doc *configDocument, opts configServeOptions, files viewFiles, to
 	if err != nil {
 		return runningViewInfo{}, false, fmt.Errorf("find the tackroom binary: %w", err)
 	}
+	// The path tackroom was started as, when it is this binary, so restart on
+	// upgrade watches a package manager's link and not the file it points to
+	// (os.Executable resolves links on Linux).
+	if path, err := exec.LookPath(os.Args[0]); err == nil {
+		if path, err = filepath.Abs(path); err == nil {
+			if a, errA := os.Stat(path); errA == nil {
+				if b, errB := os.Stat(self); errB == nil && os.SameFile(a, b) {
+					self = path
+				}
+			}
+		}
+	}
 	args := []string{"view", "--foreground", "--no-open", "--config", doc.sharedPath, "--token-file", files.token}
 	if opts.AddrSet {
 		args = append(args, "--addr", opts.Addr)
-	}
-	if opts.SecureCookie {
-		args = append(args, "--secure-cookie")
 	}
 	// Appended, so a failed start does not wipe the log of a view that runs
 	// elsewhere; logStart is where this start's lines begin.
@@ -157,7 +168,7 @@ func startView(doc *configDocument, opts configServeOptions, files viewFiles, to
 	cmd := exec.Command(self, args...)
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	cmd.Dir = doc.home
-	cmd.Env = append(os.Environ(), viewDetachedEnv+"=1")
+	cmd.Env = append(loginShellEnv(), viewDetachedEnv+"=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	err = cmd.Start()
 	logFile.Close()
@@ -197,6 +208,44 @@ func startView(doc *configDocument, opts configServeOptions, files viewFiles, to
 		case <-tick.C:
 		}
 	}
+}
+
+// loginShellEnv returns the environment of the user's login shell. Callers
+// such as the Tern daemon and Rex run tackroom with a GUI app's minimal PATH,
+// and the background view should find harnesses as a terminal does. It falls
+// back to this process's environment when $SHELL is unset or does not answer
+// within 5 seconds.
+func loginShellEnv() []string {
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		return os.Environ()
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	const marker = "TACKROOM_LOGIN_ENV"
+	cmd := exec.CommandContext(ctx, shell, "-l", "-c", "echo "+marker+"; env -0")
+	// In its own process group, so a timeout also ends what the shell's
+	// startup files started.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	cmd.WaitDelay = time.Second
+	out, err := cmd.Output()
+	at := bytes.LastIndex(out, []byte(marker+"\n"))
+	if err != nil || at < 0 {
+		return os.Environ()
+	}
+	// env -0 ends each entry with NUL; whatever follows the last one is not env.
+	entries := strings.Split(string(out[at+len(marker)+1:]), "\x00")
+	var env []string
+	for _, entry := range entries[:len(entries)-1] {
+		if eq := strings.Index(entry, "="); eq > 0 {
+			env = append(env, entry)
+		}
+	}
+	if len(env) == 0 {
+		return os.Environ()
+	}
+	return env
 }
 
 // viewStartError is reason followed by the last lines this start wrote to

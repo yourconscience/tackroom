@@ -57,7 +57,7 @@ func parseViewFlags(args []string) (configServeOptions, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Addr, "addr", defaultViewAddr, "Loopback listen address; an error when taken (without it, ui.view.addr or 127.0.0.1:8765, falling back to a free port)")
 	fs.BoolVar(&opts.NoOpen, "no-open", false, "Do not open the browser")
-	fs.BoolVar(&opts.SecureCookie, "secure-cookie", false, "Serve an HTTPS proxy such as tailscale serve: Secure cookies and https origins for non-loopback hosts")
+	fs.BoolVar(&opts.SecureCookie, "secure-cookie", false, "Serve an HTTPS proxy such as tailscale serve: Secure cookies and https origins for non-loopback hosts; implies --foreground")
 	fs.StringVar(&opts.SSHHost, "ssh-host", "", "Print an ssh -L tunnel command for this host (user@host)")
 	fs.StringVar(&opts.TokenFile, "token-file", "", "Session token file, created on first use (default view.token in $XDG_STATE_HOME/tackroom or ~/.local/state/tackroom)")
 	fs.BoolVar(&opts.JSON, "json", false, "Print url, addr, pid, started and idle_timeout as one JSON object; implies --no-open")
@@ -73,6 +73,13 @@ func parseViewFlags(args []string) (configServeOptions, error) {
 	})
 	if fs.NArg() != 0 {
 		return configServeOptions{}, errors.New("view does not accept positional arguments")
+	}
+	if opts.SecureCookie && !opts.Stop {
+		if opts.JSON {
+			return configServeOptions{}, errors.New("view --json does not combine with --secure-cookie, which serves in the foreground")
+		}
+		// Access through a proxy needs a view that does not exit when idle.
+		opts.Foreground = true
 	}
 	if opts.Stop && (opts.Foreground || opts.JSON) {
 		return configServeOptions{}, errors.New("view --stop does not combine with --foreground or --json")
