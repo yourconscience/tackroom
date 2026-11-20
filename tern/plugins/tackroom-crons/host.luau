@@ -194,7 +194,11 @@ local function open_web(state)
 		if res.status ~= 0 or not ok or type(data) ~= "table" or type(data.url) ~= "string" then
 			if current(state) then
 				local err = last_line(res.stderr)
-				state.note = "Could not open tackroom view: " .. (err ~= "" and err or ("exit " .. tostring(res.status)))
+				if string.find(res.stderr or "", "flag provided but not defined", 1, true) then
+					state.note = "Web needs a newer tackroom; upgrade it with brew or npm"
+				else
+					state.note = "Could not open tackroom view: " .. (err ~= "" and err or ("exit " .. tostring(res.status)))
+				end
 				render(state)
 			end
 			return

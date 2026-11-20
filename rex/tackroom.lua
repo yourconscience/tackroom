@@ -168,6 +168,9 @@ rex.action({
 			error(err, 0)
 		end
 		if not r.ok then
+			if string.find(r.stderr or "", "flag provided but not defined", 1, true) then
+				error("Web needs a newer tackroom; upgrade it with brew or npm", 0)
+			end
 			error("tackroom view: " .. last_line(r.stderr), 0)
 		end
 		local url = string.match(r.stdout or "", '"url"%s*:%s*"([^"]+)"')
