@@ -90,7 +90,7 @@ tackroom.config = "/path/to/tackroom.yaml" -- passed as --config to every tackro
 - With more than one `tackroom` installed, for example an old copy in `~/.local/bin` and a newer one from Homebrew, the actions take the first one found, which may be the old one. Set `tackroom.bin` to the one you want.
 - A Rex action has 30 seconds to finish; `tackroom_workspace` gives `tackroom rex` 25.
 - `tackroom_view` uses the view that keeps its token in the default place, and starts one when none runs; a view started with another `--token-file` is not found.
-- `tackroom_view` opens the page with macOS `open`. It needs `tackroom view --json`, from the release after 3.0; with an older tackroom it fails with "Web needs a newer tackroom; upgrade it with brew or npm".
+- `tackroom_view` opens the page with macOS `open`. It needs `tackroom view --json`, from tackroom 3.0; with an older tackroom it fails with "Web needs a newer tackroom; upgrade it with brew or npm".
 - `--config` is passed to the status and crons commands only when given; every pane opens in the folder that holds the config file.
 
 ## Not planned

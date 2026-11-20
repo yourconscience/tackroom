@@ -36,7 +36,7 @@ Open with **Open tackroom crons** in the palette, or `Ctrl+Alt+C`. To change it,
 
 ## Watch out
 
-- Needs a tackroom whose `cron collect` carries `health`, `short_name` and `schedule_text`, and has the `cron run|pause|resume` verbs. Web needs `tackroom view --json`, from the release after 3.0.
+- Needs a tackroom whose `cron collect` carries `health`, `short_name` and `schedule_text`, and has the `cron run|pause|resume` verbs. Web needs `tackroom view --json`, from tackroom 3.0.
 - Only launchd jobs have action buttons; crontab, systemd timers and harness schedulers stay read-only, as in the web view.
 - A collect probes every host over SSH; on a loaded machine the local probe can hit tackroom's timeout and show an error until the next collect.
 - Schedule changes are not in this block yet; use the web view or `tackroom cron schedule`.
