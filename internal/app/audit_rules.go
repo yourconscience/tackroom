@@ -236,130 +236,139 @@ func loweredLines(file string, lines []string) []bool {
 }
 
 // pyLoweredLines marks the lines of a Python file that are comments or
-// docstrings. It follows triple-quoted strings by their own delimiter, so a
-// quote inside a comment or inside another string does not move a boundary.
-// A triple-quoted string that is not a docstring is data the script can run:
-// its lines are not lowered.
+// docstrings. It reads the file as Python does: strings by their own delimiter
+// with escapes, brackets and backslashes joining physical lines into logical
+// ones. A docstring is a logical line that is one string literal and nothing
+// else, and is the first statement of the file or follows a def or class
+// header. Any other string is data the script can run: it is not lowered.
 func pyLoweredLines(lines []string) []bool {
 	out := make([]bool, len(lines))
-	delim := "" // the delimiter of the triple-quoted string the line starts in
-	doc := false
-	docStart := 0
+	var (
+		delim      string // delimiter of the string a line starts in, "" outside one
+		depth      int    // open brackets
+		joined     bool   // the previous line ended with a backslash outside a string
+		start      = -1   // first physical line of the logical line being read
+		strs       int    // string literals in it
+		code       bool   // anything else in it
+		last       byte   // its last character outside strings and comments
+		prevHeader bool   // the logical line before it was a def or class header
+		first      = true // no logical line has ended yet
+	)
 	for i, line := range lines {
-		t := strings.TrimSpace(line)
-		if delim != "" {
-			idx := strings.Index(t, delim)
-			if idx < 0 {
-				out[i] = doc
+		if delim == "" {
+			t := strings.TrimSpace(line)
+			if strings.HasPrefix(t, "#") {
+				out[i] = !strings.HasPrefix(t, "#!")
 				continue
 			}
-			rest := t[idx+3:]
-			if doc {
-				out[i] = true
-				if !pyOnlyComment(rest) {
-					// The string goes on as an expression (`""" % x`, a
-					// method call, a continuation), so it was never a docstring.
-					for k := docStart; k <= i; k++ {
-						out[k] = false
+			if t == "" && start < 0 {
+				continue
+			}
+		}
+		if start < 0 {
+			start, strs, code, last = i, 0, false, 0
+		}
+		joined = false
+		for pos := 0; pos < len(line); {
+			if delim != "" {
+				end := pyStringEnd(line, pos, delim)
+				if end < 0 {
+					if len(delim) == 1 && !pyEndsWithBackslash(line) {
+						delim = "" // an unterminated one-line string ends with its line
+					}
+					pos = len(line)
+					continue
+				}
+				pos, delim = end+len(delim), ""
+				continue
+			}
+			c := line[pos]
+			switch {
+			case c == ' ' || c == '\t' || c == '\r':
+				pos++
+			case c == '#':
+				pos = len(line)
+			case c == '"' || c == '\'':
+				delim = line[pos : pos+1]
+				if strings.HasPrefix(line[pos:], delim+delim+delim) {
+					delim = line[pos : pos+3]
+				}
+				strs++
+				pos += len(delim)
+			case c == '\\' && strings.TrimSpace(line[pos+1:]) == "":
+				joined = true
+				pos = len(line)
+			case c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z':
+				end := pos
+				for end < len(line) && (line[end] == '_' || line[end] >= '0' && line[end] <= '9' || line[end] >= 'a' && line[end] <= 'z' || line[end] >= 'A' && line[end] <= 'Z') {
+					end++
+				}
+				if end < len(line) && (line[end] == '"' || line[end] == '\'') && pyStringPrefix(line[pos:end]) {
+					pos = end // r"...", b'...', f"""...""": part of the string
+					continue
+				}
+				code, last, pos = true, line[end-1], end
+			default:
+				switch c {
+				case '(', '[', '{':
+					depth++
+				case ')', ']', '}':
+					if depth > 0 {
+						depth--
 					}
 				}
+				code, last = true, c
+				pos++
 			}
-			doc = false
-			delim = pyOpenString(rest)
-			continue
 		}
-		if strings.HasPrefix(t, "#") {
-			out[i] = !strings.HasPrefix(t, "#!")
-			continue
+		if delim != "" || depth > 0 || joined {
+			continue // the logical line goes on
 		}
-		if !pyDocstringOpens(lines, i) {
-			delim = pyOpenString(t)
-			continue
+		sole := strs == 1 && !code
+		if sole && (first || prevHeader) {
+			for k := start; k <= i; k++ {
+				out[k] = true
+			}
 		}
-		body := strings.TrimLeft(t, "rRuUbB")
-		d := body[:3]
-		end := strings.Index(body[3:], d)
-		if end < 0 {
-			delim, doc, docStart = d, true, i
-			out[i] = true
-			continue
-		}
-		rest := body[3+end+3:]
-		out[i] = pyOnlyComment(rest) // a one-line docstring is a whole statement
-		delim = pyOpenString(rest)
+		head := strings.TrimSpace(lines[start])
+		prevHeader = !sole && last == ':' && (strings.HasPrefix(head, "def ") || strings.HasPrefix(head, "async def ") || strings.HasPrefix(head, "class "))
+		first, start = false, -1
 	}
 	return out
 }
 
-// pyOnlyComment reports whether the rest of a line is empty or a comment.
-func pyOnlyComment(rest string) bool {
-	rest = strings.TrimSpace(rest)
-	return rest == "" || strings.HasPrefix(rest, "#")
-}
-
-// pyOpenString scans Python code that starts outside a string and returns the
-// delimiter of a triple-quoted string still open at the end of the line, or "".
-// It stops at a comment and steps over strings that close on the line.
-func pyOpenString(code string) string {
-	for i := 0; i < len(code); {
-		switch c := code[i]; {
-		case c == '#':
-			return ""
-		case strings.HasPrefix(code[i:], `"""`) || strings.HasPrefix(code[i:], `'''`):
-			d := code[i : i+3]
-			end := strings.Index(code[i+3:], d)
-			if end < 0 {
-				return d
-			}
-			i += 3 + end + 3
-		case c == '"' || c == '\'':
-			j := i + 1
-			for j < len(code) && code[j] != c {
-				if code[j] == '\\' {
-					j++
-				}
-				j++
-			}
-			i = j + 1
-		default:
-			i++
-		}
-	}
-	return ""
-}
-
-// pyDocstringOpens reports whether line i opens a Python docstring: a string
-// that starts the line and is the first statement of the module, or of a
-// function or class whose header is the statement just before it. Any other
-// triple-quoted string, a dictionary value or an argument for one, is data the
-// script can run, so it is not lowered.
-func pyDocstringOpens(lines []string, i int) bool {
-	t := strings.TrimLeft(strings.TrimSpace(lines[i]), "rRuUbB")
-	if !strings.HasPrefix(t, `"""`) && !strings.HasPrefix(t, `'''`) {
-		return false
-	}
-	depth := 0
-	seen := false
-	for j := i - 1; j >= 0; j-- {
-		prev := strings.TrimSpace(lines[j])
-		if prev == "" || strings.HasPrefix(prev, "#") {
+// pyStringEnd returns the index of the first delim in line at or after pos that
+// is not escaped by a backslash, or -1.
+func pyStringEnd(line string, pos int, delim string) int {
+	for j := pos; j < len(line); j++ {
+		if line[j] == '\\' {
+			j++
 			continue
 		}
-		if !seen {
-			// The statement before the string has to end a header.
-			if !strings.HasSuffix(prev, ":") {
-				return false
-			}
-			seen = true
+		if strings.HasPrefix(line[j:], delim) {
+			return j
 		}
-		// Walk back over a header that spans lines until its brackets balance.
-		depth += strings.Count(prev, ")") + strings.Count(prev, "]") - strings.Count(prev, "(") - strings.Count(prev, "[")
-		if depth > 0 {
-			continue
-		}
-		return strings.HasPrefix(prev, "def ") || strings.HasPrefix(prev, "async def ") || strings.HasPrefix(prev, "class ")
 	}
-	return !seen
+	return -1
+}
+
+// pyEndsWithBackslash reports whether the line ends with an unescaped backslash.
+func pyEndsWithBackslash(line string) bool {
+	line = strings.TrimRight(line, "\r")
+	n := 0
+	for n < len(line) && line[len(line)-1-n] == '\\' {
+		n++
+	}
+	return n%2 == 1
+}
+
+// pyStringPrefix reports whether word is a Python string prefix such as r, b, f or rb.
+func pyStringPrefix(word string) bool {
+	switch strings.ToLower(word) {
+	case "r", "u", "b", "f", "t", "br", "rb", "fr", "rf", "tr", "rt":
+		return true
+	}
+	return false
 }
 
 // scanText applies every rule line by line. file is the path relative to the
