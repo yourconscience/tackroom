@@ -1272,3 +1272,5 @@ route();
 refresh();
 loadCrons();
 loadHosts();
+// A background view exits after ui.view.idle_timeout without requests; an open, visible page keeps it up.
+setInterval(() => { if (document.visibilityState === 'visible') api('/api/ping').catch(() => {}); }, 60000);

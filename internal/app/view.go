@@ -48,17 +48,21 @@ func runView(args []string) error {
 
 // parseViewFlags parses the flags for `tackroom view`. It serves the config
 // web UI, so it shares the web server's flags (--config, --addr,
-// --secure-cookie, --no-open) plus --ssh-host for a remote tunnel hint.
+// --secure-cookie, --no-open) plus --ssh-host for a remote tunnel hint and
+// --json, --foreground and --stop for how it runs.
 func parseViewFlags(args []string) (configServeOptions, error) {
 	fs := flag.NewFlagSet("view", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	var opts configServeOptions
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
-	fs.StringVar(&opts.Addr, "addr", "127.0.0.1:8765", "Loopback listen address")
+	fs.StringVar(&opts.Addr, "addr", defaultViewAddr, "Loopback listen address; an error when taken (without it, ui.view.addr or 127.0.0.1:8765, falling back to a free port)")
 	fs.BoolVar(&opts.NoOpen, "no-open", false, "Do not open the browser")
 	fs.BoolVar(&opts.SecureCookie, "secure-cookie", false, "Serve an HTTPS proxy such as tailscale serve: Secure cookies and https origins for non-loopback hosts")
 	fs.StringVar(&opts.SSHHost, "ssh-host", "", "Print an ssh -L tunnel command for this host (user@host)")
 	fs.StringVar(&opts.TokenFile, "token-file", "", "Session token file, created on first use (default view.token in $XDG_STATE_HOME/tackroom or ~/.local/state/tackroom)")
+	fs.BoolVar(&opts.JSON, "json", false, "Print url, addr, pid, started and idle_timeout as one JSON object; implies --no-open")
+	fs.BoolVar(&opts.Foreground, "foreground", false, "Serve in this process until interrupted instead of in the background")
+	fs.BoolVar(&opts.Stop, "stop", false, "Stop the running view, if any")
 	if err := fs.Parse(args); err != nil {
 		return configServeOptions{}, err
 	}
@@ -69,6 +73,15 @@ func parseViewFlags(args []string) (configServeOptions, error) {
 	})
 	if fs.NArg() != 0 {
 		return configServeOptions{}, errors.New("view does not accept positional arguments")
+	}
+	if opts.Stop && (opts.Foreground || opts.JSON) {
+		return configServeOptions{}, errors.New("view --stop does not combine with --foreground or --json")
+	}
+	if opts.Foreground && opts.JSON {
+		return configServeOptions{}, errors.New("view --json does not combine with --foreground")
+	}
+	if opts.JSON {
+		opts.NoOpen = true
 	}
 	return opts, nil
 }
