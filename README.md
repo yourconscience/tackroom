@@ -45,7 +45,7 @@ Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GE
 
 - **Pin**: each external skill source is locked to a commit in `tackroom.lock`. Only `tackroom skill update` moves it.
 - **Audit**: outside content is scanned. An unaccepted CRITICAL finding stops it from syncing and the previous pin stays.
-- **Cooldown**: a new pin, or a new exact npm or PyPI version, waits until it is 72 hours old. `tackroom sync --allow-fresh` skips the cooldown.
+- **Cooldown**: a new pin, or a new exact npm or PyPI version, waits until it is 72 hours old, unless a published advisory names that version as a security fix. `tackroom sync --allow-fresh` skips the cooldown.
 
 ## Agents
 

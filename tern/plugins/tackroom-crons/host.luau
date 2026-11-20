@@ -9,6 +9,7 @@ local ui = tern.ui
 local POLL_MS = 60 * 1000
 local TIMEOUT_MS = 300 * 1000
 local ACTION_MS = 120 * 1000
+local VIEW_MS = 30 * 1000
 
 local HEALTH = { fail = "Failing", warn = "Last run failed", idle = "No result", ok = "Healthy", paused = "Paused" }
 local ORDER = { "fail", "warn", "idle", "ok", "paused" }
@@ -180,17 +181,36 @@ local function act(state, job, verb)
 	end)
 end
 
-local WEB_CMD = [==[
-d="${XDG_STATE_HOME:-$HOME/.local/state}/tackroom"
-a=$(tr -d '
-' < "$d/view.addr")
-t=$(tr -d '
-' < "$d/view.token")
-open "http://$a/?token=$t#crons"
-]==]
-
-local function open_web()
-	tern.process.run({ "/bin/sh", "-c", WEB_CMD }, { timeout_ms = 10000 }, function() end)
+-- `tackroom view --json` starts the view when none runs and prints its
+-- signed-in URL; Web opens that on the Crons tab.
+local function open_web(state)
+	local argv = { state.bin, "view", "--json" }
+	if state.config and state.config ~= "" then
+		table.insert(argv, "--config")
+		table.insert(argv, state.config)
+	end
+	run(state, argv, VIEW_MS, function(res)
+		local ok, data = pcall(tern.json.decode, res.stdout)
+		if res.status ~= 0 or not ok or type(data) ~= "table" or type(data.url) ~= "string" then
+			if current(state) then
+				local err = last_line(res.stderr)
+				if string.find(res.stderr or "", "flag provided but not defined", 1, true) then
+					state.note = "Web needs a newer tackroom; upgrade it with brew or npm"
+				else
+					state.note = "Could not open tackroom view: " .. (err ~= "" and err or ("exit " .. tostring(res.status)))
+				end
+				render(state)
+			end
+			return
+		end
+		tern.process.run({ "/usr/bin/open", data.url .. "#crons" }, { timeout_ms = 10000 }, function(opened)
+			if opened.status ~= 0 and current(state) then
+				local err = last_line(opened.stderr)
+				state.note = "Could not open the browser: " .. (err ~= "" and err or ("exit " .. tostring(opened.status)))
+				render(state)
+			end
+		end)
+	end)
 end
 
 -- Seconds since the epoch of an ISO 8601 time with an explicit offset.
@@ -450,7 +470,7 @@ tern.block.define("crons", {
 		if act == "collect" then
 			collect(state)
 		elseif act == "web" then
-			open_web()
+			open_web(state)
 		else
 			local verb, rest = string.match(act, "^(run|pause|resume):(.*)$")
 			if verb and state.data then

@@ -6,8 +6,8 @@
 --   tackroom_workspace  runs `tackroom rex`: a tackroom session with a shell,
 --                       `tackroom status` and `tackroom cron collect --table`
 --   tackroom_crons      opens `tackroom cron collect --table` in a new tab
---   tackroom_view       opens the running `tackroom view` on its Crons tab,
---                       where Run now, Pause and Resume are
+--   tackroom_view       opens `tackroom view` on its Crons tab, starting it
+--                       when none runs; Run now, Pause and Resume are there
 --
 -- Rex has no panel API, so acting on a job goes through the web view.
 --
@@ -95,20 +95,6 @@ local function last_line(s)
 	return tail
 end
 
-local function read(path)
-	local f = io.open(path, "r")
-	if not f then
-		return nil
-	end
-	local text = f:read("*a") or ""
-	f:close()
-	text = string.match(text, "^%s*(.-)%s*$")
-	if text == "" then
-		return nil
-	end
-	return text
-end
-
 rex.action({
 	name = "tackroom_workspace",
 	title = "Open tackroom Workspace",
@@ -176,16 +162,22 @@ rex.action({
 	category = "tackroom",
 	keywords = "tackroom view web browser crons run pause resume",
 	run = function(ctx, args)
-		local state = os.getenv("XDG_STATE_HOME")
-		if state == nil or state == "" then
-			state = home() .. "/.local/state"
+		-- `tackroom view --json` starts the view when none runs and prints its signed-in URL.
+		local r, err = rex.exec(command(bin(), { "view", "--json" }), { timeout = 20 })
+		if r == nil then
+			error(err, 0)
 		end
-		local dir = state .. "/tackroom"
-		local addr, token = read(dir .. "/view.addr"), read(dir .. "/view.token")
-		if not addr or not token then
-			error("no tackroom view address in " .. dir .. ": start one with tackroom view", 0)
+		if not r.ok then
+			if string.find(r.stderr or "", "flag provided but not defined", 1, true) then
+				error("Web needs a newer tackroom; upgrade it with brew or npm", 0)
+			end
+			error("tackroom view: " .. last_line(r.stderr), 0)
 		end
-		local r, err = rex.exec({ "open", "http://" .. addr .. "/?token=" .. token .. "#crons" }, { timeout = 10 })
+		local url = string.match(r.stdout or "", '"url"%s*:%s*"([^"]+)"')
+		if not url then
+			error("tackroom view --json printed no url", 0)
+		end
+		r, err = rex.exec({ "open", url .. "#crons" }, { timeout = 10 })
 		if r == nil then
 			error(err, 0)
 		end

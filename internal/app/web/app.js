@@ -932,7 +932,7 @@ function cronTable(rows, showHost) {
       h('td', {class: 'muted nowrap fig', title: job.last_run || '', text: lastText}),
       h('td', {class: 'num', text: job.runs != null ? compact(job.runs) : '-'})));
     if (open) {
-      const fields = [['Result', result], ['ID', job.id], ['Command', job.command], ['Log', job.log && tilde(job.log)], ['Schedule', job.schedule], ['Time zone', job.tz], ['Last run', job.last_run], ['Created by', job.created_by], ['Connectors', (job.connectors || []).join(', ')], ['Effect', job.effect], ['Inferred', (job.inferred || []).join(', ')]]
+      const fields = [['Result', result], ['ID', job.id], ['Command', job.command], ['Log', job.log && tilde(job.log)], ['Schedule', job.schedule], ['Time zone', job.tz], ['Last run', job.last_run], ['Created by', job.created_by], ['Connectors', (job.connectors || []).join(', ')], ['Effect', job.effect], ['Output', job.output_expanded], ['Inferred', (job.inferred || []).join(', ')]]
         .filter(([, field]) => field);
       tbody.append(h('tr', {class: 'detail'}, h('td', {colspan: String(width)}, h('div', {class: 'detail-grid'},
         (job.problems || []).length ? h('ul', {class: 'problems'}, job.problems.map((problem) => h('li', {text: sentence(grouped(problem))}))) : null,
@@ -1272,3 +1272,12 @@ route();
 refresh();
 loadCrons();
 loadHosts();
+// A background view exits after ui.view.idle_timeout without requests. The page pings while it is
+// visible, and while a Config draft is unsaved even when hidden, so the draft can still be saved.
+// A failed ping says the view stopped instead of leaving the next action to fail.
+function ping() {
+  const stopped = document.getElementById('view-stopped');
+  api('/api/ping').then(() => { stopped.hidden = true; }, () => { stopped.hidden = false; });
+}
+setInterval(() => { if (document.visibilityState === 'visible' || Object.keys(store.drafts).length) ping(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ping(); });

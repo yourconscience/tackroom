@@ -40,6 +40,11 @@ type config struct {
 	// plugin, so desiredMCPServersForAgent writes no [mcp_servers] row for them.
 	// Set by injectPluginMCPServersMode; never from YAML.
 	codexPluginMCP map[string]bool
+	// retiredMemoryHook returns the retired memory script a native hook
+	// command runs, or "": such a registration is stale even though no
+	// configured hook names it. Set by sync when no configured hook runs a
+	// memory script; never from YAML.
+	retiredMemoryHook func(command string) string
 	// ContextNoteTokens is the estimated skill-listing token threshold above
 	// which `tackroom doctor` prints a soft context advisory note. Absent
 	// (nil) uses contextNoteTokensDefault; 0 (or negative) disables the note.
@@ -52,6 +57,21 @@ type config struct {
 
 type uiConfig struct {
 	Links []uiLink `yaml:"links,omitempty"`
+	// View holds the settings of the background `tackroom view` server.
+	View *uiViewConfig `yaml:"view,omitempty"`
+}
+
+// uiViewConfig is ui.view. Empty fields take the defaults: 127.0.0.1:8765,
+// 30m and true. A field the local overlay sets replaces the shared one.
+type uiViewConfig struct {
+	// Addr is the loopback address a view takes when --addr is not given. It
+	// falls back to a free port when taken.
+	Addr string `yaml:"addr,omitempty"`
+	// IdleTimeout is a Go duration after which a background view with no
+	// requests exits; "0" keeps it running until `tackroom view --stop`.
+	IdleTimeout string `yaml:"idle_timeout,omitempty"`
+	// OpenBrowser false makes `tackroom view` behave as with --no-open.
+	OpenBrowser *bool `yaml:"open_browser,omitempty"`
 }
 
 type uiLink struct {
@@ -656,7 +676,7 @@ var canonicalForms = []string{
 	"  tackroom doctor audit revoke <item> <rule>",
 	"  tackroom config <validate|print|inventory> [--config PATH]   # inventory prints the web view's inventory as JSON",
 	"  tackroom config set [--config PATH] <section/name/field> <value>   # e.g. mcp_servers/exa/enabled false; then tackroom sync",
-	"  tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
+	"  tackroom view [--no-open | --json | --foreground | --stop] [--addr 127.0.0.1:8765] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]",
 	"  tackroom skill new <name> [--description ...]",
 	"  tackroom skill list [--agents ...]",
 	"  tackroom skill info <name>",
@@ -680,8 +700,8 @@ var canonicalForms = []string{
 	"  tackroom cron apply [--dry-run] [--config PATH]",
 	"  tackroom cron run|pause|resume [--host HOST] [--config PATH] ID",
 	"  tackroom cron schedule [--config PATH] ID \"MIN HOUR DOM MON DOW\"",
-	"  tackroom cron add ID --schedule \"MIN HOUR DOM MON DOW\" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--local] [--dry-run] [--no-apply] [--config PATH]",
-	"  tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--dry-run] [--no-apply] [--config PATH]",
+	"  tackroom cron add ID --schedule \"MIN HOUR DOM MON DOW\" --command CMD [--arg ARG ...] [--host NAME] [--effect TEXT] [--output PATH] [--local] [--dry-run] [--no-apply] [--config PATH]",
+	"  tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host NAME] [--effect TEXT] [--output PATH] [--dry-run] [--no-apply] [--config PATH]",
 	"  tackroom cron remove ID [--dry-run] [--no-apply] [--config PATH]",
 }
 

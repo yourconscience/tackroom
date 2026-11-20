@@ -460,6 +460,9 @@ button.cell:disabled { cursor: default; }
 /* ---------- toast ---------- */
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom)); z-index: 30; transform: translateX(-50%); max-width: min(560px, calc(100vw - 32px)); padding: 10px 16px; border-radius: var(--radius-control); background: var(--primary); color: var(--primary-ink); box-shadow: var(--float-shadow); font-size: var(--fs-body); overflow-wrap: anywhere; }
 .toast.bad { background: var(--negative); color: var(--primary-ink); }
+/* Shown when the view stops answering the page's ping. */
+.stopped { position: fixed; left: 50%; top: max(12px, env(safe-area-inset-top)); z-index: 31; transform: translateX(-50%); max-width: min(560px, calc(100vw - 32px)); padding: 10px 16px; border-radius: var(--radius-control); background: var(--negative); color: var(--primary-ink); box-shadow: var(--float-shadow); font-size: var(--fs-body); overflow-wrap: anywhere; }
+.stopped code { color: inherit; background: none; }
 
 /* ---------- narrower screens ---------- */
 @media (max-width: 1180px) {
