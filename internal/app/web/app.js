@@ -932,7 +932,7 @@ function cronTable(rows, showHost) {
       h('td', {class: 'muted nowrap fig', title: job.last_run || '', text: lastText}),
       h('td', {class: 'num', text: job.runs != null ? compact(job.runs) : '-'})));
     if (open) {
-      const fields = [['Result', result], ['ID', job.id], ['Command', job.command], ['Log', job.log && tilde(job.log)], ['Schedule', job.schedule], ['Time zone', job.tz], ['Last run', job.last_run], ['Created by', job.created_by], ['Connectors', (job.connectors || []).join(', ')], ['Effect', job.effect], ['Inferred', (job.inferred || []).join(', ')]]
+      const fields = [['Result', result], ['ID', job.id], ['Command', job.command], ['Log', job.log && tilde(job.log)], ['Schedule', job.schedule], ['Time zone', job.tz], ['Last run', job.last_run], ['Created by', job.created_by], ['Connectors', (job.connectors || []).join(', ')], ['Effect', job.effect], ['Output', job.output_expanded], ['Inferred', (job.inferred || []).join(', ')]]
         .filter(([, field]) => field);
       tbody.append(h('tr', {class: 'detail'}, h('td', {colspan: String(width)}, h('div', {class: 'detail-grid'},
         (job.problems || []).length ? h('ul', {class: 'problems'}, job.problems.map((problem) => h('li', {text: sentence(grouped(problem))}))) : null,
