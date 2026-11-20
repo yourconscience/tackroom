@@ -84,7 +84,7 @@
 /* Shelf: books stand spine out, each group on its own length of board so a wrapped row is still a shelf.
    Outside sources arrive in a crate stamped with their pin. */
 .shelves { list-style: none; margin: 0; padding: 0 0 22px; display: flex; flex-wrap: wrap; row-gap: 46px; }
-.group { position: relative; flex: 1 0 auto; display: flex; align-items: flex-end; justify-content: center; gap: 3px; min-width: 0; padding: 0 12px; }
+.group { position: relative; flex: 1 1 auto; max-width: 100%; display: flex; align-items: flex-end; justify-content: center; gap: 3px; min-width: 0; padding: 0 12px; }
 .group::after { content: ""; position: absolute; z-index: -1; left: 0; right: 0; bottom: -18px; height: 18px; background: linear-gradient(to bottom, var(--shelf-top) 0 4px, var(--shelf) 4px 15px, var(--shelf-lo) 15px 18px); box-shadow: 0 18px 16px -10px rgb(0 0 0 / .7); }
 .book { position: relative; flex: none; display: flex; justify-content: center; width: var(--w, 34px); height: var(--h, 140px); padding-top: 14px; background: var(--cloth, var(--cloth-1)); color: var(--spine-ink); border-radius: 2px 2px 1px 1px;
   box-shadow: inset -6px 0 7px -4px rgb(0 0 0 / .55), inset 3px 0 3px -2px rgb(255 255 255 / .14), 4px 0 6px -2px rgb(0 0 0 / .5); }
@@ -97,7 +97,8 @@
 .g.bad { color: var(--tr-bad); }
 .book.lean { margin-left: 16px; transform: rotate(-7deg); transform-origin: 0 100%; }
 .crate-group { flex-direction: column; align-items: center; justify-content: flex-end; gap: 0; }
-.in-crate { display: flex; align-items: flex-end; gap: 3px; margin-bottom: -58px; }
+/* A big source wraps its books into rows inside the crate instead of running off a phone screen. */
+.in-crate { display: flex; flex-wrap: wrap; justify-content: center; align-items: flex-end; gap: 3px; max-width: 100%; margin-bottom: -58px; }
 .crate { position: relative; z-index: 1; display: grid; gap: 7px; justify-items: start; min-width: 176px; max-width: 100%; padding: 9px 10px 10px;
   background: repeating-linear-gradient(to bottom, var(--crate) 0 26px, var(--crate-lo) 26px 28px); border: 3px solid var(--crate-edge); border-radius: 2px; box-shadow: inset 0 2px 0 rgb(255 220 180 / .12), 0 10px 12px -6px rgb(0 0 0 / .7); }
 .crate .label { display: grid; gap: 6px; justify-items: start; padding: 6px 8px 8px; background: var(--paper); border-radius: 2px; max-width: 100%; }
@@ -412,7 +413,8 @@
   "use strict";
   var COOLDOWN_MS = 72 * 3600 * 1000;
   // Vendor marks shipped in marks/, by tackroom.yaml key. A key without a file gets a tag without a mark.
-  var MARKS = ["agy", "amp", "claude", "codex", "copilot", "cursor", "devin", "droid", "dsh", "gemini", "grok", "kimi", "omp", "opencode", "pi", "qwen-code"];
+  // Claude Code, Codex, Copilot, Gemini CLI, Antigravity and Grok stay unmarked until their owners allow it (BRAND.md).
+  var MARKS = ["amp", "cursor", "devin", "droid", "dsh", "kimi", "omp", "opencode", "pi", "qwen-code"];
   var MARK_ALIAS = {qwen: "qwen-code"};
   // What a skill cell means on one agent (internal/app/web/app.js CELLS), and the glyph it earns.
   var CELLS = {drift: ["drifted", "!", "warn"], missing: ["missing", "✗", "bad"], conflict: ["conflict", "✗", "bad"], stale: ["stale", "!", "warn"], unknown: ["unknown", "!", "warn"]};
@@ -456,7 +458,14 @@
   }
   function plural(n, word) { return n + " " + word + (n === 1 ? "" : "s"); }
   function hash(text) { var x = 0; for (var i = 0; i < text.length; i++) x = (x * 31 + text.charCodeAt(i)) >>> 0; return x; }
-  function ownerRepo(url) { return String(url || "").replace(/^[a-z]+:\/\/[^/]+\//i, "").replace(/\.git$/, "").replace(/\/$/, ""); }
+  // https://host/owner/repo, ssh://git@host/owner/repo and git@host:owner/repo all become owner/repo.
+  function ownerRepo(url) { return String(url || "").replace(/^[a-z+]+:\/\/[^/]+\//i, "").replace(/^[^@\s/]+@[^:/]+:/, "").replace(/\.git$/, "").replace(/\/$/, ""); }
+  // Issues grouped by state, so "drifted on cursor; missing on claude" keeps each agent with its own state.
+  function issueText(issues) {
+    var by = {};
+    issues.forEach(function (i) { (by[i.cell] = by[i.cell] || []).push(i.agent); });
+    return Object.keys(by).map(function (c) { return CELLS[c][0] + " on " + by[c].join(", "); }).join("; ");
+  }
   function hostless(url) { return String(url || "").replace(/^https:\/\//, ""); }
 
   var data, now, objects = [];
@@ -561,7 +570,7 @@
   function book(skill, sunk, lean) {
     var issues = skillIssues(skill), x = hash(skill.name);
     var worst = issues.some(function (i) { return CELLS[i.cell][2] === "bad"; }) ? "bad" : issues.length ? "warn" : "";
-    var el = obj("book hl" + (lean ? " lean" : ""), skill.name + (issues.length ? ", " + CELLS[issues[0].cell][0] + " on " + issues.map(function (i) { return i.agent; }).join(", ") : ""), "skill", skill, [
+    var el = obj("book hl" + (lean ? " lean" : ""), skill.name + (issues.length ? ", " + issueText(issues) : ""), "skill", skill, [
       h("span", {"class": "bn", text: skill.name}),
       worst ? h("span", {"class": "g " + worst, "aria-hidden": "true", text: worst === "bad" ? "✗" : "!"}) : null
     ]);
@@ -639,7 +648,8 @@
     if (walked.length) {
       add(document.getElementById("inside"), [h("span", {"class": "cap", text: "Walked straight in"}), h("div", {"class": "pile"}, walked.map(function (r) { return parcel(r, "k-ok"); }))]);
     }
-    var hosts = data.hosts || [];
+    // This machine is counted once, even when the hosts list names it too.
+    var hosts = (data.hosts || []).filter(function (m) { return m && m.host && m.host !== "local" && m.relation !== "self"; });
     add(document.getElementById("key"), h("span", {"class": "keyhook"}, [
       cords("ok"),
       obj("keytag hl", "the key, ~/.agents, shared by " + plural(hosts.length + 1, "machine"), "key", {hosts: hosts}, [icon("i-key"), "~/.agents"])
@@ -719,7 +729,7 @@
         it.description ? h("p", {text: it.description}) : null,
         facts([
           ["Agents", "in place on " + ok + " of " + on.length],
-          issues.length ? [CELLS[issues[0].cell][0][0].toUpperCase() + CELLS[issues[0].cell][0].slice(1), issues.map(function (i) { return i.agent; }).join(", ")] : null,
+          issues.length ? ["Issues", issueText(issues)] : null,
           it.tokens ? ["Listing", "about " + it.tokens + " tokens"] : null
         ]),
         issues.length ? h("code", {"class": "cmd-line", text: "tackroom sync"}) : null
@@ -834,8 +844,16 @@
   var frameReq = 0;
   window.addEventListener("resize", function () { place(); cancelAnimationFrame(frameReq); frameReq = requestAnimationFrame(shadows); });
 
+  // Empties everything the renderers fill, so a failed snapshot never leaves half a room behind the demo.
+  function clear() {
+    hide(false);
+    objects = [];
+    ["pegs", "fallen", "shelves", "crates", "inside", "key"].forEach(function (id) { document.getElementById(id).replaceChildren(); });
+    [].slice.call(document.getElementById("frame").children).forEach(function (el) { if (!el.classList.contains("leaf")) el.remove(); });
+  }
   function render(d) {
-    data = {agents: d.agents || [], skills: d.skills || [], lock: d.lock || [], hosts: d.hosts};
+    clear();
+    data = {agents: d.agents || [], skills: d.skills || [], lock: d.lock || [], hosts: d.hosts || []};
     now = Date.parse(d.now || "") || Date.now();
     renderPegs();
     renderShelf();
@@ -848,9 +866,10 @@
   // ?data=<relative path> draws a local snapshot (for example a saved /api/inventory) instead of the demo.
   var src = new URLSearchParams(window.location.search).get("data");
   if (src && !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(src)) {
-    fetch(src).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (d) { document.getElementById("hint").textContent = "Snapshot from " + src + ". Hover or tap anything to read its label."; render(d); })
-      .catch(function () { render(demo); });
+    var hint = document.getElementById("hint");
+    fetch(src).then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (d) { render(d); hint.textContent = "Snapshot from " + src + ". Hover or tap anything to read its label."; })
+      .catch(function (err) { render(demo); hint.textContent = "Could not draw " + src + " (" + (err && err.message || "unreadable") + "), so this is the demo data. Hover or tap anything to read its label."; });
   } else {
     render(demo);
   }
