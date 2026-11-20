@@ -124,6 +124,11 @@ code { font-size: 16px; }
 .rest .off b { font-weight: 500; color: var(--muted); }
 .rest .marks { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 10px; }
 .rest .link { color: var(--accent); font-weight: 600; }
+.rest li > details { display: block; padding: 0; }
+.rest details > summary { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 12px; min-height: 44px; padding: 12px 0; list-style: none; cursor: pointer; }
+.rest details > summary::-webkit-details-marker { display: none; }
+.rest details > summary:hover b { text-decoration: underline; }
+.rest-detail { display: grid; gap: 14px; padding: 0 0 12px 34px; }
 
 /* ---------- tools: search, filters, buttons above a list ---------- */
 .tools { display: grid; gap: 12px; margin-top: 28px; }

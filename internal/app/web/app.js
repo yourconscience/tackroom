@@ -184,7 +184,7 @@ function command(text) { return h('div', {class: 'cmd'}, h('code', {text}), copy
 function agentChip(name, cls = '', word = '') {
   return h('span', {class: cls ? `chip ${cls}` : 'chip'}, agentMark(name), display(name), word ? h('span', {class: 'state', text: word}) : null);
 }
-function syncButton(label = 'Review sync') {
+function syncButton(label = 'Sync') {
   return h('button', {type: 'button', class: 'btn primary', onclick: openSync}, icon('i-sync'), label);
 }
 function linkButton(href, text) { return h('a', {class: 'btn', href, text}); }
@@ -288,10 +288,12 @@ function syncCounts() {
     unsynced: agents.filter((agent) => agent.inspected && agent.detected && !agent.error && !agent.synced).length,
   };
 }
-function setBadges(kind, count, title) {
+// A badge counts what fails, in red, else what needs attention, in amber: the same things the view lists.
+function setBadges(kind, count, title, warn) {
   document.querySelectorAll(`[data-badge="${kind}"]`).forEach((node) => {
     node.textContent = count ? String(count) : '';
     node.title = title;
+    node.className = warn ? 'badge warn' : 'badge';
     node.hidden = !count;
   });
 }
@@ -301,10 +303,13 @@ function linkNodes() {
 }
 function renderChrome() {
   const inv = store.inv;
+  const skillsFail = inv ? inv.skills.filter((skill) => Object.values(skill.states).some((state) => state === 'conflict' || state === 'error')).length : 0;
   const skills = inv ? inv.skills.filter(skillNeedsAttention).length : 0;
-  const crons = store.crons ? store.crons.jobs.filter((job) => job.health === 'fail').length : 0;
-  setBadges('skills', skills, `${plural(skills, 'skill')} need attention`);
-  setBadges('crons', crons, `${plural(crons, 'job')} failing`);
+  setBadges('skills', skillsFail || skills, skillsFail ? `${skillsFail} failing` : `${skills} need attention`, !skillsFail);
+  const data = store.crons;
+  const cronsFail = data ? data.jobs.filter((job) => job.health === 'fail').length + downHosts(data).length : 0;
+  const cronsWarn = data ? data.jobs.filter((job) => job.health === 'warn').length : 0;
+  setBadges('crons', cronsFail || cronsWarn, cronsFail ? `${cronsFail} failing` : `${cronsWarn} need attention`, !cronsFail);
   const {pending, unsynced} = syncCounts();
   document.getElementById('sync-label').textContent = pending > 0 ? `Review sync · ${pending}` : unsynced > 0 ? 'Review sync' : 'Sync';
   document.getElementById('dock-sync-label').textContent = pending > 0 ? `Sync · ${pending}` : 'Sync';
@@ -392,10 +397,7 @@ function issue(title, on, body, acts = []) {
 function harnessItem(agent, state) {
   const where = agent.skill_root ? h('p', {class: 'meta', text: tilde(agent.skill_root)}) : null;
   if (agent.error) return issue(display(agent.name), state.word, [h('p', {text: tilde(agent.error)}), where], [linkButton('#config', 'Open Config')]);
-  if ((agent.counts || {}).conflicts) {
-    return issue(display(agent.name), state.word, [h('p', {text: 'A native file differs from what tackroom would write, so sync skips it.'}), where], [linkButton('#unmanaged', 'See conflicts')]);
-  }
-  return issue(display(agent.name), state.word, [h('p', {text: `${sentence(harnessDetail(agent) || 'its native config differs from the plan')}.`}), where], [syncButton()]);
+  return issue(display(agent.name), state.word, [h('p', {text: 'A native file differs from what tackroom would write, so sync skips it.'}), where], [linkButton('#unmanaged', 'See conflicts')]);
 }
 function noAgentsItem() {
   return issue('No agents in your config', '', [
@@ -403,32 +405,64 @@ function noAgentsItem() {
     command('tackroom setup'),
     h('p', {class: 'meta'}, 'Or add them by hand in ', h('a', {href: '#config', text: 'Config'}), '.')]);
 }
-// Machines in crons.hosts with the same health and summary fold into one row.
-const MACHINE_HEALTH = {ok: 'ok', warn: 'warn', fail: 'fail'};
-function machineGroups(hosts) {
-  const groups = new Map();
-  for (const host of hosts) {
-    const st = MACHINE_HEALTH[host.health] || 'fail';
-    const key = `${st}\n${host.summary}`;
-    if (!groups.has(key)) groups.set(key, {st, summary: host.summary, hosts: []});
-    groups.get(key).hosts.push(host);
-  }
-  return [...groups.values()];
+// The machines of `tackroom hosts`, only with more than one host in crons.hosts.
+function machines() {
+  const hosts = store.hosts?.hosts || [];
+  return hosts.length > 1 ? hosts : [];
 }
-function machineItem(group) {
-  return issue(sentence((group.summary || 'Needs attention').replace(/^1 /, 'one ')), `on ${names(group.hosts.map((host) => hostName(host.host)))}`,
-    group.hosts.map((host) => [
-      h('p', {class: 'meta', text: [hostName(host.host), host.version && `tackroom ${host.version}`, host.commit && `config ${host.commit.slice(0, 7)}`, host.relation_text].filter(Boolean).join(', ')}),
-      host.fix ? command(host.fix) : null]));
+const MACHINE_WORDS = {ok: 'healthy', warn: 'needs attention', fail: 'failing'};
+// The command that fixes a machine: `tackroom hosts`'s own, or a look at the uncommitted changes it counts.
+function machineFix(host) {
+  if (host.fix) return host.fix;
+  if (!(host.dirty > 0 && host.config_root)) return '';
+  return `${host.host === 'local' ? '' : `ssh ${host.host} `}git -C ${host.host === 'local' ? tilde(host.config_root) : host.config_root} status`;
 }
-// Outside sources: the same rows as the cooldown lines of `tackroom status`.
-function sourceItem(row) {
-  const until = Date.parse(row.until);
-  const on = row.state === 'cooldown' ? (until ? `in cooldown until ${weekdayClock(until)}` : 'in cooldown') : row.state;
-  return issue(row.name, on, [
-    h('p', {text: sourceWhy(row)}),
-    row.command ? command(row.command) : null,
+// One failing machine is a row of its own; the machines that need attention share one row,
+// titled with their summary when they share it.
+function machineItem(list) {
+  const many = list.length > 1;
+  const same = many && new Set(list.map((host) => host.summary)).size === 1;
+  const title = !many ? hostName(list[0].host) : same ? sentence((list[0].summary || '').replace(/^1 /, 'One ')) : 'Machines need attention';
+  const on = !many ? MACHINE_WORDS[list[0].health] || list[0].health : `on ${names(list.map((host) => hostName(host.host)))}`;
+  return issue(title, on, [
+    same ? null : list.map((host) => h('p', {text: `${many ? `${hostName(host.host)}: ` : ''}${sentence(host.summary || '')}${/\.$/.test(host.summary || '') ? '' : '.'}`})),
+    list.filter(machineFix).map((host) => [many ? h('p', {class: 'meta', text: `${hostName(host.host)}:`}) : null, command(machineFix(host))]),
+  ]);
+}
+// A pending sync is one row: the changes waiting, the harnesses that need it and the config root link.
+function syncItem(outOfSync) {
+  const inv = store.inv;
+  const {pending} = syncCounts();
+  const total = (key) => outOfSync.reduce((sum, agent) => sum + ((agent.counts || {})[key] || 0), 0);
+  const what = [total('missing') && `${total('missing')} missing`, total('drifted') && `${total('drifted')} drifted`].filter(Boolean).join(', ');
+  const link = inv.repo_state && inv.repo_state !== 'synced' ? `The config root link is ${inv.repo_state}` : '';
+  const title = pending > 0 ? `${plural(pending, 'change')} waiting to sync` : outOfSync.length ? `${plural(outOfSync.length, 'harness', 'harnesses')} out of sync` : link;
+  return issue(title, '', [
+    outOfSync.length ? h('p', {text: `${names(outOfSync.map((agent) => display(agent.name)))} ${outOfSync.length === 1 ? 'needs' : 'need'} it${what ? `: ${what}` : ''}.`}) : null,
+    outOfSync.map((agent) => (harnessDetail(agent) ? h('p', {class: 'meta', text: `${display(agent.name)}: ${harnessDetail(agent)}`}) : null)),
+    link && outOfSync.length ? h('p', {class: 'meta', text: `${link}.`}) : null,
+    h('p', {class: 'meta', text: 'Sync shows the plan before it changes anything.'}),
+  ], [syncButton('Sync')]);
+}
+// A source the audit blocked, with the command that accepts the finding.
+function blockedItem(row) {
+  return issue(row.name, 'blocked', [
+    h('p', {text: `${sentence(row.reason || 'blocked by the audit')}${/\.$/.test(row.reason || '') ? '' : '.'}`}),
+    row.command ? [h('p', {class: 'meta', text: 'Read the finding with tackroom doctor audit; to sync it anyway, accept it:'}), command(row.command)] : null,
     row.source ? h('p', {class: 'meta', text: [row.source.replace(/^https:\/\//, ''), row.commit && !row.pinned ? `new ${row.commit}` : ''].filter(Boolean).join(', ')}) : null]);
+}
+// A cooldown as "owner/repo@4b4c947 · 37h left of 72h"; tackroom's own reason when there is no end time.
+function cooldownLine(row) {
+  const until = Date.parse(row.until);
+  if (!until) return `${row.name}: ${row.reason || row.state}`;
+  const ref = /^(git|npm|pypi):(\S+)@(\S+)/.exec(row.reason || '');
+  const source = ref ? (ref[1] === 'git' ? (/([^/:]+\/[^/]+?)(?:\.git)?$/.exec(ref[2])?.[1] ?? ref[2]) : ref[2])
+    : row.source ? row.source.replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, '') : row.name;
+  const version = ref ? (ref[1] === 'git' ? ref[3].slice(0, 7) : ref[3]) : (row.commit || '').slice(0, 7);
+  const published = Date.parse(/ published (\S+)/.exec(row.reason || '')?.[1]);
+  const left = Math.max(0, Math.ceil((until - Date.now()) / 3600000));
+  const of = published && until > published ? ` of ${Math.round((until - published) / 3600000)}h` : '';
+  return `${source}${version ? `@${version}` : ''} · ${left}h left${of}`;
 }
 function sourceWhy(row) {
   const until = Date.parse(row.until);
@@ -443,126 +477,135 @@ function unreachable(host, data) {
   const access = hostAccess(host, data);
   return access.length > 0 && access.every((entry) => entry.state === 'not_scanned') && access.some((entry) => (entry.detail || '').startsWith('probe failed'));
 }
+function downHosts(data) { return cronHosts(data).filter((host) => unreachable(host, data)); }
 function unreachableItem(host, data) {
-  const access = hostAccess(host, data);
-  return issue(hostName(host), 'unreachable', [h('p', {text: `${sentence(access[0]?.detail || 'probe failed')}.`}), h('p', {class: 'meta', text: 'Its scheduled jobs are not in this list.'})],
+  const detail = hostAccess(host, data).find((entry) => (entry.detail || '').startsWith('probe failed'))?.detail || 'probe failed';
+  return issue(`${hostName(host)} unreachable`, '', [h('p', {text: `${sentence(detail)}.`}), h('p', {class: 'meta', text: 'Its scheduled jobs are not in this list.'})],
     [h('button', {type: 'button', class: 'btn', onclick: () => loadCrons(true), text: 'Collect again'})]);
 }
-function cronsErrorItem() {
-  return issue('Could not collect scheduled jobs', '', [h('p', {text: store.cronsError})], [h('button', {type: 'button', class: 'btn', onclick: () => loadCrons(true), text: 'Retry'})]);
+function loadErrorItem(title, message, retry, extra = null) {
+  return issue(title, '', [h('p', {text: message})], [h('button', {type: 'button', class: 'btn', onclick: retry, text: 'Retry'}), extra]);
 }
-const FAIL_NOUNS = {job: ['a scheduled job', 'scheduled jobs'], harness: ['a harness', 'harnesses'], machine: ['a machine', 'machines'], source: ['an outside source', 'outside sources'], config: ['the config', 'the config']};
+// "12 healthy, 2 paused, 1 not run yet" for the jobs that neither fail nor need attention.
+function restCounts(jobs) {
+  const count = (health) => jobs.filter((job) => job.health === health).length;
+  return [count('ok') && `${count('ok')} healthy`, count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
+}
+const FAIL_KINDS = {job: ['a cron', 'crons'], harness: ['a harness', 'harnesses'], machine: ['a machine', 'machines']};
+
+// What the Overview answers, from every source; the headline and the rows come from here, so they cannot disagree.
+// Failing: a failing cron, a harness with a conflict or an unreadable config, a failing machine, a host the
+// crons collect could not reach. Needs attention: a cron whose last run failed, a sync waiting, the machines
+// that need attention (one row for them all), a source the audit blocked, and a source that did not load.
+// The same groups as the Herdr panel.
+function overviewModel() {
+  const inv = store.inv;
+  const data = store.crons;
+  const jobs = data?.jobs || [];
+  const hosts = machines();
+  const sick = hosts.filter((host) => host.health !== 'ok' && host.health !== 'fail');
+  const agents = inv?.agents || [];
+  const outOfSync = agents.filter((agent) => harnessState(agent).st === 'warn');
+  const syncWaiting = Boolean(inv) && (outOfSync.length > 0 || Boolean(inv.repo_state && inv.repo_state !== 'synced'));
+  const fail = [
+    ...jobs.filter((job) => job.health === 'fail').sort(byLastRun).map((job) => ['job', jobItem(job)]),
+    ...agents.filter((agent) => harnessState(agent).st === 'fail').map((agent) => ['harness', harnessItem(agent, harnessState(agent))]),
+    ...hosts.filter((host) => host.health === 'fail').map((host) => ['machine', machineItem([host])]),
+    ...(data ? downHosts(data) : []).filter((host) => !hosts.some((item) => item.host === host && item.health !== 'ok')).map((host) => ['machine', unreachableItem(host, data)]),
+  ];
+  const warn = [
+    ...jobs.filter((job) => job.health === 'warn').sort(byLastRun).map((job) => ['job', jobItem(job)]),
+    ...(inv && !agents.length ? [['harness', noAgentsItem()]] : []),
+    ...(syncWaiting ? [['sync', syncItem(outOfSync)]] : []),
+    ...(sick.length ? [['machine', machineItem(sick)]] : []),
+    ...(inv?.lock || []).filter((row) => row.state === 'blocked').map((row) => ['source', blockedItem(row)]),
+    ...(!inv && store.invError ? [['error', loadErrorItem('The inventory did not load', store.invError, refresh, linkButton('#config', 'Open Config'))]] : []),
+    ...(!data && store.cronsError ? [['error', loadErrorItem('Crons did not load', store.cronsError, () => loadCrons(true))]] : []),
+  ];
+  const pending = [!inv && !store.invError && 'harnesses', !data && !store.cronsError && 'crons', store.hostsLoading && 'machines'].filter(Boolean);
+  return {fail, warn, pending, syncWaiting};
+}
 
 function renderOverview(root) {
   const inv = store.inv;
-  const fail = [];
-  const warn = [];
-  const jobs = store.crons?.jobs || [];
-  for (const job of jobs.filter((item) => item.health === 'fail').sort(byLastRun)) fail.push(['job', jobItem(job)]);
-  for (const job of jobs.filter((item) => item.health === 'warn').sort(byLastRun)) warn.push(['job', jobItem(job)]);
-  if (store.crons) for (const host of cronHosts(store.crons).filter((item) => unreachable(item, store.crons))) warn.push(['job', unreachableItem(host, store.crons)]);
-  if (!store.crons && store.cronsError) warn.push(['job', cronsErrorItem()]);
-  if (!inv && store.invError) fail.push(['config', issue('Could not inspect your agents', '', [h('p', {text: store.invError})], [linkButton('#config', 'Open Config')])]);
-  if (inv) {
-    if (!inv.agents.length) warn.push(['harness', noAgentsItem()]);
-    if (inv.repo_state && inv.repo_state !== 'synced') warn.push(['harness', issue(`~/.agents link is ${inv.repo_state}`, '', [h('p', {text: 'Sync links your config root to ~/.agents.'})], [syncButton()])]);
-    for (const agent of inv.agents) {
-      const state = harnessState(agent);
-      if (state.st === 'fail') fail.push(['harness', harnessItem(agent, state)]);
-      if (state.st === 'warn') warn.push(['harness', harnessItem(agent, state)]);
-    }
-  }
-  // Machines only with more than one host in crons.hosts, as `tackroom hosts`; nothing until the probe answers.
-  const hosts = store.hosts?.hosts || [];
-  if (hosts.length > 1) {
-    for (const group of machineGroups(hosts).filter((item) => item.st !== 'ok')) (group.st === 'fail' ? fail : warn).push(['machine', machineItem(group)]);
-  }
-  for (const row of inv?.lock || []) {
-    if (row.state === 'blocked') fail.push(['source', sourceItem(row)]);
-    else if (row.state === 'cooldown') warn.push(['source', sourceItem(row)]);
-    else if (row.state !== 'pinned') warn.push(['source', sourceItem(row)]);
-  }
-
-  // The headline counts the rows below it, so the two never disagree.
-  const live = liveAgents();
-  const liveOk = live.filter((agent) => harnessState(agent).st === 'ok');
-  const loading = !inv && !store.invError;
-  const checking = loading || (!store.crons && !store.cronsError) || store.hostsLoading;
-  const title = checking && !fail.length && !warn.length ? 'Checking…'
-    : fail.length || warn.length ? [fail.length ? `${fail.length} failing` : '', warn.length ? `${warn.length} need${warn.length === 1 ? 's' : ''} attention` : ''].filter(Boolean).join(', ')
-      : 'All clear';
+  const {fail, warn, pending, syncWaiting} = overviewModel();
+  const title = [fail.length ? `${fail.length} failing` : '', warn.length ? `${warn.length} need${warn.length === 1 ? 's' : ''} attention` : ''].filter(Boolean).join(', ')
+    || (pending.length ? 'Checking…' : 'All clear');
+  // The line under it: whether the harnesses are in sync, what the failures are when they are all one kind,
+  // and what is still loading.
+  const live = (inv?.agents || []).filter((agent) => agent.enabled && agent.inspected && agent.detected);
   const kinds = [...new Set(fail.map(([kind]) => kind))];
+  const [one, many] = kinds.length === 1 ? FAIL_KINDS[kinds[0]] : [];
   const said = [
-    inv && live.length ? (liveOk.length === live.length ? `All ${live.length} installed harnesses are in sync.` : `${liveOk.length} of ${live.length} installed harnesses are in sync.`) : '',
-    kinds.length === 1 ? `The ${fail.length === 1 ? 'failure is' : 'failures are'} ${FAIL_NOUNS[kinds[0]][fail.length === 1 ? 0 : 1]}.` : kinds.length ? `The failures are ${names(kinds.map((kind) => FAIL_NOUNS[kind][1]))}.` : '',
-    loading ? 'Inspecting your agents.' : '',
-    !store.crons && !store.cronsError ? 'Still collecting crons.' : '',
-    store.hostsLoading ? 'Checking machines.' : '',
+    inv && !syncWaiting && live.length && live.every((agent) => harnessState(agent).st === 'ok') ? (live.length === 1 ? 'The installed harness is in sync.' : `All ${live.length} installed harnesses are in sync.`) : '',
+    one ? (fail.length === 1 ? `The failure is ${one}.` : `${fail.length === 2 ? 'Both failures' : 'The failures'} are ${many}.`) : '',
+    pending.length ? `Still checking ${names(pending)}.` : '',
   ].filter(Boolean).join(' ');
-
   mount(root,
-    hero(fail.length ? FAIL : warn.length ? WARN : checking ? IDLE : OK, title, said),
+    hero(fail.length ? FAIL : warn.length ? WARN : pending.length ? IDLE : OK, title, said),
     h('div', {class: 'cols'},
       fail.length || warn.length ? h('section', {},
         fail.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, fail.map(([, node]) => node))] : null,
         warn.length ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'), h('div', {class: 'items'}, warn.map(([, node]) => node))] : null) : null,
       h('section', {},
         h('h2', {class: 'gh'}, 'Everything else'),
-        h('ul', {class: 'rest'}, everythingElse(liveOk, live, hosts)))));
+        h('ul', {class: 'rest'}, everythingElse(syncWaiting)))));
 }
-function restLine(target, iconPair, title, sub, extra, off = false) {
-  const inner = [icon(...iconPair), h('span', {}, h('b', {text: title}), sub ? h('span', {class: 'sub', text: sub}) : null, extra)];
+// One line of Everything else: a mark, a title and the lines under it. It opens a view, opens Sync,
+// or folds open in place.
+function restLine(target, iconPair, title, subs, extra, off = false) {
+  const inner = [icon(...iconPair), h('span', {}, h('b', {text: title}), [subs].flat().filter(Boolean).map((sub) => h('span', {class: 'sub', text: sub})), extra)];
   const node = typeof target === 'string' ? h('a', {href: target}, inner)
-    : target ? h('button', {type: 'button', onclick: target}, inner) : h('div', {}, inner);
+    : typeof target === 'function' ? h('button', {type: 'button', onclick: target}, inner)
+      : target ? h('details', {}, h('summary', {}, inner), h('div', {class: 'rest-detail'}, target)) : h('div', {}, inner);
   return h('li', {class: off ? 'off' : null}, node);
 }
-function everythingElse(liveOk, live, hosts) {
+// What is healthy or off, folded to one line per kind.
+function everythingElse(syncWaiting) {
   const inv = store.inv;
   const lines = [];
-  if (inv && liveOk.length) {
-    const counts = `${plural(inv.skills.length, 'skill')}, ${plural(inv.roles.length, 'role')}, ${plural(inv.mcp.length, 'MCP server')}, ${plural(inv.hooks.length, 'hook')}.`;
-    lines.push(restLine(openSync, OK, `${plural(liveOk.length, 'harness', 'harnesses')} in sync`, liveOk.length === live.length ? `Nothing to sync. ${counts}` : counts,
-      [h('span', {class: 'marks'}, liveOk.map((agent) => agentMark(agent.name))), h('span', {class: 'sub link', text: 'Open Sync'})]));
+  const ok = (inv?.agents || []).filter((agent) => harnessState(agent).st === 'ok');
+  if (ok.length) {
+    lines.push(restLine(openSync, OK, `${plural(ok.length, 'harness', 'harnesses')} in sync${syncWaiting ? '' : ', nothing to sync'}`, [
+      [plural(inv.skills.length, 'skill'), plural(inv.roles.length, 'role'), plural(inv.mcp.length, 'MCP server'), plural(inv.hooks.length, 'hook')].join(', '),
+      ok.map((agent) => display(agent.name)).join(', '),
+    ], h('span', {class: 'sub link', text: 'Open Sync'})));
   }
-  if (store.crons) {
-    const jobs = store.crons.jobs || [];
-    const count = (health) => jobs.filter((job) => job.health === health).length;
-    const sub = [count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
-    lines.push(jobs.length ? restLine('#crons', OK, `${plural(count('ok'), 'cron')} healthy`, sub) : restLine('#crons', IDLE, 'No scheduled jobs', 'Add cron declares one tackroom owns.', null, true));
-  } else if (!store.cronsError) {
-    lines.push(restLine('#crons', IDLE, 'Collecting crons…', '', null, true));
-  }
-  if (hosts.length > 1) {
-    const ok = hosts.filter((host) => host.health === 'ok');
-    if (ok.length) {
-      const commits = new Set(ok.map((host) => (host.commit || '').slice(0, 7)));
-      const who = ok.length === hosts.length ? (hosts.length === 2 ? 'Both machines' : `All ${hosts.length} machines`) : plural(ok.length, 'machine');
-      const versions = new Map();
-      for (const host of ok) versions.set(host.version || '?', [...(versions.get(host.version || '?') || []), hostName(host.host)]);
-      lines.push(restLine(null, OK, commits.size === 1 && [...commits][0] ? `${who} on config ${[...commits][0]}` : `${who} healthy`,
-        [...versions].map(([version, list]) => `tackroom ${version} on ${names(list)}`).join('; ')));
-    }
+  const jobs = store.crons?.jobs || [];
+  const healthy = jobs.filter((job) => job.health === 'ok').length;
+  const quiet = jobs.filter((job) => job.health === 'paused' || job.health === 'idle');
+  if (healthy || quiet.length) lines.push(restLine('#crons', healthy ? OK : ['i-pause', 'st-off'], healthy ? `${plural(healthy, 'cron')} healthy` : plural(quiet.length, 'cron'), restCounts(quiet), null, !healthy));
+  const hosts = machines();
+  if (hosts.length) {
+    const commits = new Set(hosts.map((host) => host.commit));
+    const same = commits.size === 1 && hosts[0].commit;
+    const versions = new Map();
+    for (const host of hosts) if (host.version) versions.set(host.version, [...(versions.get(host.version) || []), hostName(host.host)]);
+    lines.push(restLine(null, same ? OK : ['i-laptop', 'st-off'], same ? `${hosts.length === 2 ? 'Both' : `All ${hosts.length}`} machines on config ${hosts[0].commit.slice(0, 7)}` : plural(hosts.length, 'machine'),
+      [...versions].map(([version, list]) => `tackroom ${version} on ${names(list)}`).join('; ')));
   }
   if (inv) {
     const pinned = inv.lock.filter((row) => row.state === 'pinned');
     if (pinned.length) {
       const findings = pinned.filter((row) => row.findings).map((row) => `${row.name} has ${plural(row.findings, 'audit finding')}, ${row.critical ? `${row.critical} critical` : 'none critical'}`);
       const unaudited = pinned.filter((row) => !row.audited).length;
-      lines.push(restLine('#skills', OK, `${plural(pinned.length, 'outside source')} pinned`,
-        [...findings, unaudited ? `${unaudited} not audited` : ''].filter(Boolean).join('; ') || 'All audits pass'));
-    } else if (!inv.lock.length) {
-      lines.push(restLine('#skills', ['i-minus', 'st-off'], 'No outside sources', 'tackroom skill sources add owner/repo adds one; sync pins and audits it.', null, true));
+      lines.push(restLine('#skills', OK, `${plural(pinned.length, 'outside source')} pinned`, [...findings, unaudited ? `${unaudited} not audited yet` : ''].filter(Boolean).join('; ') || 'No audit findings'));
+    }
+    const cool = inv.lock.filter((row) => row.state !== 'pinned' && row.state !== 'blocked');
+    if (cool.length) {
+      lines.push(restLine(cool.map((row) => h('div', {},
+        h('b', {text: row.name}),
+        Date.parse(row.until) ? h('p', {class: 'meta', text: `Cooldown ends ${weekdayClock(Date.parse(row.until))}.`}) : null,
+        h('p', {class: 'meta', text: sourceWhy(row)}),
+        row.command ? command(row.command) : null)), ['i-timer', 'st-off'], `${cool.length} in cooldown`, cool.map(cooldownLine), null, true));
     }
     const unmanaged = inv.unmanaged.filter((item) => item.kind !== 'conflict');
     if (unmanaged.length) lines.push(restLine('#unmanaged', ['i-unmanaged', 'st-off'], `${plural(unmanaged.length, 'item')} tackroom does not manage`, 'In agent folders; tackroom leaves them alone.', null, true));
-    const idle = inv.agents.filter((agent) => !agent.enabled || !agent.inspected || !agent.detected);
-    if (idle.length) {
-      const missing = idle.filter((agent) => agent.enabled && agent.inspected && !agent.detected);
-      const off = idle.filter((agent) => !agent.enabled);
-      const other = idle.filter((agent) => agent.enabled && !agent.inspected);
-      const title = [missing.length && `${missing.length} not installed`, off.length && `${off.length} turned off`, other.length && `${other.length} not inspected`].filter(Boolean).join(', ');
-      const sub = [missing.length && `Not installed: ${missing.map((agent) => display(agent.name)).join(', ')}.`, off.length && `Turned off: ${off.map((agent) => display(agent.name)).join(', ')}.`, other.length && `Not inspected: ${other.map((agent) => display(agent.name)).join(', ')}.`].filter(Boolean).join(' ');
-      lines.push(restLine(openSync, ['i-minus', 'st-off'], title, sub, h('span', {class: 'sub link', text: 'Turn on or off under Sync'}), true));
+    const absent = inv.agents.filter((agent) => agent.enabled && agent.inspected && !agent.detected);
+    const off = inv.agents.filter((agent) => !agent.enabled);
+    if (absent.length || off.length) {
+      lines.push(restLine(openSync, ['i-minus', 'st-off'], [absent.length ? `${absent.length} not installed` : '', off.length ? `${off.length} turned off` : ''].filter(Boolean).join(', '),
+        [...absent, ...off].map((agent) => display(agent.name)).join(', '), h('span', {class: 'sub link', text: 'Turn on or off under Sync'}), true));
     }
   }
   return lines;
@@ -978,21 +1021,29 @@ function renderCrons(root) {
   }
   const jobs = data.jobs || [];
   const hosts = cronHosts(data);
+  const down = downHosts(data);
   const fails = jobs.filter((job) => job.health === 'fail').sort(byLastRun);
   const warns = jobs.filter((job) => job.health === 'warn').sort(byLastRun);
-  const away = hosts.filter((host) => unreachable(host, data));
-  const rest = jobs.filter((job) => job.health !== 'fail' && job.health !== 'warn');
-  const title = !jobs.length ? 'No scheduled jobs yet' : fails.length ? `${fails.length} of ${jobs.length} jobs failing` : `${jobs.length} jobs, none failing`;
+  // Healthy first, then not run yet and paused, by name.
+  const order = {ok: 0, idle: 1, paused: 2};
+  const rest = jobs.filter((job) => job.health !== 'fail' && job.health !== 'warn')
+    .sort((a, b) => (order[a.health] ?? 3) - (order[b.health] ?? 3) || a.short_name.localeCompare(b.short_name));
+  const title = [jobs.length ? (fails.length ? `${fails.length} of ${jobs.length} jobs failing` : `${plural(jobs.length, 'job')}, none failing`) : '',
+    ...down.map((host) => `${hostName(host)} unreachable`)].filter(Boolean).join(', ') || 'No scheduled jobs';
+  const counts = restCounts(jobs);
+  const said = [hosts.length ? `On ${names(hosts.map(hostName))}${counts ? `: ${counts}` : ''}.` : '', jobs.length ? nextLine(jobs) : HELP.crons].filter(Boolean).join(' ');
+  const folds = hosts.map((host) => [host, rest.filter((job) => job.host === host)]).filter(([, list]) => list.length);
+  const strip = fireStrip(jobs, hosts);
   mount(root,
-    hero(fails.length ? FAIL : warns.length || away.length ? WARN : jobs.length ? OK : IDLE, title, jobs.length ? nextLine(jobs) : HELP.crons),
+    hero(fails.length || down.length ? FAIL : warns.length ? WARN : jobs.length ? OK : IDLE, title, said),
     tools,
     h('div', {class: 'cols'},
-      fails.length || warns.length || away.length ? h('section', {},
-        fails.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, fails.map(jobItem))] : null,
-        warns.length || away.length ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'), h('div', {class: 'items'}, warns.map(jobItem), away.map((host) => unreachableItem(host, data)))] : null) : null,
-      h('section', {},
+      fails.length || down.length || warns.length ? h('section', {},
+        fails.length || down.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, down.map((host) => unreachableItem(host, data)), fails.map(jobItem))] : null,
+        warns.length ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'), h('div', {class: 'items'}, warns.map(jobItem))] : null) : null,
+      folds.length || strip ? h('section', {},
         h('h2', {class: 'gh'}, 'Everything else'),
-        h('div', {class: 'hosts'}, hosts.map((host) => hostFold(host, data, rest.filter((job) => job.host === host))), fireStrip(jobs, hosts)))),
+        h('div', {class: 'hosts'}, folds.map(([host, list]) => hostFold(host, data, list)), strip)) : null),
     jobs.length ? h('p', {class: 'foot-note', text: HELP.crons}) : null);
 }
 function fold(key, defaultOpen, ...children) {
@@ -1003,8 +1054,7 @@ function fold(key, defaultOpen, ...children) {
 function hostFold(host, data, list) {
   const now = Date.now();
   const count = (health) => list.filter((job) => job.health === health).length;
-  const summary = unreachable(host, data) ? 'unreachable' : !list.length ? 'nothing else'
-    : [`${count('ok')} healthy`, count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
+  const summary = restCounts(list);
   // An empty herdr-automations source still says whether its scheduler runs.
   const sources = hostAccess(host, data).filter((entry) => entry.state === 'found' || entry.state === 'unreadable' || (entry.source === 'herdr-automations' && entry.state === 'empty' && entry.detail && entry.detail.startsWith('scheduler')));
   return fold(`host:${host}`, window.matchMedia('(min-width: 900px)').matches,
@@ -1017,7 +1067,7 @@ function hostFold(host, data, list) {
       return h('button', {class: st === 'off' ? 'jrow off' : 'jrow', type: 'button', onclick: () => openJob(job)},
         h('span', {class: 'n'}, job.short_name),
         h('span', {class: 's', text: sub.filter(Boolean).join(', ')}),
-        h('span', {class: 'l', title: job.last_run ? `Last run ${new Date(Date.parse(job.last_run)).toLocaleString()}` : 'Never run', text: ago(job.last_run, true)}));
+        h('span', {class: 'l', title: job.last_run ? `Last run ${new Date(Date.parse(job.last_run)).toLocaleString()}` : 'Never run', text: job.last_run ? ago(job.last_run, true) : 'not run'}));
     }));
 }
 function fireStrip(jobs, hosts) {
@@ -1087,10 +1137,10 @@ function renderSheet() {
   if (sheet.kind === 'menu') {
     title.textContent = 'tackroom';
     sub.textContent = store.updatedAt ? `Updated ${clock(store.updatedAt)}` : '';
-    const failing = store.crons ? store.crons.jobs.filter((job) => job.health === 'fail').length : 0;
+    const badge = document.querySelector('[data-badge="crons"]');
     mount(body,
       h('nav', {class: 'menu-list', 'aria-label': 'Views'}, TABS.map(([id, label, iconId]) => h('a', {href: `#${id}`, 'aria-current': id === store.view ? 'page' : null, onclick: () => closeDialog(document.getElementById('sheet'), true)},
-        icon(iconId), label, id === 'crons' && failing ? h('span', {class: 'badge', title: `${plural(failing, 'job')} failing`, text: String(failing)}) : null))),
+        icon(iconId), label, id === 'crons' && !badge.hidden ? h('span', {class: badge.className, title: badge.title, text: badge.textContent}) : null))),
       configLinks().length ? [h('h3', {class: 'sheet-h3', text: 'Links'}), h('nav', {class: 'menu-list', 'aria-label': 'Configured links'}, linkNodes())] : null);
     return;
   }
