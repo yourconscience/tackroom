@@ -70,8 +70,13 @@ func applyViewSettings(opts *configServeOptions, ui *uiConfig) string {
 // runByServiceManager reports whether launchd or systemd runs this process.
 // launchd sets XPC_SERVICE_NAME to the job's label; terminals set "0", and
 // apps it opens get "application.<bundle id>...", which the programs they run
-// inherit. systemd sets INVOCATION_ID.
-func runByServiceManager(getenv func(string) string) bool {
+// inherit. systemd sets INVOCATION_ID. A shell in a terminal can inherit
+// either marker (KDE and kitty pass INVOCATION_ID on), while a service has no
+// terminal on stdout, so a terminal there rules a service out.
+func runByServiceManager(getenv func(string) string, stdoutTerminal bool) bool {
+	if stdoutTerminal {
+		return false
+	}
 	if name := getenv("XPC_SERVICE_NAME"); name != "" && name != "0" && !strings.HasPrefix(name, "application.") {
 		return true
 	}
@@ -80,8 +85,9 @@ func runByServiceManager(getenv func(string) string) bool {
 
 func parseViewIdleTimeout(value string) (time.Duration, error) {
 	d, err := time.ParseDuration(value)
-	if err != nil || d < 0 {
-		return 0, fmt.Errorf("want a duration such as 30m, or 0 to never exit, got %q", value)
+	// At least 2m, so the page's request once a minute keeps an open view up.
+	if err != nil || d < 0 || (d > 0 && d < 2*time.Minute) {
+		return 0, fmt.Errorf("want 0 to never exit, or a duration of at least 2m such as 30m, got %q", value)
 	}
 	return d, nil
 }
@@ -168,7 +174,7 @@ func startView(doc *configDocument, opts configServeOptions, files viewFiles, to
 	cmd := exec.Command(self, args...)
 	cmd.Stdout, cmd.Stderr = logFile, logFile
 	cmd.Dir = doc.home
-	cmd.Env = append(loginShellEnv(), viewDetachedEnv+"=1")
+	cmd.Env = append(backgroundViewEnv(), viewDetachedEnv+"=1")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
 	err = cmd.Start()
 	logFile.Close()
@@ -210,15 +216,50 @@ func startView(doc *configDocument, opts configServeOptions, files viewFiles, to
 	}
 }
 
-// loginShellEnv returns the environment of the user's login shell. Callers
-// such as the Tern daemon and Rex run tackroom with a GUI app's minimal PATH,
-// and the background view should find harnesses as a terminal does. It falls
-// back to this process's environment when $SHELL is unset or does not answer
-// within 5 seconds.
+// backgroundViewEnv is the environment of a background view. Callers such as
+// the Tern daemon and Rex run tackroom with a GUI app's minimal PATH, and the
+// view should find harnesses as a terminal does. It is the caller's
+// environment with PATH from the login shell, plus the login shell's
+// variables the caller does not set; the caller's own values (HOME, XDG_*,
+// *_HOME) win. Without a login shell it is the caller's environment.
+func backgroundViewEnv() []string {
+	caller := os.Environ()
+	login := loginShellEnv()
+	if len(login) == 0 {
+		return caller
+	}
+	name := func(entry string) string { return entry[:strings.Index(entry, "=")] }
+	set := make(map[string]bool, len(caller))
+	for _, entry := range caller {
+		set[name(entry)] = true
+	}
+	path := ""
+	env := make([]string, 0, len(caller)+len(login))
+	for _, entry := range login {
+		switch {
+		case name(entry) == "PATH":
+			path = entry
+		case !set[name(entry)]:
+			env = append(env, entry)
+		}
+	}
+	for _, entry := range caller {
+		if path == "" || name(entry) != "PATH" {
+			env = append(env, entry)
+		}
+	}
+	if path != "" {
+		env = append(env, path)
+	}
+	return env
+}
+
+// loginShellEnv returns the environment of the user's login shell, or nil
+// when $SHELL is unset or does not answer within 5 seconds.
 func loginShellEnv() []string {
 	shell := os.Getenv("SHELL")
 	if shell == "" {
-		return os.Environ()
+		return nil
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -232,7 +273,7 @@ func loginShellEnv() []string {
 	out, err := cmd.Output()
 	at := bytes.LastIndex(out, []byte(marker+"\n"))
 	if err != nil || at < 0 {
-		return os.Environ()
+		return nil
 	}
 	// env -0 ends each entry with NUL; whatever follows the last one is not env.
 	entries := strings.Split(string(out[at+len(marker)+1:]), "\x00")
@@ -241,9 +282,6 @@ func loginShellEnv() []string {
 		if eq := strings.Index(entry, "="); eq > 0 {
 			env = append(env, entry)
 		}
-	}
-	if len(env) == 0 {
-		return os.Environ()
 	}
 	return env
 }
@@ -280,8 +318,7 @@ func stopView(opts configServeOptions, files viewFiles) error {
 		return nil
 	}
 	if info.PID == 0 {
-		fmt.Fprintf(os.Stdout, "The tackroom view at %s does not report its process ID (an older tackroom started it); stop it where it runs.\n", info.Addr)
-		return nil
+		return fmt.Errorf("the tackroom view at %s does not report its process ID (an older tackroom started it); stop it where it runs", info.Addr)
 	}
 	// Signal only a process that both the answer and view.pid name, never a
 	// group or every process.

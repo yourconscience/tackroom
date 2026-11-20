@@ -23,6 +23,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -66,7 +67,7 @@ func runConfigServe(opts configServeOptions) error {
 		}
 		return stopView(opts, files)
 	}
-	if !opts.Foreground && !opts.JSON && runByServiceManager(os.Getenv) {
+	if !opts.Foreground && !opts.JSON && runByServiceManager(os.Getenv, term.IsTerminal(os.Stdout.Fd())) {
 		// A launchd job or systemd unit that runs plain `tackroom view` keeps
 		// serving, instead of starting a background view and exiting.
 		fmt.Fprintln(os.Stdout, "tackroom view runs under launchd or systemd; serving in the foreground.")

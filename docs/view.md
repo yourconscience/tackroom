@@ -23,7 +23,7 @@ Flags and reruns:
 - A second `tackroom view` finds the running one, prints its URL and starts nothing. Without `--addr` it looks where the last view recorded its address.
 - `--foreground` serves in the terminal you run it from until Ctrl-C, as `view` used to, for SSH sessions, `tailscale serve` and debugging. It never exits when idle. Under `nohup` it keeps running after the terminal closes.
 - `--secure-cookie` implies `--foreground`: access through a proxy needs a view that does not exit when idle.
-- Under a service manager, plain `tackroom view` serves in the foreground too, so a launchd job or systemd unit written for an older tackroom keeps working. tackroom detects launchd from `XPC_SERVICE_NAME` holding a job label (not empty, `0` or an `application.` name) and systemd from `INVOCATION_ID`. `--foreground` is the explicit form. `--json` and `--stop` never serve.
+- Under a service manager, plain `tackroom view` serves in the foreground too, so a launchd job or systemd unit written for an older tackroom keeps working. tackroom detects launchd from `XPC_SERVICE_NAME` holding a job label (not empty, `0` or an `application.` name) and systemd from `INVOCATION_ID`, and only when stdout is not a terminal: a shell can inherit either variable, a service has no terminal. `--foreground` is the explicit form. `--json` and `--stop` never serve.
 
 ## Starting, stopping and the caller contract
 
@@ -32,7 +32,7 @@ Scripts, terminal plugins and editor extensions open the view through the comman
 `tackroom view` and `tackroom view --json`:
 
 - If a view for this token answers at the recorded address (or at `--addr`), it reports that view and exits 0 at once.
-- If none answers, it starts `tackroom view --foreground` as a background process in its own session, with its output in `view.log`, so it outlives the caller. The view gets the environment of your login shell (`$SHELL -l`), so it finds your harnesses as a terminal does even when the caller is an app with a minimal `PATH`; without `$SHELL`, or when the shell does not answer within 5 seconds, it gets the caller's environment. It waits until the view answers, reports it and exits 0. If the view does not answer within 10 seconds, it stops that process and exits 1 with the end of `view.log` on stderr.
+- If none answers, it starts `tackroom view --foreground` as a background process in its own session, with its output in `view.log`, so it outlives the caller. The view gets the caller's environment with `PATH` from your login shell (`$SHELL -l`), plus the login shell's variables the caller does not set, so it finds your harnesses as a terminal does even when the caller is an app with a minimal `PATH`. The caller's own values, such as `HOME`, `XDG_*` and `*_HOME`, win. Without `$SHELL`, or when the shell does not answer within 5 seconds, it gets the caller's environment unchanged. It waits until the view answers, reports it and exits 0. If the view does not answer within 10 seconds, it stops that process and exits 1 with the end of `view.log` on stderr.
 - Concurrent calls start one view: the check and the start run under an exclusive lock on `view.lock`, which is removed afterwards.
 - `--json` prints one JSON object on stdout and nothing else, and opens no browser:
 
@@ -43,9 +43,9 @@ Scripts, terminal plugins and editor extensions open the view through the comman
   `url` is the signed-in startup URL. `addr` is the address the view listens on, which differs from the configured one after a fallback. `pid` is the view's process. `started` is true only when this call started it. `idle_timeout` is the view's own setting, `"0"` for one that never exits when idle (a `--foreground` view). A view started by an older tackroom reports `pid` 0 and an empty `idle_timeout`. The output is pretty-printed; parse it as JSON.
 - Exit codes: 0 when a view answers, 1 when none could be started or a flag or the config is invalid (the reason on stderr).
 
-`tackroom view --stop` stops the view that answers for this token: it sends SIGTERM to the process that view reports, only when `view.pid` records the same one, and waits until it stops answering. It exits 0 when it stopped one and when none was running, and says which; 1 when the view still answers 5 seconds later. It does not read the config, so it also works while the config is invalid.
+`tackroom view --stop` stops the view that answers for this token: it sends SIGTERM to the process that view reports, only when `view.pid` records the same one, and waits until it stops answering. Exit 0 means no view answers now: it stopped one, or none was running, and it says which. Exit 1 means a view still answers: it did not report its process (an older tackroom started it), `view.pid` names another process, the signal failed, or it still answered 5 seconds later. It does not read the config, so it also works while the config is invalid.
 
-A background view exits when no HTTP request has reached it for `ui.view.idle_timeout` (default `30m`). Every request resets the timer, and an open page sends one every 60 seconds while it is visible, and also while it is hidden with unsaved Config changes, so a view stays up while you have it open and exits after you close the last tab or leave it hidden. When that request fails, the page says `tackroom view stopped; run tackroom view`. `0` keeps it running until `--stop`. Because the page sends its request once a minute, an open page alone does not keep up a view whose `idle_timeout` is under `1m`. It still [restarts on upgrade](#restart-on-upgrade).
+A background view exits when no HTTP request has reached it for `ui.view.idle_timeout` (default `30m`). Every request resets the timer, and an open page sends one every 60 seconds while it is visible, and also while it is hidden with unsaved Config changes, so a view stays up while you have it open and exits after you close the last tab or leave it hidden. When that request fails, the page says `tackroom view stopped; run tackroom view`. `0` keeps it running until `--stop`; any other value is at least `2m`, so the page's request once a minute always lands in time. It still [restarts on upgrade](#restart-on-upgrade).
 
 State files, in `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`), or beside `--token-file` and named after it:
 
@@ -65,14 +65,14 @@ Under `ui.view` in either config file; a key set in `tackroom.local.yaml` replac
 ui:
   view:
     addr: 127.0.0.1:8765   # loopback only; when taken, a free port is used and reported
-    idle_timeout: 30m      # a Go duration (90s, 30m, 2h); 0 keeps it running until --stop
+    idle_timeout: 30m      # 0, or a Go duration of at least 2m (2m, 30m, 2h); 0 keeps it running until --stop
     open_browser: true     # false behaves as --no-open
 ```
 
 | Key | Default | Meaning |
 |---|---|---|
 | `ui.view.addr` | `127.0.0.1:8765` | Address a view takes when `--addr` is not given. Unlike `--addr`, a taken port falls back to a free one, which `view.addr` records. |
-| `ui.view.idle_timeout` | `30m` | How long a background view waits without a request before it exits. `0` never exits. Negative or unit-less values such as `30` are refused. |
+| `ui.view.idle_timeout` | `30m` | How long a background view waits without a request before it exits. `0` never exits. Any other value must be at least `2m`; `30`, `30s` and negative values are refused. |
 | `ui.view.open_browser` | `true` | `false` makes `tackroom view` print the URL without opening a browser, as `--no-open` does. |
 
 ## Find your way around
