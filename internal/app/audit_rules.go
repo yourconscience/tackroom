@@ -374,6 +374,17 @@ func pyStringPrefix(word string) bool {
 	return false
 }
 
+// hiddenLineBreak reports whether line holds a break that splitting on "\n"
+// does not see: a carriage return before its end, which ends a Python line, or
+// U+2028 or U+2029, which end a JavaScript comment. Such a line is never
+// lowered, since the code after the break may run.
+func hiddenLineBreak(line string) bool {
+	if i := strings.IndexByte(line, '\r'); i >= 0 && i < len(line)-1 {
+		return true
+	}
+	return strings.ContainsRune(line, ' ') || strings.ContainsRune(line, ' ')
+}
+
 // scanText applies every rule line by line. file is the path relative to the
 // item, used for lowering decisions and the evidence hash. A lowered match
 // counts one level lower: a script comment, a Markdown code fence, or a framed
@@ -396,12 +407,13 @@ func scanText(file, text string) []ruleFinding {
 	lowered := loweredLines(file, lines)
 	prose := proseLines(file, lines)
 	for i, line := range lines {
+		hidden := hiddenLineBreak(line)
 		for _, rule := range auditRules {
 			m, low := ruleMatch(rule, line, prose[i])
 			if m == "" {
 				continue
 			}
-			add(newRuleFinding(rule, file, m, lowered[i] || low))
+			add(newRuleFinding(rule, file, m, (lowered[i] || low) && !hidden))
 		}
 	}
 	// Unicode rules look at runes, not lines, and are never lowered: a hidden
