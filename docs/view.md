@@ -3,21 +3,75 @@
 `tackroom view` opens a local dashboard over your config: the sync state of every harness, outside sources with their pins, cooldowns and blocks, what is on disk, MCP and hook targeting, scheduled jobs and a YAML editor. It is where you look and act day to day; every action calls the same code as a CLI command, which stays the surface for scripts and SSH.
 
 ```bash
-tackroom view                                  # start it and open your browser
-tackroom view --no-open --addr 127.0.0.1:8765  # start it and print the URL only
+tackroom view                                  # start it in the background if needed, open your browser
+tackroom view --no-open                        # the same, print the URL only
+tackroom view --json                           # the same, as JSON for scripts and plugins
+tackroom view --stop                           # stop it
+tackroom view --foreground --no-open           # serve in this terminal until Ctrl-C
 tackroom config validate                       # the same check from a shell
 tackroom config print                          # shared, local and effective config
 ```
 
 ## Start it
 
-`view` prints `tackroom config UI ready:` followed by the URL on its own line, then opens your default browser. It does not open one with `--no-open` or inside an SSH session (when `SSH_CONNECTION` is set). The view listens on loopback only and never runs `sync` on its own.
+`view` makes sure a view runs, then opens it. With none running it starts one in the background, which exits on its own after 30 minutes without requests. It prints `tackroom config UI ready:` followed by the URL on its own line, then opens your default browser. It does not open one with `--no-open`, with `ui.view.open_browser: false` or inside an SSH session (when `SSH_CONNECTION` is set). The view listens on loopback only and never runs `sync` on its own.
 
 Flags and reruns:
 
-- `--addr` is the listen address, default `127.0.0.1:8765`. It must be loopback: `127.0.0.1`, `::1` or `localhost`. Anything else is refused. When another program holds the default port and `--addr` was not given, `view` takes a free port, says so and prints that URL; later runs reuse the same port while it stays free. An explicit `--addr` that is taken is an error.
+- `--addr` is the listen address, default `ui.view.addr`, else `127.0.0.1:8765`. It must be loopback: `127.0.0.1`, `::1` or `localhost`. Anything else is refused. When another program holds that port and `--addr` was not given, `view` takes a free port, says so and prints that URL; later runs reuse the same port while it stays free. An explicit `--addr` that is taken is an error.
 - `--config PATH` opens another config file; without it the file is [resolved as for every command](commands.md#config-resolution).
 - A second `tackroom view` finds the running one, prints its URL and starts nothing. Without `--addr` it looks where the last view recorded its address.
+- `--foreground` serves in the terminal you run it from until Ctrl-C, as `view` did before 3.0, for SSH sessions, `tailscale serve` and debugging. It never exits when idle.
+
+## Starting, stopping and the caller contract
+
+Scripts, terminal plugins and editor extensions open the view through the command, never through its state files. Run `tackroom view --json` (with `--config PATH` when you have one), read `url` and open it, adding a tab fragment such as `#crons` if you want one.
+
+`tackroom view` and `tackroom view --json`:
+
+- If a view for this token answers at the recorded address (or at `--addr`), it reports that view and exits 0 at once.
+- If none answers, it starts `tackroom view --foreground` as a background process in its own session, with its output in `view.log`, so it outlives the caller. It waits until the view answers, reports it and exits 0. If the view does not answer within 10 seconds, it stops that process and exits 1 with the end of `view.log` on stderr.
+- Concurrent calls start one view: the check and the start run under an exclusive lock on `view.lock`, which is removed afterwards.
+- `--json` prints one JSON object on stdout and nothing else, and opens no browser:
+
+  ```json
+  {"url": "http://127.0.0.1:8765/?token=...", "addr": "127.0.0.1:8765", "pid": 4242, "started": true, "idle_timeout": "30m"}
+  ```
+
+  `url` is the signed-in startup URL. `addr` is the address the view listens on, which differs from the configured one after a fallback. `pid` is the view's process. `started` is true only when this call started it. `idle_timeout` is the view's own setting, `"0"` for one that never exits when idle (a `--foreground` view). A view started by tackroom before 3.0 reports `pid` 0. The output is pretty-printed; parse it as JSON.
+- Exit codes: 0 when a view answers, 1 when none could be started or a flag or the config is invalid (the reason on stderr).
+
+`tackroom view --stop` stops the view that answers for this token: it sends that process SIGTERM and waits until it stops answering. It exits 0 when it stopped one and when none was running, and says which; 1 when the view still answers 5 seconds later. It does not read the config, so it also works while the config is invalid.
+
+A background view exits when no HTTP request has reached it for `ui.view.idle_timeout` (default `30m`). Every request resets the timer, and an open page sends one every 60 seconds while it is visible, so a view stays up while you have it open and exits after you close the last tab or leave it hidden. `0` keeps it running until `--stop`. It still [restarts on upgrade](#restart-on-upgrade).
+
+State files, in `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`), or beside `--token-file` and named after it:
+
+| File | Holds |
+|---|---|
+| `view.token` | The session token, kept across restarts. |
+| `view.addr` | The address the last view listened on. |
+| `view.pid` | The running view's process ID; removed when it exits. |
+| `view.log` | What background views printed, appended at each start. |
+| `view.lock` | Present only while a call checks and starts a view. |
+
+### Settings
+
+Under `ui.view` in either config file; a key set in `tackroom.local.yaml` replaces the same key from `tackroom.yaml`. `tackroom config validate` and the Config tab report a bad value.
+
+```yaml
+ui:
+  view:
+    addr: 127.0.0.1:8765   # loopback only; when taken, a free port is used and reported
+    idle_timeout: 30m      # a Go duration (90s, 30m, 2h); 0 keeps it running until --stop
+    open_browser: true     # false behaves as --no-open
+```
+
+| Key | Default | Meaning |
+|---|---|---|
+| `ui.view.addr` | `127.0.0.1:8765` | Address a view takes when `--addr` is not given. Unlike `--addr`, a taken port falls back to a free one, which `view.addr` records. |
+| `ui.view.idle_timeout` | `30m` | How long a background view waits without a request before it exits. `0` never exits. Negative or unit-less values such as `30` are refused. |
+| `ui.view.open_browser` | `true` | `false` makes `tackroom view` print the URL without opening a browser, as `--no-open` does. |
 
 ## Find your way around
 
@@ -36,7 +90,7 @@ With more than one host in `crons.hosts`, Overview also has a Machines block rig
 
 ### Add links to the header
 
-To add entries to the header's Links menu, list them under `ui.links` in either config file:
+To add entries to the header's Links menu, list them under `ui.links` in either config file; a `ui.links` list in `tackroom.local.yaml` replaces the shared one:
 
 ```yaml
 ui:
@@ -51,7 +105,7 @@ Requests straight to `http://127.0.0.1:PORT` or `localhost` from the same machin
 
 On a machine shared with other users, anyone who can reach its loopback can use the view.
 
-The token is stored in `view.token`, created with mode 0600 on first use, next to a `view.addr` file with the listen address. Both live in `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`). `--token-file PATH` keeps the token somewhere else, and the address file sits beside it. Because the token persists, the URL survives restarts.
+The token is stored in `view.token`, created with mode 0600 on first use, next to a `view.addr` file with the listen address. Both live in `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`). `--token-file PATH` keeps the token somewhere else, and the other [state files](#starting-stopping-and-the-caller-contract) sit beside it. Because the token persists, the URL survives restarts.
 
 ## Open it from another machine
 
@@ -66,10 +120,12 @@ With `--ssh-host user@host`, or inside an SSH session where it is derived from `
   then open the URL above locally.
 ```
 
-For HTTPS over a tailnet you expose the loopback port yourself. `--secure-cookie` applies to requests that come through the proxy, so the same view still works at its local `http://127.0.0.1` URL:
+A view started over SSH keeps running after you log out, until it is idle for `ui.view.idle_timeout`; use `--foreground` to tie it to the session.
+
+For HTTPS over a tailnet you expose the loopback port yourself. `--secure-cookie` applies to requests that come through the proxy, so the same view still works at its local `http://127.0.0.1` URL. Run it in the foreground, or set `ui.view.idle_timeout: 0`, so it does not exit while nobody uses it:
 
 ```bash
-tackroom view --no-open --secure-cookie --addr 127.0.0.1:8765
+tackroom view --foreground --no-open --secure-cookie --addr 127.0.0.1:8765
 tailscale serve --bg --set-path /tackroom http://127.0.0.1:8765
 tailscale serve status                         # prints the https URL on your tailnet
 ```

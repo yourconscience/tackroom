@@ -125,7 +125,7 @@ If you copied the `tackroom` layout that earlier releases shipped in `herdr/layo
 
 #### What the panel shows
 
-- **Header.** The time the open tab's data was loaded, a Refresh button that reloads it and a Web button that opens the same tab of the running `tackroom view`. A dot after a tab's name marks a tab that needs attention.
+- **Header.** The time the open tab's data was loaded, a Refresh button that reloads it and a Web button that opens the same tab of `tackroom view`, starting the view when none runs. A dot after a tab's name marks a tab that needs attention.
 - **Overview.** It draws `tackroom sync --dry-run --json`, which writes and fetches nothing, and `tackroom hosts --json`. From the top:
   - whether everything is synced or how many changes wait;
   - a Machines section with one row per machine in `crons.hosts` (its health, a summary and the command that fixes it; only with more than one host);
@@ -159,7 +159,7 @@ Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tack
 - The web view cannot be embedded: Herdr mods are native elements drawn from JavaScript, so Herdr has its own renderer over the same data.
 - The web view's Unmanaged and Config tabs are not in the panel.
 - The Skills tab lists skills of a source sync has not pinned because it is blocked or in cooldown as missing in every harness, as the web view does; Overview lists the source under "In cooldown or blocked".
-- The Web button reads `view.addr` and `view.token` from tackroom's default state folder, so it does not find a view started with another `--token-file`.
+- The Web button runs `tackroom view --json`, which uses tackroom's default token file, so it does not find a view started with another `--token-file`; it starts one of its own instead.
 - A collect probes every host over SSH. On a loaded machine the local probe can hit tackroom's 2 minute timeout, and the host shows "unreachable" until the next collect.
 - After an Add, Edit, Delete or action, the Crons tab runs a full collect and the row updates when that finishes, not at once as in the web view.
 
@@ -206,7 +206,7 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 - Palette actions: `rex/tackroom.lua`, which you `require` from Rex's `init.lua`, adds three actions under "tackroom" in the command palette. Install: [`rex/RECIPE.md`](../rex/RECIPE.md#palette-actions).
   - Open tackroom Workspace (`tackroom rex`).
   - Open tackroom Crons (`tackroom cron collect --table` in a new tab).
-  - Open tackroom View on Crons (the running `tackroom view` on its Crons tab in the default browser).
+  - Open tackroom View on Crons (`tackroom view` on its Crons tab in the default browser, started when none runs).
 - Crons with actions: Rex has no panel API, so Run now, Pause and Resume for launchd jobs go through the web view. Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)). In Rex itself the jobs are the read-only `cron collect` table.
 
 ### Constraint
