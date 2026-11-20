@@ -31,6 +31,14 @@ type configServeOptions struct {
 	// restarted `view` keeps the same access URL. Empty means view.token in
 	// the tackroom state directory.
 	TokenFile string
+	// Foreground serves in this process until interrupted instead of making
+	// sure a background view runs.
+	Foreground bool
+	// Stop stops the running view, if any.
+	Stop bool
+	// JSON prints the view's URL, address and process as one JSON object
+	// and opens no browser.
+	JSON bool
 }
 
 func runConfigCommand(args []string) error {
