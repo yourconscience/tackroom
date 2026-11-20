@@ -99,7 +99,7 @@ Overview groups its rows as the Herdr panel's Overview does:
 
 With more than one host in `crons.hosts`, Overview counts the machines as `tackroom hosts` reports them. A failing machine gets its own row with the command that fixes it. The machines that need attention share one row, titled with their summary when they share it, each with its fix, or `git -C <config root> status` for uncommitted changes. When none needs anything, Everything else names their config commit ("Both machines on config 604ca00") and the tackroom version on each. The hosts are checked when the page opens and cached for a minute.
 
-A job's Details sheet has its problems, its actions, Edit and Delete for a job tackroom owns, a schedule field for an owned launchd job, and its fields. Log shows the path of the job's log file and a command that prints its last 50 lines: `tail -n 50 <path>`, or `ssh <host> 'tail -n 50 <path>'` for a job on another machine. The view does not read log files itself.
+A job's Details sheet has its problems, its actions, Edit and Delete for a job tackroom owns, a schedule field for an owned launchd job, and its fields. Log shows the path of the job's log file and a command that prints its last 50 lines: `tail -n 50 <path>`, or `ssh <host> 'tail -n 50 <path>'` for a job on another machine. For a systemd job that logs to the journal rather than a file, it says so instead. The view does not read log files itself.
 
 ### Add links to the sidebar
 
