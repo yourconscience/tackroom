@@ -1,7 +1,7 @@
 import { View, div, svg } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
 import { exec, props, theme, notify, openOverlay, nextCommand, run } from "herdr";
-import JobForm, { runTackroom } from "./form.js";
+import JobForm, { runTackroom, expand } from "./form.js";
 
 // tackroom inside Herdr, one tab for each tab of the web view. Every tab draws
 // the JSON of a tackroom command, the same data the web view draws:
@@ -56,6 +56,10 @@ const CELL = {
   absent: ["not installed", "off"], error: ["config unreadable", "fail"], unknown: ["unknown", "warn"],
 };
 const cellLevel = (state) => (CELL[state] ?? CELL.unknown)[1];
+// Where a row is wrong, as the web view says it: "is missing in Claude Code and Pi".
+const WRONG = { missing: "is missing in", drift: "has drifted in", conflict: "has a conflict in", error: "cannot be checked in", unknown: "is in an unknown state in" };
+// An outside source as owner/repo, the form a skill's origin starts with.
+const sourceRepo = (l) => (l.source || "").replace(/^https:\/\/github\.com\//, "").replace(/\.git$/, "");
 
 const hostName = (h) => (h === "local" ? "This Mac" : h || "Unknown host");
 const plural = (n, one, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -63,6 +67,12 @@ const andList = (xs) => (xs.length < 3 ? xs.join(" and ") : `${xs.slice(0, -1).j
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : "");
 const sentence = (s) => (s && !/[.!?]$/.test(s) ? `${s}.` : s || "");
 const shellQuote = (s) => `'${s.replace(/'/g, "'\\''")}'`;
+// The file a job logs to, in a form tail opens: systemd's file: and append:
+// prefixes dropped, and "" for journal, inherit or anything else not a path.
+function logPath(log) {
+  const path = (log || "").replace(/^(file|append):/, "");
+  return path.startsWith("/") || path.startsWith("~/") ? path : "";
+}
 // Items sync skips, in cooldown or blocked; a tackroom older than 3.0 names the list `held`.
 const skippedItems = (d) => d.skipped ?? d.held ?? [];
 
@@ -273,14 +283,21 @@ export default class Tackroom extends View {
   }
 
   // A job's log in a new terminal tab, followed as it grows: tail on this Mac,
-  // or tail over ssh on the host the job runs on.
-  openLog(j) {
-    const argv = j.host === "local" ? ["tail", "-n", "200", "-F", j.log] : ["ssh", "-t", j.host, `tail -n 200 -F ${shellQuote(j.log)}`];
-    try {
-      run("terminal.open", { argv, name: `${jobName(j)} log`, place: "tab" });
-    } catch (e) {
-      notify({ title: `Could not open the log of ${jobName(j)}`, body: String(e?.message ?? e), level: "error" });
-    }
+  // or tail over ssh on the host the job runs on. exec and terminal.open do not
+  // expand ~, so this Mac's ~/ is expanded here; a remote ~/ stays outside the
+  // quotes for the remote shell to expand. -- keeps a path or host that starts
+  // with - from reading as an option.
+  openLog(j, cx) {
+    const path = logPath(j.log);
+    cx.spawn(async () => {
+      try {
+        const argv = j.host === "local" ? ["tail", "-n", "200", "-F", "--", await expand(path)]
+          : ["ssh", "-t", "--", j.host, `tail -n 200 -F -- ${path.startsWith("~/") ? `~/${shellQuote(path.slice(2))}` : shellQuote(path)}`];
+        run("terminal.open", { argv, name: `${jobName(j)} log`, place: "tab" });
+      } catch (e) {
+        notify({ title: `Could not open the log of ${jobName(j)}`, body: String(e?.message ?? e), level: "error" });
+      }
+    });
   }
 
   // `tackroom view --json` starts the view when none runs and prints its signed-in
@@ -289,7 +306,7 @@ export default class Tackroom extends View {
     cx.spawn(async () => {
       try {
         const r = await this.tackroom(["view", "--json"], 30000);
-        // A tackroom without `view --json` (3.0 and older): open the running view
+        // A tackroom without `view --json` (2.8 and older): open the running view
         // from the files it saved, as this button did before.
         if (r.code !== 0 && r.stderr.includes("flag provided but not defined")) {
           const opened = await exec("/bin/sh", ["-c", 'd="${XDG_STATE_HOME:-$HOME/.local/state}/tackroom"; open "http://$(tr -d "\\n" < "$d/view.addr")/?token=$(tr -d "\\n" < "$d/view.token")#$1"', "sh", tab.web]);
@@ -359,7 +376,7 @@ export default class Tackroom extends View {
       levels = [...d.jobs.map(jobLevel), ...downHosts(d).map(() => "fail")];
     } else {
       if (!this.src.inventory.data) return null;
-      levels = this.inventoryRows(tab.id).map((r) => r.level);
+      levels = [...this.inventoryRows(tab.id).map((r) => r.level), ...(tab.id === "skills" ? this.orphanBlocked().map(() => "warn") : [])];
     }
     const level = worst(levels.filter(bad));
     return bad(level) ? { level, count: levels.filter((l) => l === level).length } : null;
@@ -376,16 +393,49 @@ export default class Tackroom extends View {
     }));
     let rows;
     if (id === "skills") {
-      rows = inv.skills.map((s) => ({
-        name: s.name, tag: s.origin === "local" ? "" : s.origin.replace(/^[^/]+\//, ""), states: s.states, kind: "skill", note: s.description,
-        fields: [["Origin", s.origin === "local" ? "yours" : s.origin], ["Path", s.path.replace(inv.home, "~")]],
-      }));
+      rows = inv.skills.map((s) => {
+        const lock = s.origin === "local" ? null
+          : (inv.lock ?? []).find((l) => (l.state === "blocked" || l.state === "cooldown") && sourceRepo(l) === s.origin.split("@")[0]) ?? null;
+        return {
+          name: s.name, states: s.states, kind: "skill", note: s.description, lock,
+          tag: lock?.state === "blocked" ? "source blocked" : lock ? "in cooldown" : s.origin === "local" ? "" : s.origin.replace(/^[^/]+\//, ""),
+          fields: [["Origin", s.origin === "local" ? "yours" : s.origin], ["Path", s.path.replace(inv.home, "~")],
+            ...(lock ? [["Source", lock.state === "blocked" ? "blocked by the audit" : `in cooldown${lock.until ? ` until ${lock.until}` : ""}`],
+              ["Reason", lock.state === "blocked" ? lock.reason : ""], ["Override", lock.command]] : [])],
+        };
+      });
     } else if (id === "roles") {
       rows = inv.roles.map((r) => ({ name: r.name, tag: "", states: r.states, kind: "role", fields: [] }));
     } else {
       rows = [...wired(inv.mcp, "mcp"), ...wired(inv.hooks, "hook")];
     }
-    return rows.map((r) => ({ ...r, level: worst(Object.values(r.states).map(cellLevel)) }));
+    // A skill of a source the audit blocked needs attention, whatever its states;
+    // one of a source in cooldown stays with the rest, as on Overview: sync waits
+    // for the cooldown to end on its own.
+    return rows.map((r) => {
+      const level = worst(Object.values(r.states).map(cellLevel));
+      return { ...r, level: r.lock?.state === "blocked" ? worst([level, "warn"]) : r.lock && level === "warn" ? "off" : level };
+    });
+  }
+
+  // Outside sources the audit blocked that no skill here comes from: they need attention on Skills too.
+  orphanBlocked() {
+    const inv = this.src.inventory.data;
+    const rows = this.inventoryRows("skills");
+    return (inv.lock ?? []).filter((l) => l.state === "blocked" && !rows.some((r) => r.lock === l));
+  }
+
+  // The rows that need attention, named, as the web view's line under its answer:
+  // "agent-insights is missing in Claude Code. 2 more need attention too."
+  lead(rows) {
+    const wrong = (states) => {
+      const by = {};
+      for (const [a, state] of Object.entries(states)) if (bad(cellLevel(state))) (by[state] = by[state] || []).push(a);
+      return Object.keys(WRONG).filter((state) => by[state]).map((state) => `${WRONG[state]} ${by[state].length <= 2
+        ? andList(by[state].map((a) => this.display(a))) : plural(by[state].length, "harness", "harnesses")}`).join(" and ");
+    };
+    const named = rows.filter((r) => wrong(r.states));
+    return [...named.slice(0, 3).map((r) => `${r.name} ${wrong(r.states)}.`), named.length > 3 ? `${named.length - 3} more need attention too.` : ""].filter(Boolean).join(" ");
   }
 
   // ---------- pieces every tab draws with ----------
@@ -774,14 +824,25 @@ export default class Tackroom extends View {
       .when(Boolean(r.entry) && this.canEdit(), (el) => el.child(h_flex().pt(4).child(this.switchButton(r.section, r.name, r.entry.enabled, t))));
   }
 
-  // An inventory tab: the answer, the rows that need attention, then the rest
-  // of each group by name, numbers in one right-hand column.
-  invTab(groups, okTitle, sub, noun, t) {
+  // An inventory tab: the answer, which names what needs attention, then a
+  // "Needs attention" group (a card for each blocked source, then the rows),
+  // then the rest of each group by name, numbers in one right-hand column.
+  // orphans: blocked sources no row comes from, counted in the answer as well.
+  invTab(groups, okTitle, sub, noun, t, { lead = "", blocked = [], orphans = 0 } = {}) {
     const all = groups.flatMap(([, rows]) => rows);
     const worse = all.filter((r) => bad(r.level)).sort((a, b) => RANK[b.level] - RANK[a.level] || a.name.localeCompare(b.name));
-    const level = worse.length ? worst(worse.map((r) => r.level)) : "ok";
-    const out = [this.answer(level, worse.length ? `${noun(worse)} need${worse.length === 1 ? "s" : ""} attention` : okTitle, sub, t)];
-    if (worse.length) out.push(this.group("Needs attention", level, worse.map((r) => this.invRow(r, t)), t, { column: "in place" }));
+    const level = worse.length ? worst(["warn", ...worse.map((r) => r.level)]) : orphans ? "warn" : "ok";
+    const asks = worse.length + orphans;
+    const title = asks ? `${[worse.length ? noun(worse) : "", orphans ? plural(orphans, "outside source") : ""].filter(Boolean).join(" and ")} need${asks === 1 ? "s" : ""} attention` : okTitle;
+    const out = [this.answer(level, title, [lead || this.lead(worse), sub].filter(Boolean).join(" "), t)];
+    if (asks || blocked.length) {
+      out.push(this.group("Needs attention", level, [
+        ...(blocked.length ? [v_flex().gap(12).pt(2).pb(8).children(blocked.map((l) => this.card(`lock:${l.name}`, {
+          name: sourceRepo(l) || l.name, where: "blocked", why: sentence(cap(l.reason || "blocked by the audit")), notes: [l.command ? `Override: ${l.command}` : ""],
+        }, t)))] : []),
+        ...worse.map((r) => this.invRow(r, t)),
+      ], t, { column: worse.length ? "in place" : "" }));
+    }
     for (const [title, rows] of groups) {
       const rest = rows.filter((r) => !bad(r.level)).sort((a, b) => a.name.localeCompare(b.name));
       if (rest.length) out.push(this.group(title, "", rest.map((r) => this.invRow(r, t)), t, { note: String(rest.length), column: "in place" }));
@@ -792,11 +853,19 @@ export default class Tackroom extends View {
   skills(t) {
     const inv = this.src.inventory.data;
     const rows = this.inventoryRows("skills");
-    if (!rows.length) return [this.note("No canonical skills yet. Add one with tackroom skill new <name>.", t)];
+    const blocked = (inv.lock ?? []).filter((l) => l.state === "blocked");
+    if (!rows.length && !blocked.length) return [this.note("No canonical skills yet. Add one with tackroom skill new <name>.", t)];
     const yours = inv.skills.filter((s) => s.origin === "local").length;
     const sources = new Set(inv.skills.filter((s) => s.origin !== "local").map((s) => s.origin.split("@")[0])).size;
+    const from = blocked.map((l) => {
+      const names = rows.filter((r) => r.lock === l).map((r) => r.name);
+      return names.length ? `${andList(names)} come${names.length === 1 ? "s" : ""} from ${sourceRepo(l) || l.name}, which the audit blocked.`
+        : `${sourceRepo(l) || l.name} is blocked by the audit.`;
+    });
+    const lead = [...from, this.lead(rows.filter((r) => bad(r.level) && r.lock?.state !== "blocked"))].filter(Boolean).join(" ");
     return this.invTab([["Skills", rows]], `${plural(rows.length, "skill")}, in place everywhere`,
-      `${yours} yours${sources ? `, ${rows.length - yours} from ${plural(sources, "outside source")}` : ""}.`, (xs) => plural(xs.length, "skill"), t);
+      `${yours} yours${sources ? `, ${rows.length - yours} from ${plural(sources, "outside source")}` : ""}.`, (xs) => plural(xs.length, "skill"), t,
+      { lead, blocked, orphans: this.orphanBlocked().length });
   }
 
   roles(t) {
@@ -863,7 +932,7 @@ export default class Tackroom extends View {
     const busy = this.busy !== "" || this.src.crons.loading;
     const verbs = j.source === "launchd" && j.unit ? (OFF.includes(j.state) ? ["resume"] : ["run", "pause"]) : [];
     const acts = verbs.map((v) => this.link(`${prefix}:${key(j)}:${v}`, this.busy === key(j) ? "…" : VERB[v], (cx) => this.act(j, v, cx), busy, t));
-    if (j.log) acts.push(this.link(`${prefix}:${key(j)}:log`, "Log", () => this.openLog(j), false, t));
+    if (logPath(j.log)) acts.push(this.link(`${prefix}:${key(j)}:log`, "Log", (cx) => this.openLog(j, cx), false, t));
     return acts;
   }
 

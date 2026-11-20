@@ -27,7 +27,7 @@ function grouped(lines) {
 
 let home = null;
 // exec does not expand ~, so a leading ~/ is expanded here.
-async function expand(path) {
+export async function expand(path) {
   if (!path.startsWith("~/")) return path;
   if (home == null) home = (await exec("/bin/sh", ["-c", 'printf %s "$HOME"'])).stdout;
   return home + path.slice(1);
