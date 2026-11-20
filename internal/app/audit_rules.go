@@ -301,15 +301,22 @@ func pyOnlyComment(rest string) bool {
 // delimiter of a triple-quoted string still open at the end of the line, or "".
 // It stops at a comment and steps over strings that close on the line.
 func pyOpenString(code string) string {
+	open, _ := pyScan(code)
+	return open
+}
+
+// pyScan does what pyOpenString does and also returns the code before a
+// comment that starts outside a string.
+func pyScan(code string) (open, beforeComment string) {
 	for i := 0; i < len(code); {
 		switch c := code[i]; {
 		case c == '#':
-			return ""
+			return "", code[:i]
 		case strings.HasPrefix(code[i:], `"""`) || strings.HasPrefix(code[i:], `'''`):
 			d := code[i : i+3]
 			end := strings.Index(code[i+3:], d)
 			if end < 0 {
-				return d
+				return d, code
 			}
 			i += 3 + end + 3
 		case c == '"' || c == '\'':
@@ -325,7 +332,7 @@ func pyOpenString(code string) string {
 			i++
 		}
 	}
-	return ""
+	return "", code
 }
 
 // pyDocstringOpens reports whether line i opens a Python docstring: a string
@@ -341,8 +348,9 @@ func pyDocstringOpens(lines []string, i int) bool {
 	depth := 0
 	seen := false
 	for j := i - 1; j >= 0; j-- {
-		prev := strings.TrimSpace(lines[j])
-		if prev == "" || strings.HasPrefix(prev, "#") {
+		_, prev := pyScan(lines[j])
+		prev = strings.TrimSpace(prev)
+		if prev == "" {
 			continue
 		}
 		if !seen {
@@ -357,7 +365,9 @@ func pyDocstringOpens(lines []string, i int) bool {
 		if depth > 0 {
 			continue
 		}
-		return strings.HasPrefix(prev, "def ") || strings.HasPrefix(prev, "async def ") || strings.HasPrefix(prev, "class ")
+		// An open bracket left over means the string sits inside the header,
+		// such as a default argument, not under it.
+		return depth == 0 && (strings.HasPrefix(prev, "def ") || strings.HasPrefix(prev, "async def ") || strings.HasPrefix(prev, "class "))
 	}
 	return !seen
 }
