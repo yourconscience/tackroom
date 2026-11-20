@@ -1,6 +1,6 @@
 {
   "name": "tackroom",
-  "version": "2.8.0",
+  "version": "3.0.0",
   "description": "tackroom in Claude Code: a pane with the sync status, Sync with its plan shown first, Turn on and off for harnesses, MCP servers and hooks, and scheduled jobs with Run now, Pause and Resume.",
   "author": { "name": "yourconscience" },
   "homepage": "https://github.com/yourconscience/tackroom",

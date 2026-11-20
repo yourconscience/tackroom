@@ -211,18 +211,13 @@ func loweredLines(file string, lines []string) []bool {
 		return out
 	}
 	ext := strings.ToLower(filepath.Ext(file))
-	inDoc := false
+	if ext == ".py" {
+		return pyLoweredLines(lines)
+	}
 	inBlock := false
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		switch {
-		case ext == ".py" && (strings.Count(t, `"""`)+strings.Count(t, `'''`))%2 == 1:
-			out[i] = true
-			inDoc = !inDoc
-		case inDoc:
-			out[i] = true
-		case ext == ".py" && (strings.HasPrefix(t, `"""`) || strings.HasPrefix(t, `'''`)):
-			out[i] = true // one-line docstring
 		case inBlock:
 			out[i] = true
 			if strings.Contains(t, "*/") {
@@ -238,6 +233,156 @@ func loweredLines(file string, lines []string) []bool {
 		}
 	}
 	return out
+}
+
+// pyLoweredLines marks the lines of a Python file that are comments or
+// docstrings. It reads the file as Python does: strings by their own delimiter
+// with escapes, brackets and backslashes joining physical lines into logical
+// ones. A docstring is a logical line that is one string literal and nothing
+// else, and is the first statement of the file or follows a def or class
+// header. Any other string is data the script can run: it is not lowered.
+func pyLoweredLines(lines []string) []bool {
+	out := make([]bool, len(lines))
+	var (
+		delim      string // delimiter of the string a line starts in, "" outside one
+		depth      int    // open brackets
+		joined     bool   // the previous line ended with a backslash outside a string
+		start      = -1   // first physical line of the logical line being read
+		strs       int    // string literals in it
+		code       bool   // anything else in it
+		last       byte   // its last character outside strings and comments
+		prevHeader bool   // the logical line before it was a def or class header
+		first      = true // no logical line has ended yet
+	)
+	for i, line := range lines {
+		if delim == "" {
+			t := strings.TrimSpace(line)
+			if strings.HasPrefix(t, "#") {
+				out[i] = !strings.HasPrefix(t, "#!")
+				continue
+			}
+			if t == "" && start < 0 {
+				continue
+			}
+		}
+		if start < 0 {
+			start, strs, code, last = i, 0, false, 0
+		}
+		joined = false
+		for pos := 0; pos < len(line); {
+			if delim != "" {
+				end := pyStringEnd(line, pos, delim)
+				if end < 0 {
+					if len(delim) == 1 && !pyEndsWithBackslash(line) {
+						delim = "" // an unterminated one-line string ends with its line
+					}
+					pos = len(line)
+					continue
+				}
+				pos, delim = end+len(delim), ""
+				continue
+			}
+			c := line[pos]
+			switch {
+			case c == ' ' || c == '\t' || c == '\r':
+				pos++
+			case c == '#':
+				pos = len(line)
+			case c == '"' || c == '\'':
+				delim = line[pos : pos+1]
+				if strings.HasPrefix(line[pos:], delim+delim+delim) {
+					delim = line[pos : pos+3]
+				}
+				strs++
+				pos += len(delim)
+			case c == '\\' && strings.TrimSpace(line[pos+1:]) == "":
+				joined = true
+				pos = len(line)
+			case c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z':
+				end := pos
+				for end < len(line) && (line[end] == '_' || line[end] >= '0' && line[end] <= '9' || line[end] >= 'a' && line[end] <= 'z' || line[end] >= 'A' && line[end] <= 'Z') {
+					end++
+				}
+				if end < len(line) && (line[end] == '"' || line[end] == '\'') && pyStringPrefix(line[pos:end]) {
+					// An f- or t-string runs the code in its braces, so it is
+					// never a docstring.
+					code = code || strings.ContainsAny(line[pos:end], "fFtT")
+					pos = end // r"...", b'...', f"""...""": part of the string
+					continue
+				}
+				code, last, pos = true, line[end-1], end
+			default:
+				switch c {
+				case '(', '[', '{':
+					depth++
+				case ')', ']', '}':
+					if depth > 0 {
+						depth--
+					}
+				}
+				code, last = true, c
+				pos++
+			}
+		}
+		if delim != "" || depth > 0 || joined {
+			continue // the logical line goes on
+		}
+		sole := strs == 1 && !code
+		if sole && (first || prevHeader) {
+			for k := start; k <= i; k++ {
+				out[k] = true
+			}
+		}
+		head := strings.TrimSpace(lines[start])
+		prevHeader = !sole && last == ':' && (strings.HasPrefix(head, "def ") || strings.HasPrefix(head, "async def ") || strings.HasPrefix(head, "class "))
+		first, start = false, -1
+	}
+	return out
+}
+
+// pyStringEnd returns the index of the first delim in line at or after pos that
+// is not escaped by a backslash, or -1.
+func pyStringEnd(line string, pos int, delim string) int {
+	for j := pos; j < len(line); j++ {
+		if line[j] == '\\' {
+			j++
+			continue
+		}
+		if strings.HasPrefix(line[j:], delim) {
+			return j
+		}
+	}
+	return -1
+}
+
+// pyEndsWithBackslash reports whether the line ends with an unescaped backslash.
+func pyEndsWithBackslash(line string) bool {
+	line = strings.TrimRight(line, "\r")
+	n := 0
+	for n < len(line) && line[len(line)-1-n] == '\\' {
+		n++
+	}
+	return n%2 == 1
+}
+
+// pyStringPrefix reports whether word is a Python string prefix such as r, b, f or rb.
+func pyStringPrefix(word string) bool {
+	switch strings.ToLower(word) {
+	case "r", "u", "b", "f", "t", "br", "rb", "fr", "rf", "tr", "rt":
+		return true
+	}
+	return false
+}
+
+// hiddenLineBreak reports whether line holds a break that splitting on "\n"
+// does not see: a carriage return before its end, which ends a Python line, or
+// U+2028 or U+2029, which end a JavaScript comment. Such a line is never
+// lowered, since the code after the break may run.
+func hiddenLineBreak(line string) bool {
+	if i := strings.IndexByte(line, '\r'); i >= 0 && i < len(line)-1 {
+		return true
+	}
+	return strings.ContainsRune(line, '\u2028') || strings.ContainsRune(line, '\u2029')
 }
 
 // scanText applies every rule line by line. file is the path relative to the
@@ -262,12 +407,13 @@ func scanText(file, text string) []ruleFinding {
 	lowered := loweredLines(file, lines)
 	prose := proseLines(file, lines)
 	for i, line := range lines {
+		hidden := hiddenLineBreak(line)
 		for _, rule := range auditRules {
 			m, low := ruleMatch(rule, line, prose[i])
 			if m == "" {
 				continue
 			}
-			add(newRuleFinding(rule, file, m, lowered[i] || low))
+			add(newRuleFinding(rule, file, m, (lowered[i] || low) && !hidden))
 		}
 	}
 	// Unicode rules look at runes, not lines, and are never lowered: a hidden
