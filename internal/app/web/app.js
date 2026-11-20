@@ -1218,14 +1218,26 @@ function jobFacts(job) {
   return h('dl', {class: 'facts'}, rows.map(([label, value]) => [h('dt', {text: label}), h('dd', {class: ['Command', 'ID', 'Cron'].includes(label) ? 'mono' : '', text: value})]));
 }
 // The view does not read log files; it names the file and the command that shows its end.
+// A leading ~/ stays outside the quotes, so the shell that runs the command expands it, there or over ssh.
 function shellWord(path) {
-  if (!/[\s'"$`\\!*?#&;|<>(){}]/.test(path)) return path;
   const home = path.startsWith('~/');
-  return `"${home ? '$HOME' : ''}${(home ? path.slice(1) : path).replace(/(["\\$`])/g, '\\$1')}"`;
+  const rest = home ? path.slice(2) : path;
+  const quoted = /[\s'"$`\\!*?#&;|<>(){}]/.test(rest) ? `"${rest.replace(/(["\\$`])/g, '\\$1')}"` : rest;
+  return home ? `~/${quoted}` : quoted;
 }
+// launchd gives a path; systemd gives StandardOutput, which is file:, append: or truncate: and a path,
+// or where the output goes instead: journal, inherit, syslog, kmsg, tty, null.
 function logNode(job) {
-  if (!job.log) return h('p', {class: 'log-note', text: 'tackroom knows no log file for this job.'});
-  const path = job.host === 'local' ? tilde(job.log) : job.log;
+  const raw = String(job.log || '').trim();
+  if (!raw) return h('p', {class: 'log-note', text: 'tackroom knows no log file for this job.'});
+  const value = raw.replace(/^(file|append|truncate):/, '');
+  const path = job.host === 'local' ? tilde(value) : value;
+  if (!path.startsWith('/') && !path.startsWith('~/')) {
+    return [
+      h('p', {class: 'log-path'}, h('code', {text: raw})),
+      h('p', {class: 'log-note', text: value === 'null' ? 'This job discards its output, so there is no log to read.' : 'This job logs to the systemd journal, not to a file.'}),
+    ];
+  }
   const tail = `tail -n 50 ${shellWord(path)}`;
   return [
     h('p', {class: 'log-path'}, h('code', {text: path})),
