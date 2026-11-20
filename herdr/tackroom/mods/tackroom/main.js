@@ -227,11 +227,13 @@ export default class Tackroom extends View {
         // A tackroom without `view --json` (3.0 and older): open the running view
         // from the files it saved, as this button did before.
         if (r.code !== 0 && r.stderr.includes("flag provided but not defined")) {
-          await exec("/bin/sh", ["-c", 'd="${XDG_STATE_HOME:-$HOME/.local/state}/tackroom"; open "http://$(tr -d "\\n" < "$d/view.addr")/?token=$(tr -d "\\n" < "$d/view.token")#$1"', "sh", tab.web]);
+          const opened = await exec("/bin/sh", ["-c", 'd="${XDG_STATE_HOME:-$HOME/.local/state}/tackroom"; open "http://$(tr -d "\\n" < "$d/view.addr")/?token=$(tr -d "\\n" < "$d/view.token")#$1"', "sh", tab.web]);
+          if (opened.code !== 0) throw new Error(lastLine(opened));
           return;
         }
         if (r.code !== 0) throw new Error(lastLine(r));
-        await exec("/usr/bin/open", [`${JSON.parse(r.stdout).url}#${tab.web}`]);
+        const opened = await exec("/usr/bin/open", [`${JSON.parse(r.stdout).url}#${tab.web}`]);
+        if (opened.code !== 0) throw new Error(lastLine(opened));
       } catch (e) {
         notify({ title: "Could not open tackroom view", body: String(e?.message ?? e), level: "error" });
       }

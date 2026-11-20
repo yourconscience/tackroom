@@ -203,7 +203,13 @@ local function open_web(state)
 			end
 			return
 		end
-		tern.process.run({ "/usr/bin/open", data.url .. "#crons" }, { timeout_ms = 10000 }, function() end)
+		tern.process.run({ "/usr/bin/open", data.url .. "#crons" }, { timeout_ms = 10000 }, function(opened)
+			if opened.status ~= 0 and current(state) then
+				local err = last_line(opened.stderr)
+				state.note = "Could not open the browser: " .. (err ~= "" and err or ("exit " .. tostring(opened.status)))
+				render(state)
+			end
+		end)
 	end)
 end
 
