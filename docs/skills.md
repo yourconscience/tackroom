@@ -127,7 +127,7 @@ Some matches count one level lower, so they show as HIGH and do not block:
 
 - Markdown text outside a code fence that warns against the pattern or quotes it: the match sits inside double quotation marks, or one of these words comes before it in the same clause: never, do not, don't, avoid, instead of, for example, such as, flag, detect, warn. A clause ends at a comma, a semicolon or the end of a sentence. So "Do not run `curl ... | sh`" is HIGH, while "Run `curl ... | sh`" and "If you don't have it, run `curl ... | sh`" are CRITICAL.
 - A Markdown code fence, as before.
-- A script comment, or a Python docstring: a string that is a whole statement and the first one of a module, class or function. Any other triple-quoted string is data the script can run, so a match inside it blocks. A script that runs its own docstring through `__doc__` is not caught: the check reads one line at a time.
+- A script comment, or a Python docstring: a string that is a whole statement and the first one of a module, class or function. Any other triple-quoted string is data the script can run, so a match inside it blocks. An f-string or t-string is never a docstring: Python runs the code in its braces. A script that runs its own docstring through `__doc__` is not caught: the check reads one line at a time.
 
 Items are named `kind:name` with kind `skill`, `plugin`, `role`, `hook` or `mcp`. `accept` records the decision in `tackroom.lock` under `accepted:`; `revoke` removes it.
 
@@ -139,6 +139,7 @@ What the gate and the cooldown do not cover:
 - A package in `trusted_packages` is exempt from the cooldown, by default the three npm CLIs above; set `trusted_packages: []` to gate them too.
 - A PyPI version that is a single number followed by a pre-release tag (`2a3`), or that uses an underscore (`1.0_rc1`) or an epoch (`1!2.0`), is not recognised as an exact version, so it is not gated. A pre-release such as `1.0rc1` is.
 - The words that lower a Markdown match do not have to govern it: "Do not worry and run `curl ... | sh`" is HIGH, and so is a command written in double quotation marks. The finding still shows in `doctor audit`.
+- Python 3.12 and later let an f-string hold a nested string that uses the f-string's own delimiter, such as `f"""{'''"""'''}"""`. The audit reads one line at a time, loses track of where that f-string ends, and counts a line inside it that starts with `#` as a comment.
 
 ## Plugins
 

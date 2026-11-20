@@ -304,6 +304,9 @@ func pyLoweredLines(lines []string) []bool {
 					end++
 				}
 				if end < len(line) && (line[end] == '"' || line[end] == '\'') && pyStringPrefix(line[pos:end]) {
+					// An f- or t-string runs the code in its braces, so it is
+					// never a docstring.
+					code = code || strings.ContainsAny(line[pos:end], "fFtT")
 					pos = end // r"...", b'...', f"""...""": part of the string
 					continue
 				}
