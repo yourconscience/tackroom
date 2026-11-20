@@ -78,6 +78,7 @@ code { font-size: 16px; }
 .top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 8px 0 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
 .brand { display: flex; align-items: center; gap: 9px; flex: 1; min-width: 0; font-size: 17px; font-weight: 600; text-decoration: none; }
 .brand .ic { width: 22px; height: 22px; }
+.top .brand { min-height: 44px; }
 .side { display: none; }
 
 /* ---------- main ---------- */
@@ -147,6 +148,7 @@ code { font-size: 16px; }
 /* ---------- skills ---------- */
 .src { display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; margin: 26px 0 4px; }
 .src b { font-weight: 600; color: var(--muted); }
+.src b.st-warn { color: var(--warn); }
 .src code { color: var(--faint); font-size: 14px; }
 .srow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; width: 100%; min-height: 44px; padding: 12px 0; border: 0; border-top: 1px solid var(--line); background: none; text-align: left; }
 .srow .n { font-weight: 600; font-size: 17px; overflow-wrap: anywhere; }

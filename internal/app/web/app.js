@@ -281,7 +281,30 @@ async function loadHosts(refreshNow = false) {
 }
 
 // ---------- chrome ----------
-function skillNeedsAttention(skill) { return Object.values(skill.states).some((state) => ATTENTION.has(state)); }
+function sourceRepo(row) { return (row.source || '').replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, ''); }
+// The lock row of the source an outside skill comes from, when the audit blocked that source.
+function blockedSource(skill) {
+  if (skill.origin === 'local') return null;
+  const repo = skill.origin.split('@')[0];
+  return (store.inv?.lock || []).find((row) => row.state === 'blocked' && sourceRepo(row) === repo) || null;
+}
+function skillNeedsAttention(skill) { return Object.values(skill.states).some((state) => ATTENTION.has(state)) || Boolean(blockedSource(skill)); }
+// Where a skill, role, MCP server or hook is wrong, as "is missing in 12 harnesses and has drifted in Pi".
+const STATE_PHRASES = {missing: 'is missing in', drift: 'has drifted in', conflict: 'has a conflict in', error: 'cannot be checked in', unknown: 'is in an unknown state in'};
+function whereWrong(states) {
+  const visible = new Set(columns());
+  const by = {};
+  for (const [agent, state] of Object.entries(states)) if (visible.has(agent) && ATTENTION.has(state)) (by[state] = by[state] || []).push(agent);
+  return Object.keys(STATE_PHRASES).filter((state) => by[state]).map((state) => {
+    const list = agentOrder(by[state]);
+    return `${STATE_PHRASES[state]} ${list.length <= 2 ? names(list.map(display)) : plural(list.length, 'harness', 'harnesses')}`;
+  }).join(' and ') || 'needs attention';
+}
+// The rows that need attention, named in a view's lead: three at most, then how many more.
+function attentionLead(rows) {
+  return [...rows.slice(0, 3).map((row) => `${row.name} ${whereWrong(row.states)}.`), rows.length > 3 ? `${rows.length - 3} more need attention too.` : ''].filter(Boolean).join(' ');
+}
+function needsAttention(row) { return Object.values(row.states).some((state) => ATTENTION.has(state)); }
 function syncCounts() {
   const agents = store.inv?.agents || [];
   return {
@@ -440,7 +463,7 @@ function syncItem(outOfSync) {
   const title = pending > 0 ? `${plural(pending, 'change')} waiting to sync` : outOfSync.length ? `${plural(outOfSync.length, 'harness', 'harnesses')} out of sync` : link;
   return issue(title, '', [
     outOfSync.length ? h('p', {text: `${names(outOfSync.map((agent) => display(agent.name)))} ${outOfSync.length === 1 ? 'needs' : 'need'} it${what ? `: ${what}` : ''}.`}) : null,
-    outOfSync.map((agent) => (harnessDetail(agent) ? h('p', {class: 'meta', text: `${display(agent.name)}: ${harnessDetail(agent)}`}) : null)),
+    new Set(outOfSync.map(harnessDetail)).size > 1 ? outOfSync.map((agent) => (harnessDetail(agent) ? h('p', {class: 'meta', text: `${display(agent.name)}: ${harnessDetail(agent)}`}) : null)) : null,
     link && outOfSync.length ? h('p', {class: 'meta', text: `${link}.`}) : null,
     h('p', {class: 'meta', text: 'Sync shows the plan before it changes anything.'}),
   ], [syncButton('Sync')]);
@@ -619,19 +642,30 @@ function renderSkills(root) {
   const live = liveAgents();
   const skills = inv.skills;
   const attention = skills.filter(skillNeedsAttention);
+  // A blocked source with no skill here yet still needs attention, as on Overview.
+  const blocked = inv.lock.filter((row) => row.state === 'blocked');
+  const orphans = blocked.filter((row) => !skills.some((skill) => blockedSource(skill) === row));
+  const asks = attention.length + orphans.length;
   const yours = skills.filter((skill) => skill.origin === 'local');
   const outside = skills.filter((skill) => skill.origin !== 'local');
   const sources = new Set(outside.map((skill) => skill.origin.split('@')[0]));
   const allOk = skills.every((skill) => live.every((agent) => skill.states[agent.name] === 'ok'));
   const listing = live.find((agent) => agent.tokens)?.tokens;
-  const title = !skills.length ? 'No skills yet'
-    : attention.length ? `${plural(attention.length, 'skill')} need${attention.length === 1 ? 's' : ''} attention`
+  const title = asks ? `${[attention.length && plural(attention.length, 'skill'), orphans.length && plural(orphans.length, 'outside source')].filter(Boolean).join(' and ')} need${asks === 1 ? 's' : ''} attention`
+    : !skills.length ? 'No skills yet'
       : allOk ? `${skills.length} skills, in place everywhere` : `${plural(skills.length, 'skill')}, none needs attention`;
-  const said = !skills.length ? 'No canonical skills yet. Add one with tackroom skill new <name>.' : [
-    allOk && live.length ? `Every skill is linked in all ${live.length} installed harnesses.` : '',
-    `${yours.length} ${yours.length === 1 ? 'is' : 'are'} yours and ${outside.length} ${outside.length === 1 ? 'comes' : 'come'} from ${plural(sources.size, 'outside source')}.`,
-    listing ? `Their listings cost about ${tokens(listing).slice(1)} tokens in each harness.` : '',
-    HELP.skills,
+  const fromBlocked = blocked.map((row) => {
+    const from = skills.filter((skill) => blockedSource(skill) === row).map((skill) => skill.name);
+    return from.length ? `${names(from)} come${from.length === 1 ? 's' : ''} from ${sourceRepo(row) || row.name}, which the audit blocked.` : `${sourceRepo(row) || row.name} is blocked by the audit.`;
+  }).join(' ');
+  const said = [
+    fromBlocked,
+    attentionLead(skills.filter(needsAttention)),
+    !skills.length ? 'No canonical skills yet. Add one with tackroom skill new <name>.' : '',
+    skills.length && allOk && live.length ? `Every skill is linked in all ${live.length} installed harnesses.` : '',
+    skills.length ? `${yours.length} ${yours.length === 1 ? 'is' : 'are'} yours and ${outside.length} ${outside.length === 1 ? 'comes' : 'come'} from ${plural(sources.size, 'outside source')}.` : '',
+    listing && skills.length ? `Their listings cost about ${tokens(listing).slice(1)} tokens in each harness.` : '',
+    skills.length ? HELP.skills : '',
   ].filter(Boolean).join(' ');
   const list = h('div', {class: 'list'});
   const counts = {all: skills.length, attention: attention.length, local: yours.length, external: outside.length};
@@ -642,12 +676,12 @@ function renderSkills(root) {
       drawSkills(list);
     }}, label, h('span', {class: 'mono', text: String(counts[value])}))));
   mount(root,
-    hero(attention.length ? WARN : OK, title, said),
+    hero(asks ? WARN : skills.length ? OK : IDLE, title, said),
     skills.length ? h('div', {class: 'tools'},
       h('label', {class: 'search'}, icon('i-search'), h('input', {type: 'search', 'aria-label': 'Search skills', placeholder: `Search ${skills.length} skills`, value: store.skillQuery, oninput: (event) => { store.skillQuery = event.target.value; drawSkills(list); }})),
       filters) : null,
     list,
-    h('div', {class: 'list'}, sourcesSection(inv.lock)));
+    h('div', {class: 'list'}, sourcesSection(inv.lock.filter((row) => row.state !== 'blocked'))));
   drawSkills(list);
 }
 function drawSkills(list) {
@@ -656,28 +690,34 @@ function drawSkills(list) {
   const filter = store.skillFilter;
   const match = (skill) => (!query || `${skill.name} ${skill.description} ${skill.origin}`.toLowerCase().includes(query))
     && (filter === 'all' || (filter === 'attention' && skillNeedsAttention(skill)) || (filter === 'local' && skill.origin === 'local') || (filter === 'external' && skill.origin !== 'local'));
+  // Needs attention first: each blocked source with the command that accepts it, then the skills to look at.
+  const blocked = filter === 'local' ? [] : inv.lock.filter((row) => row.state === 'blocked' && (!query || `${row.name} ${row.source}`.toLowerCase().includes(query)));
+  const asks = inv.skills.filter((item) => skillNeedsAttention(item) && match(item));
   const groups = new Map();
-  for (const skill of inv.skills.filter((item) => item.origin !== 'local' && match(item))) {
+  for (const skill of inv.skills.filter((item) => item.origin !== 'local' && !skillNeedsAttention(item) && match(item))) {
     const repo = skill.origin.split('@')[0];
     if (!groups.has(repo)) groups.set(repo, []);
     groups.get(repo).push(skill);
   }
-  const mine = inv.skills.filter((item) => item.origin === 'local' && match(item));
-  const root = mine[0] ? tilde(mine[0].path.slice(0, mine[0].path.lastIndexOf('/'))) : '';
+  const mine = inv.skills.filter((item) => item.origin === 'local' && !skillNeedsAttention(item) && match(item));
+  const local = inv.skills.find((item) => item.origin === 'local');
+  const root = local ? tilde(local.path.slice(0, local.path.lastIndexOf('/'))) : '';
   mount(list,
+    blocked.length || asks.length ? [h('div', {class: 'src'}, h('b', {class: 'st-warn', text: 'Needs attention'})), blocked.map(blockedItem), asks.map(skillRow)] : null,
     [...groups].map(([repo, items]) => {
-      const lock = inv.lock.find((row) => (row.source || '').replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, '') === repo);
+      const lock = inv.lock.find((row) => sourceRepo(row) === repo);
       const commit = items[0].origin.split('@')[1];
       return [h('div', {class: 'src'}, h('b', {text: repo}), h('code', {text: lock && lock.state !== 'pinned' ? lock.state : commit ? `pinned at ${commit}` : 'pinned'}),
         lock?.findings ? h('span', {class: lock.critical ? 'st-fail' : 'st-warn', text: plural(lock.findings, 'audit finding')}) : null), items.map(skillRow)];
     }),
     mine.length ? [h('div', {class: 'src'}, h('b', {text: 'Yours'}), root ? h('code', {text: root}) : null), mine.map(skillRow)] : null,
-    !mine.length && !groups.size && inv.skills.length ? h('p', {class: 'muted', text: filter === 'attention' && !query ? 'Nothing needs attention: every skill is in place.' : 'No skill matches.'}) : null);
+    !mine.length && !groups.size && !asks.length && !blocked.length && inv.skills.length ? h('p', {class: 'muted', text: filter === 'attention' && !query ? 'Nothing needs attention: every skill is in place.' : 'No skill matches.'}) : null);
 }
 function skillRow(skill) {
   const key = `skill:${skill.name}`;
   const open = store.openRows.has(key);
   const live = new Set(columns());
+  const lock = blockedSource(skill);
   const byState = {};
   for (const [agent, state] of Object.entries(skill.states)) if (live.has(agent)) (byState[state] = byState[state] || []).push(agent);
   const chipsFor = (state, cls) => h('span', {class: 'chips'}, agentOrder(byState[state] || []).map((agent) => agentChip(agent, cls)));
@@ -687,6 +727,7 @@ function skillRow(skill) {
       Object.keys(STATE_LABELS).filter((state) => byState[state]).map((state) => [h('dt', {text: STATE_LABELS[state]}), h('dd', {}, chipsFor(state, state === 'conflict' || state === 'error' ? 'st-fail' : 'st-warn'))]),
       h('dt', {text: 'Path'}), h('dd', {class: 'mono', text: tilde(skill.path)}),
       h('dt', {text: 'Origin'}), h('dd', {text: skill.origin === 'local' ? 'yours' : skill.origin}),
+      lock ? [h('dt', {text: 'Source'}), h('dd', {class: 'st-warn', text: `blocked by the audit: ${lock.reason || 'see Needs attention'}`})] : null,
       h('dt', {text: 'Listing'}), h('dd', {text: `${tokens(skill.tokens)} tokens in each harness (est.)`})));
   const row = h('button', {class: 'srow', type: 'button', 'aria-expanded': String(open), onclick: () => {
     const next = !store.openRows.has(key);
@@ -694,7 +735,7 @@ function skillRow(skill) {
     row.setAttribute('aria-expanded', String(next));
     detail.hidden = !next;
   }},
-  h('span', {class: 'n'}, skill.name, skillNeedsAttention(skill) ? h('span', {class: 'tag st-warn', text: 'needs attention'}) : null),
+  h('span', {class: 'n'}, skill.name, lock ? h('span', {class: 'tag st-warn', text: 'source blocked'}) : needsAttention(skill) ? h('span', {class: 'tag st-warn', text: 'needs attention'}) : null),
   h('span', {class: 'd', text: skill.description || ''}),
   h('span', {class: 't', title: 'Listing tokens (est.)', text: String(skill.tokens)}));
   return [row, detail];
@@ -735,22 +776,23 @@ function renderRoles(root) {
   const live = liveAgents();
   const takes = live.filter((agent) => agent.supports_roles);
   const not = live.filter((agent) => !agent.supports_roles);
-  const roles = inv.roles;
-  const attention = roles.filter((role) => Object.values(role.states).some((state) => ATTENTION.has(state)));
+  const attention = inv.roles.filter(needsAttention);
+  const roles = [...attention, ...inv.roles.filter((role) => !needsAttention(role))];
   const allOk = roles.every((role) => takes.every((agent) => role.states[agent.name] === 'ok'));
   const title = !roles.length ? 'No roles yet'
     : attention.length ? `${plural(attention.length, 'role')} need${attention.length === 1 ? 's' : ''} attention`
       : allOk && takes.length ? `${plural(roles.length, 'role')}, in place in all ${takes.length} harnesses that take roles` : plural(roles.length, 'role');
-  const said = [not.length ? `${names(not.map((agent) => display(agent.name)))} ${not.length === 1 ? 'does' : 'do'} not support roles.` : '', HELP.roles].filter(Boolean).join(' ');
+  const said = [attentionLead(attention), not.length ? `${names(not.map((agent) => display(agent.name)))} ${not.length === 1 ? 'does' : 'do'} not support roles.` : '', HELP.roles].filter(Boolean).join(' ');
   const visible = new Set(columns());
   mount(root,
     hero(attention.length ? WARN : roles.length ? OK : IDLE, title, said),
     h('div', {class: 'list'}, roles.length ? roles.map((role) => {
       const states = Object.entries(role.states).filter(([agent]) => visible.has(agent));
       const ok = agentOrder(states.filter(([, state]) => state === 'ok').map(([agent]) => agent));
-      const bad = states.filter(([, state]) => ATTENTION.has(state));
+      const order = agentOrder(states.map(([agent]) => agent));
+      const bad = states.filter(([, state]) => ATTENTION.has(state)).sort(([a], [b]) => order.indexOf(a) - order.indexOf(b));
       return h('div', {class: 'entry'},
-        h('h3', {text: role.name}),
+        h('h3', {}, role.name, needsAttention(role) ? [' ', h('span', {class: 'tag st-warn', text: 'needs attention'})] : null),
         h('span', {class: 'chips'}, ok.map((agent) => agentChip(agent)), bad.map(([agent, state]) => agentChip(agent, state === 'conflict' || state === 'error' ? 'st-fail' : 'st-warn', CELLS[state]))),
         h('p', {class: 'meta', text: `agents/${role.name}.md in your config root`}));
     }) : h('p', {class: 'muted', text: 'No agent roles are configured. Roles live in agents/*.md in your config root.'})));
@@ -760,18 +802,19 @@ function renderRoles(root) {
 function renderWiring(root) {
   const inv = store.inv;
   const rows = [...inv.mcp, ...inv.hooks];
-  const attention = rows.filter((row) => Object.values(row.states).some((state) => ATTENTION.has(state)));
+  const attention = rows.filter(needsAttention);
+  const first = (list) => [...list.filter(needsAttention), ...list.filter((row) => !needsAttention(row))];
   const off = rows.filter((row) => !row.enabled).length;
   const counts = `${plural(inv.mcp.length, 'MCP server')} and ${plural(inv.hooks.length, 'hook')}`;
   const title = attention.length ? `${plural(attention.length, 'entry', 'entries')} need${attention.length === 1 ? 's' : ''} attention`
     : !rows.length ? 'No MCP servers or hooks yet' : off ? `${counts}, ${off} turned off` : `${counts}, all in place`;
   mount(root,
-    hero(attention.length ? WARN : rows.length ? OK : IDLE, title, HELP.wiring),
+    hero(attention.length ? WARN : rows.length ? OK : IDLE, title, [attentionLead(attention), HELP.wiring].filter(Boolean).join(' ')),
     h('div', {class: 'list'},
       h('h2', {class: 'sec-h', text: 'MCP servers'}),
-      inv.mcp.length ? inv.mcp.map((row) => wiringEntry('mcp', row)) : h('p', {class: 'muted', text: 'No MCP servers yet. Add one with tackroom mcp add.'}),
+      inv.mcp.length ? first(inv.mcp).map((row) => wiringEntry('mcp', row)) : h('p', {class: 'muted', text: 'No MCP servers yet. Add one with tackroom mcp add.'}),
       h('h2', {class: 'sec-h', text: 'Hooks'}),
-      inv.hooks.length ? inv.hooks.map((row) => wiringEntry('hooks', row)) : h('p', {class: 'muted', text: 'No hooks yet. Add them under hooks: in tackroom.yaml.'})));
+      inv.hooks.length ? first(inv.hooks).map((row) => wiringEntry('hooks', row)) : h('p', {class: 'muted', text: 'No hooks yet. Add them under hooks: in tackroom.yaml.'})));
 }
 function wiringEntry(kind, row) {
   const section = kind === 'mcp' ? 'mcp_servers' : 'hooks';
@@ -794,7 +837,7 @@ function wiringEntry(kind, row) {
     }, agentMark(agent), display(agent), shown ? h('span', {class: 'state', text: `(${shown})`}) : null);
   });
   return h('div', {class: 'entry'},
-    switchEl(row.enabled, row.name, sub, (next) => patch(section, row.name, 'enabled', next, `${row.name} ${next ? 'turned on' : 'turned off'}.`)),
+    switchEl(row.enabled, [row.name, needsAttention(row) ? h('span', {class: 'tag st-warn', text: 'needs attention'}) : null], sub, (next) => patch(section, row.name, 'enabled', next, `${row.name} ${next ? 'turned on' : 'turned off'}.`)),
     row.command ? h('p', {class: 'meta'}, h('code', {text: tilde(row.command)})) : null,
     chips.length ? [h('p', {class: 'muted', text: 'Targets. Select a harness to add or remove it:'}), h('div', {class: 'chips'}, chips)] : null,
     unsupported.length ? h('p', {class: 'muted', text: `Not supported in ${names(unsupported.map(display))}.`}) : null);
