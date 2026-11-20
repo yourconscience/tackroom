@@ -86,25 +86,26 @@ func parseViewIdleTimeout(value string) (time.Duration, error) {
 
 // ensureView reports the running view, starting one in the background first
 // when none answers, then opens it unless told not to.
-func ensureView(doc *configDocument, opts configServeOptions, files viewFiles, token, idle string) error {
+func ensureView(doc *configDocument, opts configServeOptions, files viewFiles, token string) error {
 	info, started, err := runOrStartView(doc, opts, files, token)
 	if err != nil {
 		return err
 	}
-	if info.IdleTimeout == "" {
-		info.IdleTimeout = idle
-	}
+	// A view an older tackroom started reports no idle timeout; it stays
+	// empty rather than claiming this config's value.
 	if opts.JSON {
 		return encodeJSON(os.Stdout, viewJSON{URL: info.URL, Addr: info.Addr, PID: info.PID, Started: started, IdleTimeout: info.IdleTimeout})
 	}
-	lifetime := "it runs until tackroom view --stop"
+	lifetime := ""
 	if d, err := parseViewIdleTimeout(info.IdleTimeout); err == nil && d > 0 {
-		lifetime = "it exits after " + info.IdleTimeout + " without requests, or on tackroom view --stop"
+		lifetime = "; it exits after " + info.IdleTimeout + " without requests, or on tackroom view --stop"
+	} else if err == nil {
+		lifetime = "; it runs until tackroom view --stop"
 	}
 	if started {
-		fmt.Fprintf(os.Stdout, "\nStarted tackroom view in the background (pid %d); %s.\n", info.PID, lifetime)
+		fmt.Fprintf(os.Stdout, "\nStarted tackroom view in the background (pid %d)%s.\n", info.PID, lifetime)
 	} else {
-		fmt.Fprintf(os.Stdout, "\ntackroom view is already running (pid %d); %s.\n", info.PID, lifetime)
+		fmt.Fprintf(os.Stdout, "\ntackroom view is already running (pid %d)%s.\n", info.PID, lifetime)
 	}
 	announceView(os.Stdout, info.URL, opts, os.Getenv("SSH_CONNECTION") != "", resolveSSHHost(opts.SSHHost, os.Getenv))
 	return nil
@@ -232,6 +233,12 @@ func stopView(opts configServeOptions, files viewFiles) error {
 	if info.PID == 0 {
 		fmt.Fprintf(os.Stdout, "The tackroom view at %s does not report its process ID (an older tackroom started it); stop it where it runs.\n", info.Addr)
 		return nil
+	}
+	// Signal only a process that both the answer and view.pid name, never a
+	// group or every process.
+	recorded, _ := os.ReadFile(files.pid)
+	if info.PID <= 1 || strings.TrimSpace(string(recorded)) != strconv.Itoa(info.PID) {
+		return fmt.Errorf("the view at %s reports pid %d, which %s does not record; not stopping it", info.Addr, info.PID, files.pid)
 	}
 	if err := syscall.Kill(info.PID, syscall.SIGTERM); err != nil {
 		return fmt.Errorf("stop tackroom view (pid %d): %w", info.PID, err)

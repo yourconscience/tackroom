@@ -85,7 +85,7 @@ func runConfigServe(opts configServeOptions) error {
 		return err
 	}
 	if !opts.Foreground {
-		return ensureView(doc, opts, files, token, idle)
+		return ensureView(doc, opts, files, token)
 	}
 	return serveView(doc, opts, files, token, idle)
 }
@@ -311,7 +311,8 @@ func resolveServerToken(tokenFile string) (string, error) {
 	if tokenFile == "" {
 		return randomToken(32)
 	}
-	switch data, err := os.ReadFile(tokenFile); {
+	data, err := os.ReadFile(tokenFile)
+	switch {
 	case err == nil:
 		if tok := strings.TrimSpace(string(data)); tok != "" {
 			return tok, nil
@@ -319,6 +320,7 @@ func resolveServerToken(tokenFile string) (string, error) {
 	case !errors.Is(err, os.ErrNotExist):
 		return "", fmt.Errorf("read token file %s: %w", tokenFile, err)
 	}
+	missing := err != nil
 	tok, err := randomToken(32)
 	if err != nil {
 		return "", err
@@ -326,10 +328,44 @@ func resolveServerToken(tokenFile string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(tokenFile), 0o700); err != nil {
 		return "", fmt.Errorf("create token file directory: %w", err)
 	}
+	if missing {
+		// Created by hard link, so concurrent first runs never see a half
+		// written file and all take the token of the one that linked first.
+		if winner, ok := linkNewToken(tokenFile, tok); ok {
+			return winner, nil
+		}
+	}
 	if err := os.WriteFile(tokenFile, []byte(tok+"\n"), 0o600); err != nil {
 		return "", fmt.Errorf("write token file %s: %w", tokenFile, err)
 	}
 	return tok, nil
+}
+
+// linkNewToken creates tokenFile holding tok unless it exists, and returns the
+// token the file then holds. It reports false when the file system cannot do
+// it, and the caller writes the file directly.
+func linkNewToken(tokenFile, tok string) (string, bool) {
+	tmp, err := os.CreateTemp(filepath.Dir(tokenFile), ".view-token-*")
+	if err != nil {
+		return "", false
+	}
+	defer os.Remove(tmp.Name())
+	_, writeErr := tmp.WriteString(tok + "\n")
+	if err := tmp.Close(); err != nil || writeErr != nil {
+		return "", false
+	}
+	err = os.Link(tmp.Name(), tokenFile)
+	if err == nil {
+		return tok, true
+	}
+	if !errors.Is(err, os.ErrExist) {
+		return "", false
+	}
+	data, err := os.ReadFile(tokenFile)
+	if winner := strings.TrimSpace(string(data)); err == nil && winner != "" {
+		return winner, true
+	}
+	return "", false
 }
 
 func (s *configWebServer) handler() http.Handler {

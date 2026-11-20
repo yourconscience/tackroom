@@ -39,12 +39,12 @@ Scripts, terminal plugins and editor extensions open the view through the comman
   {"url": "http://127.0.0.1:8765/?token=...", "addr": "127.0.0.1:8765", "pid": 4242, "started": true, "idle_timeout": "30m"}
   ```
 
-  `url` is the signed-in startup URL. `addr` is the address the view listens on, which differs from the configured one after a fallback. `pid` is the view's process. `started` is true only when this call started it. `idle_timeout` is the view's own setting, `"0"` for one that never exits when idle (a `--foreground` view). A view started by an older tackroom reports `pid` 0. The output is pretty-printed; parse it as JSON.
+  `url` is the signed-in startup URL. `addr` is the address the view listens on, which differs from the configured one after a fallback. `pid` is the view's process. `started` is true only when this call started it. `idle_timeout` is the view's own setting, `"0"` for one that never exits when idle (a `--foreground` view). A view started by an older tackroom reports `pid` 0 and an empty `idle_timeout`. The output is pretty-printed; parse it as JSON.
 - Exit codes: 0 when a view answers, 1 when none could be started or a flag or the config is invalid (the reason on stderr).
 
-`tackroom view --stop` stops the view that answers for this token: it sends that process SIGTERM and waits until it stops answering. It exits 0 when it stopped one and when none was running, and says which; 1 when the view still answers 5 seconds later. It does not read the config, so it also works while the config is invalid.
+`tackroom view --stop` stops the view that answers for this token: it sends SIGTERM to the process that view reports, only when `view.pid` records the same one, and waits until it stops answering. It exits 0 when it stopped one and when none was running, and says which; 1 when the view still answers 5 seconds later. It does not read the config, so it also works while the config is invalid.
 
-A background view exits when no HTTP request has reached it for `ui.view.idle_timeout` (default `30m`). Every request resets the timer, and an open page sends one every 60 seconds while it is visible, so a view stays up while you have it open and exits after you close the last tab or leave it hidden. `0` keeps it running until `--stop`. It still [restarts on upgrade](#restart-on-upgrade).
+A background view exits when no HTTP request has reached it for `ui.view.idle_timeout` (default `30m`). Every request resets the timer, and an open page sends one every 60 seconds while it is visible, so a view stays up while you have it open and exits after you close the last tab or leave it hidden. `0` keeps it running until `--stop`. Because the page sends its request once a minute, an open page alone does not keep up a view whose `idle_timeout` is under `1m`. It still [restarts on upgrade](#restart-on-upgrade).
 
 State files, in `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`), or beside `--token-file` and named after it:
 
