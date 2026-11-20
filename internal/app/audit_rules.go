@@ -376,8 +376,9 @@ func pyStringPrefix(word string) bool {
 
 // hiddenLineBreak reports whether line holds a break that splitting on "\n"
 // does not see: a carriage return before its end, which ends a Python line, or
-// U+2028 or U+2029, which end a JavaScript comment. Such a line is never
-// lowered, since the code after the break may run.
+// U+2028 or U+2029, which end a JavaScript comment. A file with such a break
+// lowers nothing: the code after it may run, and it shifts how later lines are
+// read.
 func hiddenLineBreak(line string) bool {
 	if i := strings.IndexByte(line, '\r'); i >= 0 && i < len(line)-1 {
 		return true
@@ -406,14 +407,20 @@ func scanText(file, text string) []ruleFinding {
 	lines := strings.Split(text, "\n")
 	lowered := loweredLines(file, lines)
 	prose := proseLines(file, lines)
+	breaks := false
+	for _, line := range lines {
+		breaks = breaks || hiddenLineBreak(line)
+	}
 	for i, line := range lines {
-		hidden := hiddenLineBreak(line)
+		// A line after one that ends with a backslash continues it in a shell
+		// and in most languages, so it is never lowered.
+		joined := i > 0 && strings.HasSuffix(strings.TrimSuffix(lines[i-1], "\r"), `\`)
 		for _, rule := range auditRules {
 			m, low := ruleMatch(rule, line, prose[i])
 			if m == "" {
 				continue
 			}
-			add(newRuleFinding(rule, file, m, (lowered[i] || low) && !hidden))
+			add(newRuleFinding(rule, file, m, (lowered[i] || low) && !breaks && !joined))
 		}
 	}
 	// Unicode rules look at runes, not lines, and are never lowered: a hidden
