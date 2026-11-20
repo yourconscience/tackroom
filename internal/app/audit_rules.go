@@ -382,7 +382,7 @@ func hiddenLineBreak(line string) bool {
 	if i := strings.IndexByte(line, '\r'); i >= 0 && i < len(line)-1 {
 		return true
 	}
-	return strings.ContainsRune(line, ' ') || strings.ContainsRune(line, ' ')
+	return strings.ContainsRune(line, '\u2028') || strings.ContainsRune(line, '\u2029')
 }
 
 // scanText applies every rule line by line. file is the path relative to the
