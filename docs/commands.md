@@ -65,7 +65,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 | `tackroom config print` | Prints the shared, local and effective config. |
 | `tackroom config inventory` | Prints, as JSON, what the web view's tabs draw. Read-only. |
 | `tackroom config set <section/name/field> <value>` | Changes one field of an entry, as the web view's switches and cells do. |
-| `tackroom view` | Opens the loopback web UI. See [view.md](view.md). |
+| `tackroom view` | Opens the loopback web UI, starting it in the background when none runs. `--json` for scripts, `--stop`, `--foreground`. See [view.md](view.md). |
 
 ## Crons
 
@@ -200,7 +200,11 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 - The value is JSON when it parses as JSON and text otherwise; `null` is refused.
 - An entry defined in `tackroom.local.yaml` is changed there, otherwise `tackroom.yaml`. It prints the changed lines and does not sync.
 
-`tackroom view [--addr 127.0.0.1:8765] [--no-open] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]`: see [view.md](view.md).
+`tackroom view [--no-open | --json | --foreground | --stop] [--addr 127.0.0.1:8765] [--secure-cookie] [--ssh-host user@host] [--token-file PATH]`: see [view.md](view.md).
+
+- Without `--foreground` it reports the running view or starts one in the background, which exits after `ui.view.idle_timeout` (default `30m`) without requests, then opens it in the browser.
+- `--json` prints `url`, `addr`, `pid`, `started` and `idle_timeout` as one JSON object and opens no browser; plugins and scripts use it ([caller contract](view.md#starting-stopping-and-the-caller-contract)).
+- `--stop` stops the running view. Exit 0 means no view answers now (it stopped one or none ran); exit 1 means one still answers. `--foreground` serves in this terminal until Ctrl-C; under launchd or systemd plain `view` does too.
 
 ### Crons in detail
 

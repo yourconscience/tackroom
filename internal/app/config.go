@@ -73,9 +73,33 @@ func mergeConfig(base *config, overlay config) {
 		base.TrustedPackages = &trusted
 	}
 	if overlay.UI != nil {
-		copyUI := *overlay.UI
-		copyUI.Links = append([]uiLink(nil), overlay.UI.Links...)
-		base.UI = &copyUI
+		// Each ui key the local file sets replaces the shared one, so a
+		// machine can change ui.view without repeating ui.links.
+		merged := uiConfig{}
+		if base.UI != nil {
+			merged = *base.UI
+		}
+		if overlay.UI.Links != nil {
+			merged.Links = append([]uiLink(nil), overlay.UI.Links...)
+		}
+		if o := overlay.UI.View; o != nil {
+			view := uiViewConfig{}
+			if merged.View != nil {
+				view = *merged.View
+			}
+			if o.Addr != "" {
+				view.Addr = o.Addr
+			}
+			if o.IdleTimeout != "" {
+				view.IdleTimeout = o.IdleTimeout
+			}
+			if o.OpenBrowser != nil {
+				openBrowser := *o.OpenBrowser
+				view.OpenBrowser = &openBrowser
+			}
+			merged.View = &view
+		}
+		base.UI = &merged
 	}
 }
 
@@ -323,6 +347,20 @@ func validateConfig(cfg *config, home string, expand bool) error {
 			parsed, err := url.Parse(link.URL)
 			if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
 				return fmt.Errorf("config ui link %s must be an absolute https URL or origin-relative path", link.Name)
+			}
+		}
+		if view := cfg.UI.View; view != nil {
+			view.Addr = strings.TrimSpace(view.Addr)
+			view.IdleTimeout = strings.TrimSpace(view.IdleTimeout)
+			if view.Addr != "" {
+				if err := validateLoopbackAddr(view.Addr); err != nil {
+					return fmt.Errorf("config ui.view.addr: %w", err)
+				}
+			}
+			if view.IdleTimeout != "" {
+				if _, err := parseViewIdleTimeout(view.IdleTimeout); err != nil {
+					return fmt.Errorf("config ui.view.idle_timeout: %w", err)
+				}
 			}
 		}
 	}

@@ -218,9 +218,26 @@ export default class Tackroom extends View {
     });
   }
 
-  // The running `tackroom view` on the matching tab, signed in with the token it saved.
-  openWeb(tab) {
-    exec("/bin/sh", ["-c", 'd="${XDG_STATE_HOME:-$HOME/.local/state}/tackroom"; open "http://$(tr -d "\\n" < "$d/view.addr")/?token=$(tr -d "\\n" < "$d/view.token")#$1"', "sh", tab.web]);
+  // `tackroom view --json` starts the view when none runs and prints its signed-in
+  // URL; Web opens that on the matching tab.
+  openWeb(tab, cx) {
+    cx.spawn(async () => {
+      try {
+        const r = await this.tackroom(["view", "--json"], 30000);
+        // A tackroom without `view --json` (3.0 and older): open the running view
+        // from the files it saved, as this button did before.
+        if (r.code !== 0 && r.stderr.includes("flag provided but not defined")) {
+          const opened = await exec("/bin/sh", ["-c", 'd="${XDG_STATE_HOME:-$HOME/.local/state}/tackroom"; open "http://$(tr -d "\\n" < "$d/view.addr")/?token=$(tr -d "\\n" < "$d/view.token")#$1"', "sh", tab.web]);
+          if (opened.code !== 0) throw new Error(lastLine(opened));
+          return;
+        }
+        if (r.code !== 0) throw new Error(lastLine(r));
+        const opened = await exec("/usr/bin/open", [`${JSON.parse(r.stdout).url}#${tab.web}`]);
+        if (opened.code !== 0) throw new Error(lastLine(opened));
+      } catch (e) {
+        notify({ title: "Could not open tackroom view", body: String(e?.message ?? e), level: "error" });
+      }
+    });
   }
 
   // The inventory as rows of the Skills, Roles and MCP & hooks tabs: a name, a
@@ -289,7 +306,7 @@ export default class Tackroom extends View {
       .child(div().flex_1().text_size(13).font_semibold().child("tackroom"))
       .child(div().text_size(11).text_color(t.dim).child(s.loading ? "loading…" : s.at ? clock(s.at) : ""))
       .child(this.button("refresh", "Refresh", (cx) => this.load(tab.source, cx), false, s.loading, t))
-      .child(this.button("web", "Web", () => this.openWeb(tab), false, false, t));
+      .child(this.button("web", "Web", (cx) => this.openWeb(tab, cx), false, false, t));
     const strip = h_flex().flex_none().flex_wrap().gap(2).px(8).pb(6).border_b(1).border_color(t.border)
       .children(TABS.map((x) => this.tabButton(x, t)));
 

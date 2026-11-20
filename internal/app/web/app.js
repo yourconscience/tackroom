@@ -1272,3 +1272,12 @@ route();
 refresh();
 loadCrons();
 loadHosts();
+// A background view exits after ui.view.idle_timeout without requests. The page pings while it is
+// visible, and while a Config draft is unsaved even when hidden, so the draft can still be saved.
+// A failed ping says the view stopped instead of leaving the next action to fail.
+function ping() {
+  const stopped = document.getElementById('view-stopped');
+  api('/api/ping').then(() => { stopped.hidden = true; }, () => { stopped.hidden = false; });
+}
+setInterval(() => { if (document.visibilityState === 'visible' || Object.keys(store.drafts).length) ping(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') ping(); });
