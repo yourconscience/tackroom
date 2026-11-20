@@ -415,9 +415,9 @@ func scanText(file, text string) []ruleFinding {
 		breaks = breaks || script && hiddenLineBreak(line)
 	}
 	for i, line := range lines {
-		// A line after one that ends with a backslash continues it in a shell
-		// and in most languages, so it is never lowered.
-		joined := script && i > 0 && strings.HasSuffix(strings.TrimSuffix(lines[i-1], "\r"), `\`)
+		// A line after one that ends with an unescaped backslash continues it in
+		// a shell and in most languages, so it is never lowered.
+		joined := script && i > 0 && pyEndsWithBackslash(lines[i-1])
 		for _, rule := range auditRules {
 			m, low := ruleMatch(rule, line, prose[i])
 			if m == "" {
