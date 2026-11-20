@@ -152,8 +152,11 @@ func startView(doc *configDocument, opts configServeOptions, files viewFiles, to
 	if err != nil {
 		return runningViewInfo{}, false, fmt.Errorf("start tackroom view: %w", err)
 	}
-	exited := make(chan error, 1)
-	go func() { exited <- cmd.Wait() }()
+	exited := make(chan struct{})
+	go func() {
+		_ = cmd.Wait()
+		close(exited)
+	}()
 	deadline := time.After(viewStartTimeout)
 	tick := time.NewTicker(100 * time.Millisecond)
 	defer tick.Stop()
