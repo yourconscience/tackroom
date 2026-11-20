@@ -52,6 +52,8 @@ const store = {
   cronBusy: '',
   hosts: null,
   hostsLoading: true,
+  hostsError: '',
+  scheduleDrafts: {},
   sheet: null,
 };
 
@@ -220,6 +222,13 @@ async function patch(section, name, field, value, message) {
   const state = layer === 'local' ? store.local : store.shared;
   store.busy = true;
   document.querySelectorAll('.sw, button.chip').forEach((node) => { node.disabled = true; });
+  // The plan on screen no longer matches the config: Apply stays off until the new plan arrives.
+  if (sheetOpen('sync-panel')) {
+    planSeq += 1;
+    store.preview = null;
+    store.planChanges = 0;
+    setApply(false, 'Saving the change, then building the plan again…');
+  }
   try {
     await api('/api/config', {method: 'PATCH', body: JSON.stringify({layer, expected_revision: state.revision, operations: [{op: 'set', path: `/${section}/${name}/${field}`, value}]})});
     toast(`${message} Saved to ${layer === 'local' ? 'tackroom.local.yaml' : 'tackroom.yaml'}; Sync to apply it.`);
@@ -273,22 +282,49 @@ async function loadCrons(refreshNow = false) {
 async function loadHosts(refreshNow = false) {
   try {
     store.hosts = await api(`/api/hosts${refreshNow ? '?refresh=1' : ''}`);
-  } catch {
-    // Without an answer the Machines rows stay out, as with a single host.
+    store.hostsError = '';
+  } catch (error) {
+    // Overview shows the failure with Retry: it never reads "All clear" with the machines unchecked.
+    store.hostsError = error.message;
   }
   store.hostsLoading = false;
   if (store.view === 'overview') renderView();
 }
 
 // ---------- chrome ----------
-function sourceRepo(row) { return (row.source || '').replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, ''); }
-// The lock row of the source an outside skill comes from, when the audit blocked that source.
-function blockedSource(skill) {
+// owner/repo of a source URL in any form (https, ssh://, git@host:), as tackroom names a skill's origin.
+function sourceRepo(row) {
+  let rest = String(row.source || '').trim();
+  if (rest.includes('://')) rest = rest.slice(rest.indexOf('://') + 3);
+  rest = rest.replace(/^git@/, '');
+  if (rest.includes(':')) rest = rest.slice(rest.indexOf(':') + 1);
+  const parts = rest.replace(/\/$/, '').replace(/\.git$/, '').split('/');
+  return parts.length >= 2 ? parts.slice(-2).join('/') : rest;
+}
+// The lock row of the source an outside skill comes from, when that source is blocked or in cooldown.
+function sourceLock(skill) {
   if (skill.origin === 'local') return null;
   const repo = skill.origin.split('@')[0];
-  return (store.inv?.lock || []).find((row) => row.state === 'blocked' && sourceRepo(row) === repo) || null;
+  return (store.inv?.lock || []).find((row) => (row.state === 'blocked' || row.state === 'cooldown') && sourceRepo(row) === repo) || null;
 }
-function skillNeedsAttention(skill) { return Object.values(skill.states).some((state) => ATTENTION.has(state)) || Boolean(blockedSource(skill)); }
+function blockedSource(skill) { const lock = sourceLock(skill); return lock?.state === 'blocked' ? lock : null; }
+// The states that count against a skill. A skill of a source in cooldown stays with the rest, as on Overview
+// and in the Herdr panel: sync waits for the cooldown on its own, so only a conflict or an unreadable config counts.
+function skillStates(skill) {
+  if (!sourceLock(skill)) return skill.states;
+  return Object.fromEntries(Object.entries(skill.states).filter(([, state]) => state === 'conflict' || state === 'error'));
+}
+function skillNeedsAttention(skill) { return Boolean(blockedSource(skill)) || Object.values(skillStates(skill)).some((state) => ATTENTION.has(state)); }
+// What needs attention on Skills: its skills, and blocked sources no skill here comes from yet.
+// The headline, the filter chip and the sidebar badge all count this.
+function skillAsks() {
+  const inv = store.inv;
+  if (!inv) return {skills: [], orphans: [], fail: 0};
+  const skills = inv.skills.filter(skillNeedsAttention);
+  const orphans = inv.lock.filter((row) => row.state === 'blocked' && !inv.skills.some((skill) => blockedSource(skill) === row));
+  const fail = skills.filter((skill) => Object.values(skillStates(skill)).some((state) => state === 'conflict' || state === 'error')).length;
+  return {skills, orphans, fail};
+}
 // Where a skill, role, MCP server or hook is wrong, as "is missing in 12 harnesses and has drifted in Pi".
 const STATE_PHRASES = {missing: 'is missing in', drift: 'has drifted in', conflict: 'has a conflict in', error: 'cannot be checked in', unknown: 'is in an unknown state in'};
 function whereWrong(states) {
@@ -327,16 +363,19 @@ function linkNodes() {
 }
 function renderChrome() {
   const inv = store.inv;
-  const skillsFail = inv ? inv.skills.filter((skill) => Object.values(skill.states).some((state) => state === 'conflict' || state === 'error')).length : 0;
-  const skills = inv ? inv.skills.filter(skillNeedsAttention).length : 0;
-  setBadges('skills', skillsFail || skills, skillsFail ? `${skillsFail} failing` : `${skills} need attention`, !skillsFail);
+  const asks = skillAsks();
+  const skills = asks.skills.length + asks.orphans.length;
+  setBadges('skills', skills, `${skills} need${skills === 1 ? 's' : ''} attention`, !asks.fail);
   const data = store.crons;
   const cronsFail = data ? data.jobs.filter((job) => job.health === 'fail').length + downHosts(data).length : 0;
-  const cronsWarn = data ? data.jobs.filter((job) => job.health === 'warn').length : 0;
+  const cronsWarn = data ? data.jobs.filter((job) => job.health === 'warn').length + unreadableSources(data).length + (store.cronsError ? 1 : 0) : 0;
   setBadges('crons', cronsFail || cronsWarn, cronsFail ? `${cronsFail} failing` : `${cronsWarn} need attention`, !cronsFail);
   const {pending, unsynced} = syncCounts();
   document.getElementById('sync-label').textContent = pending > 0 ? `Review sync · ${pending}` : unsynced > 0 ? 'Review sync' : 'Sync';
-  document.getElementById('dock-sync-label').textContent = pending > 0 ? `Sync · ${pending}` : 'Sync';
+  const dockBadge = document.getElementById('dock-sync-badge');
+  dockBadge.textContent = pending > 0 ? String(pending) : '';
+  dockBadge.title = `${plural(pending, 'change')} waiting to sync`;
+  dockBadge.hidden = !(pending > 0);
   const links = document.getElementById('links');
   mount(links, linkNodes());
   links.hidden = configLinks().length === 0;
@@ -439,7 +478,11 @@ const MACHINE_WORDS = {ok: 'healthy', warn: 'needs attention', fail: 'failing'};
 function machineFix(host) {
   if (host.fix) return host.fix;
   if (!(host.dirty > 0 && host.config_root)) return '';
-  return `${host.host === 'local' ? '' : `ssh ${host.host} `}git -C ${host.host === 'local' ? tilde(host.config_root) : host.config_root} status`;
+  const root = host.host === 'local' ? tilde(host.config_root) : host.config_root;
+  const cmd = `git -C ${shellWord(root)} status`;
+  if (host.host === 'local') return cmd;
+  // Quoted for the remote shell, so a space or a ~ in the path reaches it intact.
+  return `ssh ${host.host} ${shellWord(root) === root && !root.startsWith('~') ? cmd : `'${cmd.replace(/'/g, "'\\''")}'`}`;
 }
 // One failing machine is a row of its own; the machines that need attention share one row,
 // titled with their summary when they share it.
@@ -502,6 +545,18 @@ function unreachable(host, data) {
   return access.length > 0 && access.every((entry) => entry.state === 'not_scanned') && access.some((entry) => (entry.detail || '').startsWith('probe failed'));
 }
 function downHosts(data) { return cronHosts(data).filter((host) => unreachable(host, data)); }
+function unreadableSources(data) { return (data.access || []).filter((entry) => entry.state === 'unreadable'); }
+function unreadableItem(entry) {
+  return issue(`${entry.source} on ${hostName(entry.host)}`, 'unreadable', [
+    h('p', {text: `${sentence(entry.detail || 'tackroom could not read it')}${/\.$/.test(entry.detail || '') ? '' : '.'}`}),
+    h('p', {class: 'meta', text: 'Its jobs are not in this list.'})],
+  [h('button', {type: 'button', class: 'btn', onclick: () => loadCrons(true), text: 'Collect again'})]);
+}
+// A collect that failed while older rows stay on screen.
+function staleCronsItem() {
+  const at = Date.parse(store.crons?.scanned_at);
+  return loadErrorItem('Crons did not refresh', `${store.cronsError}${at ? ` The jobs shown are from ${clock(at)}.` : ''}`, () => loadCrons(true));
+}
 function unreachableItem(host, data) {
   const detail = hostAccess(host, data).find((entry) => (entry.detail || '').startsWith('probe failed'))?.detail || 'probe failed';
   return issue(`${hostName(host)} unreachable`, '', [h('p', {text: `${sentence(detail)}.`}), h('p', {class: 'meta', text: 'Its scheduled jobs are not in this list.'})],
@@ -544,7 +599,10 @@ function overviewModel() {
     ...(sick.length ? [['machine', machineItem(sick)]] : []),
     ...(inv?.lock || []).filter((row) => row.state === 'blocked').map((row) => ['source', blockedItem(row)]),
     ...(!inv && store.invError ? [['error', loadErrorItem('The inventory did not load', store.invError, refresh, linkButton('#config', 'Open Config'))]] : []),
+    ...(data ? unreadableSources(data) : []).map((entry) => ['job', unreadableItem(entry)]),
     ...(!data && store.cronsError ? [['error', loadErrorItem('Crons did not load', store.cronsError, () => loadCrons(true))]] : []),
+    ...(data && store.cronsError ? [['error', staleCronsItem()]] : []),
+    ...(store.hostsError ? [['error', loadErrorItem(store.hosts ? 'Machines did not refresh' : 'Machines did not load', store.hostsError, () => loadHosts(true))]] : []),
   ];
   const pending = [!inv && !store.invError && 'harnesses', !data && !store.cronsError && 'crons', store.hostsLoading && 'machines'].filter(Boolean);
   return {fail, warn, pending, syncWaiting};
@@ -641,10 +699,9 @@ function renderSkills(root) {
   const inv = store.inv;
   const live = liveAgents();
   const skills = inv.skills;
-  const attention = skills.filter(skillNeedsAttention);
   // A blocked source with no skill here yet still needs attention, as on Overview.
+  const {skills: attention, orphans} = skillAsks();
   const blocked = inv.lock.filter((row) => row.state === 'blocked');
-  const orphans = blocked.filter((row) => !skills.some((skill) => blockedSource(skill) === row));
   const asks = attention.length + orphans.length;
   const yours = skills.filter((skill) => skill.origin === 'local');
   const outside = skills.filter((skill) => skill.origin !== 'local');
@@ -660,7 +717,7 @@ function renderSkills(root) {
   }).join(' ');
   const said = [
     fromBlocked,
-    attentionLead(skills.filter(needsAttention)),
+    attentionLead(attention.filter((skill) => !blockedSource(skill)).map((skill) => ({name: skill.name, states: skillStates(skill)}))),
     !skills.length ? 'No canonical skills yet. Add one with tackroom skill new <name>.' : '',
     skills.length && allOk && live.length ? `Every skill is linked in all ${live.length} installed harnesses.` : '',
     skills.length ? `${yours.length} ${yours.length === 1 ? 'is' : 'are'} yours and ${outside.length} ${outside.length === 1 ? 'comes' : 'come'} from ${plural(sources.size, 'outside source')}.` : '',
@@ -668,7 +725,7 @@ function renderSkills(root) {
     skills.length ? HELP.skills : '',
   ].filter(Boolean).join(' ');
   const list = h('div', {class: 'list'});
-  const counts = {all: skills.length, attention: attention.length, local: yours.length, external: outside.length};
+  const counts = {all: skills.length, attention: asks, local: yours.length, external: outside.length};
   const filters = h('div', {class: 'filters', role: 'group', 'aria-label': 'Filter skills'}, [['all', 'All'], ['attention', 'Needs attention'], ['local', 'Yours'], ['external', 'Outside']].map(([value, label]) =>
     h('button', {type: 'button', 'aria-pressed': String(value === store.skillFilter), onclick: (event) => {
       store.skillFilter = value;
@@ -717,7 +774,7 @@ function skillRow(skill) {
   const key = `skill:${skill.name}`;
   const open = store.openRows.has(key);
   const live = new Set(columns());
-  const lock = blockedSource(skill);
+  const lock = sourceLock(skill);
   const byState = {};
   for (const [agent, state] of Object.entries(skill.states)) if (live.has(agent)) (byState[state] = byState[state] || []).push(agent);
   const chipsFor = (state, cls) => h('span', {class: 'chips'}, agentOrder(byState[state] || []).map((agent) => agentChip(agent, cls)));
@@ -727,7 +784,9 @@ function skillRow(skill) {
       Object.keys(STATE_LABELS).filter((state) => byState[state]).map((state) => [h('dt', {text: STATE_LABELS[state]}), h('dd', {}, chipsFor(state, state === 'conflict' || state === 'error' ? 'st-fail' : 'st-warn'))]),
       h('dt', {text: 'Path'}), h('dd', {class: 'mono', text: tilde(skill.path)}),
       h('dt', {text: 'Origin'}), h('dd', {text: skill.origin === 'local' ? 'yours' : skill.origin}),
-      lock ? [h('dt', {text: 'Source'}), h('dd', {class: 'st-warn', text: `blocked by the audit: ${lock.reason || 'see Needs attention'}`})] : null,
+      lock ? [h('dt', {text: 'Source'}), h('dd', {class: lock.state === 'blocked' ? 'st-warn' : '', text: lock.state === 'blocked' ? `blocked by the audit: ${lock.reason || 'see Needs attention'}`
+        : `in cooldown${Date.parse(lock.until) ? ` until ${weekdayClock(Date.parse(lock.until))}` : ''}; sync takes it when the cooldown ends`})] : null,
+      lock?.command ? [h('dt', {text: lock.state === 'blocked' ? 'Accept' : 'Take it now'}), h('dd', {}, command(lock.command))] : null,
       h('dt', {text: 'Listing'}), h('dd', {text: `${tokens(skill.tokens)} tokens in each harness (est.)`})));
   const row = h('button', {class: 'srow', type: 'button', 'aria-expanded': String(open), onclick: () => {
     const next = !store.openRows.has(key);
@@ -735,7 +794,8 @@ function skillRow(skill) {
     row.setAttribute('aria-expanded', String(next));
     detail.hidden = !next;
   }},
-  h('span', {class: 'n'}, skill.name, lock ? h('span', {class: 'tag st-warn', text: 'source blocked'}) : needsAttention(skill) ? h('span', {class: 'tag st-warn', text: 'needs attention'}) : null),
+  h('span', {class: 'n'}, skill.name, lock?.state === 'blocked' ? h('span', {class: 'tag st-warn', text: 'source blocked'})
+    : lock ? h('span', {class: 'tag', text: 'in cooldown'}) : skillNeedsAttention(skill) ? h('span', {class: 'tag st-warn', text: 'needs attention'}) : null),
   h('span', {class: 'd', text: skill.description || ''}),
   h('span', {class: 't', title: 'Listing tokens (est.)', text: String(skill.tokens)}));
   return [row, detail];
@@ -1072,19 +1132,22 @@ function renderCrons(root) {
   const order = {ok: 0, idle: 1, paused: 2};
   const rest = jobs.filter((job) => job.health !== 'fail' && job.health !== 'warn')
     .sort((a, b) => (order[a.health] ?? 3) - (order[b.health] ?? 3) || a.short_name.localeCompare(b.short_name));
+  const unreadable = unreadableSources(data);
+  const stale = Boolean(store.cronsError);
   const title = [jobs.length ? (fails.length ? `${fails.length} of ${jobs.length} jobs failing` : `${plural(jobs.length, 'job')}, none failing`) : '',
-    ...down.map((host) => `${hostName(host)} unreachable`)].filter(Boolean).join(', ') || 'No scheduled jobs';
+    ...down.map((host) => `${hostName(host)} unreachable`), unreadable.length ? `${plural(unreadable.length, 'scheduler')} unreadable` : ''].filter(Boolean).join(', ') || 'No scheduled jobs';
   const counts = restCounts(jobs);
   const said = [hosts.length ? `On ${names(hosts.map(hostName))}${counts ? `: ${counts}` : ''}.` : '', jobs.length ? nextLine(jobs) : HELP.crons].filter(Boolean).join(' ');
   const folds = hosts.map((host) => [host, rest.filter((job) => job.host === host)]).filter(([, list]) => list.length);
   const strip = fireStrip(jobs, hosts);
   mount(root,
-    hero(fails.length || down.length ? FAIL : warns.length ? WARN : jobs.length ? OK : IDLE, title, said),
+    hero(fails.length || down.length ? FAIL : warns.length || unreadable.length || stale ? WARN : jobs.length ? OK : IDLE, title, said),
     tools,
     h('div', {class: 'cols'},
-      fails.length || down.length || warns.length ? h('section', {},
+      fails.length || down.length || warns.length || unreadable.length || stale ? h('section', {},
         fails.length || down.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, down.map((host) => unreachableItem(host, data)), fails.map(jobItem))] : null,
-        warns.length ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'), h('div', {class: 'items'}, warns.map(jobItem))] : null) : null,
+        warns.length || unreadable.length || stale ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'),
+          h('div', {class: 'items'}, stale ? staleCronsItem() : null, unreadable.map(unreadableItem), warns.map(jobItem))] : null) : null,
       folds.length || strip ? h('section', {},
         h('h2', {class: 'gh'}, 'Everything else'),
         h('div', {class: 'hosts'}, folds.map(([host, list]) => hostFold(host, data, list)), strip)) : null),
@@ -1175,6 +1238,13 @@ function openMenu() {
 function renderSheet() {
   const sheet = store.sheet;
   if (!sheet) return;
+  // A redraw keeps the caret in the schedule field the user is typing in.
+  const active = document.activeElement;
+  const caret = active?.closest?.('#sheet-body .cron-schedule') ? active.selectionStart : null;
+  const refocus = () => {
+    const input = caret === null ? null : document.querySelector('#sheet-body .cron-schedule input');
+    if (input) { input.focus(); input.setSelectionRange(caret, caret); }
+  };
   const title = document.getElementById('sheet-title');
   const sub = document.getElementById('sheet-sub');
   const body = document.getElementById('sheet-body');
@@ -1194,6 +1264,7 @@ function renderSheet() {
   mount(sub, h('span', {class: `st-${st}`, text: word}), ` on ${hostName(job.host)}`);
   if (sheet.kind === 'log') {
     mount(body, logNode(job), h('h3', {class: 'sheet-h3', text: 'Actions'}), cronActions(job));
+    refocus();
     return;
   }
   const reason = jobReason(job);
@@ -1203,6 +1274,7 @@ function renderSheet() {
     jobFacts(job),
     h('h3', {class: 'sheet-h3', text: 'Log'}),
     logNode(job));
+  refocus();
 }
 function jobFacts(job) {
   const now = Date.now();
@@ -1213,7 +1285,7 @@ function jobFacts(job) {
     ['Last run', job.last_run ? `${ago(job.last_run)}, ${new Date(Date.parse(job.last_run)).toLocaleString()}${(job.inferred || []).includes('last_run') ? ' (from the log file)' : ''}` : 'never'],
     ['Result', result], ['Runs', job.runs != null ? compact(job.runs) : ''], ['Effect', job.effect], ['Command', job.command], ['ID', job.id],
     ['Scheduler', job.source], ['Cron', job.schedule !== jobSchedule(job) ? job.schedule : ''], ['Time zone', job.tz], ['Created by', job.created_by],
-    ['Connectors', (job.connectors || []).join(', ')], ['Output', job.output_expanded], ['Inferred', (job.inferred || []).join(', ')],
+    ['Connectors', (job.connectors || []).join(', ')], ['Output', job.output_expanded || job.output], ['Inferred', (job.inferred || []).join(', ')],
   ].filter(([, value]) => value);
   return h('dl', {class: 'facts'}, rows.map(([label, value]) => [h('dt', {text: label}), h('dd', {class: ['Command', 'ID', 'Cron'].includes(label) ? 'mono' : '', text: value})]));
 }
@@ -1252,7 +1324,8 @@ function cronActions(job) {
   if (!launchd && !job.editable && !job.edit_note) return h('p', {class: 'note', text: job.source === 'claude-desktop' ? 'Run and pause this task in Claude Desktop.' : 'No actions for this job.'});
   const busy = Boolean(store.cronBusy);
   const input = launchd && job.owned && job.host === 'local' && job.state !== 'disabled'
-    ? h('input', {type: 'text', value: job.declared_schedule || '', placeholder: '0 9 * * *', 'aria-label': 'Schedule (cron expression)', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off'})
+    ? h('input', {type: 'text', value: store.scheduleDrafts[cronKey(job)] ?? job.declared_schedule ?? '', placeholder: '0 9 * * *', 'aria-label': 'Schedule (cron expression)', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off',
+      oninput: (event) => { store.scheduleDrafts[cronKey(job)] = event.target.value; }})
     : null;
   return h('div', {},
     h('div', {class: 'acts sheet-acts'},
@@ -1274,6 +1347,7 @@ async function cronAction(job, action, schedule) {
   try {
     const result = await api('/api/crons/action', {method: 'POST', body: JSON.stringify({host: job.host, source: job.source, id: job.id, action, ...(action === 'schedule' ? {schedule} : {})})});
     toast(`${done} ${job.short_name}`);
+    if (action === 'schedule') delete store.scheduleDrafts[cronKey(job)];
     // The answer carries the job as it now is: redraw that row now, and let the
     // full collect below catch up in the background.
     if (result.job) patchCronRow((row) => row.host === job.host && row.source === job.source && row.id === job.id, result.job);
@@ -1593,6 +1667,9 @@ function updateApply() {
 }
 function setApply(enabled, note, bad = false) {
   document.getElementById('apply-sync').disabled = !enabled;
+  setNote(note, bad);
+}
+function setNote(note, bad = false) {
   const node = document.getElementById('sync-note');
   node.textContent = note;
   node.className = bad ? 'note bad' : 'note';
@@ -1610,7 +1687,7 @@ async function applySync() {
   } catch (error) {
     if (error.code === 'sync_plan_changed' || error.code === 'stale_revision') {
       await loadPlan();
-      setApply(false, 'Something changed since the preview. Review the new plan.', true);
+      setNote('Something changed since the preview. Review the new plan.', true);
       return;
     }
     setApply(true, error.message, true);
