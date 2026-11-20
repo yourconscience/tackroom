@@ -15,11 +15,13 @@
 <link rel="stylesheet" href="tokens.css">
 <link rel="stylesheet" href="style.css">
 <style>
-/* The tack room: one setup drawn as a room you could walk into. The scene (wood, iron, lamp light, the doorway)
-   is the one place on the site that goes past BRAND.md's flat rule; its warm colours live only in the --scene
-   variables below. Everything that carries meaning stays Graphite: nameplates, books, labels, stamps and the
-   status vocabulary, each on its own Graphite surface with a mat ring, so contrast never depends on the wood.
-   State colour always follows a glyph and a shape (solid pin, dashed cooldown, 2px blocked, outlined pass). */
+/* The tack room: one setup drawn as a room at evening, lit by one pendant lamp, with dusk outside the open door.
+   It is the one place on the site that goes past BRAND.md's flat rule. The room keeps its evening look in both page
+   themes; everything written inside it sits on light paper and uses Graphite's light values, so the status
+   vocabulary reads the same everywhere (solid pin, dashed cooldown, 2px blocked, outlined pass, glyph first).
+   State is told by the object where it can be: a synced tag hangs straight, a drifted one hangs from one cord,
+   an unreadable one has fallen to the floor, a turned-off one faces the wall, an undetected peg is empty.
+   Light is one pass over the room (multiply for shade, screen for lamp and doorway light), not shading per object. */
 .intro { display: grid; gap: 14px; padding: 32px 0 20px; }
 .intro h1 { font-size: 34px; }
 .intro .lead { max-width: 60ch; }
@@ -27,167 +29,180 @@
 .legend { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
 .tag .w code, .cooldown-meta { font-size: 16px; }
 
-/* Scene materials. Day by default; evening in dark mode, where the lamp does the work. Checked pairs (3:1 for
-   graphics): plate, book and label surfaces against the wall with and without lamp light, the cord against
-   the wall, and the mat edge against the doorway light and the floor spill. */
 .room {
-  --rail-y: 22px; --row: 236px; --lamp-x: 82%; --door-x: 50%;
-  --wall: #a2744a; --wall-b: #9d7046; --seam: #74502f; --grain: rgba(70, 42, 20, .22); --grain-hi: rgba(255, 232, 196, .12);
-  --glow: rgba(255, 226, 170, .10); --glow-core: rgba(255, 240, 208, 0); --shade: rgba(60, 34, 14, .10); --bulb: #fff1cf; --bloom: rgba(255, 220, 160, .5);
-  --cord: #3e2818; --cord-under: transparent;
-  --rail-hi: #c08e5c; --rail-wood: #8c5d35; --rail-lo: #5e3c20; --rail-shadow: rgba(40, 22, 8, .34);
-  --iron-hi: #b4b7bd; --iron: #45474c; --iron-lo: #232427;
-  --shelf-top: #c39463; --shelf-lip: #8a5a32; --shelf-lo: #5e3c20; --shelf-shadow: rgba(40, 22, 8, .4);
-  --trim: #6e4729; --trim-hi: #a0703f; --door: #96663c; --door-seam: #6e4729;
-  --outside-top: #fdf3e1; --outside-bottom: #f6dcac; --light: rgba(255, 236, 190, .95); --light-h: 96px; --spill: rgba(255, 228, 170, .12);
-  --floor: #7a5030; --floor-seam: #5a3a20; --skirting: #5e3c20; --pool: rgba(255, 228, 170, .55);
-  --mat: var(--tr-surface); --mat-edge: #6b6b71; --edge: var(--tr-line-strong); --drop: rgba(30, 16, 6, .45);
+  /* Graphite light values for everything written in the room. */
+  --tr-bg: #fafafa; --tr-surface: #f4f3ef; --tr-raised: #e8e6e0; --tr-line: #d6d4cd; --tr-line-strong: #86868c;
+  --tr-text: #111113; --tr-muted: #4d4d53; --tr-faint: #68686e; --tr-focus: #f4f3ef;
+  --tr-ok: #17784c; --tr-ok-bg: #e6f3ec; --tr-warn: #9c5200; --tr-warn-bg: #fcf0e1; --tr-bad: #c21f3a; --tr-bad-bg: #fce8eb; --tr-pin: #0b5cad; --tr-pin-bg: #e7eff9;
+  /* Materials: walnut boards, pine pegs and crates, iron, kraft paper, cloth bindings. */
+  --lamp-x: 50%; --lamp-y: 70px; --side: 0px;
+  --board-a: #45311f; --board-b: #3c2b1c; --board-c: #4a3422; --seam: #1c130c; --seam-hi: rgb(255 214 170 / .08);
+  --rail-hi: #8a603b; --rail: #63432a; --rail-lo: #2c1d12;
+  --peg-hi: #e2b57f; --peg: #a77344; --peg-lo: #5b3a1e;
+  --shelf-top: #8a6340; --shelf: #5d4027; --shelf-lo: #2a1c11;
+  --iron-hi: #a4a7ad; --iron: #3b3d42; --iron-lo: #17181a;
+  --cord: #d9c3a0; --cord-under: rgb(20 12 6 / .7);
+  --warm: 255 182 102; --cool: 140 170 225;
+  --dusk-1: #10172a; --dusk-2: #1f2c4d; --dusk-3: #4a4a6a; --dusk-4: #b57a58; --hills: #141a2b; --step: #3d465c; --step-hi: #6b7590;
+  --floor: #2c1e14; --floor-front: #3a281a; --floor-line: rgb(0 0 0 / .5); --skirting: #22170f;
+  --door: #4b3322; --door-seam: #2a1b11; --trim: #24180f; --trim-hi: #5b3e28;
+  --paper: #f4f3ef; --ink: #111113; --kraft: #a07a52; --kraft-lo: #75573a; --twine: #eadbbd;
+  --cloth-0: #2f4b3c; --cloth-1: #2a3a55; --cloth-2: #5b2b2e; --cloth-3: #4b3a5a; --cloth-4: #3d4a4f; --cloth-5: #6a4a2c; --spine-ink: #f2ead9;
+  --crate: #7d5838; --crate-lo: #4d3421; --crate-edge: #2f1f13;
+  position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: "wall" "door" "floor";
+  margin-bottom: 40px; background: var(--board-a); border: 1px solid #2a1c12; border-radius: var(--tr-radius-card); overflow: hidden; color: var(--tr-text);
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) .room {
-    --wall: #3b2a1e; --wall-b: #37271b; --seam: #22170f; --grain: rgba(0, 0, 0, .3); --grain-hi: rgba(255, 214, 160, .05);
-    --glow: rgba(255, 186, 105, .18); --glow-core: rgba(255, 196, 120, .35); --shade: rgba(10, 6, 3, .55); --bulb: #ffd59a; --bloom: rgba(255, 190, 110, .9);
-    --cord: #c2a07c; --cord-under: rgba(20, 12, 6, .75);
-    --rail-hi: #6a4a33; --rail-wood: #4a3221; --rail-lo: #24180f; --rail-shadow: rgba(0, 0, 0, .5);
-    --iron-hi: #9a9da4; --iron: #3a3c40; --iron-lo: #17181a;
-    --shelf-top: #5f412b; --shelf-lip: #3f2a1b; --shelf-lo: #24180f; --shelf-shadow: rgba(0, 0, 0, .55);
-    --trim: #24180f; --trim-hi: #4f3624; --door: #4a3222; --door-seam: #2a1b11;
-    --outside-top: #4a321d; --outside-bottom: #6e4a28; --light: rgba(255, 184, 103, .95); --light-h: 14px; --spill: rgba(255, 180, 90, .22);
-    --floor: #2b1d13; --floor-seam: #1a110b; --skirting: #24180f; --pool: rgba(255, 176, 90, .4);
-    --mat-edge: #b9b9be; --edge: #b9b9be; --drop: rgba(0, 0, 0, .6);
-  }
-}
-:root[data-theme="dark"] .room {
-  --wall: #3b2a1e; --wall-b: #37271b; --seam: #22170f; --grain: rgba(0, 0, 0, .3); --grain-hi: rgba(255, 214, 160, .05);
-  --glow: rgba(255, 186, 105, .18); --glow-core: rgba(255, 196, 120, .35); --shade: rgba(10, 6, 3, .55); --bulb: #ffd59a; --bloom: rgba(255, 190, 110, .9);
-  --cord: #c2a07c; --cord-under: rgba(20, 12, 6, .75);
-  --rail-hi: #6a4a33; --rail-wood: #4a3221; --rail-lo: #24180f; --rail-shadow: rgba(0, 0, 0, .5);
-  --iron-hi: #9a9da4; --iron: #3a3c40; --iron-lo: #17181a;
-  --shelf-top: #5f412b; --shelf-lip: #3f2a1b; --shelf-lo: #24180f; --shelf-shadow: rgba(0, 0, 0, .55);
-  --trim: #24180f; --trim-hi: #4f3624; --door: #4a3222; --door-seam: #2a1b11;
-  --outside-top: #4a321d; --outside-bottom: #6e4a28; --light: rgba(255, 184, 103, .95); --light-h: 14px; --spill: rgba(255, 180, 90, .22);
-  --floor: #2b1d13; --floor-seam: #1a110b; --skirting: #24180f; --pool: rgba(255, 176, 90, .4);
-  --mat-edge: #b9b9be; --edge: #b9b9be; --drop: rgba(0, 0, 0, .6);
-}
+.wood { position: absolute; inset: 0; z-index: -3; width: 100%; height: 100%; }
+.b-a { fill: var(--board-a); } .b-b { fill: var(--board-b); } .b-c { fill: var(--board-c); }
+.b-s { fill: var(--seam); } .b-h { fill: var(--seam-hi); }
+/* One pass of light over the whole room. */
+.shade { position: absolute; inset: 0; z-index: -2; pointer-events: none; mix-blend-mode: multiply;
+  background: linear-gradient(to bottom, rgb(14 8 4 / .6), transparent 120px),
+    radial-gradient(ellipse 75% 70% at var(--lamp-x) 160px, transparent 30%, rgb(14 8 4 / .78) 100%); }
+.light { position: absolute; inset: 0; z-index: -1; pointer-events: none; mix-blend-mode: screen;
+  background: radial-gradient(ellipse 220px 170px at var(--lamp-x) var(--lamp-y), rgb(var(--warm) / .42), rgb(var(--warm) / .12) 55%, transparent 80%),
+    radial-gradient(ellipse 48% 62% at var(--lamp-x) var(--lamp-y), rgb(var(--warm) / .14), transparent 85%); }
+.cone { position: absolute; z-index: -1; top: 66px; left: var(--lamp-x); width: 520px; height: 420px; margin-left: -260px; pointer-events: none; mix-blend-mode: screen;
+  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%); background: linear-gradient(to bottom, rgb(var(--warm) / .2), rgb(var(--warm) / .05) 60%, transparent); }
+.lamp { position: absolute; z-index: 2; top: 0; left: var(--lamp-x); width: 84px; margin-left: -42px; pointer-events: none; }
+.lamp-cord { display: block; width: 2px; height: 26px; margin: 0 auto; background: var(--iron-lo); }
+.lamp svg { display: block; width: 84px; height: 46px; overflow: visible; }
+.lamp .so { fill: var(--iron); stroke: var(--iron-lo); stroke-width: 1; }
+.lamp .si { fill: #6e5232; }
+.lamp .bu { fill: #fff0cc; filter: drop-shadow(0 0 6px rgb(255 210 140 / .95)) drop-shadow(0 4px 14px rgb(255 180 100 / .8)); }
 
-.room { position: relative; isolation: isolate; display: grid; grid-template-columns: minmax(0, 1fr); margin-bottom: 40px; background: var(--wall); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-card); overflow: hidden; }
-.wood { position: absolute; inset: 0; z-index: -2; width: 100%; height: 100%; }
-.w-a { fill: var(--wall); }
-.w-b { fill: var(--wall-b); }
-.w-grain path, .w-knot { fill: none; stroke: var(--grain); stroke-width: 1.2; }
-.w-hi path { fill: none; stroke: var(--grain-hi); stroke-width: 3; }
-.w-seam { fill: var(--seam); }
-.glow { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 240px 150px at var(--lamp-x) 52px, var(--glow-core), transparent), radial-gradient(ellipse 70% 50% at var(--lamp-x) 60px, var(--glow), transparent 72%), radial-gradient(ellipse 140% 110% at var(--lamp-x) 0, transparent 45%, var(--shade)); }
-.lamp { position: absolute; z-index: 1; top: 0; left: var(--lamp-x); width: 60px; height: 64px; margin-left: -30px; pointer-events: none; overflow: visible; }
-.lamp-bulb { filter: drop-shadow(0 4px 8px var(--bloom)); }
-.lamp-cord { stroke: var(--cord); stroke-width: 2; }
-.lamp-shade { fill: var(--iron); stroke: var(--iron-lo); stroke-width: 1; }
-.lamp-bulb { fill: var(--bulb); }
-.zone { min-width: 0; padding: 16px 16px 0; border: 0; }
-/* Words in the room sit on small Graphite plates, never on the wood. */
-.label { display: flex; align-items: center; gap: 8px; width: fit-content; max-width: 100%; margin: 0; padding: 4px 10px; background: var(--tr-surface); color: var(--tr-muted); border: 1px solid var(--edge); border-radius: var(--tr-radius-plate); box-shadow: 0 6px 10px -6px var(--drop); font: 600 var(--tr-fs-body)/1.3 var(--tr-font-body); letter-spacing: 0; }
-.label .ico { color: var(--tr-faint); }
-.zone-title { margin-bottom: 8px; }
+.zone { position: relative; min-width: 0; }
+.backwall { grid-area: wall; display: grid; gap: 18px; padding: 112px 12px 8px; }
+.backwall > section { padding: 0; border: 0; }
+.cap { display: inline-block; width: fit-content; padding: 3px 9px; background: var(--paper); color: var(--tr-muted); border-radius: 2px; box-shadow: 0 6px 8px -4px rgb(0 0 0 / .6); font: 500 var(--tr-fs-body)/1.35 var(--tr-font-body); }
 
-/* Every object in the room is a button: hover shows its plate, a click or tap pins it. */
-.obj, .fold { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.obj:focus-visible, .fold:focus-visible { outline: none; }
-.obj:hover .hl, .obj.on .hl, .obj:focus-visible .hl, .obj.hl:hover, .obj.hl.on, .obj.hl:focus-visible, .fold:hover .plate, .fold:focus-visible .plate { outline: 2px solid var(--tr-focus); outline-offset: 5px; }
+/* Every object is a button: hover shows its card, a click or tap pins it. The ring is paper-light, so it reads on the wood. */
+.obj { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.obj:focus-visible { outline: none; }
+.obj:hover .hl, .obj.on .hl, .obj:focus-visible .hl, .obj.hl:hover, .obj.hl.on, .obj.hl:focus-visible { outline: 2px solid var(--tr-focus); outline-offset: 4px; }
 
-/* Back wall: a wooden peg rail per row with iron pegs, drawn across the whole wall so a short last row still has its rail. */
-.pegs { list-style: none; margin: 0 -16px; padding: 0 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); grid-auto-rows: var(--row);
-  background: repeating-linear-gradient(to bottom, transparent 0 var(--rail-y), var(--rail-hi) var(--rail-y) calc(var(--rail-y) + 2px), var(--rail-wood) calc(var(--rail-y) + 2px) calc(var(--rail-y) + 13px), var(--rail-lo) calc(var(--rail-y) + 13px) calc(var(--rail-y) + 16px), var(--rail-shadow) calc(var(--rail-y) + 16px), transparent calc(var(--rail-y) + 26px) var(--row)); }
-.peg { position: relative; display: flex; justify-content: center; min-width: 0; padding-top: calc(var(--rail-y) + 8px); }
-.peg::before { content: ""; position: absolute; z-index: 1; top: var(--rail-y); left: 50%; width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--iron-hi), var(--iron) 55%, var(--iron-lo)); box-shadow: 0 3px 3px rgba(0, 0, 0, .4); }
-.hang, .fold { display: flex; flex-direction: column; align-items: center; width: min(148px, calc(100% - 12px)); }
-.wire { display: block; width: 100%; height: 24px; overflow: visible; fill: none; stroke: var(--cord); stroke-width: 1.6; stroke-linecap: round; }
-.s-warn .wire { height: 40px; }
-.s-bad .wire { height: 44px; }
-.wire .under { stroke: var(--cord-under); stroke-width: 3.6; }
-.wire .stub { stroke-dasharray: 3 3; }
-.plate { display: grid; justify-items: center; align-content: start; gap: 4px; width: 100%; padding: 10px 8px 9px; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-plate); box-shadow: 0 0 0 3px var(--mat), 0 0 0 4px var(--mat-edge), 0 12px 14px -6px var(--drop); text-align: center; }
-.plate img { width: 40px; height: 40px; margin-bottom: 2px; padding: 5px; background: var(--tr-mark-bg); border: 1px solid var(--tr-mark-line); border-radius: var(--tr-radius-card); object-fit: contain; }
-.plate .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
-.plate .key { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.25 var(--tr-font-mono); overflow-wrap: anywhere; }
-.st { font-weight: 600; line-height: 1.3; text-wrap: balance; }
-.st .g { margin-right: 6px; font-family: var(--tr-font-mono); font-weight: 500; }
-.s-ok .st { color: var(--tr-ok); }
-.s-warn .plate { border: 1px dashed var(--tr-warn); }
-.s-warn .st { color: var(--tr-warn); }
-.s-bad .plate { border: 2px solid var(--tr-bad); }
-.s-bad .st { color: var(--tr-bad); }
-.s-none .plate { background: var(--tr-raised); border: 1px dashed var(--tr-line-strong); box-shadow: 0 0 0 3px var(--tr-raised), 0 0 0 4px var(--mat-edge); }
-.s-off .plate { background: var(--tr-raised); box-shadow: 0 0 0 3px var(--tr-raised), 0 0 0 4px var(--mat-edge), 0 12px 14px -6px var(--drop); }
-.s-none .st, .s-off .st { color: var(--tr-muted); font-weight: 400; }
-/* On a phone the synced plates fold into one bundle so the wall stays short; a tap unfolds them. */
-.peg.bundle { display: none; }
-.bundle .plate { position: relative; }
-.bundle .plate::before, .bundle .plate::after { content: ""; position: absolute; inset: 0; z-index: -1; background: var(--tr-surface); border: 1px solid var(--tr-line-strong); border-radius: inherit; box-shadow: 0 0 0 3px var(--mat), 0 0 0 4px var(--mat-edge), 0 12px 14px -6px var(--drop); transform: translate(6px, 6px); }
-.bundle .plate::after { transform: translate(12px, 12px); }
-.minis { display: flex; align-items: center; justify-content: center; gap: 4px; }
-.plate .minis img { width: 30px; height: 30px; margin: 0; padding: 3px; }
-.minis .more { color: var(--tr-muted); font: 500 var(--tr-fs-body)/1 var(--tr-font-mono); }
-.fold-hint { color: var(--tr-muted); }
-
-/* Shelf: a wooden board with a top face, a front lip and a shadow; each stack carries its own segment and stacks fill
-   their row, so every row reads as one board. Books stay Graphite. */
-.stacks { list-style: none; margin: 0 -16px; padding: 0 16px; display: flex; flex-wrap: wrap; }
-.stack { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; align-items: flex-start; min-width: 0; max-width: 100%; padding: 24px 14px 0; }
-.stack::after { content: ""; align-self: stretch; height: 22px; margin: 0 -14px 10px; background: linear-gradient(to bottom, var(--shelf-top) 0 7px, var(--shelf-lip) 7px 19px, var(--shelf-lo) 19px 22px); box-shadow: 0 14px 14px -8px var(--shelf-shadow); }
-.pile { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: 100%; margin-bottom: -4px; filter: drop-shadow(3px 0 1px rgba(0, 0, 0, .22)); }
-.book { position: relative; display: flex; align-items: center; gap: 8px; max-width: calc(100% - var(--o, 0px)); margin: 0 0 -1px var(--o, 0px); padding: 3px calc(10px + var(--x, 0px)) 3px 10px; background: var(--tr-surface); border: 1px solid var(--edge); border-radius: 2px; font: 400 var(--tr-fs-body)/1.45 var(--tr-font-mono); }
-.book.t1 { background: var(--tr-raised); }
-.book.t2 { background: var(--tr-bg); }
-.book:hover, .book.on, .book:focus-visible { z-index: 2; }
-.bn { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Shelf: books stand spine out, each group on its own length of board so a wrapped row is still a shelf.
+   Outside sources arrive in a crate stamped with their pin. */
+.shelves { list-style: none; margin: 0; padding: 0 0 22px; display: flex; flex-wrap: wrap; row-gap: 46px; }
+.group { position: relative; flex: 1 0 auto; display: flex; align-items: flex-end; justify-content: center; gap: 3px; min-width: 0; padding: 0 12px; }
+.group::after { content: ""; position: absolute; z-index: -1; left: 0; right: 0; bottom: -18px; height: 18px; background: linear-gradient(to bottom, var(--shelf-top) 0 4px, var(--shelf) 4px 15px, var(--shelf-lo) 15px 18px); box-shadow: 0 18px 16px -10px rgb(0 0 0 / .7); }
+.book { position: relative; flex: none; display: flex; justify-content: center; width: var(--w, 34px); height: var(--h, 140px); padding-top: 14px; background: var(--cloth, var(--cloth-1)); color: var(--spine-ink); border-radius: 2px 2px 1px 1px;
+  box-shadow: inset -6px 0 7px -4px rgb(0 0 0 / .55), inset 3px 0 3px -2px rgb(255 255 255 / .14), 4px 0 6px -2px rgb(0 0 0 / .5); }
+.book::before, .book::after { content: ""; position: absolute; left: 5px; right: 5px; height: 2px; background: rgb(242 234 217 / .32); }
+.book::before { top: 6px; }
+.book::after { bottom: 7px; }
+.book .bn { writing-mode: vertical-rl; font: 500 var(--tr-fs-body)/1 var(--tr-font-mono); white-space: nowrap; }
+.book .g { position: absolute; bottom: 14px; left: 50%; display: grid; place-items: center; width: 24px; height: 24px; margin-left: -12px; border-radius: 50%; background: var(--paper); font: 600 var(--tr-fs-body)/1 var(--tr-font-mono); }
 .g.warn { color: var(--tr-warn); }
 .g.bad { color: var(--tr-bad); }
-.book .g { flex: none; font-weight: 500; }
-.base { position: relative; z-index: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; align-self: stretch; margin-top: 6px; padding: 8px 10px; background: var(--tr-raised); border: 1px solid var(--edge); border-radius: var(--tr-radius-plate) var(--tr-radius-plate) 0 0; }
-.base .bn { font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
-.base.local .bn { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
+.book.lean { margin-left: 16px; transform: rotate(-7deg); transform-origin: 0 100%; }
+.crate-group { flex-direction: column; align-items: center; justify-content: flex-end; gap: 0; }
+.in-crate { display: flex; align-items: flex-end; gap: 3px; margin-bottom: -58px; }
+.crate { position: relative; z-index: 1; display: grid; gap: 7px; justify-items: start; min-width: 176px; max-width: 100%; padding: 9px 10px 10px;
+  background: repeating-linear-gradient(to bottom, var(--crate) 0 26px, var(--crate-lo) 26px 28px); border: 3px solid var(--crate-edge); border-radius: 2px; box-shadow: inset 0 2px 0 rgb(255 220 180 / .12), 0 10px 12px -6px rgb(0 0 0 / .7); }
+.crate .label { display: grid; gap: 6px; justify-items: start; padding: 6px 8px 8px; background: var(--paper); border-radius: 2px; max-width: 100%; }
+.crate .bn { font-weight: 600; overflow-wrap: anywhere; }
+.crate.local-crate { position: absolute; left: 14px; bottom: -40px; min-width: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.crate.local-crate .label { padding: 2px 8px; box-shadow: 0 6px 8px -4px rgb(0 0 0 / .6); }
+.crate.local-crate .bn { font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); color: var(--tr-muted); }
 
-/* The door is the gate: a plank door stands open on outside light, where new pins wait; the sill is the line sync
-   will not cross until the cooldown ends. */
-.door { display: flex; flex-direction: column; gap: 12px; }
+/* Back wall: Shaker peg rails, one per row, with turned pine pegs. Each agent hangs on two cords under a silver
+   tag that carries its mark, with a paper label below. Marks are never moved, recoloured or animated. */
+.pegs { list-style: none; margin: 0 -12px; padding: 0 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(98px, 1fr)); grid-auto-rows: 214px;
+  background: repeating-linear-gradient(to bottom, transparent 0 16px, var(--rail-hi) 16px 18px, var(--rail) 18px 30px, var(--rail-lo) 30px 33px, rgb(0 0 0 / .42) 33px, transparent 46px 214px); }
+.peg { position: relative; display: flex; justify-content: center; min-width: 0; }
+.peg::before { content: ""; position: absolute; z-index: 1; top: 14px; left: 50%; width: 20px; height: 20px; margin-left: -10px; border-radius: 50%;
+  background: radial-gradient(circle at 36% 32%, var(--peg-hi), var(--peg) 52%, var(--peg-lo) 100%); box-shadow: 3px 5px 5px rgb(0 0 0 / .55), inset 0 0 0 2px rgb(0 0 0 / .12); }
+.hang { display: flex; flex-direction: column; align-items: center; width: 100%; padding-top: 24px; }
+.cords { display: block; overflow: visible; fill: none; stroke: var(--cord); stroke-width: 1.6; stroke-linecap: round; }
+.cords .under { stroke: var(--cord-under); stroke-width: 3.4; }
+.cords .stub { stroke-dasharray: 3 3; }
+.disc { position: relative; z-index: 1; display: grid; place-items: center; width: 64px; height: 64px; margin-top: -10px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 28%, #cfd2d8, var(--tr-mark-bg) 58%, #989ba2); border: 1px solid var(--tr-mark-line);
+  box-shadow: inset 0 0 0 3px rgb(255 255 255 / .22), inset 0 -2px 3px rgb(0 0 0 / .18), var(--sx, 0px) var(--sy, 8px) var(--sb, 9px) rgb(8 4 2 / .62); }
+.disc img { width: 32px; height: 32px; object-fit: contain; }
+.disc .initial { color: #2b2b2f; font: 700 22px/1 var(--tr-font-body); }
+.disc.back { background: radial-gradient(circle at 34% 28%, #8d9097, #5f6268 62%, #45474c); border-color: #2b2c30; }
+.disc.back::after { content: ""; width: 34px; height: 2px; background: rgb(0 0 0 / .25); box-shadow: 0 8px 0 rgb(0 0 0 / .18), 0 -8px 0 rgb(0 0 0 / .18); }
+.disc.ghost { background: none; border: 2px dashed rgb(244 243 239 / .38); box-shadow: none; }
+.paper { display: grid; justify-items: center; gap: 2px; max-width: calc(100% - 6px); margin-top: 10px; padding: 4px 8px 5px; background: var(--paper); color: var(--ink); border-radius: 2px; box-shadow: 0 7px 9px -5px rgb(0 0 0 / .7); text-align: center; }
+.paper .nm { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font: 600 var(--tr-fs-body)/1.2 var(--tr-font-body); overflow-wrap: anywhere; }
+.paper .st { font: 500 var(--tr-fs-body)/1.25 var(--tr-font-body); text-wrap: balance; }
+.paper .st .g { margin-right: 5px; font-family: var(--tr-font-mono); }
+.s-warn .paper { outline: 1px dashed var(--tr-warn); outline-offset: -3px; }
+.s-warn .st { color: var(--tr-warn); }
+.s-bad .st { color: var(--tr-bad); }
+.s-bad .paper { box-shadow: inset 0 0 0 2px var(--tr-bad), 0 7px 9px -5px rgb(0 0 0 / .7); }
+.s-none .paper, .s-off .paper { background: #d9d7d0; }
+.s-none .st, .s-off .st { color: var(--tr-muted); }
+.s-none .nm, .s-off .nm { font-weight: 500; }
+
+/* The door is the gate: open on a dusk yard, where new pins wait on the step until they are 72 hours old. */
+.door { grid-area: door; display: flex; flex-direction: column; padding: 8px 12px 0; border: 0; }
 .door-top { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.sign { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--tr-surface); border: 1px solid var(--edge); border-radius: var(--tr-radius-plate); box-shadow: 0 8px 12px -6px var(--drop); font-weight: 600; }
+.sign { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: var(--paper); color: var(--ink); border-radius: 2px; box-shadow: 0 8px 10px -5px rgb(0 0 0 / .7); font-weight: 600; }
 .sign .ico { color: var(--tr-muted); }
-.keyhook { display: flex; flex-direction: column; align-items: center; margin-right: 6px; transform-origin: 50% 7px; }
-.keyhook::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--iron-hi), var(--iron) 55%, var(--iron-lo)); box-shadow: 0 2px 3px rgba(0, 0, 0, .4); }
-.keyhook .wire { width: 40px; height: 14px; }
-.keytag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--tr-surface); border: 1px solid var(--edge); border-radius: 999px; box-shadow: 0 8px 12px -6px var(--drop); font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
+.keyhook { display: flex; flex-direction: column; align-items: center; margin-right: 4px; transform-origin: 50% 7px; }
+.keyhook::before { content: ""; width: 14px; height: 14px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, var(--iron-hi), var(--iron) 55%, var(--iron-lo)); box-shadow: 2px 3px 3px rgb(0 0 0 / .5); }
+.keytag { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: var(--paper); color: var(--ink); border-radius: 999px; box-shadow: 0 8px 10px -5px rgb(0 0 0 / .7); font: 400 var(--tr-fs-body)/1.3 var(--tr-font-mono); }
 .keytag .ico { color: var(--tr-muted); }
-.frame { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; min-height: 340px; padding: 14px 14px 18px 68px; background: linear-gradient(to bottom, var(--outside-top), var(--outside-bottom)); border: 10px solid var(--trim); border-bottom: 0; border-radius: 4px 4px 0 0; box-shadow: 0 0 0 2px var(--trim-hi), inset 0 10px 14px -10px rgba(0, 0, 0, .45); }
-.frame::before { content: ""; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(to top, var(--light) 0, transparent var(--light-h)); }
-.frame > :not(.leaf) { position: relative; }
-.frame .cap { margin-bottom: auto; font-weight: 400; }
-.leaf { position: absolute; top: 0; bottom: 0; left: 0; width: 52px; filter: drop-shadow(4px 0 4px rgba(0, 0, 0, .35)); }
-.leaf-face { position: absolute; inset: 0; clip-path: polygon(0 0, 100% 4%, 100% 96%, 0 100%); background: repeating-linear-gradient(90deg, transparent 0 4px, var(--grain) 4px 5px, transparent 5px 11px), repeating-linear-gradient(90deg, var(--door) 0 15px, var(--door-seam) 15px 17px); }
+.frame { position: relative; flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; gap: 12px; min-height: 380px; margin-top: 16px; padding: 14px 12px 18px 62px;
+  background: radial-gradient(circle at 34% 9%, #fff8 0 1px, transparent 2px), radial-gradient(circle at 71% 6%, #fff9 0 1px, transparent 2px), radial-gradient(circle at 56% 17%, #fff6 0 1px, transparent 2px),
+    radial-gradient(circle at 86% 21%, #fff7 0 1px, transparent 2px), radial-gradient(circle at 44% 29%, #fff5 0 1px, transparent 2px), radial-gradient(circle at 78% 36%, #fff4 0 1px, transparent 2px),
+    radial-gradient(ellipse 90% 40% at 60% 100%, rgb(232 150 100 / .45), transparent 70%), linear-gradient(to bottom, var(--dusk-1), var(--dusk-2) 42%, var(--dusk-3) 78%, var(--dusk-4));
+  border: 12px solid var(--trim); border-bottom: 0; border-radius: 3px 3px 0 0; box-shadow: 0 0 0 2px var(--trim-hi), 8px 0 18px -6px rgb(0 0 0 / .6), inset 0 16px 18px -12px rgb(0 0 0 / .8); }
+.frame::before { content: ""; position: absolute; left: 0; right: 0; bottom: 16px; height: 54px; background: var(--hills); clip-path: polygon(0 62%, 14% 40%, 30% 58%, 47% 22%, 63% 50%, 80% 30%, 100% 46%, 100% 100%, 0 100%); }
+.frame::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 18px; background: linear-gradient(to bottom, var(--step-hi) 0 2px, var(--step) 2px); }
+.frame > :not(.leaf) { position: relative; z-index: 1; }
+.pile { display: grid; width: 100%; }
+.leaf { position: absolute; z-index: 2; top: 0; bottom: 0; left: 0; width: 50px; filter: drop-shadow(5px 0 5px rgb(0 0 0 / .5)); }
+.leaf-face { position: absolute; inset: 0; clip-path: polygon(0 0, 100% 5%, 100% 95%, 0 100%); background: linear-gradient(90deg, rgb(0 0 0 / .25), transparent 60%), repeating-linear-gradient(90deg, var(--door) 0 15px, var(--door-seam) 15px 17px); }
 .hinge { position: absolute; left: 0; width: 16px; height: 8px; border-radius: 0 3px 3px 0; background: linear-gradient(to bottom, var(--iron-hi), var(--iron) 40%, var(--iron-lo)); }
 .hinge.h1 { top: 12%; }
 .hinge.h2 { bottom: 12%; }
-.handle { position: absolute; top: 50%; right: 8px; width: 6px; height: 28px; margin-top: -14px; border-radius: 3px; background: linear-gradient(90deg, var(--iron-hi), var(--iron) 60%, var(--iron-lo)); box-shadow: 1px 1px 2px rgba(0, 0, 0, .4); }
-.sill { height: 12px; margin: -12px -12px 0; background: linear-gradient(to bottom, var(--trim-hi) 0 3px, var(--trim) 3px); border-radius: 2px; box-shadow: 0 4px 8px -2px var(--drop); }
-.spill { height: 56px; margin: -12px 0 -56px; clip-path: polygon(4% 0, 96% 0, 100% 100%, 0 100%); background: linear-gradient(to bottom, var(--spill), transparent); pointer-events: none; }
-.ticket { display: grid; justify-items: start; gap: 8px; width: 100%; padding: 10px 12px; background: var(--tr-surface); border: 1px dashed var(--tr-warn); border-radius: var(--tr-radius-plate); box-shadow: 0 0 0 3px var(--mat), 0 0 0 4px var(--mat-edge), 0 10px 14px -6px var(--drop); }
-.ticket.k-bad { border: 2px solid var(--tr-bad); }
-.ticket.k-ok { border: 1px solid var(--tr-ok); }
-.ticket .bn { font-weight: 600; white-space: normal; overflow-wrap: anywhere; }
-.ticket .meta { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.35 var(--tr-font-mono); overflow-wrap: anywhere; }
-.ticket .cooldown { max-width: none; }
-.inside { display: grid; gap: 14px; padding: 18px 4px 20px; }
-.floor { grid-column: 1 / -1; height: 30px; background: radial-gradient(ellipse 150px 24px at var(--door-x) 8px, var(--pool), transparent), linear-gradient(to bottom, var(--skirting) 0 8px, rgba(0, 0, 0, .28) 8px 10px, transparent 10px), repeating-linear-gradient(90deg, var(--floor) 0 140px, var(--floor-seam) 140px 142px); }
+.handle { position: absolute; top: 52%; right: 9px; width: 6px; height: 28px; margin-top: -14px; border-radius: 3px; background: linear-gradient(90deg, var(--iron-hi), var(--iron) 60%, var(--iron-lo)); }
+/* A parcel per waiting item: kraft boxes stacked on the step, each tied with twine to a paper tag that carries its state. */
+.parcel { display: grid; grid-template-columns: var(--bw, 52px) minmax(0, 1fr); align-items: stretch; column-gap: 10px; width: 100%; }
+.parcel .ptag { margin: 5px 0; }
+.box { position: relative; width: var(--bw, 52px); min-height: 40px; border-radius: 2px; background: linear-gradient(to bottom, var(--kraft), var(--kraft-lo)); box-shadow: inset 0 2px 0 rgb(255 230 190 / .25), inset 0 -3px 4px rgb(0 0 0 / .3), 0 6px 7px -3px rgb(0 0 0 / .7); }
+.box::before, .box::after { content: ""; position: absolute; background: var(--twine); }
+.box::before { left: 50%; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; }
+.box::after { top: 46%; left: 0; right: 0; height: 3px; }
+.k-bad .box::before, .k-bad .box::after { top: 50%; left: -3px; right: -3px; bottom: auto; width: auto; height: 6px; margin: -3px 0 0; background: var(--tr-bad); transform: rotate(32deg); }
+.k-bad .box::after { transform: rotate(-32deg); }
+.ptag { display: grid; justify-items: start; gap: 8px; min-width: 0; padding: 9px 11px 10px; background: var(--paper); color: var(--ink); border-radius: 3px; box-shadow: 0 8px 10px -5px rgb(0 0 0 / .75); }
+.k-warn .ptag { outline: 1px dashed var(--tr-warn); outline-offset: -4px; }
+.k-bad .ptag { box-shadow: inset 0 0 0 2px var(--tr-bad), 0 8px 10px -5px rgb(0 0 0 / .75); }
+.k-ok .ptag { box-shadow: inset 0 0 0 1px var(--tr-ok), 0 8px 10px -5px rgb(0 0 0 / .75); }
+.ptag .bn { font-weight: 600; overflow-wrap: anywhere; }
+.ptag .meta { color: var(--tr-muted); font: 400 var(--tr-fs-body)/1.35 var(--tr-font-mono); overflow-wrap: anywhere; }
+.ptag .cooldown { max-width: none; }
+
+/* Floor: boards running toward you, the lamp's pool near the wall and the doorway's cool spill by the door.
+   A tag that fell off its peg lies here, and so does anything that walked straight in. */
+.floor { grid-area: floor; position: relative; z-index: 0; display: grid; gap: 14px; min-height: 104px; padding: 26px 12px 16px; background: linear-gradient(to bottom, var(--floor), var(--floor-front)); }
+.floor::before { content: ""; position: absolute; z-index: 1; top: 0; left: 0; right: 0; height: 12px; background: linear-gradient(to bottom, #3a281a 0 2px, var(--skirting) 2px); box-shadow: 0 4px 8px rgb(0 0 0 / .55); }
+.floor .boards { position: absolute; z-index: -1; inset: 0; width: 100%; height: 100%; }
+.floor .boards path { stroke: var(--floor-line); stroke-width: 1.4; fill: none; }
+.floor::after { content: ""; position: absolute; z-index: -1; inset: 0; pointer-events: none; mix-blend-mode: screen;
+  background: radial-gradient(ellipse 260px 60px at var(--lamp-x) 10px, rgb(var(--warm) / .3), transparent 75%), radial-gradient(ellipse 200px 70px at var(--door-x, 80%) 6px, rgb(var(--cool) / .35), transparent 75%); }
+.fallen-spot, .inside { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 20px; min-width: 0; }
+.fallen { display: flex; align-items: flex-end; gap: 10px; }
+.fallen .disc { margin: 0; }
+.fallen .paper { margin: 0 0 4px; }
+.inside { flex-direction: column; align-items: flex-start; }
+.inside .parcel { max-width: 300px; }
 .noscript { margin: 0 0 48px; }
+
 @media (prefers-reduced-motion: no-preference) {
-  /* One moment of life: the doorway light flickers once after load, from its resting state, and the key swings when touched. */
-  .frame::before, .spill { animation: flicker 1.6s ease-out .5s 1 both; }
+  /* Two moments of life: the lamp warms up once after load, from its resting brightness, and the key swings when touched. */
+  .light, .cone { animation: warm 1.8s ease-out .3s 1 both; }
   .keyhook:hover { animation: sway 1.4s ease-in-out; }
 }
-@keyframes flicker { 0%, 100% { opacity: 1; } 10% { opacity: .35; } 16% { opacity: .9; } 24% { opacity: .5; } 34% { opacity: 1; } }
+@keyframes warm { 0%, 100% { opacity: 1; } 12% { opacity: .55; } 20% { opacity: .95; } 30% { opacity: .7; } 45% { opacity: 1; } }
 @keyframes sway { 0%, 100% { transform: rotate(0); } 20% { transform: rotate(7deg); } 45% { transform: rotate(-5deg); } 70% { transform: rotate(2deg); } }
 
-/* The plate for whatever is hovered or tapped: a card by the object, a bottom sheet on touch screens. */
+/* The card for whatever is hovered or tapped: by the object, or a bottom sheet on touch screens. Page theme. */
 .card { position: fixed; z-index: 20; top: 0; left: 0; width: min(340px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; padding: 14px 16px 16px; background: var(--tr-surface); color: var(--tr-text); border: 1px solid var(--tr-line-strong); border-radius: var(--tr-radius-card); box-shadow: 0 10px 30px rgb(0 0 0 / .22); }
 .card[hidden] { display: none; }
 .card-head { display: flex; align-items: flex-start; gap: 12px; }
@@ -208,21 +223,21 @@
 .card p { margin-top: 12px; color: var(--tr-muted); }
 .cmd-line { display: block; margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: var(--tr-code-bg); color: var(--tr-code-text); font: 400 var(--tr-fs-body)/1.45 var(--tr-font-mono); overflow-wrap: anywhere; }
 
-@media (max-width: 719px) {
-  .peg.bundle { display: flex; }
-  .pegs.folded .peg.s-ok:not(.bundle) { display: none; }
-}
 @media (max-width: 719px), (hover: none) {
   .card { top: auto !important; right: 0; bottom: 0; left: 0 !important; width: auto; max-height: 64vh; border-bottom: 0; border-radius: 12px 12px 0 0; padding-bottom: calc(18px + env(safe-area-inset-bottom)); }
 }
 @media (min-width: 640px) {
   .intro h1 { font-size: var(--tr-fs-h1); }
+  .backwall { padding-left: 20px; padding-right: 20px; }
+  .pegs { margin: 0 -20px; padding: 0 20px; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .door { padding: 8px 20px 0; }
+  .floor { padding-left: 20px; padding-right: 20px; }
 }
 @media (min-width: 900px) {
-  .room { grid-template-columns: minmax(0, 1fr) 300px; --lamp-x: calc((100% - 300px) / 2); --door-x: calc(100% - 150px); }
-  .backwall { grid-column: 1; grid-row: 1; }
-  .shelf { grid-column: 1; grid-row: 2; }
-  .door { grid-column: 2; grid-row: 1 / span 2; padding-left: 0; }
+  .room { grid-template-columns: minmax(0, 1fr) 320px; grid-template-areas: "wall door" "floor floor"; --lamp-x: calc((100% - 320px) / 2); --door-x: calc(100% - 160px); }
+  .door { padding: 28px 20px 0 0; }
+  .frame { min-height: 0; }
+  .floor { grid-template-columns: minmax(0, 1fr) 300px; }
 }
 </style>
 <script>
@@ -262,8 +277,8 @@
   <div class="wrap">
     <div class="intro">
       <h1>The tack room</h1>
-      <p class="lead">Each coding agent hangs on its own peg. Skills sit on the shelf, and the ones from outside stand on a plate that names their pin. Anything new from outside waits at the door until it is 72 hours old.</p>
-      <p class="hint" id="hint">Demo data. Hover or tap anything to read its plate.</p>
+      <p class="lead">Each coding agent hangs on its own peg. Skills stand on the shelf, and the ones from outside arrive in a crate stamped with their pin. Anything new from outside waits at the door until it is 72 hours old.</p>
+      <p class="hint" id="hint">Demo data. Hover or tap anything to read its label.</p>
       <ul class="legend" aria-label="States">
         <li class="tag t-ok"><span class="g" aria-hidden="true">✓</span><span class="w">synced</span></li>
         <li class="tag t-warn"><span class="g" aria-hidden="true">!</span><span class="w">drifted</span></li>
@@ -276,33 +291,39 @@
     <div class="room" id="room">
       <svg class="wood" aria-hidden="true" focusable="false">
         <defs>
-          <pattern id="planks" width="192" height="360" patternUnits="userSpaceOnUse">
-            <rect class="w-a" width="96" height="360"/>
-            <rect class="w-b" x="96" width="96" height="360"/>
-            <g class="w-hi"><path d="M25 0C28 120 21 240 26 360"/><path d="M122 0C119 120 126 240 121 360"/></g>
-            <g class="w-grain">
-              <path d="M14 0C18 90 10 180 15 270S13 350 14 360"/><path d="M37 0C33 70 41 150 36 240S39 330 37 360"/>
-              <path d="M61 0C66 100 57 190 62 280S60 340 61 360"/><path d="M82 0C79 80 86 170 81 250S84 330 82 360"/>
-              <path d="M110 0C114 90 106 170 111 260S108 340 110 360"/><path d="M134 0C129 60 139 150 133 230S137 320 134 360"/>
-              <path d="M157 0C161 100 152 190 158 270S155 340 157 360"/><path d="M178 0C175 80 182 160 177 250S180 330 178 360"/>
-            </g>
-            <ellipse class="w-knot" cx="146" cy="214" rx="5" ry="11"/>
-            <rect class="w-seam" x="94" width="2" height="360"/><rect class="w-seam" x="190" width="2" height="360"/>
-            <rect class="w-seam" width="96" height="2"/><rect class="w-seam" x="96" y="180" width="96" height="2"/>
+          <!-- Tongue-and-groove boards of uneven width, then a procedural grain laid over them. -->
+          <pattern id="boards" width="312" height="8" patternUnits="userSpaceOnUse">
+            <rect class="b-a" width="58" height="8"/><rect class="b-b" x="58" width="74" height="8"/><rect class="b-c" x="132" width="64" height="8"/>
+            <rect class="b-a" x="196" width="52" height="8"/><rect class="b-b" x="248" width="64" height="8"/>
+            <rect class="b-s" x="56" width="2" height="8"/><rect class="b-s" x="130" width="2" height="8"/><rect class="b-s" x="194" width="2" height="8"/>
+            <rect class="b-s" x="246" width="2" height="8"/><rect class="b-s" x="310" width="2" height="8"/>
+            <rect class="b-h" x="58" width="1" height="8"/><rect class="b-h" x="132" width="1" height="8"/><rect class="b-h" x="196" width="1" height="8"/><rect class="b-h" x="248" width="1" height="8"/><rect class="b-h" width="1" height="8"/>
           </pattern>
+          <filter id="grain" x="0" y="0" width="100%" height="100%" color-interpolation-filters="sRGB">
+            <feTurbulence type="fractalNoise" baseFrequency="0.21 0.0042" numOctaves="3" seed="11"/>
+            <feColorMatrix type="matrix" values="0 0 0 0 .07  0 0 0 0 .04  0 0 0 0 .02  -2.4 0 0 0 1.32"/>
+          </filter>
         </defs>
-        <rect width="100%" height="100%" fill="url(#planks)"/>
+        <rect width="100%" height="100%" fill="url(#boards)"/>
+        <rect width="100%" height="100%" filter="url(#grain)" opacity=".6"/>
       </svg>
-      <div class="glow" aria-hidden="true"></div>
-      <svg class="lamp" viewBox="0 0 60 64" aria-hidden="true" focusable="false"><path class="lamp-cord" d="M30 0V27"/><path class="lamp-shade" d="M19 26H41L54 46H6Z"/><ellipse class="lamp-bulb" cx="30" cy="48" rx="9" ry="5"/></svg>
-      <section class="zone backwall" aria-labelledby="wall-title">
-        <h2 class="zone-title label" id="wall-title"><svg class="ico" aria-hidden="true"><use href="#i-robot"/></svg>Agents, one per peg</h2>
-        <ul class="pegs" id="pegs"></ul>
-      </section>
-      <section class="zone shelf" aria-labelledby="shelf-title">
-        <h2 class="zone-title label" id="shelf-title"><svg class="ico" aria-hidden="true"><use href="#i-skills"/></svg>Skills</h2>
-        <ul class="stacks" id="stacks"></ul>
-      </section>
+      <div class="shade" aria-hidden="true"></div>
+      <div class="light" aria-hidden="true"></div>
+      <div class="cone" aria-hidden="true"></div>
+      <div class="lamp" id="lamp" aria-hidden="true"><i class="lamp-cord"></i><svg viewBox="0 0 84 46"><path class="so" d="M30 2H54L78 36H6Z"/><path class="si" d="M8 34H76L78 37H6Z"/><ellipse class="bu" cx="42" cy="38" rx="12" ry="6"/></svg></div>
+
+      <div class="zone backwall">
+        <section aria-labelledby="shelf-title">
+          <h2 class="sr" id="shelf-title">Skills</h2>
+          <ul class="shelves" id="shelves"></ul>
+          <ul class="shelves" id="crates"></ul>
+        </section>
+        <section aria-labelledby="wall-title">
+          <h2 class="sr" id="wall-title">Agents, one per peg</h2>
+          <ul class="pegs" id="pegs"></ul>
+        </section>
+      </div>
+
       <section class="zone door" aria-labelledby="door-title">
         <h2 class="sr" id="door-title">The door</h2>
         <div class="door-top">
@@ -312,11 +333,13 @@
         <div class="frame" id="frame">
           <span class="leaf" aria-hidden="true"><span class="leaf-face"></span><i class="hinge h1"></i><i class="hinge h2"></i><i class="handle"></i></span>
         </div>
-        <div class="sill" aria-hidden="true"></div>
-        <div class="spill" aria-hidden="true"></div>
-        <div class="inside" id="inside"></div>
       </section>
-      <div class="floor" aria-hidden="true"></div>
+
+      <div class="zone floor">
+        <svg class="boards" viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><path id="floorboards" vector-effect="non-scaling-stroke"/></svg>
+        <div class="fallen-spot" id="fallen"></div>
+        <div class="inside" id="inside"></div>
+      </div>
     </div>
     <noscript><p class="noscript">The room is drawn from its data with JavaScript.</p></noscript>
   </div>
@@ -388,12 +411,12 @@
 (function () {
   "use strict";
   var COOLDOWN_MS = 72 * 3600 * 1000;
-  // Vendor marks shipped in marks/, by tackroom.yaml key. A key without a file gets a plate without a mark.
+  // Vendor marks shipped in marks/, by tackroom.yaml key. A key without a file gets a tag without a mark.
   var MARKS = ["agy", "amp", "claude", "codex", "copilot", "cursor", "devin", "droid", "dsh", "gemini", "grok", "kimi", "omp", "opencode", "pi", "qwen-code"];
   var MARK_ALIAS = {qwen: "qwen-code"};
   // What a skill cell means on one agent (internal/app/web/app.js CELLS), and the glyph it earns.
   var CELLS = {drift: ["drifted", "!", "warn"], missing: ["missing", "✗", "bad"], conflict: ["conflict", "✗", "bad"], stale: ["stale", "!", "warn"], unknown: ["unknown", "!", "warn"]};
-  var STACK = 8;
+  var PER_GROUP = 5, CLOTHS = 6;
   var SVG = "http://www.w3.org/2000/svg";
 
   function h(tag, attrs, kids) {
@@ -486,53 +509,44 @@
     objects.push({kind: kind, item: item});
     return b;
   }
-  function wire(state) {
+  // Two cords from the peg to the tag; a drifted tag hangs lower from one, a fallen one leaves two torn ends.
+  function cords(state) {
     var paths = {
-      ok: [["M50 0 L14 24"], ["M50 0 L86 24"]],
-      off: [["M50 0 L14 24"], ["M50 0 L86 24"]],
-      warn: [["M50 0 L14 40"], ["M86 40 L79 29", "stub"]],
-      bad: [["M14 44 L21 33", "stub"], ["M86 44 L79 33", "stub"]],
+      ok: [["M32 0 L10 30"], ["M32 0 L54 30"]],
+      off: [["M32 0 L10 30"], ["M32 0 L54 30"]],
+      warn: [["M32 0 L12 46"], ["M54 46 L49 35", "stub"]],
+      bad: [["M30 2 L24 16", "stub"], ["M34 2 L41 15", "stub"]],
       none: []
     }[state];
-    var h_ = {warn: 40, bad: 44}[state] || 24;
-    return s("svg", {"class": "wire", viewBox: "0 0 100 " + h_, preserveAspectRatio: "none", "aria-hidden": "true"},
-      // Each cord is drawn twice, a dark under-stroke first, so it reads on dark wood and under the lamp alike.
-      paths.map(function (p) { return [s("path", {d: p[0], "class": "under", "vector-effect": "non-scaling-stroke"}), s("path", {d: p[0], "class": p[1] || null, "vector-effect": "non-scaling-stroke"})]; }));
+    var ht = {warn: 46, bad: 30}[state] || 30;
+    return s("svg", {"class": "cords", width: 64, height: ht, viewBox: "0 0 64 " + ht, "aria-hidden": "true"},
+      paths.map(function (p) { return [s("path", {d: p[0], "class": "under"}), s("path", {d: p[0], "class": p[1] || null})]; }));
+  }
+  function disc(a, st) {
+    if (st.cls === "none") return h("span", {"class": "disc ghost"});
+    if (st.cls === "off") return h("span", {"class": "disc back"});
+    var name = a.display_name || a.name;
+    return h("span", {"class": "disc"}, markFor(a.name) || h("span", {"class": "initial", text: name.charAt(0)}));
+  }
+  function paper(a, st) {
+    return h("span", {"class": "paper hl"}, [
+      h("span", {"class": "nm", text: a.display_name || a.name}),
+      st.cls !== "ok" ? h("span", {"class": "st"}, [st.glyph ? h("span", {"class": "g", "aria-hidden": "true", text: st.glyph}) : null, st.word]) : null
+    ]);
   }
 
   function renderPegs() {
-    var list = document.getElementById("pegs");
-    add(list, data.agents.map(function (a) {
+    var list = document.getElementById("pegs"), floor = document.getElementById("fallen");
+    data.agents.forEach(function (a) {
       var st = agentState(a), name = a.display_name || a.name;
-      var showMark = st.cls !== "none" && st.cls !== "off";
-      var plate = h("span", {"class": "plate hl"}, [
-        showMark ? markFor(a.name) : null,
-        h("span", {"class": "nm", text: name}),
-        h("span", {"class": "key", text: a.name}),
-        h("span", {"class": "st"}, [st.glyph ? h("span", {"class": "g", "aria-hidden": "true", text: st.glyph}) : null, st.word])
-      ]);
-      return h("li", {"class": "peg s-" + st.cls}, obj("hang", name + ", " + st.word, "agent", a, [wire(st.cls), plate]));
-    }));
-    // Phones show the synced plates as one bundle (CSS hides the bundle on wider screens); a tap unfolds them.
-    var synced = data.agents.filter(function (a) { return agentState(a).cls === "ok"; });
-    if (synced.length < 2) return;
-    var hint = h("span", {"class": "fold-hint", text: "Tap to show"});
-    var fold = h("button", {type: "button", "class": "fold", "aria-expanded": "false", "aria-controls": "pegs", "aria-label": synced.length + " synced agents, show them"}, [
-      wire("ok"),
-      h("span", {"class": "plate"}, [
-        h("span", {"class": "minis"}, [synced.slice(0, 3).map(function (a) { return markFor(a.name); }), synced.length > 3 ? h("span", {"class": "more", text: "+" + (synced.length - 3)}) : null]),
-        h("span", {"class": "st"}, [h("span", {"class": "g", "aria-hidden": "true", text: "✓"}), synced.length + " synced"]),
-        hint
-      ])
-    ]);
-    fold.addEventListener("click", function () {
-      var open = list.classList.toggle("folded") === false;
-      fold.setAttribute("aria-expanded", String(open));
-      fold.setAttribute("aria-label", synced.length + " synced agents, " + (open ? "fold them" : "show them"));
-      hint.textContent = open ? "Tap to fold" : "Tap to show";
+      if (st.cls === "bad") {
+        // Its peg stays, with the torn cords; the tag itself lies on the floor.
+        add(list, h("li", {"class": "peg s-bad"}, h("span", {"class": "hang", "aria-hidden": "true"}, cords("bad"))));
+        add(floor, obj("fallen s-bad", name + ", " + st.word, "agent", a, [disc(a, st), paper(a, st)]));
+        return;
+      }
+      add(list, h("li", {"class": "peg s-" + st.cls}, obj("hang", name + ", " + st.word, "agent", a, [cords(st.cls), disc(a, st), paper(a, st)])));
     });
-    list.classList.add("folded");
-    list.insertBefore(h("li", {"class": "peg s-ok bundle"}, fold), list.firstChild);
   }
 
   function skillIssues(skill) {
@@ -543,82 +557,115 @@
     });
     return out;
   }
-  function book(skill, maxTokens) {
+  // A book's height follows its title; width and cloth come from its name, so the shelf looks the same on every load.
+  function book(skill, sunk, lean) {
     var issues = skillIssues(skill), x = hash(skill.name);
     var worst = issues.some(function (i) { return CELLS[i.cell][2] === "bad"; }) ? "bad" : issues.length ? "warn" : "";
-    var el = obj("book hl t" + (x % 3), skill.name + (issues.length ? ", " + CELLS[issues[0].cell][0] + " on " + issues.map(function (i) { return i.agent; }).join(", ") : ""), "skill", skill, [
+    var el = obj("book hl" + (lean ? " lean" : ""), skill.name + (issues.length ? ", " + CELLS[issues[0].cell][0] + " on " + issues.map(function (i) { return i.agent; }).join(", ") : ""), "skill", skill, [
       h("span", {"class": "bn", text: skill.name}),
       worst ? h("span", {"class": "g " + worst, "aria-hidden": "true", text: worst === "bad" ? "✗" : "!"}) : null
     ]);
-    el.style.setProperty("--o", (x % 9) + "px");
-    el.style.setProperty("--x", Math.round(36 * Math.min(1, (skill.tokens || 0) / maxTokens)) + "px");
+    var tall = Math.max(118, Math.round(skill.name.length * 9.9 + 36 + (worst ? 34 : 0))) + (x % 4) * 6;
+    el.style.setProperty("--h", (tall + (sunk ? 58 : 0)) + "px");
+    el.style.setProperty("--w", (32 + (x % 3) * 3) + "px");
+    el.style.setProperty("--cloth", "var(--cloth-" + (x % CLOTHS) + ")");
     return el;
   }
 
   function renderShelf() {
     var lockByRepo = {}, local = [], groups = {}, order = [];
     data.lock.forEach(function (row) { if (row.source) lockByRepo[ownerRepo(row.source)] = row; });
-    var maxTokens = Math.max.apply(null, [1].concat(data.skills.map(function (k) { return k.tokens || 0; })));
     data.skills.slice().sort(function (a, b) { return a.name < b.name ? -1 : 1; }).forEach(function (skill) {
       var origin = skill.origin || "local";
       if (origin === "local") { local.push(skill); return; }
       var repo = origin.replace(/ \(unpinned\)$/, "").replace(/@[^@]*$/, "");
-      if (!groups[repo]) { groups[repo] = {repo: repo, origin: origin, skills: []}; order.push(repo); }
+      if (!groups[repo]) { groups[repo] = {repo: repo, skills: []}; order.push(repo); }
       groups[repo].skills.push(skill);
     });
-    // A pinned source stands on the shelf even while its next commit waits at the door or is blocked there.
+    // A pinned source stays on the shelf even while its next commit waits at the door or is blocked there.
     data.lock.forEach(function (row) {
       var repo = ownerRepo(row.source);
       if (row.source && row.pinned && !groups[repo]) { groups[repo] = {repo: repo, skills: []}; order.push(repo); }
     });
-    // A stack is its books on a base plate; the li around it carries the board.
-    function stack(books, base) { return h("li", {"class": "stack"}, h("div", {"class": "pile"}, [books, base])); }
-    var stacks = [], piles = Math.ceil(local.length / STACK), per = Math.ceil(local.length / Math.max(1, piles));
+    // Your own skills on the upper shelf, the crates from outside on the one below.
+    var out = [], crates = [], piles = Math.ceil(local.length / PER_GROUP), per = Math.ceil(local.length / Math.max(1, piles));
     for (var i = 0; i < local.length; i += per) {
-      stacks.push(stack(local.slice(i, i + per).map(function (k) { return book(k, maxTokens); }),
-        obj("base local hl", "local skills, " + local.length + " in the config root", "local", {count: local.length}, h("span", {"class": "bn", text: "local"}))));
+      var run = local.slice(i, i + per);
+      out.push(h("li", {"class": "group"}, run.map(function (k, j) { return book(k, false, run.length > 2 && j === run.length - 1); })));
     }
     order.forEach(function (repo) {
       var g = groups[repo], row = lockByRepo[repo] || {name: repo.split("/").pop(), source: "https://github.com/" + repo, state: "unpinned", pinned: false};
       if (!row.pinned && row.state !== "unpinned") return;
-      stacks.push(stack(g.skills.map(function (k) { return book(k, maxTokens); }),
-        obj("base hl", row.name + ", " + (row.pinned ? "pinned at " + row.commit : row.state), "source", {row: row, skills: g.skills},
-          [h("span", {"class": "bn", text: row.name}), row.pinned ? tag("t-pin", "✓", "pinned", row.commit) : tag("t-warn", "!", row.state)])));
+      crates.push(h("li", {"class": "group crate-group"}, [
+        h("div", {"class": "in-crate"}, g.skills.map(function (k) { return book(k, true, false); })),
+        obj("crate", row.name + ", " + (row.pinned ? "pinned at " + row.commit : row.state), "source", {row: row, skills: g.skills},
+          h("span", {"class": "label hl"}, [h("span", {"class": "bn", text: row.name}), row.pinned ? tag("t-pin", "✓", "pinned", row.commit) : tag("t-warn", "!", row.state)]))
+      ]));
     });
-    add(document.getElementById("stacks"), stacks);
+    if (local.length) {
+      // The local stacks need no crate; one small plate on the board says where they live.
+      out[0].appendChild(obj("crate local-crate", "local skills, " + local.length + " in the config root", "local", {count: local.length}, h("span", {"class": "label hl"}, h("span", {"class": "bn", text: "local"}))));
+    }
+    add(document.getElementById("shelves"), out);
+    add(document.getElementById("crates"), crates);
   }
 
-  function ticket(row, cls) {
+  function parcel(row, cls) {
     var c = row.state === "cooldown" ? cooldown(row) : null;
     var meta = row.state === "allowed" ? row.ref
       : row.state === "cooldown" && row.pinned ? "new " + String(row.reason || "").split(" ")[0]
       : row.state === "blocked" ? (row.critical ? plural(row.critical, "critical finding") : row.reason)
       : row.source ? hostless(row.source) : String(row.reason || "").split(" ")[0];
-    return obj("ticket hl " + cls, row.name + ", " + row.state, "gate", row, [
-      h("span", {"class": "bn", text: row.name}),
-      lockTag(row, true),
-      c ? rail(c, c.age + "h of 72h") : null,
-      meta ? h("span", {"class": "meta", text: meta}) : null
+    var b = obj("parcel " + cls, row.name + ", " + row.state, "gate", row, [
+      h("span", {"class": "box", "aria-hidden": "true"}),
+      h("span", {"class": "ptag hl"}, [
+        h("span", {"class": "bn", text: row.name}),
+        lockTag(row, true),
+        c ? rail(c, c.age + "h of 72h") : null,
+        meta ? h("span", {"class": "meta", text: meta}) : null
+      ])
     ]);
+    // Boxes differ a little in width so the stack on the step does not look machine-cut.
+    b.style.setProperty("--bw", (46 + hash(row.name) % 4 * 4) + "px");
+    return b;
   }
 
   function renderDoor() {
     var waiting = data.lock.filter(function (r) { return r.state !== "pinned" && r.state !== "allowed"; });
     var walked = data.lock.filter(function (r) { return r.state === "allowed"; });
     var frame = document.getElementById("frame");
-    add(frame, h("span", {"class": "cap label", text: waiting.length ? "Waiting at the door" : "Nobody waiting. New outside skills wait here until they are 72 hours old."}));
-    add(frame, waiting.map(function (r) { return ticket(r, r.state === "blocked" ? "k-bad" : "k-warn"); }));
+    add(frame, h("span", {"class": "cap", text: waiting.length ? "Waiting at the door" : "Nobody waiting. New outside skills wait here until they are 72 hours old."}));
+    if (waiting.length) add(frame, h("div", {"class": "pile"}, waiting.map(function (r) { return parcel(r, r.state === "blocked" ? "k-bad" : "k-warn"); })));
     if (walked.length) {
-      add(document.getElementById("inside"), [h("span", {"class": "cap label", text: "Walked straight in"}), walked.map(function (r) { return ticket(r, "k-ok"); })]);
+      add(document.getElementById("inside"), [h("span", {"class": "cap", text: "Walked straight in"}), h("div", {"class": "pile"}, walked.map(function (r) { return parcel(r, "k-ok"); }))]);
     }
     var hosts = data.hosts || [];
     add(document.getElementById("key"), h("span", {"class": "keyhook"}, [
-      wire("ok"),
+      cords("ok"),
       obj("keytag hl", "the key, ~/.agents, shared by " + plural(hosts.length + 1, "machine"), "key", {hosts: hosts}, [icon("i-key"), "~/.agents"])
     ]));
   }
 
-  // The card: what a plate says when you lean in.
+  // Boards on the floor run toward the viewer, so their seams meet at one point behind the wall.
+  function renderFloor() {
+    var d = "";
+    for (var x = -700; x <= 1700; x += 76) d += "M" + x + " 100L" + (500 + (x - 500) * 0.58).toFixed(1) + " 0";
+    document.getElementById("floorboards").setAttribute("d", d);
+  }
+  // Each hanging tag casts its shadow away from the lamp, longer the farther it hangs.
+  function shadows() {
+    var lamp = document.getElementById("lamp").getBoundingClientRect();
+    var lx = lamp.left + lamp.width / 2, ly = lamp.bottom;
+    document.querySelectorAll(".hang .disc, .fallen .disc").forEach(function (el) {
+      var r = el.getBoundingClientRect(), dx = r.left + r.width / 2 - lx, dy = r.top + r.height / 2 - ly;
+      var dist = Math.max(1, Math.hypot(dx, dy)), reach = 3 + 10 * Math.min(1, dist / 700);
+      el.style.setProperty("--sx", (dx / dist * reach).toFixed(1) + "px");
+      el.style.setProperty("--sy", Math.max(4, dy / dist * reach).toFixed(1) + "px");
+      el.style.setProperty("--sb", (7 + 8 * Math.min(1, dist / 700)).toFixed(0) + "px");
+    });
+  }
+
+  // The card: what a label says when you lean in.
   function facts(rows) {
     return h("dl", {"class": "facts"}, rows.filter(Boolean).map(function (r) { return h("div", {style: "display:contents"}, [h("dt", {text: r[0]}), h("dd", {}, r[1])]); }));
   }
@@ -784,7 +831,8 @@
   document.addEventListener("click", function (e) { if (current && !room.contains(e.target) && !card.contains(e.target)) hide(false); });
   document.addEventListener("keydown", function (e) { if (e.key === "Escape" && current) hide(true); });
   window.addEventListener("scroll", place, {passive: true});
-  window.addEventListener("resize", place);
+  var frameReq = 0;
+  window.addEventListener("resize", function () { place(); cancelAnimationFrame(frameReq); frameReq = requestAnimationFrame(shadows); });
 
   function render(d) {
     data = {agents: d.agents || [], skills: d.skills || [], lock: d.lock || [], hosts: d.hosts};
@@ -792,13 +840,16 @@
     renderPegs();
     renderShelf();
     renderDoor();
+    renderFloor();
+    shadows();
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(shadows);
   }
   var demo = JSON.parse(document.getElementById("room-data").textContent);
   // ?data=<relative path> draws a local snapshot (for example a saved /api/inventory) instead of the demo.
   var src = new URLSearchParams(window.location.search).get("data");
   if (src && !/^[a-z][a-z0-9+.-]*:|^\/\//i.test(src)) {
     fetch(src).then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
-      .then(function (d) { document.getElementById("hint").textContent = "Snapshot from " + src + ". Hover or tap anything to read its plate."; render(d); })
+      .then(function (d) { document.getElementById("hint").textContent = "Snapshot from " + src + ". Hover or tap anything to read its label."; render(d); })
       .catch(function () { render(demo); });
   } else {
     render(demo);
