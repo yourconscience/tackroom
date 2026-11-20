@@ -1,7 +1,10 @@
 const VIEWS = ['overview', 'skills', 'roles', 'wiring', 'unmanaged', 'crons', 'config'];
+// The six views in the sidebar and the phone menu. Unmanaged opens from Overview.
+const TABS = [['overview', 'Overview', 'i-overview'], ['skills', 'Skills', 'i-skills'], ['roles', 'Roles', 'i-roles'], ['wiring', 'MCP & hooks', 'i-wiring'], ['crons', 'Crons', 'i-crons'], ['config', 'Config', 'i-config']];
+const TITLES = {...Object.fromEntries(TABS.map(([id, label]) => [id, label])), unmanaged: 'Unmanaged'};
 const baseURL = new URL(window.location.pathname.endsWith('/') ? window.location.pathname : `${window.location.pathname}/`, window.location.origin);
 
-// What each matrix dot means.
+// What each per-agent state means.
 const CELLS = {
   ok: 'in place',
   drift: 'drifted',
@@ -16,6 +19,10 @@ const CELLS = {
   unknown: 'unknown',
 };
 const ATTENTION = new Set(['drift', 'missing', 'conflict', 'error', 'unknown']);
+const OK = ['i-ok', 'st-ok'];
+const WARN = ['i-warn', 'st-warn'];
+const FAIL = ['i-fail', 'st-fail'];
+const IDLE = ['i-idle', 'st-off'];
 
 const store = {
   view: 'overview',
@@ -23,10 +30,12 @@ const store = {
   invError: '',
   shared: null,
   local: null,
+  updatedAt: 0,
   busy: false,
   skillQuery: '',
   skillFilter: 'all',
   openRows: new Set(),
+  folds: {},
   configLayer: 'shared',
   configState: null,
   configLoading: false,
@@ -34,15 +43,24 @@ const store = {
   configDiff: '',
   configNote: '',
   preview: null,
+  previewAt: 0,
   crons: null,
   cronsError: '',
   cronsLoading: false,
-  cronFilter: 'all',
   cronPatches: [],
+  cronBusy: '',
   hosts: null,
+  hostsLoading: true,
+  sheet: null,
 };
 
 // ---------- helpers ----------
+// Children may nest arrays at any depth; null, undefined, false and '' are skipped.
+function nodes(children) {
+  return children.flat(Infinity)
+    .filter((child) => child !== undefined && child !== null && child !== false && child !== '')
+    .map((child) => (child instanceof Node ? child : document.createTextNode(String(child))));
+}
 function h(tag, props = {}, ...children) {
   const node = document.createElement(tag);
   for (const [key, value] of Object.entries(props || {})) {
@@ -56,14 +74,11 @@ function h(tag, props = {}, ...children) {
     else if (value === true) node.setAttribute(key, '');
     else node.setAttribute(key, value);
   }
-  for (const child of children.flat()) {
-    if (child === undefined || child === null || child === false) continue;
-    node.append(child instanceof Node ? child : document.createTextNode(String(child)));
-  }
+  node.append(...nodes(children));
   return node;
 }
 function mount(root, ...children) {
-  root.replaceChildren(...children.flat().filter((child) => child !== null && child !== undefined && child !== false));
+  root.replaceChildren(...nodes(children));
 }
 function tilde(path) {
   const home = store.inv?.home;
@@ -77,34 +92,9 @@ function svgNode(tag, attrs = {}) {
   return node;
 }
 function icon(id, cls) {
-  const svg = svgNode('svg', {'aria-hidden': 'true', ...(cls ? {class: cls} : {})});
+  const svg = svgNode('svg', {'aria-hidden': 'true', class: cls ? `ic ${cls}` : 'ic'});
   svg.append(svgNode('use', {href: `#${id}`}));
   return svg;
-}
-// A thin ring split into parts [{value, kind, label}]; CSS colours each kind. The centre holds a figure and a word.
-function ring(parts, figure, word, size = 88) {
-  const stroke = size >= 80 ? 7 : 6;
-  const c = size / 2;
-  const r = c - stroke / 2;
-  const length = 2 * Math.PI * r;
-  const total = parts.reduce((sum, part) => sum + part.value, 0);
-  const seam = parts.filter((part) => part.value > 0).length > 1 ? 2 : 0;
-  const svg = svgNode('svg', {viewBox: `0 0 ${size} ${size}`, class: 'ring-svg', 'aria-hidden': 'true'});
-  svg.append(svgNode('circle', {cx: c, cy: c, r, class: 'ring-track', 'stroke-width': stroke}));
-  let offset = 0;
-  for (const part of parts) {
-    if (!part.value || !total) continue;
-    const span = (part.value / total) * length;
-    svg.append(svgNode('circle', {cx: c, cy: c, r, class: `ring-part ${part.kind}`, 'stroke-width': stroke, 'stroke-dasharray': `${Math.max(span - seam, 1)} ${length}`, 'stroke-dashoffset': -offset, transform: `rotate(-90 ${c} ${c})`}));
-    offset += span;
-  }
-  const label = total ? parts.filter((part) => part.value).map((part) => `${part.value} ${part.label || part.kind}`).join(', ') : word;
-  return h('div', {class: total ? 'ring' : 'ring empty', role: 'img', 'aria-label': label, style: {width: `${size}px`, height: `${size}px`}}, svg,
-    h('div', {class: 'ring-center'}, h('b', {text: String(figure)}), word ? h('span', {text: word}) : null));
-}
-// A 100% bar split into parts with 2px seams.
-function bar(parts) {
-  return h('div', {class: 'bar', 'aria-hidden': 'true'}, parts.filter((part) => part.value > 0).map((part) => h('span', {class: part.kind, style: {flexGrow: String(part.value)}})));
 }
 // Agent marks from the tackroom site; an agent without one gets its initial.
 const AGENT_MARKS = {
@@ -112,13 +102,16 @@ const AGENT_MARKS = {
   pi: 'a-pi', omp: 'a-omp', qwen: 'a-qwen-code', 'qwen-code': 'a-qwen-code', opencode: 'a-opencode', amp: 'a-amp',
   cursor: 'a-cursor', copilot: 'a-copilot', grok: 'a-grok', dsh: 'a-deepseek',
 };
-function agentMark(name, cls = 'ag') {
+function agentMark(name) {
   const id = AGENT_MARKS[name];
-  return id ? icon(id, cls) : h('span', {class: `${cls} ag-letter`, 'aria-hidden': 'true', text: (name || '?')[0].toUpperCase()});
+  return id ? icon(id, 'mark') : h('span', {class: 'mark letter', 'aria-hidden': 'true', text: (name || '?')[0].toUpperCase()});
 }
-// The view's own controls sit in the top bar, left of Sync.
-function actions(...nodes) { mount(document.getElementById('view-actions'), ...nodes); }
-function chip(kind, iconId, text, title) { return h('span', {class: `chip ${kind}`, title}, icon(iconId), text); }
+function agentByName(name) { return (store.inv?.agents || []).find((agent) => agent.name === name); }
+function display(name) { return agentByName(name)?.display_name || name; }
+function names(list) {
+  if (list.length < 2) return list.join('');
+  return `${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}`;
+}
 function pick(object, ...keys) {
   for (const key of keys) if (object && object[key] !== undefined && object[key] !== null) return object[key];
   return undefined;
@@ -138,36 +131,82 @@ async function api(path, options = {}) {
   }
   return body;
 }
+// The toast is a popover, so it shows above an open sheet; browsers without popovers show it as a plain fixed box.
 let toastTimer;
 function toast(message, bad = false) {
   const node = document.getElementById('toast');
   node.textContent = message;
   node.className = bad ? 'toast bad' : 'toast';
   node.hidden = false;
+  try {
+    if (node.showPopover) {
+      if (node.matches(':popover-open')) node.hidePopover();
+      node.showPopover();
+    }
+  } catch { /* shown as a plain box */ }
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => { node.hidden = true; }, bad ? 6000 : 3200);
+  toastTimer = setTimeout(hideToast, bad ? 6000 : 3200);
+}
+function hideToast() {
+  const node = document.getElementById('toast');
+  try { if (node.hidePopover && node.matches(':popover-open')) node.hidePopover(); } catch { /* plain box */ }
+  node.hidden = true;
 }
 function plural(count, word, many = `${word}s`) { return `${count} ${count === 1 ? word : many}`; }
 function tokens(count) { return count >= 1000 ? `~${(count / 1000).toFixed(1)}k` : `~${count}`; }
 function columns() { return (store.inv?.agents || []).filter((agent) => agent.inspected).map((agent) => agent.name); }
-function agentOrder(names) {
+function agentOrder(list) {
   const order = (store.inv?.agents || []).map((agent) => agent.name);
-  return [...names].sort((a, b) => {
+  return [...list].sort((a, b) => {
     const ia = order.indexOf(a); const ib = order.indexOf(b);
     return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib) || a.localeCompare(b);
   });
 }
-function switchControl(checked, label, onchange, disabled = false) {
-  const input = h('input', {type: 'checkbox', 'aria-label': label, disabled: disabled || store.busy || undefined, onchange});
-  input.checked = !!checked;
-  return h('label', {class: 'switch'}, input, h('span', {'aria-hidden': 'true'}));
+function liveAgents() { return (store.inv?.agents || []).filter((agent) => agent.enabled && agent.inspected && agent.detected && !agent.error); }
+function hero([iconId, cls], title, text) {
+  return h('div', {class: 'hero'}, icon(iconId, cls), h('h1', {text: title}), text ? h('p', {}, text) : null);
+}
+// A switch: a button with role=switch, its label and one line under it.
+function switchEl(on, label, sub, onpick, disabled = false) {
+  return h('button', {class: 'sw', type: 'button', role: 'switch', 'aria-checked': String(!!on), disabled: disabled || store.busy || undefined,
+    onclick: (event) => { event.currentTarget.setAttribute('aria-checked', String(!on)); onpick(!on); }},
+  h('span', {class: 'sw-text'}, h('span', {class: 'sw-label'}, label), sub ? h('span', {class: 'sw-sub', text: sub}) : null),
+  h('span', {class: 'sw-track', 'aria-hidden': 'true'}, h('span', {class: 'sw-knob'})));
 }
 function copyButton(text) {
-  return h('button', {class: 'icon-button quiet', type: 'button', 'aria-label': `Copy ${text}`, title: `Copy: ${text}`, onclick: async () => {
+  return h('button', {class: 'copy', type: 'button', 'aria-label': `Copy ${text}`, title: `Copy: ${text}`, onclick: async () => {
     try { await navigator.clipboard.writeText(text); toast('Copied to the clipboard.'); }
     catch { toast(text); }
   }}, icon('i-copy'));
 }
+// A command to run in a terminal, with a copy button.
+function command(text) { return h('div', {class: 'cmd'}, h('code', {text}), copyButton(text)); }
+function agentChip(name, cls = '', word = '') {
+  return h('span', {class: cls ? `chip ${cls}` : 'chip'}, agentMark(name), display(name), word ? h('span', {class: 'state', text: word}) : null);
+}
+function syncButton(label = 'Review sync') {
+  return h('button', {type: 'button', class: 'btn primary', onclick: openSync}, icon('i-sync'), label);
+}
+function linkButton(href, text) { return h('a', {class: 'btn', href, text}); }
+
+// ---------- sheets ----------
+// Dialogs that slide up on a phone and in from the right from 900px. showModal keeps focus inside and Escape closes.
+const closeTimers = {};
+function openDialog(dialog) {
+  clearTimeout(closeTimers[dialog.id]);
+  if (!dialog.open) dialog.showModal();
+  document.body.classList.add('sheet-open');
+  void dialog.offsetHeight; // start the slide from off screen
+  dialog.classList.add('in');
+}
+function closeDialog(dialog, instant = false) {
+  if (!dialog.open) return;
+  dialog.classList.remove('in');
+  clearTimeout(closeTimers[dialog.id]);
+  if (instant || window.matchMedia('(prefers-reduced-motion: reduce)').matches) dialog.close();
+  else closeTimers[dialog.id] = setTimeout(() => dialog.close(), 220);
+}
+function sheetOpen(id) { return document.getElementById(id).open; }
 
 // ---------- config edits ----------
 const SECTION_KEYS = {agents: ['Agents', 'agents'], mcp_servers: ['MCPServers', 'mcp_servers'], hooks: ['Hooks', 'hooks']};
@@ -179,6 +218,7 @@ async function patch(section, name, field, value, message) {
   const layer = definedLocally(section, name) ? 'local' : 'shared';
   const state = layer === 'local' ? store.local : store.shared;
   store.busy = true;
+  document.querySelectorAll('.sw, button.chip').forEach((node) => { node.disabled = true; });
   try {
     await api('/api/config', {method: 'PATCH', body: JSON.stringify({layer, expected_revision: state.revision, operations: [{op: 'set', path: `/${section}/${name}/${field}`, value}]})});
     toast(`${message} Saved to ${layer === 'local' ? 'tackroom.local.yaml' : 'tackroom.yaml'}; Sync to apply it.`);
@@ -187,6 +227,8 @@ async function patch(section, name, field, value, message) {
   } finally {
     store.busy = false;
     await refresh();
+    // The plan in an open Sync sheet is stale after any config change.
+    if (sheetOpen('sync-panel')) loadPlan();
   }
 }
 
@@ -201,376 +243,517 @@ async function refresh() {
   store.invError = inv.status === 'rejected' ? inv.reason.message : '';
   store.shared = shared.status === 'fulfilled' ? shared.value : null;
   store.local = local.status === 'fulfilled' ? local.value : null;
+  store.updatedAt = Date.now();
   // Drop the cached Config layer so it reloads with the new revision; an
   // unsaved draft keeps its base, so saving it reports the conflict instead.
   if (!store.drafts[store.configLayer]) store.configState = null;
   renderChrome();
   renderView();
+  renderToggles();
+}
+async function loadCrons(refreshNow = false) {
+  store.cronsLoading = true;
+  if (store.view === 'crons') renderView();
+  const started = Date.now();
+  try {
+    const data = await api(`/api/crons${refreshNow ? '?refresh=1' : ''}`);
+    // A row changed after this collect began is newer than what it read.
+    for (const item of store.cronPatches.filter((entry) => entry.at >= started)) data.jobs = replaceCronRow(data.jobs || [], item.matches, item.fresh);
+    store.crons = data;
+    store.cronsError = '';
+  } catch (error) {
+    store.cronsError = error.message;
+  }
+  store.cronsLoading = false;
+  renderChrome();
+  if (store.view === 'crons' || store.view === 'overview') renderView();
+  renderSheet();
+}
+async function loadHosts(refreshNow = false) {
+  try {
+    store.hosts = await api(`/api/hosts${refreshNow ? '?refresh=1' : ''}`);
+  } catch {
+    // Without an answer the Machines rows stay out, as with a single host.
+  }
+  store.hostsLoading = false;
+  if (store.view === 'overview') renderView();
 }
 
 // ---------- chrome ----------
+function skillNeedsAttention(skill) { return Object.values(skill.states).some((state) => ATTENTION.has(state)); }
+function syncCounts() {
+  const agents = store.inv?.agents || [];
+  return {
+    pending: agents.reduce((sum, agent) => sum + (agent.inspected ? agent.pending : 0), 0),
+    unsynced: agents.filter((agent) => agent.inspected && agent.detected && !agent.error && !agent.synced).length,
+  };
+}
+function setBadges(kind, count, title) {
+  document.querySelectorAll(`[data-badge="${kind}"]`).forEach((node) => {
+    node.textContent = count ? String(count) : '';
+    node.title = title;
+    node.hidden = !count;
+  });
+}
+function configLinks() { return pick(store.shared?.effective_ui, 'Links', 'links') || []; }
+function linkNodes() {
+  return configLinks().map((link) => h('a', {href: pick(link, 'URL', 'url'), target: '_top'}, icon('i-out'), h('span', {class: 'label', text: pick(link, 'Name', 'name')})));
+}
 function renderChrome() {
   const inv = store.inv;
-  const counts = {skills: '', roles: '', wiring: '', unmanaged: '', crons: ''};
-  const alerts = {};
-  if (inv) {
-    const attention = inv.skills.filter((skill) => Object.values(skill.states).some((state) => ATTENTION.has(state))).length;
-    counts.skills = attention || inv.skills.length;
-    alerts.skills = attention > 0;
-    counts.roles = inv.roles.length || '';
-    counts.wiring = inv.mcp.length + inv.hooks.length || '';
-    counts.unmanaged = inv.unmanaged.length || '';
-  }
-  if (store.crons) {
-    const attention = store.crons.jobs.filter((job) => job.health === 'fail').length;
-    counts.crons = attention || store.crons.jobs.length || '';
-    alerts.crons = attention > 0;
-  }
-  document.querySelectorAll('[data-count]').forEach((node) => {
-    node.textContent = counts[node.dataset.count] ?? '';
-    node.classList.toggle('alert', !!alerts[node.dataset.count]);
-  });
-  const pending = (inv?.agents || []).reduce((sum, agent) => sum + (agent.inspected ? agent.pending : 0), 0);
-  const unsynced = (inv?.agents || []).filter((agent) => agent.inspected && agent.detected && !agent.error && !agent.synced).length;
-  const button = document.getElementById('open-sync');
-  button.classList.toggle('pending', pending > 0 || unsynced > 0);
+  const skills = inv ? inv.skills.filter(skillNeedsAttention).length : 0;
+  const crons = store.crons ? store.crons.jobs.filter((job) => job.health === 'fail').length : 0;
+  setBadges('skills', skills, `${plural(skills, 'skill')} need attention`);
+  setBadges('crons', crons, `${plural(crons, 'job')} failing`);
+  const {pending, unsynced} = syncCounts();
   document.getElementById('sync-label').textContent = pending > 0 ? `Review sync · ${pending}` : unsynced > 0 ? 'Review sync' : 'Sync';
-  const links = pick(store.shared?.effective_ui, 'Links', 'links') || [];
-  mount(document.getElementById('links'), ...links.map((link) => h('a', {href: pick(link, 'URL', 'url'), target: '_top', text: pick(link, 'Name', 'name')})));
-  document.getElementById('links-menu').hidden = links.length === 0;
-  document.getElementById('scope').textContent = store.shared?.paths?.shared ? tilde(store.shared.paths.shared) : '';
+  document.getElementById('dock-sync-label').textContent = pending > 0 ? `Sync · ${pending}` : 'Sync';
+  const links = document.getElementById('links');
+  mount(links, linkNodes());
+  links.hidden = configLinks().length === 0;
+  const stamp = document.getElementById('stamp');
+  stamp.textContent = store.updatedAt ? `Updated ${clock(store.updatedAt)}` : '';
+  stamp.title = [store.shared?.paths?.shared && `Config ${tilde(store.shared.paths.shared)}`, inv?.revision && `revision ${inv.revision.slice(0, 12)}`].filter(Boolean).join(', ');
 }
 
 function route() {
   const next = window.location.hash.replace('#', '');
   store.view = VIEWS.includes(next) ? next : 'overview';
   document.querySelectorAll('.view').forEach((node) => { node.hidden = node.dataset.view !== store.view; });
-  document.querySelectorAll('.tabs a').forEach((node) => {
+  document.querySelectorAll('.side-nav a[data-view]').forEach((node) => {
     if (node.dataset.view === store.view) node.setAttribute('aria-current', 'page');
     else node.removeAttribute('aria-current');
   });
+  document.querySelectorAll('[data-dock]').forEach((node) => {
+    const current = node.dataset.dock === store.view || (node.dataset.dock === 'menu' && !['overview', 'crons'].includes(store.view));
+    if (current) node.setAttribute('aria-current', 'page');
+    else node.removeAttribute('aria-current');
+  });
+  document.title = `${TITLES[store.view]} - tackroom`;
   if (store.view === 'crons' && !store.crons && !store.cronsLoading) loadCrons();
-  document.getElementById('crumb').textContent = document.querySelector(`.tabs a[data-view="${store.view}"] .label`)?.textContent || '';
-  const help = document.getElementById('help');
-  help.dataset.tip = HELP[store.view];
-  help.setAttribute('aria-label', HELP[store.view]);
-  document.body.classList.remove('nav-open');
-  document.getElementById('open-nav').setAttribute('aria-expanded', 'false');
+  if (store.sheet?.kind === 'menu') closeDialog(document.getElementById('sheet'), true);
   renderView();
 }
 
 function renderView() {
   const root = document.getElementById(`view-${store.view}`);
-  actions();
   if (store.view === 'config') { renderConfig(root); return; }
   if (store.view === 'crons') { renderCrons(root); return; }
+  if (store.view === 'overview') { renderOverview(root); return; }
   if (!store.inv) {
     mount(root, store.invError
-      ? h('div', {class: 'error-box'}, h('strong', {text: 'Could not inspect your agents. '}), store.invError, ' Fix the config in the ', h('a', {href: '#config', text: 'Config'}), ' view.')
-      : h('p', {class: 'loading', text: 'Inspecting your agents…'}));
+      ? [hero(FAIL, 'Could not inspect your agents', [store.invError, ' Fix the config in ', h('a', {href: '#config', text: 'Config'}), '.'])]
+      : hero(IDLE, 'Inspecting your agents…'));
     return;
   }
-  ({overview: renderOverview, skills: renderSkills, roles: renderRoles, wiring: renderWiring, unmanaged: renderUnmanaged})[store.view](root);
+  ({skills: renderSkills, roles: renderRoles, wiring: renderWiring, unmanaged: renderUnmanaged})[store.view](root);
 }
 
-// Each view's explanation lives behind the info mark next to its title.
+// Each view's explanation, under its headline.
 const HELP = {
-  overview: 'What tackroom manages on each coding agent. The ring is linked skills; turn an agent off to stop syncing it, nothing on disk is removed.',
-  skills: 'Every canonical skill goes to every enabled agent. Each dot shows what is on disk now; Sync fixes drifted and missing links. Select a row for details.',
-  roles: 'Agent roles from agents/*.md, rendered into each agent that supports subagents.',
-  wiring: 'Which agents get each MCP server and hook. Select a dot to add or remove that agent; changes save to your config right away and Sync writes them to the agents.',
+  skills: 'Every canonical skill goes to every enabled agent. Sync fixes drifted and missing links.',
+  roles: 'Agent roles from agents/*.md in your config root, rendered into each agent that supports subagents.',
+  wiring: 'Turn an entry on or off, and select a harness to add or remove it. Each change saves to your config right away; Sync writes it to the agents.',
   unmanaged: "Things in your agents' folders that tackroom did not put there. tackroom never deletes them; copy the promote command to manage one.",
   crons: 'Scheduled jobs and services on every host in crons.hosts (tackroom.local.yaml). Add cron declares a job tackroom owns; Edit and Delete change only those. The CLI shows the same: tackroom cron collect --table.',
   config: 'Shared is tackroom.yaml in your config root; Local overrides it on this machine only; Effective is what sync uses.',
+  sources: 'Skills and packages from outside your config root. Sync pins each source to a commit in tackroom.lock, audits it, and puts anything published in the last 72 hours in cooldown. Nothing in cooldown or blocked reaches your agents until the cooldown ends or is skipped, or the finding is accepted.',
 };
 
-// ---------- overview ----------
-function agentStatus(agent) {
-  if (!agent.enabled) return ['', 'i-pause', 'off'];
-  if (!agent.inspected) return ['', 'i-idle', 'not inspected'];
-  if (agent.error) return ['bad', 'i-fail', 'config unreadable'];
-  if (!agent.detected) return ['', 'i-idle', 'not installed'];
-  if (agent.pending > 0) return ['warn', 'i-warn', `${agent.pending} pending`];
-  if (agent.synced) return ['ok', 'i-ok', 'synced'];
-  return ['warn', 'i-warn', 'needs sync'];
+// ---------- overview: one answer, then what fails, what needs attention and everything else ----------
+function harnessState(agent) {
+  const c = agent.counts || {};
+  if (!agent.enabled) return {st: 'off', word: 'turned off'};
+  if (!agent.inspected) return {st: 'off', word: 'not inspected'};
+  if (agent.error) return {st: 'fail', word: 'config unreadable'};
+  if (!agent.detected) return {st: 'off', word: 'not installed'};
+  if (c.conflicts) return {st: 'fail', word: plural(c.conflicts, 'conflict')};
+  if (agent.pending > 0) return {st: 'warn', word: `${agent.pending} pending`};
+  if (!agent.synced || c.drifted || c.missing || (agent.root_state && agent.root_state !== 'synced')) return {st: 'warn', word: 'needs sync'};
+  return {st: 'ok', word: 'synced'};
 }
+function harnessDetail(agent) {
+  const c = agent.counts || {};
+  return [
+    c.drifted && plural(c.drifted, 'drifted link'),
+    c.missing && `${plural(c.missing, 'skill')} not linked`,
+    agent.pending > 0 && `${plural(agent.pending, 'change')} waiting`,
+    agent.root_state && agent.root_state !== 'synced' && `root instructions ${agent.root_state}`,
+  ].filter(Boolean).join(', ');
+}
+// One row of Failing or Needs attention: a title, what is wrong, and its fix.
+function issue(title, on, body, acts = []) {
+  const buttons = nodes([acts]);
+  return h('article', {class: 'item'},
+    h('h3', {}, title, on ? h('span', {text: ` ${on}`}) : null),
+    body,
+    buttons.length ? h('div', {class: 'acts'}, buttons) : null);
+}
+function harnessItem(agent, state) {
+  const where = agent.skill_root ? h('p', {class: 'meta', text: tilde(agent.skill_root)}) : null;
+  if (agent.error) return issue(display(agent.name), state.word, [h('p', {text: tilde(agent.error)}), where], [linkButton('#config', 'Open Config')]);
+  if ((agent.counts || {}).conflicts) {
+    return issue(display(agent.name), state.word, [h('p', {text: 'A native file differs from what tackroom would write, so sync skips it.'}), where], [linkButton('#unmanaged', 'See conflicts')]);
+  }
+  return issue(display(agent.name), state.word, [h('p', {text: `${sentence(harnessDetail(agent) || 'its native config differs from the plan')}.`}), where], [syncButton()]);
+}
+function noAgentsItem() {
+  return issue('No agents in your config', '', [
+    h('p', {text: 'tackroom.yaml lists no agents, so sync has nothing to write to. Setup finds the agents installed on this machine, adds them to tackroom.yaml and syncs them.'}),
+    command('tackroom setup'),
+    h('p', {class: 'meta'}, 'Or add them by hand in ', h('a', {href: '#config', text: 'Config'}), '.')]);
+}
+// Machines in crons.hosts with the same health and summary fold into one row.
+const MACHINE_HEALTH = {ok: 'ok', warn: 'warn', fail: 'fail'};
+function machineGroups(hosts) {
+  const groups = new Map();
+  for (const host of hosts) {
+    const st = MACHINE_HEALTH[host.health] || 'fail';
+    const key = `${st}\n${host.summary}`;
+    if (!groups.has(key)) groups.set(key, {st, summary: host.summary, hosts: []});
+    groups.get(key).hosts.push(host);
+  }
+  return [...groups.values()];
+}
+function machineItem(group) {
+  return issue(sentence((group.summary || 'Needs attention').replace(/^1 /, 'one ')), `on ${names(group.hosts.map((host) => hostName(host.host)))}`,
+    group.hosts.map((host) => [
+      h('p', {class: 'meta', text: [hostName(host.host), host.version && `tackroom ${host.version}`, host.commit && `config ${host.commit.slice(0, 7)}`, host.relation_text].filter(Boolean).join(', ')}),
+      host.fix ? command(host.fix) : null]));
+}
+// Outside sources: the same rows as the cooldown lines of `tackroom status`.
+function sourceItem(row) {
+  const until = Date.parse(row.until);
+  const on = row.state === 'cooldown' ? (until ? `in cooldown until ${weekdayClock(until)}` : 'in cooldown') : row.state;
+  return issue(row.name, on, [
+    h('p', {text: sourceWhy(row)}),
+    row.command ? command(row.command) : null,
+    row.source ? h('p', {class: 'meta', text: [row.source.replace(/^https:\/\//, ''), row.commit && !row.pinned ? `new ${row.commit}` : ''].filter(Boolean).join(', ')}) : null]);
+}
+function sourceWhy(row) {
+  const until = Date.parse(row.until);
+  return {
+    cooldown: until ? 'Sync skips it until then and your agents keep what they have. To take it now:' : `In cooldown: ${row.reason}. To take it anyway:`,
+    blocked: `Sync skips it: ${row.reason}. Read the finding with tackroom doctor audit; to sync it anyway, accept it:`,
+  }[row.state] || `${sentence(row.reason || row.state)}. Fix it with:`;
+}
+function cronHosts(data) { return [...new Set([...(data.access || []).map((entry) => entry.host), ...(data.jobs || []).map((job) => job.host)])]; }
+function hostAccess(host, data) { return (data.access || []).filter((entry) => entry.host === host); }
+function unreachable(host, data) {
+  const access = hostAccess(host, data);
+  return access.length > 0 && access.every((entry) => entry.state === 'not_scanned') && access.some((entry) => (entry.detail || '').startsWith('probe failed'));
+}
+function unreachableItem(host, data) {
+  const access = hostAccess(host, data);
+  return issue(hostName(host), 'unreachable', [h('p', {text: `${sentence(access[0]?.detail || 'probe failed')}.`}), h('p', {class: 'meta', text: 'Its scheduled jobs are not in this list.'})],
+    [h('button', {type: 'button', class: 'btn', onclick: () => loadCrons(true), text: 'Collect again'})]);
+}
+function cronsErrorItem() {
+  return issue('Could not collect scheduled jobs', '', [h('p', {text: store.cronsError})], [h('button', {type: 'button', class: 'btn', onclick: () => loadCrons(true), text: 'Retry'})]);
+}
+const FAIL_NOUNS = {job: ['a scheduled job', 'scheduled jobs'], harness: ['a harness', 'harnesses'], machine: ['a machine', 'machines'], source: ['an outside source', 'outside sources'], config: ['the config', 'the config']};
 
 function renderOverview(root) {
   const inv = store.inv;
-  const enabled = inv.agents.filter((agent) => agent.enabled);
-  const pending = inv.agents.reduce((sum, agent) => sum + (agent.inspected ? agent.pending : 0), 0);
-  const unsynced = inv.agents.filter((agent) => agent.inspected && agent.detected && !agent.error && !agent.synced).length;
-  actions(
-    !inv.agents.length ? chip('warn', 'i-warn', 'No agents')
-      : pending > 0 ? chip('warn', 'i-warn', `${plural(pending, 'change')} waiting`)
-      : unsynced > 0 ? chip('warn', 'i-warn', `${plural(unsynced, 'agent')} out of sync`) : chip('ok', 'i-ok', 'All synced'),
-    inv.revision ? chip('', 'i-commit', inv.revision.slice(0, 7), `Config revision ${inv.revision}`) : null);
-
-  const cronJobs = store.crons?.jobs || [];
-  const cronTrouble = cronJobs.filter((job) => job.health === 'fail').length;
-  const tiles = h('div', {class: 'kpis tiles'},
-    tile('i-robot', 'Agents on', `${enabled.length}/${inv.agents.length}`),
-    tile('i-skills', 'Skills', inv.skills.length, '#skills'),
-    tile('i-roles', 'Roles', inv.roles.length, '#roles'),
-    tile('i-plug', 'MCP servers', inv.mcp.length, '#wiring'),
-    tile('i-bolt', 'Hooks', inv.hooks.length, '#wiring'),
-    cronTrouble ? tile('i-crons', 'Crons failing', `${cronTrouble}/${cronJobs.length}`, '#crons', true) : tile('i-crons', 'Crons', store.crons ? cronJobs.length : '-', '#crons'));
-
-  const issues = [];
-  for (const agent of inv.agents.filter((item) => item.inspected)) {
-    if (agent.error) issues.push(['i-fail', `${agent.name}: config unreadable`, '#config']);
-    if (agent.counts.drifted) issues.push(['i-drift', `${agent.name}: ${plural(agent.counts.drifted, 'drifted link')}`, '#skills']);
-    if (agent.counts.missing) issues.push(['i-minus', `${agent.name}: ${plural(agent.counts.missing, 'skill')} not linked`, '#skills']);
-    if (agent.counts.conflicts) issues.push(['i-warn', `${agent.name}: ${plural(agent.counts.conflicts, 'conflict')}`, '#unmanaged']);
-    if (agent.root_state && agent.root_state !== 'synced') issues.push(['i-warn', `${agent.name}: root instructions ${agent.root_state}`, null]);
+  const fail = [];
+  const warn = [];
+  const jobs = store.crons?.jobs || [];
+  for (const job of jobs.filter((item) => item.health === 'fail').sort(byLastRun)) fail.push(['job', jobItem(job)]);
+  for (const job of jobs.filter((item) => item.health === 'warn').sort(byLastRun)) warn.push(['job', jobItem(job)]);
+  if (store.crons) for (const host of cronHosts(store.crons).filter((item) => unreachable(item, store.crons))) warn.push(['job', unreachableItem(host, store.crons)]);
+  if (!store.crons && store.cronsError) warn.push(['job', cronsErrorItem()]);
+  if (!inv && store.invError) fail.push(['config', issue('Could not inspect your agents', '', [h('p', {text: store.invError})], [linkButton('#config', 'Open Config')])]);
+  if (inv) {
+    if (!inv.agents.length) warn.push(['harness', noAgentsItem()]);
+    if (inv.repo_state && inv.repo_state !== 'synced') warn.push(['harness', issue(`~/.agents link is ${inv.repo_state}`, '', [h('p', {text: 'Sync links your config root to ~/.agents.'})], [syncButton()])]);
+    for (const agent of inv.agents) {
+      const state = harnessState(agent);
+      if (state.st === 'fail') fail.push(['harness', harnessItem(agent, state)]);
+      if (state.st === 'warn') warn.push(['harness', harnessItem(agent, state)]);
+    }
   }
-  if (inv.repo_state && inv.repo_state !== 'synced') issues.unshift(['i-link', `~/.agents link is ${inv.repo_state}`, null]);
-  const attention = issues.length
-    ? h('ul', {class: 'issues'}, issues.map(([iconId, text, href]) => h('li', {}, icon(iconId), href ? h('a', {href, text}) : h('span', {text}))))
-    : null;
-  const crons = store.crons ? h('section', {class: 'block'},
-    h('div', {class: 'block-title'}, icon('i-crons'), h('h2', {}, h('a', {href: '#crons', text: 'Crons'})), cronTrouble ? h('span', {class: 'count-chip bad', title: 'Jobs that need attention', text: String(cronTrouble)}) : null),
-    h('div', {class: 'hero-grid'}, [...new Set(cronJobs.map((job) => job.host))].map((host) => hostCard(host, store.crons)), upNextCard(cronJobs))) : null;
-  // With no agents, saying so comes first: nothing else on the page can change until there are some.
-  const agents = inv.agents.length ? h('div', {class: 'cards'}, inv.agents.map(agentCard)) : null;
-  // Machines come right after what needs attention here: a machine that fell behind is news on a phone.
-  mount(root, tiles, attention, machinesBlock(), agents ? null : noAgents(), lockBlock(inv.lock), agents, crons);
+  // Machines only with more than one host in crons.hosts, as `tackroom hosts`; nothing until the probe answers.
+  const hosts = store.hosts?.hosts || [];
+  if (hosts.length > 1) {
+    for (const group of machineGroups(hosts).filter((item) => item.st !== 'ok')) (group.st === 'fail' ? fail : warn).push(['machine', machineItem(group)]);
+  }
+  for (const row of inv?.lock || []) {
+    if (row.state === 'blocked') fail.push(['source', sourceItem(row)]);
+    else if (row.state === 'cooldown') warn.push(['source', sourceItem(row)]);
+    else if (row.state !== 'pinned') warn.push(['source', sourceItem(row)]);
+  }
+
+  // The headline counts the rows below it, so the two never disagree.
+  const live = liveAgents();
+  const liveOk = live.filter((agent) => harnessState(agent).st === 'ok');
+  const loading = !inv && !store.invError;
+  const checking = loading || (!store.crons && !store.cronsError) || store.hostsLoading;
+  const title = checking && !fail.length && !warn.length ? 'Checking…'
+    : fail.length || warn.length ? [fail.length ? `${fail.length} failing` : '', warn.length ? `${warn.length} need${warn.length === 1 ? 's' : ''} attention` : ''].filter(Boolean).join(', ')
+      : 'All clear';
+  const kinds = [...new Set(fail.map(([kind]) => kind))];
+  const said = [
+    inv && live.length ? (liveOk.length === live.length ? `All ${live.length} installed harnesses are in sync.` : `${liveOk.length} of ${live.length} installed harnesses are in sync.`) : '',
+    kinds.length === 1 ? `The ${fail.length === 1 ? 'failure is' : 'failures are'} ${FAIL_NOUNS[kinds[0]][fail.length === 1 ? 0 : 1]}.` : kinds.length ? `The failures are ${names(kinds.map((kind) => FAIL_NOUNS[kind][1]))}.` : '',
+    loading ? 'Inspecting your agents.' : '',
+    !store.crons && !store.cronsError ? 'Still collecting crons.' : '',
+    store.hostsLoading ? 'Checking machines.' : '',
+  ].filter(Boolean).join(' ');
+
+  mount(root,
+    hero(fail.length ? FAIL : warn.length ? WARN : checking ? IDLE : OK, title, said),
+    h('div', {class: 'cols'},
+      fail.length || warn.length ? h('section', {},
+        fail.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, fail.map(([, node]) => node))] : null,
+        warn.length ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'), h('div', {class: 'items'}, warn.map(([, node]) => node))] : null) : null,
+      h('section', {},
+        h('h2', {class: 'gh'}, 'Everything else'),
+        h('ul', {class: 'rest'}, everythingElse(liveOk, live, hosts)))));
+}
+function restLine(target, iconPair, title, sub, extra, off = false) {
+  const inner = [icon(...iconPair), h('span', {}, h('b', {text: title}), sub ? h('span', {class: 'sub', text: sub}) : null, extra)];
+  const node = typeof target === 'string' ? h('a', {href: target}, inner)
+    : target ? h('button', {type: 'button', onclick: target}, inner) : h('div', {}, inner);
+  return h('li', {class: off ? 'off' : null}, node);
+}
+function everythingElse(liveOk, live, hosts) {
+  const inv = store.inv;
+  const lines = [];
+  if (inv && liveOk.length) {
+    const counts = `${plural(inv.skills.length, 'skill')}, ${plural(inv.roles.length, 'role')}, ${plural(inv.mcp.length, 'MCP server')}, ${plural(inv.hooks.length, 'hook')}.`;
+    lines.push(restLine(openSync, OK, `${plural(liveOk.length, 'harness', 'harnesses')} in sync`, liveOk.length === live.length ? `Nothing to sync. ${counts}` : counts,
+      [h('span', {class: 'marks'}, liveOk.map((agent) => agentMark(agent.name))), h('span', {class: 'sub link', text: 'Open Sync'})]));
+  }
+  if (store.crons) {
+    const jobs = store.crons.jobs || [];
+    const count = (health) => jobs.filter((job) => job.health === health).length;
+    const sub = [count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
+    lines.push(jobs.length ? restLine('#crons', OK, `${plural(count('ok'), 'cron')} healthy`, sub) : restLine('#crons', IDLE, 'No scheduled jobs', 'Add cron declares one tackroom owns.', null, true));
+  } else if (!store.cronsError) {
+    lines.push(restLine('#crons', IDLE, 'Collecting crons…', '', null, true));
+  }
+  if (hosts.length > 1) {
+    const ok = hosts.filter((host) => host.health === 'ok');
+    if (ok.length) {
+      const commits = new Set(ok.map((host) => (host.commit || '').slice(0, 7)));
+      const who = ok.length === hosts.length ? (hosts.length === 2 ? 'Both machines' : `All ${hosts.length} machines`) : plural(ok.length, 'machine');
+      const versions = new Map();
+      for (const host of ok) versions.set(host.version || '?', [...(versions.get(host.version || '?') || []), hostName(host.host)]);
+      lines.push(restLine(null, OK, commits.size === 1 && [...commits][0] ? `${who} on config ${[...commits][0]}` : `${who} healthy`,
+        [...versions].map(([version, list]) => `tackroom ${version} on ${names(list)}`).join('; ')));
+    }
+  }
+  if (inv) {
+    const pinned = inv.lock.filter((row) => row.state === 'pinned');
+    if (pinned.length) {
+      const findings = pinned.filter((row) => row.findings).map((row) => `${row.name} has ${plural(row.findings, 'audit finding')}, ${row.critical ? `${row.critical} critical` : 'none critical'}`);
+      const unaudited = pinned.filter((row) => !row.audited).length;
+      lines.push(restLine('#skills', OK, `${plural(pinned.length, 'outside source')} pinned`,
+        [...findings, unaudited ? `${unaudited} not audited` : ''].filter(Boolean).join('; ') || 'All audits pass'));
+    } else if (!inv.lock.length) {
+      lines.push(restLine('#skills', ['i-minus', 'st-off'], 'No outside sources', 'tackroom skill sources add owner/repo adds one; sync pins and audits it.', null, true));
+    }
+    const unmanaged = inv.unmanaged.filter((item) => item.kind !== 'conflict');
+    if (unmanaged.length) lines.push(restLine('#unmanaged', ['i-unmanaged', 'st-off'], `${plural(unmanaged.length, 'item')} tackroom does not manage`, 'In agent folders; tackroom leaves them alone.', null, true));
+    const idle = inv.agents.filter((agent) => !agent.enabled || !agent.inspected || !agent.detected);
+    if (idle.length) {
+      const missing = idle.filter((agent) => agent.enabled && agent.inspected && !agent.detected);
+      const off = idle.filter((agent) => !agent.enabled);
+      const other = idle.filter((agent) => agent.enabled && !agent.inspected);
+      const title = [missing.length && `${missing.length} not installed`, off.length && `${off.length} turned off`, other.length && `${other.length} not inspected`].filter(Boolean).join(', ');
+      const sub = [missing.length && `Not installed: ${missing.map((agent) => display(agent.name)).join(', ')}.`, off.length && `Turned off: ${off.map((agent) => display(agent.name)).join(', ')}.`, other.length && `Not inspected: ${other.map((agent) => display(agent.name)).join(', ')}.`].filter(Boolean).join(' ');
+      lines.push(restLine(openSync, ['i-minus', 'st-off'], title, sub, h('span', {class: 'sub link', text: 'Turn on or off under Sync'}), true));
+    }
+  }
+  return lines;
 }
 
-// tackroom on each machine in crons.hosts, in the words of `tackroom hosts`. Only with more than one
-// host, so one machine sees no change; nothing shows until the probe answers.
-const MACHINE_HEALTH = {ok: ['ok', 'healthy'], warn: ['warn', 'needs attention'], fail: ['bad', 'failing']};
-function machinesBlock() {
-  const hosts = store.hosts?.hosts || [];
-  if (hosts.length < 2) return null;
-  const failing = hosts.filter((host) => host.health === 'fail').length;
-  const help = 'tackroom on each machine in crons.hosts: its version, whether it is set up and synced, and its config commit against this machine\'s. The CLI shows the same: tackroom hosts.';
-  return h('section', {class: 'block machines'},
-    h('div', {class: 'block-title'}, icon('i-laptop'), h('h2', {text: 'Machines'}),
-      h('span', {class: failing ? 'count-chip bad' : 'count-chip', text: String(hosts.length)}),
-      h('span', {class: 'help', tabindex: '0', role: 'note', 'aria-label': help, dataset: {tip: help}}, icon('i-info'))),
-    h('ul', {class: 'lock-list'}, hosts.map(machineItem)));
+// ---------- skills ----------
+const STATE_LABELS = {drift: 'Drifted in', missing: 'Missing in', conflict: 'Conflict in', error: 'Config unreadable in', unknown: 'Unknown in'};
+function renderSkills(root) {
+  const inv = store.inv;
+  const live = liveAgents();
+  const skills = inv.skills;
+  const attention = skills.filter(skillNeedsAttention);
+  const yours = skills.filter((skill) => skill.origin === 'local');
+  const outside = skills.filter((skill) => skill.origin !== 'local');
+  const sources = new Set(outside.map((skill) => skill.origin.split('@')[0]));
+  const allOk = skills.every((skill) => live.every((agent) => skill.states[agent.name] === 'ok'));
+  const listing = live.find((agent) => agent.tokens)?.tokens;
+  const title = !skills.length ? 'No skills yet'
+    : attention.length ? `${plural(attention.length, 'skill')} need${attention.length === 1 ? 's' : ''} attention`
+      : allOk ? `${skills.length} skills, in place everywhere` : `${plural(skills.length, 'skill')}, none needs attention`;
+  const said = !skills.length ? 'No canonical skills yet. Add one with tackroom skill new <name>.' : [
+    allOk && live.length ? `Every skill is linked in all ${live.length} installed harnesses.` : '',
+    `${yours.length} ${yours.length === 1 ? 'is' : 'are'} yours and ${outside.length} ${outside.length === 1 ? 'comes' : 'come'} from ${plural(sources.size, 'outside source')}.`,
+    listing ? `Their listings cost about ${tokens(listing).slice(1)} tokens in each harness.` : '',
+    HELP.skills,
+  ].filter(Boolean).join(' ');
+  const list = h('div', {class: 'list'});
+  const counts = {all: skills.length, attention: attention.length, local: yours.length, external: outside.length};
+  const filters = h('div', {class: 'filters', role: 'group', 'aria-label': 'Filter skills'}, [['all', 'All'], ['attention', 'Needs attention'], ['local', 'Yours'], ['external', 'Outside']].map(([value, label]) =>
+    h('button', {type: 'button', 'aria-pressed': String(value === store.skillFilter), onclick: (event) => {
+      store.skillFilter = value;
+      filters.querySelectorAll('button').forEach((node) => node.setAttribute('aria-pressed', String(node === event.currentTarget)));
+      drawSkills(list);
+    }}, label, h('span', {class: 'mono', text: String(counts[value])}))));
+  mount(root,
+    hero(attention.length ? WARN : OK, title, said),
+    skills.length ? h('div', {class: 'tools'},
+      h('label', {class: 'search'}, icon('i-search'), h('input', {type: 'search', 'aria-label': 'Search skills', placeholder: `Search ${skills.length} skills`, value: store.skillQuery, oninput: (event) => { store.skillQuery = event.target.value; drawSkills(list); }})),
+      filters) : null,
+    list,
+    h('div', {class: 'list'}, sourcesSection(inv.lock)));
+  drawSkills(list);
 }
-function machineItem(host) {
-  const [kind, word] = MACHINE_HEALTH[host.health] || MACHINE_HEALTH.fail;
-  return h('li', {},
-    h('div', {class: 'lock-head'}, icon('i-laptop', `health ${host.health}`), h('span', {class: 'lock-name', text: hostName(host.host)}), h('span', {class: `pill ${kind}`, text: word})),
-    h('p', {class: 'note', text: host.summary}),
-    host.version || host.commit ? h('div', {class: 'lock-meta'},
-      host.version ? h('span', {text: `tackroom ${host.version}`}) : null,
-      host.commit ? h('span', {class: 'fig', title: host.commit, text: host.commit.slice(0, 7)}) : null,
-      host.relation_text ? h('span', {text: host.relation_text}) : null) : null,
-    host.fix ? command(host.fix) : null);
+function drawSkills(list) {
+  const inv = store.inv;
+  const query = store.skillQuery.trim().toLowerCase();
+  const filter = store.skillFilter;
+  const match = (skill) => (!query || `${skill.name} ${skill.description} ${skill.origin}`.toLowerCase().includes(query))
+    && (filter === 'all' || (filter === 'attention' && skillNeedsAttention(skill)) || (filter === 'local' && skill.origin === 'local') || (filter === 'external' && skill.origin !== 'local'));
+  const groups = new Map();
+  for (const skill of inv.skills.filter((item) => item.origin !== 'local' && match(item))) {
+    const repo = skill.origin.split('@')[0];
+    if (!groups.has(repo)) groups.set(repo, []);
+    groups.get(repo).push(skill);
+  }
+  const mine = inv.skills.filter((item) => item.origin === 'local' && match(item));
+  const root = mine[0] ? tilde(mine[0].path.slice(0, mine[0].path.lastIndexOf('/'))) : '';
+  mount(list,
+    [...groups].map(([repo, items]) => {
+      const lock = inv.lock.find((row) => (row.source || '').replace(/^https:\/\/github\.com\//, '').replace(/\.git$/, '') === repo);
+      const commit = items[0].origin.split('@')[1];
+      return [h('div', {class: 'src'}, h('b', {text: repo}), h('code', {text: lock && lock.state !== 'pinned' ? lock.state : commit ? `pinned at ${commit}` : 'pinned'}),
+        lock?.findings ? h('span', {class: lock.critical ? 'st-fail' : 'st-warn', text: plural(lock.findings, 'audit finding')}) : null), items.map(skillRow)];
+    }),
+    mine.length ? [h('div', {class: 'src'}, h('b', {text: 'Yours'}), root ? h('code', {text: root}) : null), mine.map(skillRow)] : null,
+    !mine.length && !groups.size && inv.skills.length ? h('p', {class: 'muted', text: filter === 'attention' && !query ? 'Nothing needs attention: every skill is in place.' : 'No skill matches.'}) : null);
+}
+function skillRow(skill) {
+  const key = `skill:${skill.name}`;
+  const open = store.openRows.has(key);
+  const live = new Set(columns());
+  const byState = {};
+  for (const [agent, state] of Object.entries(skill.states)) if (live.has(agent)) (byState[state] = byState[state] || []).push(agent);
+  const chipsFor = (state, cls) => h('span', {class: 'chips'}, agentOrder(byState[state] || []).map((agent) => agentChip(agent, cls)));
+  const detail = h('div', {class: 'open', hidden: !open || undefined},
+    h('dl', {class: 'facts'},
+      h('dt', {text: 'In place in'}), h('dd', {}, byState.ok ? chipsFor('ok') : 'No harness yet.'),
+      Object.keys(STATE_LABELS).filter((state) => byState[state]).map((state) => [h('dt', {text: STATE_LABELS[state]}), h('dd', {}, chipsFor(state, state === 'conflict' || state === 'error' ? 'st-fail' : 'st-warn'))]),
+      h('dt', {text: 'Path'}), h('dd', {class: 'mono', text: tilde(skill.path)}),
+      h('dt', {text: 'Origin'}), h('dd', {text: skill.origin === 'local' ? 'yours' : skill.origin}),
+      h('dt', {text: 'Listing'}), h('dd', {text: `${tokens(skill.tokens)} tokens in each harness (est.)`})));
+  const row = h('button', {class: 'srow', type: 'button', 'aria-expanded': String(open), onclick: () => {
+    const next = !store.openRows.has(key);
+    if (next) store.openRows.add(key); else store.openRows.delete(key);
+    row.setAttribute('aria-expanded', String(next));
+    detail.hidden = !next;
+  }},
+  h('span', {class: 'n'}, skill.name, skillNeedsAttention(skill) ? h('span', {class: 'tag st-warn', text: 'needs attention'}) : null),
+  h('span', {class: 'd', text: skill.description || ''}),
+  h('span', {class: 't', title: 'Listing tokens (est.)', text: String(skill.tokens)}));
+  return [row, detail];
 }
 
 // Outside sources: each pin, and what sync puts in cooldown or blocks with the command that lets it through.
-// The same rows as the cooldown lines of `tackroom status`, drawn
-// with the site's lock stamps: pinned solid, cooldown dashed, blocked a 2px fill, audit pass outlined.
+// Drawn with the site's lock stamps: pinned solid, cooldown dashed, blocked a 2px fill, audit pass outlined.
 const LOCK_STATES = {pinned: ['t-pin', '✓', 'i-pin'], cooldown: ['t-warn', '!', 'i-timer'], blocked: ['t-bad', '✗', 'i-audit']};
 function lockTag(cls, glyph, word, code) {
   return h('span', {class: `lock-tag ${cls}`}, h('span', {class: 'g', 'aria-hidden': 'true', text: glyph}), h('span', {class: 'w'}, word, code ? h('code', {text: code}) : null));
 }
-function lockBlock(rows) {
-  const blocked = rows.filter((row) => row.state === 'blocked').length;
-  const help = 'Skills and packages from outside your config root. Sync pins each source to a commit in tackroom.lock, audits it, and puts anything published in the last 72 hours in cooldown. Nothing in cooldown or blocked reaches your agents until the cooldown ends or is skipped, or the finding is accepted.';
-  return h('section', {class: 'block'},
-    h('div', {class: 'block-title'}, icon('i-pin'), h('h2', {text: 'Outside sources'}),
-      h('span', {class: blocked ? 'count-chip bad' : 'count-chip', text: String(rows.length)}),
-      h('span', {class: 'help', tabindex: '0', role: 'note', 'aria-label': help, dataset: {tip: help}}, icon('i-info'))),
-    rows.length
-      ? h('ul', {class: 'lock-list'}, rows.map(lockItem))
-      : h('p', {class: 'muted'}, 'None yet. ', h('code', {text: 'tackroom skill sources add owner/repo'}), ' adds one; sync pins it, audits it and puts anything published in the last 72 hours in cooldown.'));
+function sourcesSection(rows) {
+  return [
+    h('h2', {class: 'sec-h', text: 'Outside sources'}),
+    h('p', {class: 'sec-p', text: HELP.sources}),
+    rows.length ? rows.map(lockItem)
+      : h('p', {class: 'muted'}, 'None yet. ', h('code', {text: 'tackroom skill sources add owner/repo'}), ' adds one; sync pins it, audits it and puts anything published in the last 72 hours in cooldown.'),
+  ];
 }
 function lockItem(row) {
   const [cls, glyph, iconId] = LOCK_STATES[row.state] || ['t-warn', '!', 'i-warn'];
   const until = Date.parse(row.until);
   const audit = !row.audited ? null
     : row.critical ? lockTag('t-bad', '✗', 'audit', `${row.critical} critical`)
-    : row.findings ? lockTag('t-warn', '!', 'audit', plural(row.findings, 'finding')) : lockTag('t-ok', '✓', 'audit pass');
-  const why = {
-    cooldown: until ? 'Sync skips it until then and your agents keep what they have. To take it now:' : `In cooldown: ${row.reason}. To take it anyway:`,
-    blocked: `Sync skips it: ${row.reason}. Read the finding with tackroom doctor audit; to sync it anyway, accept it:`,
-  }[row.state] || `${sentence(row.reason || row.state)}. Fix it with:`;
-  return h('li', {},
-    h('div', {class: 'lock-head'}, icon(iconId, `lock-icon ${cls}`), h('span', {class: 'lock-name', text: row.name}),
+      : row.findings ? lockTag('t-warn', '!', 'audit', plural(row.findings, 'finding')) : lockTag('t-ok', '✓', 'audit pass');
+  return h('div', {class: 'lock'},
+    h('div', {class: 'lock-head'}, icon(iconId, cls === 't-pin' ? 'st-off' : cls === 't-bad' ? 'st-fail' : 'st-warn'), h('span', {class: 'lock-name', text: row.name}),
       row.state === 'pinned' ? lockTag(cls, glyph, 'pinned', row.commit)
         : row.state === 'cooldown' && until ? lockTag(cls, glyph, 'cooldown until', weekdayClock(until)) : lockTag(cls, glyph, row.state),
       audit),
-    row.source ? h('div', {class: 'lock-meta'}, h('span', {text: row.source.replace(/^https:\/\//, '')}),
-      row.commit && !row.pinned ? h('span', {class: 'fig', title: 'The commit sync would take; not pinned', text: `new ${row.commit}`}) : null) : null,
-    row.state === 'pinned' ? null : [h('p', {class: 'note', text: why}), row.command ? command(row.command) : null]);
+    row.source ? h('p', {class: 'meta', text: [row.source.replace(/^https:\/\//, ''), row.commit && !row.pinned ? `new ${row.commit}` : ''].filter(Boolean).join(', ')}) : null,
+    row.state === 'pinned' ? null : [h('p', {class: 'note', text: sourceWhy(row)}), row.command ? command(row.command) : null]);
 }
 
-// An empty agents list is a config state, not a load in progress: say so and name the command that fills it.
-function noAgents() {
-  return h('section', {class: 'card'},
-    h('h2', {text: 'No agents in your config'}),
-    h('p', {class: 'muted'}, 'tackroom.yaml lists no agents, so sync has nothing to write to. Setup finds the agents installed on this machine, adds them to tackroom.yaml and syncs them.'),
-    command('tackroom setup'),
-    h('p', {class: 'muted'}, 'Or add them by hand in ', h('a', {href: '#config', text: 'Config'}), '.'));
-}
-// A command to run in a terminal, with a copy button.
-function command(text) { return h('div', {class: 'command'}, h('code', {text}), copyButton(text)); }
-
-function tile(iconId, label, value, href, bad = false) {
-  return h(href ? 'a' : 'div', {class: 'kpi', href}, h('span', {class: 'kpi-label'}, icon(iconId), label), h('b', {class: bad ? 'kpi-value bad' : 'kpi-value', text: String(value)}));
-}
-
-function agentCard(agent) {
-  const [kind, statusIcon, label] = agentStatus(agent);
-  const local = definedLocally('agents', agent.name);
-  const toggle = switchControl(agent.enabled, `${agent.name} enabled`, (event) => patch('agents', agent.name, 'enabled', event.target.checked, `${agent.name} ${event.target.checked ? 'turned on' : 'turned off'}.`));
-  const live = agent.inspected && agent.detected && !agent.error;
-  const c = agent.counts || {};
-  const total = store.inv.skills.length;
-  const visual = live
-    ? ring([
-      {value: c.managed, kind: 'ok', label: 'linked'},
-      {value: c.drifted, kind: 'warn', label: 'drifted'},
-      {value: c.missing, kind: 'warn', label: 'missing'},
-      {value: Math.max(0, total - c.managed - c.drifted - c.missing), kind: 'none', label: 'not linked'},
-    ], c.managed, 'skills', 76)
-    : ring([], '-', agent.enabled ? '' : 'off', 76);
-  const value = (n) => (live ? n || 0 : '-');
-  const title = [agent.error, agent.skill_root && tilde(agent.skill_root), live && `${tokens(agent.tokens)} tokens of skill listings (est.)`].filter(Boolean).join(' · ');
-  const idle = !agent.enabled || (agent.inspected && !agent.detected);
-  return h('article', {class: idle ? 'card agent off' : 'card agent'},
-    h('div', {class: 'agent-head'},
-      agentMark(agent.name, 'ag ag-card'),
-      h('div', {class: 'agent-name'},
-        h('h3', {title}, agent.name, local ? h('span', {class: 'tag local', text: 'local'}) : null),
-        h('span', {class: `status ${kind}`}, icon(statusIcon), label)),
-      toggle),
-    h('div', {class: 'agent-body'}, visual,
-      h('ul', {class: 'facts'},
-        fact('i-drift', 'Drifted', value(c.drifted), c.drifted ? 'warn' : ''),
-        fact('i-minus', 'Missing', value(c.missing), c.missing ? 'warn' : ''),
-        fact('i-unmanaged', 'Unmanaged', value(c.unmanaged)))));
-}
-function fact(iconId, label, value, kind = '') { return h('li', {class: kind}, icon(iconId), h('span', {text: label}), h('b', {text: String(value)})); }
-
-// ---------- matrices ----------
-// The agent's mark shows beside its dot only when the matrix stacks on a narrow screen.
-function cellMark(agent) { return h('span', {class: 'cell-agent', 'aria-hidden': 'true'}, agentMark(agent)); }
-function cell(state, agent) {
-  const word = CELLS[state] || CELLS.unknown;
-  return [cellMark(agent), h('span', {class: `cell ${state}`, role: 'img', title: `${agent}: ${word}`, 'aria-label': `${agent}: ${word}`})];
-}
-// How many agent cells are in each state, as a figure, a bar and a legend.
-function coverage(items, states, noun) {
-  const counts = {};
-  for (const item of items) for (const agent of columns()) { const state = item.states[agent] || 'unknown'; counts[state] = (counts[state] || 0) + 1; }
-  const n = (state) => counts[state] || 0;
-  const untargeted = (state) => ['absent', 'unsupported', 'off', 'disabled'].includes(state);
-  const targeted = Object.entries(counts).filter(([state]) => !untargeted(state)).reduce((sum, [, count]) => sum + count, 0);
-  return h('div', {class: 'coverage'},
-    h('div', {class: 'coverage-figure'}, h('b', {text: `${n('ok')}/${targeted}`}), h('span', {text: `${noun} in place`})),
-    bar([...new Set([...states, ...Object.keys(counts)])].filter((state) => !untargeted(state)).map((state) => ({kind: state, value: n(state)}))),
-    h('div', {class: 'legend'}, states.filter((state) => n(state) || ['ok', 'drift', 'missing'].includes(state)).map((state) => h('span', {}, h('span', {class: `cell ${state}`, 'aria-hidden': 'true'}), CELLS[state], h('b', {text: String(n(state))})))));
-}
-function matrixHead(lead) {
-  return h('thead', {}, h('tr', {}, h('th', {class: 'lead', scope: 'col', text: lead}), columns().map((name) => h('th', {scope: 'col'}, h('span', {class: 'col-agent', title: name}, agentMark(name), h('span', {class: 'col-name', text: name}))))));
-}
-
-function renderSkills(root) {
-  const inv = store.inv;
-  const query = store.skillQuery.trim().toLowerCase();
-  const rows = inv.skills.filter((skill) => {
-    if (query && !`${skill.name} ${skill.description} ${skill.origin}`.toLowerCase().includes(query)) return false;
-    if (store.skillFilter === 'attention') return Object.values(skill.states).some((state) => ATTENTION.has(state));
-    if (store.skillFilter === 'local') return skill.origin === 'local';
-    if (store.skillFilter === 'external') return skill.origin !== 'local';
-    return true;
-  });
-  const search = h('input', {class: 'search', type: 'search', placeholder: 'Search skills', 'aria-label': 'Search skills', value: store.skillQuery, oninput: (event) => {
-    store.skillQuery = event.target.value;
-    const caret = event.target.selectionStart;
-    renderView();
-    const next = document.querySelector('#view-skills .search');
-    next.focus(); next.setSelectionRange(caret, caret);
-  }});
-  const filters = segmented([['all', 'All'], ['attention', 'Needs attention'], ['local', 'Local'], ['external', 'External']], store.skillFilter, (value) => { store.skillFilter = value; renderView(); });
-  const tbody = h('tbody', {});
-  for (const skill of rows) {
-    const open = store.openRows.has(`skill:${skill.name}`);
-    const row = h('tr', {class: 'row', tabindex: '0', 'aria-expanded': String(open), onclick: () => toggleRow(`skill:${skill.name}`), onkeydown: (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleRow(`skill:${skill.name}`); } }},
-      h('td', {class: 'lead'},
-        h('div', {class: 'lead-title', title: skill.description || ''}, skill.name,
-          skill.origin === 'local' ? null : h('span', {class: 'tag', title: skill.origin}, icon('i-github'), skill.origin.split('@')[0]))),
-      columns().map((agent) => h('td', {}, cell(skill.states[agent] || 'unknown', agent))));
-    tbody.append(row);
-    if (open) {
-      tbody.append(h('tr', {class: 'detail'}, h('td', {colspan: String(columns().length + 1)}, h('div', {class: 'detail-grid'},
-        skill.description ? h('p', {text: skill.description}) : null,
-        h('dl', {},
-          h('dt', {text: 'origin'}), h('dd', {text: skill.origin}),
-          h('dt', {text: 'path'}), h('dd', {class: 'mono', text: tilde(skill.path)}),
-          h('dt', {text: 'listing'}), h('dd', {text: `${tokens(skill.tokens)} tokens (est.)`}))))));
-    }
-  }
-  const table = rows.length
-    ? h('div', {class: 'matrix-wrap'}, h('table', {class: 'matrix'}, matrixHead(`${plural(rows.length, 'skill')}`), tbody))
-    : h('p', {class: 'empty', text: inv.skills.length ? 'No skills match this filter.' : 'No canonical skills yet. Add one with tackroom skill new <name>.'});
-  mount(root,
-    coverage(inv.skills, ['ok', 'drift', 'missing', 'conflict', 'absent'], 'links'),
-    h('div', {class: 'toolbar'}, h('label', {class: 'search-wrap'}, icon('i-search'), search), filters),
-    table);
-}
-function toggleRow(key) {
-  if (store.openRows.has(key)) store.openRows.delete(key); else store.openRows.add(key);
-  renderView();
-}
-function segmented(options, current, onpick) {
-  return h('div', {class: 'segmented', role: 'group'}, options.map(([value, label]) => h('button', {type: 'button', 'aria-pressed': String(value === current), onclick: () => onpick(value), text: label})));
-}
-
+// ---------- roles ----------
 function renderRoles(root) {
   const inv = store.inv;
-  const body = inv.roles.length
-    ? h('div', {class: 'matrix-wrap'}, h('table', {class: 'matrix'}, matrixHead(plural(inv.roles.length, 'role')),
-      h('tbody', {}, inv.roles.map((role) => h('tr', {}, h('td', {class: 'lead'}, h('div', {class: 'lead-title', text: role.name})), columns().map((agent) => h('td', {}, cell(role.states[agent] || 'unknown', agent))))))))
-    : h('p', {class: 'empty', text: 'No agent roles are configured. Roles live in agents/*.md in your config root.'});
-  mount(root, inv.roles.length ? coverage(inv.roles, ['ok', 'drift', 'missing', 'unsupported'], 'roles') : null, body);
+  const live = liveAgents();
+  const takes = live.filter((agent) => agent.supports_roles);
+  const not = live.filter((agent) => !agent.supports_roles);
+  const roles = inv.roles;
+  const attention = roles.filter((role) => Object.values(role.states).some((state) => ATTENTION.has(state)));
+  const allOk = roles.every((role) => takes.every((agent) => role.states[agent.name] === 'ok'));
+  const title = !roles.length ? 'No roles yet'
+    : attention.length ? `${plural(attention.length, 'role')} need${attention.length === 1 ? 's' : ''} attention`
+      : allOk && takes.length ? `${plural(roles.length, 'role')}, in place in all ${takes.length} harnesses that take roles` : plural(roles.length, 'role');
+  const said = [not.length ? `${names(not.map((agent) => display(agent.name)))} ${not.length === 1 ? 'does' : 'do'} not support roles.` : '', HELP.roles].filter(Boolean).join(' ');
+  const visible = new Set(columns());
+  mount(root,
+    hero(attention.length ? WARN : roles.length ? OK : IDLE, title, said),
+    h('div', {class: 'list'}, roles.length ? roles.map((role) => {
+      const states = Object.entries(role.states).filter(([agent]) => visible.has(agent));
+      const ok = agentOrder(states.filter(([, state]) => state === 'ok').map(([agent]) => agent));
+      const bad = states.filter(([, state]) => ATTENTION.has(state));
+      return h('div', {class: 'entry'},
+        h('h3', {text: role.name}),
+        h('span', {class: 'chips'}, ok.map((agent) => agentChip(agent)), bad.map(([agent, state]) => agentChip(agent, state === 'conflict' || state === 'error' ? 'st-fail' : 'st-warn', CELLS[state]))),
+        h('p', {class: 'meta', text: `agents/${role.name}.md in your config root`}));
+    }) : h('p', {class: 'muted', text: 'No agent roles are configured. Roles live in agents/*.md in your config root.'})));
 }
 
-// ---------- wiring ----------
-const EVENT_ICONS = {SessionStart: 'i-play', Stop: 'i-stop', SessionEnd: 'i-signout'};
+// ---------- MCP & hooks ----------
 function renderWiring(root) {
   const inv = store.inv;
+  const rows = [...inv.mcp, ...inv.hooks];
+  const attention = rows.filter((row) => Object.values(row.states).some((state) => ATTENTION.has(state)));
+  const off = rows.filter((row) => !row.enabled).length;
+  const counts = `${plural(inv.mcp.length, 'MCP server')} and ${plural(inv.hooks.length, 'hook')}`;
+  const title = attention.length ? `${plural(attention.length, 'entry', 'entries')} need${attention.length === 1 ? 's' : ''} attention`
+    : !rows.length ? 'No MCP servers or hooks yet' : off ? `${counts}, ${off} turned off` : `${counts}, all in place`;
   mount(root,
-    h('div', {class: 'legend'}, ['ok', 'missing', 'drift', 'off', 'disabled', 'unsupported'].map((state) => h('span', {}, h('span', {class: `cell ${state}`, 'aria-hidden': 'true'}), CELLS[state]))),
-    h('div', {class: 'block-title'}, icon('i-plug'), h('h2', {text: 'MCP servers'}), h('span', {class: 'count-chip', text: String(inv.mcp.length)})),
-    wiringTable('mcp', inv.mcp),
-    h('div', {class: 'block-title'}, icon('i-bolt'), h('h2', {text: 'Hooks'}), h('span', {class: 'count-chip', text: String(inv.hooks.length)})),
-    wiringTable('hooks', inv.hooks));
+    hero(attention.length ? WARN : rows.length ? OK : IDLE, title, HELP.wiring),
+    h('div', {class: 'list'},
+      h('h2', {class: 'sec-h', text: 'MCP servers'}),
+      inv.mcp.length ? inv.mcp.map((row) => wiringEntry('mcp', row)) : h('p', {class: 'muted', text: 'No MCP servers yet. Add one with tackroom mcp add.'}),
+      h('h2', {class: 'sec-h', text: 'Hooks'}),
+      inv.hooks.length ? inv.hooks.map((row) => wiringEntry('hooks', row)) : h('p', {class: 'muted', text: 'No hooks yet. Add them under hooks: in tackroom.yaml.'})));
 }
-function wiringTable(kind, rows) {
-  if (!rows.length) return h('p', {class: 'empty', text: kind === 'mcp' ? 'No MCP servers yet. Add one with tackroom mcp add.' : 'No hooks yet. Add them under hooks: in tackroom.yaml.'});
+function wiringEntry(kind, row) {
   const section = kind === 'mcp' ? 'mcp_servers' : 'hooks';
   const supportKey = kind === 'mcp' ? 'supports_mcp' : 'supports_hooks';
-  return h('div', {class: 'matrix-wrap'}, h('table', {class: 'matrix'}, matrixHead(kind === 'mcp' ? 'Server' : 'Hook'),
-    h('tbody', {}, rows.map((row) => {
-      const local = definedLocally(section, row.name);
-      const lead = h('td', {class: 'lead'}, h('div', {class: 'lead-row'},
-        switchControl(row.enabled, `${row.name} enabled`, (event) => patch(section, row.name, 'enabled', event.target.checked, `${row.name} ${event.target.checked ? 'turned on' : 'turned off'}.`)),
-        h('div', {class: 'lead-title', title: tilde(row.command || '')}, row.name,
-          row.event ? h('span', {class: 'tag'}, icon(EVENT_ICONS[row.event] || 'i-bolt'), row.event) : null,
-          row.explicit ? null : h('span', {class: 'tag', text: 'all agents'}),
-          local ? h('span', {class: 'tag local', text: 'local'}) : null)));
-      const cells = columns().map((agent) => {
-        const state = row.states[agent] || 'unknown';
-        const targeted = !['off', 'unsupported', 'absent', 'error'].includes(state);
-        const locked = ['unsupported', 'absent', 'error'].includes(state) || store.busy;
-        const word = CELLS[state] || CELLS.unknown;
-        return h('td', {}, h('button', {
-          type: 'button', class: `cell ${state}`, disabled: locked || undefined,
-          'aria-pressed': String(targeted), 'aria-label': `${row.name} on ${agent}: ${word}`,
-          title: locked ? `${agent}: ${word}` : `${agent}: ${word}. Select to ${targeted ? 'remove' : 'add'} this agent.`,
-          onclick: () => toggleTarget(section, supportKey, row, agent, targeted),
-        }, cellMark(agent)));
-      });
-      return h('tr', {}, lead, cells);
-    }))));
+  const local = definedLocally(section, row.name);
+  const sub = [kind === 'mcp' ? 'MCP server' : row.event ? `${row.event} hook` : 'hook', row.explicit ? '' : 'all agents', local ? 'in tackroom.local.yaml' : ''].filter(Boolean).join(' · ');
+  const agents = columns();
+  const unsupported = agents.filter((agent) => row.states[agent] === 'unsupported');
+  const chips = agents.filter((agent) => row.states[agent] !== 'unsupported').map((agent) => {
+    const state = row.states[agent] || 'unknown';
+    const targeted = !['off', 'unsupported', 'absent', 'error'].includes(state);
+    const locked = ['absent', 'error'].includes(state) || store.busy;
+    const word = CELLS[state] || CELLS.unknown;
+    const shown = ['ok', 'off'].includes(state) ? '' : word;
+    return h('button', {
+      type: 'button', class: `chip${state === 'absent' ? ' dim' : ''}${ATTENTION.has(state) ? ' st-warn' : ''}`, disabled: locked || undefined,
+      'aria-pressed': String(targeted), 'aria-label': `${row.name} on ${display(agent)}: ${word}`,
+      title: locked ? `${display(agent)}: ${word}` : `${display(agent)}: ${word}. Select to ${targeted ? 'remove' : 'add'} this agent.`,
+      onclick: () => toggleTarget(section, supportKey, row, agent, targeted),
+    }, agentMark(agent), display(agent), shown ? h('span', {class: 'state', text: `(${shown})`}) : null);
+  });
+  return h('div', {class: 'entry'},
+    switchEl(row.enabled, row.name, sub, (next) => patch(section, row.name, 'enabled', next, `${row.name} ${next ? 'turned on' : 'turned off'}.`)),
+    row.command ? h('p', {class: 'meta'}, h('code', {text: tilde(row.command)})) : null,
+    chips.length ? [h('p', {class: 'muted', text: 'Targets. Select a harness to add or remove it:'}), h('div', {class: 'chips'}, chips)] : null,
+    unsupported.length ? h('p', {class: 'muted', text: `Not supported in ${names(unsupported.map(display))}.`}) : null);
 }
 async function toggleTarget(section, supportKey, row, agent, targeted) {
   const universe = store.inv.agents.filter((item) => item[supportKey]).map((item) => item.name);
@@ -591,61 +774,34 @@ const UNMANAGED_GROUPS = [
 ];
 function renderUnmanaged(root) {
   const items = store.inv.unmanaged;
-  const groups = UNMANAGED_GROUPS.map(([kind, iconId, title, help]) => {
+  const conflicts = items.filter((item) => item.kind === 'conflict').length;
+  const groups = UNMANAGED_GROUPS.map(([kind, , title, help]) => {
     const list = items.filter((item) => item.kind === kind);
     if (!list.length) return null;
-    return h('section', {class: 'block'},
-      h('div', {class: 'block-title'}, icon(iconId, kind === 'conflict' ? 'bad' : ''), h('h2', {text: title}), h('span', {class: kind === 'conflict' ? 'count-chip bad' : 'count-chip', text: String(list.length)}),
-        h('span', {class: 'help', tabindex: '0', role: 'note', 'aria-label': help, dataset: {tip: help}}, icon('i-info'))),
-      h('div', {class: 'items'}, list.map((item) => {
-        const link = /symlink/.test(item.detail || '');
-        return h('div', {class: 'item'},
-          h('span', {class: 'item-icon', title: tilde(item.detail || '')}, icon(link ? 'i-link' : 'i-folder')),
-          h('span', {class: 'item-name', title: tilde(item.detail || ''), text: item.name}),
-          h('span', {class: 'chips'}, item.agents.map((agent) => h('span', {class: 'tag', title: agent, 'aria-label': agent}, agentMark(agent)))),
-          item.hint ? copyButton(tilde(item.hint)) : h('span'));
-      })));
+    return [h('h2', {class: kind === 'conflict' ? 'sec-h st-fail' : 'sec-h', text: `${title} (${list.length})`}), h('p', {class: 'sec-p', text: help}),
+      list.map((item) => h('div', {class: 'entry'},
+        h('div', {class: 'entry-head'}, icon(/symlink/.test(item.detail || '') ? 'i-link' : 'i-folder', 'st-off'), h('h3', {text: item.name}),
+          h('span', {class: 'chips'}, item.agents.map((agent) => h('span', {title: display(agent), 'aria-label': display(agent)}, agentMark(agent))))),
+        item.detail ? h('p', {class: 'meta', text: tilde(item.detail)}) : null,
+        item.hint ? command(tilde(item.hint)) : null))];
   }).filter(Boolean);
-  mount(root, ...(groups.length ? groups : [h('p', {class: 'empty', text: 'Everything in your agents\' skill folders is managed by tackroom.'})]));
+  mount(root,
+    hero(conflicts ? FAIL : ['i-unmanaged', 'st-off'], items.length ? `${plural(items.length, 'item')} tackroom does not manage` : 'Everything is managed', items.length ? HELP.unmanaged : "Everything in your agents' skill folders is managed by tackroom."),
+    h('div', {class: 'list'}, groups));
 }
 
+// ---------- crons ----------
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STRIP_HOURS = 24;
-
-async function loadCrons(refresh = false) {
-  store.cronsLoading = true;
-  if (store.view === 'crons') renderView();
-  const started = Date.now();
-  try {
-    const data = await api(`/api/crons${refresh ? '?refresh=1' : ''}`);
-    // A row changed after this collect began is newer than what it read.
-    for (const patch of store.cronPatches.filter((item) => item.at >= started)) data.jobs = replaceCronRow(data.jobs || [], patch.matches, patch.fresh);
-    store.crons = data;
-    store.cronsError = '';
-  } catch (error) {
-    store.cronsError = error.message;
-  }
-  store.cronsLoading = false;
-  renderChrome();
-  if (store.view === 'crons' || store.view === 'overview') renderView();
-}
-async function loadHosts(refresh = false) {
-  try {
-    store.hosts = await api(`/api/hosts${refresh ? '?refresh=1' : ''}`);
-  } catch {
-    return;
-  }
-  if (store.view === 'overview') renderView();
-}
-function ago(iso) {
+function ago(iso, short = false) {
   const time = Date.parse(iso);
-  if (!time) return '';
+  if (!time) return short ? '-' : '';
   const minutes = Math.round((Date.now() - time) / 60000);
-  if (minutes < 2) return 'just now';
-  if (minutes < 90) return `${minutes} min ago`;
+  if (minutes < 2) return short ? 'now' : 'just now';
+  if (minutes < 90) return short ? `${minutes}m` : `${minutes} min ago`;
   const hours = Math.round(minutes / 60);
-  if (hours < 36) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} d ago`;
+  if (hours < 36) return short ? `${hours}h` : `${hours} h ago`;
+  return short ? `${Math.round(hours / 24)}d` : `${Math.round(hours / 24)} d ago`;
 }
 function until(ms) {
   const minutes = Math.max(1, Math.round(ms / 60000));
@@ -745,83 +901,53 @@ function nextFire(job, from) {
   return null;
 }
 function weekdayClock(ms) { return `${DAY_NAMES[new Date(ms).getDay()]} ${clock(ms)}`; }
+function when(ms, now) { return ms - now < 86400000 ? clock(ms) : weekdayClock(ms); }
 const PAUSED = ['disabled', 'paused', 'not_loaded'];
 const SOURCE_ICONS = {launchd: 'i-launchd', crontab: 'i-crontab', systemd: 'i-gear', codex: 'a-codex', 'claude-desktop': 'a-claude-code', 'claude-cloud': 'a-claude-code', 'herdr-automations': 'i-alarm'};
-const HEALTH = {ok: ['i-ok', 'Healthy'], idle: ['i-idle', 'No result'], warn: ['i-warn', 'Last run failed'], fail: ['i-fail', 'Failing'], paused: ['i-pause', 'Paused']};
-const HEALTH_ORDER = ['ok', 'idle', 'warn', 'fail', 'paused'];
+const JOB_STATES = {fail: ['fail', 'failing'], warn: ['warn', 'last run failed'], idle: ['off', 'not run yet'], ok: ['ok', 'healthy'], paused: ['off', 'paused']};
+function jobState(job) { return JOB_STATES[job.health] || ['warn', job.health || 'unknown']; }
 function sourceIcon(job) { return icon(SOURCE_ICONS[job.source] || 'i-crons', 'src-icon'); }
 function compact(n) { return n >= 10000 ? `${(n / 1000).toFixed(n >= 100000 ? 0 : 1)}k` : n.toLocaleString('en-US'); }
-// The kind of trouble as [icon, label, short detail].
-function problemKind(job) {
-  const problems = job.problems || [];
-  const first = problems[0] || '';
-  let match = /crash loop: KeepAlive restarted it (\d+) times, last exit (-?\d+)/.exec(first);
-  if (match) return ['i-loop', 'Crash loop', `${compact(Number(match[1]))} restarts · exit ${match[2]}`];
-  const missing = problems.filter((problem) => problem.startsWith('path does not exist: '));
-  if (missing.length) return ['i-file-x', 'Missing file', missing.map((problem) => problem.split('/').pop()).join(', ')];
-  if (first.includes('has not run')) return ['i-alarm', 'Missed run', job.last_run ? `last ran ${ago(job.last_run)}` : 'never ran'];
-  if (first.startsWith('last error: ')) {
-    const text = first.slice(12).replace(/^\[[^\]]*\]\s*/, '');
-    const auth = /credential|auth/i.test(text);
-    return [auth ? 'i-key' : 'i-fail', auth ? 'Auth error' : 'Run failed', text.split(/[:.]/)[0].trim()];
-  }
-  match = /^last exit (-?\d+)/.exec(first);
-  if (match) return ['i-fail', 'Exited', `exit ${match[1]}`];
-  return ['i-warn', sentence(job.state), sentence(first)];
-}
 function cronKey(job) { return `cron:${job.host}/${job.source}/${job.id}`; }
 function hostName(host) { return host === 'local' ? 'This Mac' : host || 'Unknown host'; }
-function openCron(job) {
-  store.cronFilter = 'all';
-  store.openRows.add(cronKey(job));
-  renderView();
-  document.getElementById(cronKey(job))?.scrollIntoView({block: 'center'});
+function byLastRun(a, b) { return (Date.parse(b.last_run) || 0) - (Date.parse(a.last_run) || 0); }
+function jobSchedule(job) { return job.schedule_text || job.schedule || ''; }
+function jobNext(job, now = Date.now()) {
+  if (PAUSED.includes(job.state) || job.health === 'paused' || job.state === 'service') return null;
+  return cronFires(job, now)?.fires?.[0] ?? nextFire(job, now);
 }
-
-function renderCrons(root) {
-  const data = store.crons;
-  actions(
-    h('button', {type: 'button', class: 'primary', onclick: () => openJobPanel('add')}, icon('i-plus'), 'Add cron'),
-    data ? h('span', {class: 'stamp', title: `Collected ${new Date(Date.parse(data.scanned_at)).toLocaleString()}`}, icon('i-crontab'), clock(Date.parse(data.scanned_at))) : null,
-    h('button', {type: 'button', class: store.cronsLoading ? 'icon-button spinning' : 'icon-button', disabled: store.cronsLoading || undefined, 'aria-label': 'Collect again', title: store.cronsLoading ? 'Collecting…' : 'Collect again', onclick: () => loadCrons(true)}, icon('i-refresh')));
-  if (!data) {
-    if (store.cronsError) {
-      mount(root, h('div', {class: 'error-box'}, h('strong', {text: 'Could not collect scheduled jobs. '}), store.cronsError, ' ', h('button', {type: 'button', class: 'quiet', onclick: () => loadCrons(true), text: 'Retry'})));
-      return;
-    }
-    // The final layout with its figures still empty, so nothing moves when the data lands.
-    const waiting = (iconId, title) => h('section', {class: 'hero-card'}, h('div', {class: 'hero-head'}, icon(iconId), h('h2', {text: title})), h('div', {class: 'host-body'}, ring([], '-', 'jobs'), h('p', {class: 'muted', text: 'Collecting…'})));
-    mount(root, h('div', {class: 'hero-grid'}, waiting('i-laptop', 'This Mac'), waiting('i-laptop', 'Hosts'), waiting('i-timer', 'Up next')));
-    return;
-  }
-  const jobs = data.jobs || [];
-  const hosts = [...new Set([...(data.access || []).map((entry) => entry.host), ...jobs.map((job) => job.host)])];
-  const attention = jobs.filter((job) => job.health === 'fail').sort((a, b) => (Date.parse(b.last_run) || 0) - (Date.parse(a.last_run) || 0));
-  mount(root,
-    h('div', {class: 'hero-grid'}, hosts.map((host) => hostCard(host, data)), upNextCard(jobs)),
-    attention.length ? h('section', {class: 'block'},
-      h('div', {class: 'block-title'}, icon('i-warn', 'bad'), h('h2', {text: 'Needs attention'}), h('span', {class: 'count-chip bad', text: String(attention.length)})),
-      h('div', {class: 'alert-grid'}, attention.map(alertCard))) : null,
-    fireStrip(jobs, hosts),
-    jobsBlock(jobs, hosts));
+function jobReason(job) {
+  const problems = (job.problems || []).map((problem) => `${sentence(grouped(job.host === 'local' ? tilde(problem) : problem))}.`.replace(/\.\.$/, '.'));
+  if (problems.length) return problems;
+  if (job.health === 'warn') return [job.last_exit != null ? `Last run exited ${job.last_exit}.` : job.last_status ? `Last run: ${job.last_status.replace('_', ' ')}.` : 'Last run failed.'];
+  if (job.health === 'fail') return ['Failing.'];
+  return [];
 }
-function hostCard(host, data) {
-  const access = (data.access || []).filter((entry) => entry.host === host);
-  const unreachable = access.length > 0 && access.every((entry) => entry.state === 'not_scanned') && access.some((entry) => (entry.detail || '').startsWith('probe failed'));
-  const jobs = data.jobs.filter((job) => job.host === host);
-  const counts = Object.fromEntries(HEALTH_ORDER.map((kind) => [kind, 0]));
-  jobs.forEach((job) => { counts[job.health] += 1; });
-  // An empty herdr-automations source still says whether its scheduler runs.
-  const sources = access.filter((entry) => entry.state === 'found' || entry.state === 'unreadable' || (entry.source === 'herdr-automations' && entry.state === 'empty' && entry.detail && entry.detail.startsWith('scheduler')));
-  return h('section', {class: 'hero-card'},
-    h('div', {class: 'hero-head'}, icon('i-laptop'), h('h2', {text: hostName(host)}), unreachable ? h('span', {class: 'pill bad', title: access[0].detail, text: 'unreachable'}) : null),
-    h('div', {class: 'host-body'},
-      ring(HEALTH_ORDER.map((kind) => ({kind, value: counts[kind], label: HEALTH[kind][1].toLowerCase()})), jobs.length, 'jobs'),
-      h('ul', {class: 'health-list'}, HEALTH_ORDER.filter((kind) => counts[kind]).map((kind) => h('li', {class: kind}, icon(HEALTH[kind][0]), h('span', {text: HEALTH[kind][1]}), h('b', {text: String(counts[kind])}))))),
-    h('div', {class: 'source-row'}, sources.map((entry) => h('span', {class: entry.state === 'unreadable' ? 'src bad' : 'src', title: `${entry.source}: ${entry.state === 'found' ? plural(entry.jobs, 'job') + (entry.detail ? `, ${entry.detail}` : '') : entry.detail || entry.state}`},
-      icon(SOURCE_ICONS[entry.source] || 'i-crons'), entry.source, h('b', {text: entry.state === 'unreadable' ? '!' : String(entry.jobs)})))));
+function lastRunText(job) {
+  if (!job.last_run) return 'never run';
+  return `last run ${ago(job.last_run)}${(job.inferred || []).includes('last_run') ? ' (from the log file)' : ''}`;
 }
-function upNextCard(jobs) {
+// Run, pause and resume a launchd job.
+function runButtons(job) {
+  if (!(job.source === 'launchd' && job.unit)) return null;
+  const busy = Boolean(store.cronBusy);
+  const off = ['disabled', 'not_loaded'].includes(job.state);
+  const button = (label, action, primary) => h('button', {type: 'button', class: primary ? 'btn primary' : 'btn', disabled: busy || undefined, onclick: () => cronAction(job, action), text: label});
+  return off ? [button('Resume', 'resume', true)] : [button('Run now', 'run', true), button('Pause', 'pause')];
+}
+// A failing or attention row: what is wrong, the schedule, and its actions.
+function jobItem(job) {
+  return h('article', {class: 'item'},
+    h('h3', {}, job.short_name, h('span', {text: ` on ${hostName(job.host)}`})),
+    jobReason(job).map((text) => h('p', {text})),
+    h('p', {class: 'meta', text: [jobSchedule(job), lastRunText(job)].filter(Boolean).join(', ')}),
+    h('div', {class: 'acts'},
+      runButtons(job),
+      job.log ? h('button', {class: 'btn', type: 'button', onclick: () => openLog(job), text: 'Log'}) : null,
+      h('button', {class: 'btn quiet', type: 'button', onclick: () => openJob(job), text: 'Details'})));
+}
+// The soonest runs, with one job due on several machines at once said once.
+function nextLine(jobs) {
   const now = Date.now();
   const queue = [];
   for (const job of jobs) {
@@ -832,25 +958,67 @@ function upNextCard(jobs) {
     if (next) queue.push({job, next});
   }
   queue.sort((a, b) => a.next - b.next);
-  const [first, ...rest] = queue;
-  const when = (t) => (t - now < 86400000 ? clock(t) : weekdayClock(t));
-  return h('section', {class: 'hero-card'},
-    h('div', {class: 'hero-head'}, icon('i-timer'), h('h2', {text: 'Up next'})),
-    first
-      ? h('div', {class: 'upnext-lead', title: `${first.job.name || first.job.id} · ${hostName(first.job.host)} · ${when(first.next)}`},
-        h('b', {class: 'upnext-in', text: until(first.next - now).replace(/^in /, '')}),
-        h('span', {class: 'upnext-name'}, sourceIcon(first.job), first.job.short_name, h('span', {class: 'faint', text: hostName(first.job.host)})))
-      : h('p', {class: 'muted', text: 'Nothing scheduled this week.'}),
-    rest.length ? h('ul', {class: 'upnext-list'}, rest.slice(0, 4).map(({job, next}) => h('li', {title: `${job.name || job.id} · ${hostName(job.host)}`},
-      h('span', {class: 'fig', text: when(next)}), sourceIcon(job), h('span', {class: 'upnext-job', text: job.short_name}), h('span', {class: 'faint', text: hostName(job.host)})))) : null);
+  if (!queue.length) return 'Nothing scheduled this week.';
+  const first = queue[0];
+  const same = queue.filter((item) => item.next === first.next && item.job.short_name === first.job.short_name);
+  return `Next: ${first.job.short_name} on ${names(same.map((item) => hostName(item.job.host)))} at ${when(first.next, now)}.`;
 }
-function alertCard(job) {
-  const [iconId, label, detail] = problemKind(job);
-  const stale = iconId === 'i-alarm' && Date.now() - (Date.parse(job.last_run) || 0) > 7 * 86400000;
-  return h('button', {type: 'button', class: stale ? 'alert-card stale' : 'alert-card', title: `${job.name || job.id}\n${(job.problems || []).map((problem) => sentence(grouped(problem))).join('\n')}`, onclick: () => openCron(job)},
-    h('span', {class: 'alert-top'}, icon(iconId, 'alert-icon'), h('span', {text: label}), h('span', {class: 'alert-ago', text: job.last_run ? ago(job.last_run) : ''})),
-    h('span', {class: 'alert-name', text: job.short_name}),
-    h('span', {class: 'alert-meta'}, icon('i-laptop'), h('span', {text: hostName(job.host)}), detail ? h('span', {class: 'alert-detail', text: detail}) : null));
+
+function renderCrons(root) {
+  const data = store.crons;
+  const tools = h('div', {class: 'tools tools-row'},
+    h('button', {type: 'button', class: 'btn primary', onclick: () => openJobPanel('add')}, icon('i-plus'), 'Add cron'),
+    h('button', {type: 'button', class: store.cronsLoading ? 'btn spinning' : 'btn', disabled: store.cronsLoading || undefined, onclick: () => loadCrons(true)}, icon('i-refresh'), store.cronsLoading ? 'Collecting…' : 'Collect again'),
+    data ? h('span', {class: 'stamp', title: new Date(Date.parse(data.scanned_at)).toLocaleString(), text: `Collected ${clock(Date.parse(data.scanned_at))}`}) : null);
+  if (!data) {
+    mount(root, store.cronsError
+      ? [hero(FAIL, 'Could not collect scheduled jobs', store.cronsError), tools]
+      : [hero(IDLE, 'Collecting scheduled jobs…', HELP.crons), tools]);
+    return;
+  }
+  const jobs = data.jobs || [];
+  const hosts = cronHosts(data);
+  const fails = jobs.filter((job) => job.health === 'fail').sort(byLastRun);
+  const warns = jobs.filter((job) => job.health === 'warn').sort(byLastRun);
+  const away = hosts.filter((host) => unreachable(host, data));
+  const rest = jobs.filter((job) => job.health !== 'fail' && job.health !== 'warn');
+  const title = !jobs.length ? 'No scheduled jobs yet' : fails.length ? `${fails.length} of ${jobs.length} jobs failing` : `${jobs.length} jobs, none failing`;
+  mount(root,
+    hero(fails.length ? FAIL : warns.length || away.length ? WARN : jobs.length ? OK : IDLE, title, jobs.length ? nextLine(jobs) : HELP.crons),
+    tools,
+    h('div', {class: 'cols'},
+      fails.length || warns.length || away.length ? h('section', {},
+        fails.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, fails.map(jobItem))] : null,
+        warns.length || away.length ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'), h('div', {class: 'items'}, warns.map(jobItem), away.map((host) => unreachableItem(host, data)))] : null) : null,
+      h('section', {},
+        h('h2', {class: 'gh'}, 'Everything else'),
+        h('div', {class: 'hosts'}, hosts.map((host) => hostFold(host, data, rest.filter((job) => job.host === host))), fireStrip(jobs, hosts)))),
+    jobs.length ? h('p', {class: 'foot-note', text: HELP.crons}) : null);
+}
+function fold(key, defaultOpen, ...children) {
+  const open = key in store.folds ? store.folds[key] : defaultOpen;
+  return h('details', {class: key === 'strip' ? 'strip-wrap' : 'host', open: open || undefined, ontoggle: (event) => { store.folds[key] = event.currentTarget.open; }}, children);
+}
+// Healthy and paused jobs, folded per machine; each row opens the job.
+function hostFold(host, data, list) {
+  const now = Date.now();
+  const count = (health) => list.filter((job) => job.health === health).length;
+  const summary = unreachable(host, data) ? 'unreachable' : !list.length ? 'nothing else'
+    : [`${count('ok')} healthy`, count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
+  // An empty herdr-automations source still says whether its scheduler runs.
+  const sources = hostAccess(host, data).filter((entry) => entry.state === 'found' || entry.state === 'unreadable' || (entry.source === 'herdr-automations' && entry.state === 'empty' && entry.detail && entry.detail.startsWith('scheduler')));
+  return fold(`host:${host}`, window.matchMedia('(min-width: 900px)').matches,
+    h('summary', {}, h('b', {text: hostName(host)}), h('span', {text: summary}), icon('i-plus')),
+    sources.length ? h('p', {class: 'sources'}, sources.map((entry) => h('span', {class: entry.state === 'unreadable' ? 'st-fail' : null, title: entry.detail || '', text: `${entry.source} ${entry.state === 'unreadable' ? 'unreadable' : entry.jobs}`}))) : null,
+    list.map((job) => {
+      const [st, word] = jobState(job);
+      const next = st === 'off' ? null : jobNext(job, now);
+      const sub = st === 'off' ? [word, jobSchedule(job)] : [jobSchedule(job), next ? `next ${when(next, now)}` : '', job.state === 'service' ? 'service' : ''];
+      return h('button', {class: st === 'off' ? 'jrow off' : 'jrow', type: 'button', onclick: () => openJob(job)},
+        h('span', {class: 'n'}, job.short_name),
+        h('span', {class: 's', text: sub.filter(Boolean).join(', ')}),
+        h('span', {class: 'l', title: job.last_run ? `Last run ${new Date(Date.parse(job.last_run)).toLocaleString()}` : 'Never run', text: ago(job.last_run, true)}));
+    }));
 }
 function fireStrip(jobs, hosts) {
   const now = Date.now();
@@ -861,6 +1029,7 @@ function fireStrip(jobs, hosts) {
       if (fires) rows.push({job, ...fires});
     }
   }
+  if (!rows.length) return null;
   rows.sort((a, b) => (a.job.host === b.job.host ? (a.fires[0] ?? Infinity) - (b.fires[0] ?? Infinity) : hosts.indexOf(a.job.host) - hosts.indexOf(b.job.host)));
   const span = STRIP_HOURS * 3600000;
   const at = (t) => `${(((t - now) / span) * 100).toFixed(3)}%`;
@@ -880,97 +1049,121 @@ function fireStrip(jobs, hosts) {
         : fires.map((t) => h('span', {class: 'strip-fire', style: {left: at(t)}})),
       many ? h('span', {class: 'strip-band alt', style: {left: at(fires[0]), right: '0'}}) : null,
       fires.length ? null : h('span', {class: 'strip-later', text: later ? `→ ${weekdayClock(later)}` : 'not this week'}));
-    return h('div', {class: ['strip-row', (job.health === 'fail') && 'trouble', many && 'many'].filter(Boolean).join(' ')},
+    return h('div', {class: ['strip-row', job.health === 'fail' && 'trouble', many && 'many'].filter(Boolean).join(' ')},
       h('span', {class: 'strip-label', title: [job.name || job.id, hostName(job.host), job.schedule_text].filter(Boolean).join(' · ')}, sourceIcon(job), h('span', {class: 'strip-name', text: job.short_name}), hosts.length > 1 ? h('span', {class: 'strip-host', text: hostName(job.host)}) : null),
       track);
   });
-  return h('section', {class: 'block'},
-    h('div', {class: 'block-title'}, icon('i-crons'), h('h2', {text: 'Next 24 hours'}), h('span', {class: 'count-chip', text: String(rows.length)})),
-    h('div', {class: 'panel-block strip'}, h('div', {class: 'block-body'}, axis, ...body)));
-}
-function jobsBlock(jobs, hosts) {
-  const healthCount = (kind) => jobs.filter((job) => job.health === kind).length;
-  const filters = [
-    ['all', null, 'All', jobs.length],
-    ...(hosts.length > 1 ? hosts.map((host) => [`host:${host}`, 'i-laptop', hostName(host), jobs.filter((job) => job.host === host).length]) : []),
-    ['health:fail', 'i-fail', 'Failing', healthCount('fail')],
-    ['health:paused', 'i-pause', 'Paused', healthCount('paused')],
-  ].filter(([value, , , count]) => value === 'all' || count > 0);
-  const current = filters.some(([value]) => value === store.cronFilter) ? store.cronFilter : 'all';
-  const [kind, value] = current.split(':');
-  const rows = jobs.filter((job) => (kind === 'host' ? job.host === value : kind === 'health' ? job.health === value : true));
-  return h('section', {class: 'block'},
-    h('div', {class: 'block-title'}, icon('i-launchd'), h('h2', {text: 'Jobs'}),
-      h('div', {class: 'filter-chips', role: 'group', 'aria-label': 'Filter jobs'}, filters.map(([option, iconId, label, count]) => h('button', {type: 'button', class: 'chip-button', 'aria-pressed': String(option === current), onclick: () => { store.cronFilter = option; renderView(); }},
-        iconId ? icon(iconId) : null, label, h('span', {class: 'chip-count', text: String(count)}))))),
-    h('div', {class: 'panel-block'}, cronTable(rows, hosts.length > 1)));
-}
-function cronTable(rows, showHost) {
-  const now = Date.now();
-  const tbody = h('tbody', {});
-  const width = showHost ? 7 : 6;
-  for (const job of rows) {
-    const key = cronKey(job);
-    const open = store.openRows.has(key);
-    const toggle = () => toggleRow(key);
-    const next = cronFires(job, now)?.fires?.[0];
-    const health = job.health;
-    const paused = health === 'paused';
-    const schedule = job.schedule_text || job.schedule || '-';
-    const later = !paused && !next && job.state !== 'service' ? nextFire(job, now) : null;
-    const nextText = paused ? 'Paused' : next ? until(next - now) : later ? weekdayClock(later) : '-';
-    const lastText = job.last_run ? ago(job.last_run) : '-';
-    const result = job.last_exit != null ? `exit ${job.last_exit}` : job.last_status ? job.last_status.replace('_', ' ') : '';
-    tbody.append(h('tr', {id: key, class: `row ${health}`, tabindex: '0', 'aria-expanded': String(open), onclick: toggle, onkeydown: (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); } }},
-      h('td', {class: 'status-cell', title: [HEALTH[health][1], result].filter(Boolean).join(' · ')}, icon(HEALTH[health][0], `health ${health}`), h('span', {class: 'sr', text: HEALTH[health][1]})),
-      h('td', {class: 'ident'},
-        h('span', {class: 'ident-name', title: job.name || job.id}, sourceIcon(job), h('span', {text: job.short_name})),
-        h('span', {class: 'ident-phone', text: [schedule !== '-' ? schedule : job.state === 'missing' ? 'Missing' : HEALTH[health][1], nextText !== '-' ? nextText : job.last_run ? `ran ${lastText}` : ''].filter(Boolean).join(' · ')})),
-      showHost ? h('td', {class: 'muted nowrap', text: hostName(job.host)}) : null,
-      h('td', {class: 'nowrap', title: job.schedule || '', text: schedule}),
-      h('td', {class: paused ? 'faint nowrap fig' : 'nowrap fig', title: next ? new Date(next).toLocaleString() : '', text: nextText}),
-      h('td', {class: 'muted nowrap fig', title: job.last_run || '', text: lastText}),
-      h('td', {class: 'num', text: job.runs != null ? compact(job.runs) : '-'})));
-    if (open) {
-      const fields = [['Result', result], ['ID', job.id], ['Command', job.command], ['Log', job.log && tilde(job.log)], ['Schedule', job.schedule], ['Time zone', job.tz], ['Last run', job.last_run], ['Created by', job.created_by], ['Connectors', (job.connectors || []).join(', ')], ['Effect', job.effect], ['Output', job.output_expanded], ['Inferred', (job.inferred || []).join(', ')]]
-        .filter(([, field]) => field);
-      tbody.append(h('tr', {class: 'detail'}, h('td', {colspan: String(width)}, h('div', {class: 'detail-grid'},
-        (job.problems || []).length ? h('ul', {class: 'problems'}, job.problems.map((problem) => h('li', {text: sentence(grouped(problem))}))) : null,
-        h('dl', {}, fields.flatMap(([label, field]) => [h('dt', {text: label}), h('dd', {class: ['ID', 'Command', 'Log', 'Schedule'].includes(label) ? 'code' : '', text: field})])),
-        cronActions(job)))));
-    }
-  }
-  if (!rows.length) tbody.append(h('tr', {}, h('td', {colspan: String(width), class: 'muted', text: 'No jobs match.'})));
-  return h('div', {class: 'block-body'}, h('table', {class: 'grid-table jobs'},
-    h('thead', {}, h('tr', {}, [['', 'status-cell'], ['Job', ''], showHost ? ['Host', ''] : null, ['Schedule', ''], ['Next run', ''], ['Last run', ''], ['Runs', 'num']].filter(Boolean).map(([label, cls]) => h('th', {scope: 'col', class: cls, text: label, 'aria-label': label || 'Status'})))),
-    tbody));
+  return fold('strip', false,
+    h('summary', {}, h('b', {text: 'Next 24 hours'}), h('span', {text: plural(rows.length, 'job')}), icon('i-plus')),
+    h('div', {class: 'strip'}, axis, body));
 }
 
+// The job sheet: what is wrong, every action this job takes, its facts and where its log is.
+function currentJob() {
+  const sheet = store.sheet;
+  return store.crons?.jobs?.find((job) => cronKey(job) === sheet.key) || sheet.job;
+}
+function openJob(job) {
+  store.sheet = {kind: 'job', key: cronKey(job), job};
+  renderSheet();
+  openDialog(document.getElementById('sheet'));
+}
+function openLog(job) {
+  store.sheet = {kind: 'log', key: cronKey(job), job};
+  renderSheet();
+  openDialog(document.getElementById('sheet'));
+}
+function openMenu() {
+  store.sheet = {kind: 'menu'};
+  renderSheet();
+  openDialog(document.getElementById('sheet'));
+}
+function renderSheet() {
+  const sheet = store.sheet;
+  if (!sheet) return;
+  const title = document.getElementById('sheet-title');
+  const sub = document.getElementById('sheet-sub');
+  const body = document.getElementById('sheet-body');
+  if (sheet.kind === 'menu') {
+    title.textContent = 'tackroom';
+    sub.textContent = store.updatedAt ? `Updated ${clock(store.updatedAt)}` : '';
+    const failing = store.crons ? store.crons.jobs.filter((job) => job.health === 'fail').length : 0;
+    mount(body,
+      h('nav', {class: 'menu-list', 'aria-label': 'Views'}, TABS.map(([id, label, iconId]) => h('a', {href: `#${id}`, 'aria-current': id === store.view ? 'page' : null, onclick: () => closeDialog(document.getElementById('sheet'), true)},
+        icon(iconId), label, id === 'crons' && failing ? h('span', {class: 'badge', title: `${plural(failing, 'job')} failing`, text: String(failing)}) : null))),
+      configLinks().length ? [h('h3', {class: 'sheet-h3', text: 'Links'}), h('nav', {class: 'menu-list', 'aria-label': 'Configured links'}, linkNodes())] : null);
+    return;
+  }
+  const job = currentJob();
+  const [st, word] = jobState(job);
+  title.textContent = sheet.kind === 'log' ? `${job.short_name} log` : job.short_name;
+  mount(sub, h('span', {class: `st-${st}`, text: word}), ` on ${hostName(job.host)}`);
+  if (sheet.kind === 'log') {
+    mount(body, logNode(job), h('h3', {class: 'sheet-h3', text: 'Actions'}), cronActions(job));
+    return;
+  }
+  const reason = jobReason(job);
+  mount(body,
+    reason.length > 1 ? h('ul', {class: 'problems'}, reason.map((text) => h('li', {text}))) : reason.length ? h('p', {class: `job-reason st-${st}`, text: reason[0]}) : null,
+    cronActions(job),
+    jobFacts(job),
+    h('h3', {class: 'sheet-h3', text: 'Log'}),
+    logNode(job));
+}
+function jobFacts(job) {
+  const now = Date.now();
+  const next = jobNext(job, now);
+  const result = job.last_exit != null ? `exit ${job.last_exit}` : job.last_status ? job.last_status.replace('_', ' ') : '';
+  const rows = [
+    ['Schedule', jobSchedule(job)], ['Next run', next ? `${when(next, now)} (${until(next - now)})` : ''],
+    ['Last run', job.last_run ? `${ago(job.last_run)}, ${new Date(Date.parse(job.last_run)).toLocaleString()}${(job.inferred || []).includes('last_run') ? ' (from the log file)' : ''}` : 'never'],
+    ['Result', result], ['Runs', job.runs != null ? compact(job.runs) : ''], ['Effect', job.effect], ['Command', job.command], ['ID', job.id],
+    ['Scheduler', job.source], ['Cron', job.schedule !== jobSchedule(job) ? job.schedule : ''], ['Time zone', job.tz], ['Created by', job.created_by],
+    ['Connectors', (job.connectors || []).join(', ')], ['Output', job.output_expanded], ['Inferred', (job.inferred || []).join(', ')],
+  ].filter(([, value]) => value);
+  return h('dl', {class: 'facts'}, rows.map(([label, value]) => [h('dt', {text: label}), h('dd', {class: ['Command', 'ID', 'Cron'].includes(label) ? 'mono' : '', text: value})]));
+}
+// The view does not read log files; it names the file and the command that shows its end.
+function shellWord(path) {
+  if (!/[\s'"$`\\!*?#&;|<>(){}]/.test(path)) return path;
+  const home = path.startsWith('~/');
+  return `"${home ? '$HOME' : ''}${(home ? path.slice(1) : path).replace(/(["\\$`])/g, '\\$1')}"`;
+}
+function logNode(job) {
+  if (!job.log) return h('p', {class: 'log-note', text: 'tackroom knows no log file for this job.'});
+  const path = job.host === 'local' ? tilde(job.log) : job.log;
+  const tail = `tail -n 50 ${shellWord(path)}`;
+  return [
+    h('p', {class: 'log-path'}, h('code', {text: path})),
+    h('p', {class: 'log-note', text: job.host === 'local' ? 'The view does not read log files. To see its last lines, run:' : `This log is on ${job.host}. To see its last lines, run:`}),
+    command(job.host === 'local' ? tail : `ssh ${job.host} '${tail.replace(/'/g, "'\\''")}'`),
+  ];
+}
 // Run, pause and resume a launchd job. A job tackroom owns here also takes a new
 // schedule, Edit and Delete; for any other job the server says why not (edit_note).
 function cronActions(job) {
   const launchd = job.source === 'launchd' && job.unit;
-  if (!launchd && !job.editable && !job.edit_note) return null;
+  if (!launchd && !job.editable && !job.edit_note) return h('p', {class: 'note', text: job.source === 'claude-desktop' ? 'Run and pause this task in Claude Desktop.' : 'No actions for this job.'});
   const busy = Boolean(store.cronBusy);
-  const off = ['disabled', 'not_loaded'].includes(job.state);
-  const button = (label, action, cls) => h('button', {type: 'button', class: cls, disabled: busy || undefined, onclick: () => cronAction(job, action), text: label});
   const input = launchd && job.owned && job.host === 'local' && job.state !== 'disabled'
     ? h('input', {type: 'text', value: job.declared_schedule || '', placeholder: '0 9 * * *', 'aria-label': 'Schedule (cron expression)', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off'})
     : null;
-  return h('div', {class: 'cron-actions'},
-    launchd ? (off ? button('Resume', 'resume', 'primary') : [button('Run now', 'run', 'primary'), button('Pause', 'pause')]) : null,
-    job.editable ? [
-      h('button', {type: 'button', disabled: busy || undefined, onclick: () => openJobPanel('edit', job), text: 'Edit'}),
-      h('button', {type: 'button', class: 'danger', disabled: busy || undefined, onclick: () => openJobPanel('delete', job), text: 'Delete'}),
-    ] : null,
+  return h('div', {},
+    h('div', {class: 'acts sheet-acts'},
+      runButtons(job),
+      job.editable ? [
+        h('button', {type: 'button', class: 'btn', disabled: busy || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('edit', job); }, text: 'Edit'}),
+        h('button', {type: 'button', class: 'btn danger', disabled: busy || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('delete', job); }, text: 'Delete'}),
+      ] : null),
     input ? h('form', {class: 'cron-schedule', onsubmit: (event) => { event.preventDefault(); cronAction(job, 'schedule', input.value); }},
-      input, h('button', {type: 'submit', disabled: busy || undefined, text: 'Save schedule'})) : null,
-    store.cronBusy === cronKey(job) ? h('span', {class: 'muted', text: 'Working…'}) : null,
+      input, h('button', {type: 'submit', class: 'btn', disabled: busy || undefined, text: 'Save schedule'})) : null,
+    store.cronBusy === cronKey(job) ? h('p', {class: 'note', text: 'Working…'}) : null,
     !job.editable && job.edit_note ? h('p', {class: 'note'}, h('b', {text: 'No edit or delete. '}), job.edit_note) : null);
 }
 async function cronAction(job, action, schedule) {
   store.cronBusy = cronKey(job);
   renderView();
+  renderSheet();
   const done = {run: 'Started', pause: 'Paused', resume: 'Resumed', schedule: 'New schedule applied to'}[action];
   try {
     const result = await api('/api/crons/action', {method: 'POST', body: JSON.stringify({host: job.host, source: job.source, id: job.id, action, ...(action === 'schedule' ? {schedule} : {})})});
@@ -983,6 +1176,7 @@ async function cronAction(job, action, schedule) {
   }
   store.cronBusy = '';
   renderView();
+  renderSheet();
   loadCrons(true);
 }
 
@@ -1000,16 +1194,17 @@ function replaceCronRow(jobs, matches, fresh) {
   return out;
 }
 function patchCronRow(matches, fresh) {
-  store.cronPatches = store.cronPatches.filter((patch) => Date.now() - patch.at < 120000);
+  store.cronPatches = store.cronPatches.filter((item) => Date.now() - item.at < 120000);
   store.cronPatches.push({at: Date.now(), matches, fresh});
   if (!store.crons) return;
   store.crons = {...store.crons, jobs: replaceCronRow(store.crons.jobs || [], matches, fresh)};
   renderChrome();
   renderView();
+  renderSheet();
 }
 
 // ---------- cron jobs: add, edit, delete ----------
-// One drawer for the three. POST /api/crons/jobs does the work (the same code as
+// One sheet for the three. POST /api/crons/jobs does the work (the same code as
 // `tackroom cron add|edit|remove`) and answers with the job's fresh record. A
 // refusal shows in the form, where it can be fixed, not only in a toast.
 const jobDialog = {mode: '', job: null, busy: false};
@@ -1029,15 +1224,15 @@ function openJobPanel(mode, job) {
   document.getElementById('job-title').textContent = {add: 'Add cron', edit: `Edit ${job?.short_name}`, delete: `Delete ${job?.short_name}?`}[mode];
   const submit = document.getElementById('submit-job');
   submit.textContent = {add: 'Add cron', edit: 'Save changes', delete: 'Delete'}[mode];
-  submit.className = mode === 'delete' ? 'danger' : 'primary';
+  submit.className = mode === 'delete' ? 'btn danger' : 'btn primary';
   submit.disabled = false;
   setJobNote('');
   let first = document.getElementById('cancel-job');
   if (mode === 'delete') {
     mount(document.getElementById('job-body'),
       h('p', {}, 'This removes ', h('b', {text: job.short_name}), ' from your tackroom config and its unit from this machine. tackroom touches no other job.'),
-      h('div', {class: 'detail-grid'}, h('dl', {}, [['Schedule', job.declared_schedule], ['Command', (job.declared_command || []).map(quoted).join(' ')], ['Effect', job.effect]]
-        .filter(([, value]) => value).flatMap(([label, value]) => [h('dt', {text: label}), h('dd', {class: 'code', text: value})]))));
+      h('dl', {class: 'facts'}, [['Schedule', job.declared_schedule], ['Command', (job.declared_command || []).map(quoted).join(' ')], ['Effect', job.effect]]
+        .filter(([, value]) => value).map(([label, value]) => [h('dt', {text: label}), h('dd', {class: 'mono', text: value})])));
   } else {
     mount(document.getElementById('job-body'),
       mode === 'add'
@@ -1049,13 +1244,11 @@ function openJobPanel(mode, job) {
       jobField('Effect (optional)', text('effect', job?.effect || ''), 'What it changes, shown in the Crons tab.'));
     first = document.querySelector('#job-body input:not([readonly])');
   }
-  const panel = document.getElementById('job-panel');
-  if (!panel.open) panel.showModal();
+  openDialog(document.getElementById('job-panel'));
   first.focus();
 }
 function closeJobPanel() {
-  const panel = document.getElementById('job-panel');
-  if (panel.open) panel.close();
+  closeDialog(document.getElementById('job-panel'));
 }
 async function submitJob(event) {
   event.preventDefault();
@@ -1110,14 +1303,18 @@ async function loadConfigLayer(layer) {
   renderView();
 }
 function renderConfig(root) {
-  actions(segmented([['shared', 'Shared'], ['local', 'Local'], ['effective', 'Effective']], store.configLayer, (value) => loadConfigLayer(value)));
+  const head = [
+    hero(['i-config', 'st-off'], 'Config', HELP.config),
+    h('div', {class: 'tools'}, h('div', {class: 'filters', role: 'group', 'aria-label': 'Config layer'}, [['shared', 'Shared'], ['local', 'Local'], ['effective', 'Effective']].map(([value, label]) =>
+      h('button', {type: 'button', 'aria-pressed': String(value === store.configLayer), onclick: () => loadConfigLayer(value), text: label})))),
+  ];
   const state = store.configState;
   if (!state || state.active_layer !== store.configLayer) {
     if (store.configNote) {
-      mount(root, h('div', {class: 'error-box'}, store.configNote, ' ', h('button', {type: 'button', onclick: () => loadConfigLayer(store.configLayer), text: 'Retry'})));
+      mount(root, head, h('div', {class: 'configs'}, h('div', {class: 'error-box'}, store.configNote, ' ', h('button', {type: 'button', class: 'btn', onclick: () => loadConfigLayer(store.configLayer), text: 'Retry'}))));
       return;
     }
-    mount(root, h('p', {class: 'loading', text: 'Loading config…'}));
+    mount(root, head, h('div', {class: 'configs'}, h('p', {class: 'loading', text: 'Loading config…'})));
     if (!store.configLoading) loadConfigLayer(store.configLayer);
     return;
   }
@@ -1125,7 +1322,7 @@ function renderConfig(root) {
   const readOnly = state.read_only;
   const original = state.raw_yaml || '';
   const draft = store.drafts[layer] ?? original;
-  const editor = h('textarea', {class: 'editor', id: `editor-${layer}`, spellcheck: 'false', 'aria-label': `${layer} YAML`, readonly: readOnly || undefined, oninput: (event) => {
+  const editor = h('textarea', {class: 'editor', id: `editor-${layer}`, spellcheck: 'false', autocapitalize: 'off', 'aria-label': `${layer} YAML`, readonly: readOnly || undefined, oninput: (event) => {
     store.drafts[layer] = event.target.value;
     store.configDiff = '';
     buttons.querySelectorAll('[data-dirty]').forEach((node) => { node.disabled = event.target.value === original; });
@@ -1133,16 +1330,17 @@ function renderConfig(root) {
   editor.value = draft;
   const dirty = draft !== original;
   const buttons = h('div', {class: 'editor-actions'},
-    h('button', {type: 'button', dataset: {dirty: '1'}, disabled: readOnly || !dirty || undefined, onclick: () => validateConfig(layer), text: 'Check changes'}),
-    h('button', {type: 'button', class: 'primary', dataset: {dirty: '1'}, disabled: readOnly || !dirty || undefined, onclick: () => saveConfig(layer), text: 'Save'}),
-    h('button', {type: 'button', class: 'quiet', dataset: {dirty: '1'}, disabled: readOnly || !dirty || undefined, onclick: () => { delete store.drafts[layer]; store.configDiff = ''; store.configNote = ''; renderView(); }, text: 'Discard'}),
+    h('button', {type: 'button', class: 'btn', dataset: {dirty: '1'}, disabled: readOnly || !dirty || undefined, onclick: () => validateConfig(layer), text: 'Check changes'}),
+    h('button', {type: 'button', class: 'btn primary', dataset: {dirty: '1'}, disabled: readOnly || !dirty || undefined, onclick: () => saveConfig(layer), text: 'Save'}),
+    h('button', {type: 'button', class: 'btn quiet', dataset: {dirty: '1'}, disabled: readOnly || !dirty || undefined, onclick: () => { delete store.drafts[layer]; store.configDiff = ''; store.configNote = ''; renderView(); }, text: 'Discard'}),
     store.configNote ? h('span', {class: 'note', text: store.configNote}) : null);
   const path = layer === 'effective' ? 'merge of both files' : tilde(state.paths?.[layer] || '');
-  mount(root,
-    h('div', {class: 'config-meta'}, h('span', {}, icon('i-folder'), path), state.revision ? h('span', {}, icon('i-commit'), state.revision.slice(0, 12)) : null, readOnly ? h('span', {text: 'read-only'}) : null),
-    editor,
-    readOnly ? null : buttons,
-    store.configDiff ? renderDiff(store.configDiff) : null);
+  mount(root, head,
+    h('div', {class: 'configs'},
+      h('div', {class: 'config-meta'}, h('span', {}, icon('i-folder'), path), state.revision ? h('span', {}, icon('i-commit'), state.revision.slice(0, 12)) : null, readOnly ? h('span', {text: 'read-only'}) : null),
+      editor,
+      readOnly ? null : buttons,
+      store.configDiff ? renderDiff(store.configDiff) : null));
 }
 function renderDiff(text) {
   return h('pre', {class: 'diff', 'aria-label': 'Changes'}, text.split('\n').map((line) => {
@@ -1172,52 +1370,110 @@ async function saveConfig(layer) {
 }
 
 // ---------- sync ----------
+// The Sync sheet: the dry-run plan per harness, then the switches that turn agents, MCP servers and hooks on or off.
+// Any switch saves to the config and builds the plan again, so Apply always sends the digest of the plan on screen.
 const PLAN_GROUPS = [
   ['Adds', 'add', 'skill'], ['AddsAgent', 'add', 'role'], ['AddsMCP', 'add', 'MCP'], ['AddsHook', 'add', 'hook'],
   ['Updates', 'update', 'skill'], ['UpdatesAgent', 'update', 'role (overwrite)'], ['UpdatesMCP', 'update', 'MCP'], ['UpdatesHook', 'update', 'hook'], ['UpdatesPackage', 'update', 'package'],
   ['Removes', 'remove', 'skill'], ['RemovesAgent', 'remove', 'role'], ['RemovesPackage', 'remove', 'package'],
 ];
 async function openSync() {
-  const panel = document.getElementById('sync-panel');
-  if (!panel.open) panel.showModal();
+  openDialog(document.getElementById('sync-panel'));
+  mount(document.getElementById('sync-body'), h('div', {id: 'sync-plan'}), h('div', {id: 'sync-toggles'}));
+  renderToggles();
+  await loadPlan();
+}
+let planSeq = 0;
+async function loadPlan() {
+  const seq = ++planSeq;
   store.preview = null;
   setApply(false, '');
-  mount(document.getElementById('sync-body'), h('p', {class: 'loading', text: 'Building the sync plan…'}));
+  document.getElementById('sync-sub').textContent = 'Building the plan…';
+  const box = document.getElementById('sync-plan');
+  if (box) mount(box, h('p', {class: 'loading', text: 'Building the sync plan…'}));
   try {
-    store.preview = await api('/api/sync/preview', {method: 'POST', body: '{}'});
+    const preview = await api('/api/sync/preview', {method: 'POST', body: '{}'});
+    if (seq !== planSeq) return;
+    store.preview = preview;
+    store.previewAt = Date.now();
     renderPlan();
   } catch (error) {
-    mount(document.getElementById('sync-body'), h('div', {class: 'error-box', text: error.message}));
+    if (seq !== planSeq) return;
+    document.getElementById('sync-sub').textContent = 'No plan';
+    if (box) mount(box, h('div', {class: 'error-box', text: error.message}));
   }
 }
 function renderPlan() {
+  const box = document.getElementById('sync-plan');
+  if (!box || !store.preview) return;
   const plan = store.preview.plan || {};
-  const body = [];
+  const summary = Object.fromEntries((plan.summary || []).map((line) => {
+    const at = line.indexOf(': ');
+    return at < 0 ? [line, ''] : [line.slice(0, at), line.slice(at + 2)];
+  }));
+  let changes = 0;
+  let errors = 0;
+  const rows = [];
   const repoState = plan.repo?.State;
-  if (repoState && repoState !== 'synced') body.push(h('div', {class: 'plan-agent'}, h('h3', {text: '~/.agents'}), h('ul', {}, h('li', {}, h('span', {class: 'verb update', text: 'link'}), h('span', {text: `${repoState} → ${tilde(plan.repo.ExpectedTarget)}`})))));
+  if (repoState && repoState !== 'synced') {
+    changes += 1;
+    rows.push(h('div', {class: 'plan-row'}, icon('i-link', 'mark'), h('b', {text: '~/.agents'}), h('ul', {}, h('li', {}, h('span', {class: 'verb update', text: 'link'}), h('span', {text: `${repoState} → ${tilde(plan.repo.ExpectedTarget)}`})))));
+  }
+  const reported = new Set();
   for (const report of plan.reports || []) {
+    reported.add(report.Name);
     const items = [];
-    if (report.Error) items.push(['note', `config unreadable, skipped: ${report.Error}`]);
-    else if (!report.Detected) items.push(['note', 'not installed, skipped']);
-    else {
+    if (report.Error) { errors += 1; items.push(['note', `config unreadable, skipped: ${report.Error}`]); }
+    else if (report.Detected) {
       for (const [key, verb, noun] of PLAN_GROUPS) for (const name of report[key] || []) items.push([verb, `${noun} ${name}`]);
       for (const conflict of report.Conflicts || []) items.push(['conflict', `${tilde(conflict)} (left alone)`]);
       if (report.RootState && report.RootState !== 'synced') items.push([report.RootState === 'missing' ? 'add' : 'update', `root instructions (${report.RootState})`]);
-      if (!items.length) items.push(['note', report.Synced ? 'up to date' : 'refresh native config']);
+      if (!items.length && !report.Synced) items.push(['note', 'refresh native config']);
     }
-    body.push(h('div', {class: 'plan-agent'}, h('h3', {}, agentMark(report.Name), report.Name), h('ul', {}, items.map(([verb, text]) => h('li', {}, h('span', {class: `verb ${verb}`, text: verb}), h('span', {text}))))));
+    changes += items.filter(([verb]) => ['add', 'update', 'remove'].includes(verb)).length;
+    const line = summary[report.Name] || (report.Error ? 'config unreadable' : !report.Detected ? 'not installed, skipped' : items.length ? plural(items.length, 'change') : 'up to date');
+    const count = (key) => (report[key] || []).length;
+    const counts = report.Detected && !report.Error ? [plural(count('Managed'), 'skill'), count('ManagedAgent') && plural(count('ManagedAgent'), 'role'), count('ManagedMCP') && `${count('ManagedMCP')} MCP`, count('ManagedHook') && plural(count('ManagedHook'), 'hook')].filter(Boolean).join(', ') : '';
+    rows.push(h('div', {class: report.Detected && !report.Error ? 'plan-row' : 'plan-row off'}, agentMark(report.Name), h('b', {text: `${display(report.Name)}: ${line}`}),
+      counts ? h('span', {text: counts}) : null,
+      items.length ? h('ul', {}, items.map(([verb, text]) => h('li', {}, h('span', {class: `verb ${verb}`, text: verb}), h('span', {text})))) : null));
+  }
+  for (const agent of (store.inv?.agents || []).filter((item) => !reported.has(item.name) && !item.enabled)) {
+    rows.push(h('div', {class: 'plan-row off'}, agentMark(agent.name), h('b', {text: `${display(agent.name)}: turned off, skipped`})));
   }
   const waiting = (store.inv?.lock || []).filter((row) => row.state === 'cooldown' || row.state === 'blocked');
-  if (waiting.length) body.push(h('div', {class: 'plan-agent'}, h('h3', {}, icon('i-pin'), 'Outside sources'),
-    h('ul', {}, waiting.map((row) => h('li', {}, h('span', {class: `verb ${row.state}`, text: row.state}), h('span', {text: `${row.name}, skipped. See Overview.`}))))));
-  const destructive = plan.destructive || [];
-  if (destructive.length) {
-    body.unshift(h('div', {class: 'destructive'},
-      h('strong', {text: `${plural(destructive.length, 'change')} cannot be undone by sync. Tick each one to continue.`}),
-      destructive.map((item) => h('label', {}, h('input', {type: 'checkbox', 'aria-label': `Confirm: ${item}`, dataset: {destructive: item}, onchange: updateApply}), h('span', {text: item})))));
+  if (waiting.length) {
+    rows.push(h('div', {class: 'plan-row'}, icon('i-pin', 'mark'), h('b', {text: 'Outside sources'}),
+      h('ul', {}, waiting.map((row) => h('li', {}, h('span', {class: `verb ${row.state}`, text: row.state}), h('span', {text: `${row.name}, skipped. See Overview.`}))))));
   }
-  mount(document.getElementById('sync-body'), ...body);
+  const destructive = plan.destructive || [];
+  changes = Math.max(changes, destructive.length);
+  document.getElementById('sync-sub').textContent = changes ? `${plural(changes, 'change')} to apply` : 'Nothing to change';
+  mount(box,
+    destructive.length ? h('div', {class: 'destructive'},
+      h('strong', {text: `${plural(destructive.length, 'change')} cannot be undone by sync. Tick each one to continue.`}),
+      destructive.map((item) => h('label', {}, h('input', {type: 'checkbox', 'aria-label': `Confirm: ${item}`, dataset: {destructive: item}, onchange: updateApply}), h('span', {text: item})))) : null,
+    h('p', {class: 'sheet-lead', text: `Plan from the dry run at ${clock(store.previewAt)}.${!changes && !errors ? ' Every installed harness is up to date.' : ''}`}),
+    h('h3', {class: 'sheet-h3', text: 'Plan by harness'}),
+    rows);
   updateApply();
+}
+function renderToggles() {
+  const box = document.getElementById('sync-toggles');
+  if (!box || !sheetOpen('sync-panel')) return;
+  const inv = store.inv;
+  if (!inv) { mount(box); return; }
+  const onOff = (section, row, sub) => switchEl(row.enabled, row.name, sub, (next) => patch(section, row.name, 'enabled', next, `${row.name} ${next ? 'turned on' : 'turned off'}.`));
+  mount(box,
+    h('h3', {class: 'sheet-h3', text: 'Turn on or off'}),
+    h('p', {class: 'sheet-lead', text: 'Each switch saves to your config right away, and the plan above is built again. Turning a harness off stops syncing it; nothing on disk is removed.'}),
+    inv.agents.length ? [h('p', {class: 'toggle-group', text: 'Agents'}), inv.agents.map((agent) => {
+      const local = definedLocally('agents', agent.name);
+      return switchEl(agent.enabled, [agentMark(agent.name), display(agent.name)], [harnessState(agent).word, local ? 'in tackroom.local.yaml' : ''].filter(Boolean).join(' · '),
+        (next) => patch('agents', agent.name, 'enabled', next, `${agent.name} ${next ? 'turned on' : 'turned off'}.`));
+    })] : null,
+    inv.mcp.length ? [h('p', {class: 'toggle-group', text: 'MCP servers'}), inv.mcp.map((row) => onOff('mcp_servers', row, tilde(row.command || '')))] : null,
+    inv.hooks.length ? [h('p', {class: 'toggle-group', text: 'Hooks'}), inv.hooks.map((row) => onOff('hooks', row, row.event || tilde(row.command || '')))] : null);
 }
 function updateApply() {
   const boxes = [...document.querySelectorAll('[data-destructive]')];
@@ -1236,13 +1492,13 @@ async function applySync() {
   setApply(false, 'Syncing…');
   try {
     await api('/api/sync/apply', {method: 'POST', body: JSON.stringify({expected_revision: preview.revision, plan_digest: preview.digest, confirmed_destructive: preview.plan?.destructive || []})});
-    document.getElementById('sync-panel').close();
+    closeDialog(document.getElementById('sync-panel'));
     toast('Synced to your agents.');
     await refresh();
     loadHosts(true);
   } catch (error) {
     if (error.code === 'sync_plan_changed' || error.code === 'stale_revision') {
-      await openSync();
+      await loadPlan();
       setApply(false, 'Something changed since the preview. Review the new plan.', true);
       return;
     }
@@ -1251,23 +1507,28 @@ async function applySync() {
 }
 
 // ---------- boot ----------
+for (const dialog of document.querySelectorAll('dialog.sheet')) {
+  // Escape and a tap on the scrim slide the sheet out instead of dropping it.
+  dialog.addEventListener('cancel', (event) => { event.preventDefault(); closeDialog(dialog); });
+  dialog.addEventListener('click', (event) => { if (event.target === dialog) closeDialog(dialog); });
+  dialog.addEventListener('close', () => {
+    dialog.classList.remove('in');
+    if (dialog.id === 'sheet' && !dialog.open) store.sheet = null;
+    if (!document.querySelector('dialog[open]')) document.body.classList.remove('sheet-open');
+  });
+}
 document.getElementById('open-sync').addEventListener('click', openSync);
-document.getElementById('close-sync').addEventListener('click', () => document.getElementById('sync-panel').close());
-document.getElementById('cancel-sync').addEventListener('click', () => document.getElementById('sync-panel').close());
+document.getElementById('dock-sync').addEventListener('click', openSync);
+document.getElementById('close-sync').addEventListener('click', () => closeDialog(document.getElementById('sync-panel')));
 document.getElementById('apply-sync').addEventListener('click', applySync);
-document.getElementById('sync-panel').addEventListener('click', (event) => { if (event.target === event.currentTarget) event.currentTarget.close(); });
+document.getElementById('close-sheet').addEventListener('click', () => closeDialog(document.getElementById('sheet')));
+document.getElementById('menu-btn').addEventListener('click', openMenu);
+document.getElementById('open-menu').addEventListener('click', openMenu);
 document.getElementById('job-form').addEventListener('submit', submitJob);
 document.getElementById('close-job').addEventListener('click', closeJobPanel);
 document.getElementById('cancel-job').addEventListener('click', closeJobPanel);
-document.addEventListener('click', (event) => {
-  const menu = document.getElementById('links-menu');
-  if (menu.open && !menu.contains(event.target)) menu.open = false;
-});
-document.getElementById('open-nav').addEventListener('click', (event) => {
-  const open = document.body.classList.toggle('nav-open');
-  event.currentTarget.setAttribute('aria-expanded', String(open));
-});
-window.addEventListener('hashchange', route);
+document.getElementById('toast').addEventListener('click', hideToast);
+window.addEventListener('hashchange', () => { route(); window.scrollTo(0, 0); });
 route();
 refresh();
 loadCrons();
