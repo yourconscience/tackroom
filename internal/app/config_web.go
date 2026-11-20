@@ -16,6 +16,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -255,8 +256,12 @@ func restartOnUpgrade() {
 			continue
 		}
 		fmt.Fprintf(os.Stderr, "tackroom binary at %s changed; restarting view\n", path)
-		// --no-open keeps the restart from opening another browser tab.
-		args := append(append([]string{}, os.Args...), "--no-open")
+		// --no-open keeps the restart from opening another browser tab. It is
+		// added once, so repeated upgrades do not pile it up.
+		args := append([]string{}, os.Args...)
+		if !slices.Contains(args[1:], "--no-open") && !slices.Contains(args[1:], "-no-open") {
+			args = append(args, "--no-open")
+		}
 		err = syscall.Exec(path, args, os.Environ())
 		fmt.Fprintf(os.Stderr, "view restart failed, still serving the old version: %v\n", err)
 		return

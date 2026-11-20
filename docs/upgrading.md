@@ -9,6 +9,7 @@ What changed in each release since 2.0, newest first, with what to do on every m
 - New: `ui.view.addr`, `ui.view.idle_timeout` and `ui.view.open_browser` in `tackroom.yaml` or `tackroom.local.yaml` ([Settings](view.md#settings)). `config validate` refuses a non-loopback address and an idle timeout that is not a non-negative Go duration.
 - Changed: a `ui` block in `tackroom.local.yaml` replaces only the `ui` keys it sets. Before, it replaced the whole shared `ui` block, so a local `ui:` without `links` dropped the shared links.
 - Changed: the Herdr panel's Web button, the Tern crons block's Web button and Rex's Open tackroom View on Crons run `tackroom view --json`, so they start the view when none runs. Copy the Herdr mod, the Tern plugin and `rex/tackroom.lua` again.
+- Fixed: a view that restarts itself after an upgrade adds `--no-open` to its arguments only when it is not there yet. Before, each restart added another one.
 
 ## To 3.0
 
