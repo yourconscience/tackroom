@@ -114,7 +114,7 @@ One set: Phosphor Regular 2.1.1 (MIT), already shipped by the dashboard. Site, d
 
 - Hand-drawn strokes, paper textures, pinboards, sticky notes or crayon marks (skillshare's look).
 - Indigo on near-black, serif headlines over Geist, or cartoon mascots (HarnessKit's look).
-- Leather, wood grain, stitching or other tack-room skeuomorphism. The metaphor is structural: a rail, hooks, plates. One exception: the tack room page (`docs/site/room.html`) draws the room itself, with wood, lamp light and objects. Everything written in it stays Graphite, and vendor marks stay unmodified and still.
+- Leather, wood grain, stitching or other tack-room skeuomorphism. The metaphor is structural: a rail, hooks, plates.
 - A trust score as a lone coloured number. State plus glyph plus detail, every time.
 - Badge walls, star charts, avatar walls or multi-megabyte GIFs above the install command.
 - Raster-only marks, several renditions of the logo, or a logo that fails on dark backgrounds.

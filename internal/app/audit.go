@@ -104,7 +104,7 @@ func checkExternalSkillAudit(cfg config, home string) checkResult {
 	if len(findings) > 0 {
 		return checkResult{checkName, checkStatusWarn, "review: " + strings.Join(findings, "; ")}
 	}
-	return checkResult{checkName, checkStatusPass, fmt.Sprintf("%d skills scanned, no risky patterns", len(skills))}
+	return checkResult{checkName, checkStatusPass, fmt.Sprintf("%d skills scanned, no audit rule matched", len(skills))}
 }
 
 func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResult {
