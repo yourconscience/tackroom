@@ -13,7 +13,7 @@ import (
 // Shared risky-pattern regexes, reused by the doctor external-skill audit and
 // the standalone `tackroom audit` command.
 var (
-	rePipeToShell     = regexp.MustCompile(`(?i)\b(curl|wget)\b[^|\n]*\|\s*(sudo\s+)?(ba|z)?sh\b`)
+	rePipeToShell     = regexp.MustCompile(`(?i)\b(curl|wget)\b[^|\n]*[^|\s][^|\n]*\|\s*(sudo\s+)?(ba|z)?sh\b`)
 	reBase64ToShell   = regexp.MustCompile(`(?i)\bbase64\b\s+(-d|-D|--decode)\b[^\n]*\|\s*(ba|z)?sh\b`)
 	reCredentialPaths = regexp.MustCompile(`(\$HOME|~)/\.(ssh|aws|gnupg|netrc)\b`)
 )
