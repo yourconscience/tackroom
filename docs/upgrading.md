@@ -2,6 +2,14 @@
 
 What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
+## To 3.0.2
+
+Nothing to migrate by hand. If you read `tackroom status` or `tackroom cron collect --table` in a script, note the changes below; `status --json` and `cron collect` without `--table` are unchanged.
+
+- Changed: `tackroom status` is one screen by default. It prints a title with the overall state, the repo link, the sources and the lock check, then one table with a row per harness. A harness gets a block under the table only when it needs attention: its config could not be read, it drifted, or it lists something to act on. What to do comes last, and a synced setup prints nothing after the table, so the last line is no longer `Everything is synced.`. The title says `synced` or `needs attention`. In a window too narrow for the bordered table, the table loses its borders, then the columns no harness uses, then becomes one line per harness. `tackroom status --verbose` prints the block of every harness, with the full lists and native paths, as `status` did before.
+- Changed: `tackroom cron collect --table` fits the terminal. On a terminal wider than the table it prints as before. On a narrower one the jobs table loses its borders, then columns (`problems`, `runs`, `source`, `schedule`), then shortens the `id` and the `last run` until it fits. The access table cuts its `detail` the same way. A long `id` is cut in the middle, so the end that tells launchd labels apart stays. A last run that failed shows `exit N` in red. Into a pipe or a file the output keeps every column. The access table now comes first, then the jobs, then Outputs and Problems, so the jobs and problems are the last lines on screen.
+- Changed: `tackroom tmux`, `tackroom zellij`, `tackroom tern` and `tackroom rex` put the shell and `tackroom status` side by side on top, and `tackroom cron collect --table` across the full width below them. The status pane was on the right with the crons pane under it, which left each of them half the width. A session that already exists keeps its old layout: close it and run the command again to get the new one. See [terminals.md](terminals.md).
+
 ## To 3.0.1
 
 Nothing to migrate by hand, with two things to know. If you use the Herdr panel, copy the mods from `herdr/tackroom/mods/` again. A sync run with a second config file next to `tackroom.yaml`, such as a web view started with `--config`, now stops with an error unless that file lists the pinned skill sources as `tackroom.yaml` does.

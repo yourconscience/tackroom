@@ -16,10 +16,11 @@ import (
 const rexSessionLabel = "tackroom"
 
 // runRexCommand opens a tackroom workspace in the Rex terminal: a session
-// labelled "tackroom" in the config root, with a shell pane, a `tackroom
-// status` pane on the right, and a `tackroom cron collect --table` pane below
-// it, then asks the Rex app to show that session. It is the optional Rex
-// terminal integration; an absent Rex is an error, not a silent no-op.
+// labelled "tackroom" in the config root, with a shell pane and a `tackroom
+// status` pane side by side, and a `tackroom cron collect --table` pane across
+// the full width below them, then asks the Rex app to show that session. It is
+// the optional Rex terminal integration; an absent Rex is an error, not a
+// silent no-op.
 func runRexCommand(args []string) error {
 	fs := flag.NewFlagSet("rex", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -157,11 +158,12 @@ func runRexCommand(args []string) error {
 		}
 		return made.BlockIDs[0], nil
 	}
-	statusBlock, err := split("<status>", shell, "right", status)
-	if err != nil {
+	// The crons pane splits off first, so it spans the full width; the status
+	// pane then splits the shell above it.
+	if _, err := split("", shell, "below", crons); err != nil {
 		return err
 	}
-	if _, err := split("", statusBlock, "below", crons); err != nil {
+	if _, err := split("", shell, "right", status); err != nil {
 		return err
 	}
 	if hint := show(session); hint != "" {

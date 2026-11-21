@@ -34,10 +34,10 @@ func shellWords(words []string) string {
 }
 
 // runTmuxCommand opens a tackroom workspace in tmux: a session named
-// "tackroom" in the config root, with a shell pane, a `tackroom status` pane
-// on the right, and a `tackroom cron collect --table` pane below it, then
-// shows that session. It is the optional tmux integration; an absent tmux is
-// an error, not a silent no-op.
+// "tackroom" in the config root, with a shell pane and a `tackroom status` pane
+// side by side, and a `tackroom cron collect --table` pane across the full
+// width below them, then shows that session. It is the optional tmux
+// integration; an absent tmux is an error, not a silent no-op.
 func runTmuxCommand(args []string) error {
 	fs := flag.NewFlagSet("tmux", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -125,11 +125,12 @@ func runTmuxCommand(args []string) error {
 		if err != nil {
 			return err
 		}
-		statusPane, err := run("%status", append([]string{"split-window", "-h", "-t", shell, "-c", root, "-P", "-F", "#{pane_id}"}, pane(status)...)...)
-		if err != nil {
+		// The crons pane splits off first, so it spans the full width; the status
+		// pane then splits the shell above it.
+		if _, err := run("", append([]string{"split-window", "-v", "-t", shell, "-c", root}, pane(crons)...)...); err != nil {
 			return err
 		}
-		if _, err := run("", append([]string{"split-window", "-v", "-t", statusPane, "-c", root}, pane(crons)...)...); err != nil {
+		if _, err := run("", append([]string{"split-window", "-h", "-t", shell, "-c", root}, pane(status)...)...); err != nil {
 			return err
 		}
 		if _, err := run("", "select-pane", "-t", shell); err != nil {

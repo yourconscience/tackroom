@@ -13,10 +13,11 @@ import (
 )
 
 // runTernCommand opens a tackroom workspace in the Tern terminal: a session
-// named "tackroom" in the config root, with a shell pane, a `tackroom status`
-// pane on the right, and a `tackroom cron collect --table` pane below it, and
-// shows that session in the window. It is the optional Tern terminal
-// integration; an absent Tern is an error, not a silent no-op.
+// named "tackroom" in the config root, with a shell pane and a `tackroom
+// status` pane side by side, and a `tackroom cron collect --table` pane across
+// the full width below them, and shows that session in the window. It is the
+// optional Tern terminal integration; an absent Tern is an error, not a silent
+// no-op.
 func runTernCommand(args []string) error {
 	fs := flag.NewFlagSet("tern", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -82,11 +83,12 @@ func runTernCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	statusBlock, err := step("<status>", append(append([]string{"split", shell, "right"}, launch...), append([]string{"--"}, status...)...)...)
-	if err != nil {
+	// The crons pane splits off first, so it spans the full width; the status
+	// pane then splits the shell above it.
+	if _, err := step("", append(append([]string{"split", shell, "down"}, launch...), append([]string{"--"}, crons...)...)...); err != nil {
 		return err
 	}
-	if _, err := step("", append(append([]string{"split", statusBlock, "down"}, launch...), append([]string{"--"}, crons...)...)...); err != nil {
+	if _, err := step("", append(append([]string{"split", shell, "right"}, launch...), append([]string{"--"}, status...)...)...); err != nil {
 		return err
 	}
 	// The window shows the new session only once one of its blocks is focused.

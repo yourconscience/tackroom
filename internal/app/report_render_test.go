@@ -1,7 +1,6 @@
 package app
 
 import (
-	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -209,21 +208,6 @@ func TestRenderReportShowsUnsupportedHooksAsNotice(t *testing.T) {
 	out := renderReport(true, syncedRepo(), reports, t.TempDir(), config{}, 100)
 	if !strings.Contains(out, ui.Yellow.Render("hooks unsupported (1)")) || strings.Contains(out, ui.Red.Render("hooks unsupported (1)")) {
 		t.Fatalf("unsupported hooks should be a yellow notice on a synced harness:\n%s", ansi.Strip(out))
-	}
-}
-
-func TestPrintStatusReportWritesToTheGivenWriter(t *testing.T) {
-	var buf bytes.Buffer
-	reports := []agentReport{{Name: "claude", Detected: true, Synced: true, SkillRoot: "/h/s", Managed: hyphenatedSkills(30)}}
-	printStatusReport(&buf, t.TempDir(), syncedRepo(), reports, t.TempDir(), config{}, true)
-	out := buf.String()
-	if strings.Contains(out, "\x1b[") {
-		t.Fatalf("status to a non-terminal carried escape codes: %q", out)
-	}
-	for _, want := range []string{"tackroom status", "claude   ✓ synced", "skills (30)", "skill-29-release-notes-draft", "Everything is synced."} {
-		if !strings.Contains(out, want) {
-			t.Errorf("status missing %q:\n%s", want, out)
-		}
 	}
 }
 

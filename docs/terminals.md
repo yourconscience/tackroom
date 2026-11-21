@@ -23,7 +23,7 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 tackroom tmux [--config PATH] [--dry-run]
 ```
 
-It creates a session named `tackroom` in the config root with three panes: a shell on the left, `tackroom status` on the right and `tackroom cron collect --table` below it. Then it shows the session. Outside tmux it attaches to it; inside tmux it switches your client to it; with no terminal on stdin or stdout it prints the `tmux attach-session` command instead.
+It creates a session named `tackroom` in the config root with three panes: a shell and `tackroom status` side by side on top, and `tackroom cron collect --table` across the full width below them. Then it shows the session. Outside tmux it attaches to it; inside tmux it switches your client to it; with no terminal on stdin or stdout it prints the `tmux attach-session` command instead.
 
 The two command panes run the same `tackroom` that opened them, by its absolute path, and keep a shell open when the command ends so you can read what it printed.
 
@@ -54,12 +54,12 @@ It writes this layout to a temporary file, never into zellij's own config folder
 ```kdl
 layout {
     cwd "/home/you/.agents"
-    pane split_direction="vertical" {
-        pane name="shell"
-        pane split_direction="horizontal" {
+    pane split_direction="horizontal" {
+        pane split_direction="vertical" {
+            pane name="shell"
             pane name="status" command="/usr/local/bin/tackroom" { args "status"; }
-            pane name="crons" command="/usr/local/bin/tackroom" { args "cron" "collect" "--table"; }
         }
+        pane name="crons" command="/usr/local/bin/tackroom" { args "cron" "collect" "--table"; }
     }
 }
 ```
@@ -178,7 +178,7 @@ tackroom has not checked whether terminals in the Herdr app set `HERDR_ENV`. See
 ### Shipped
 
 - `tackroom doctor` checks Tern: installed, version, runnable (`checkTern`). An absent Tern reports `skipped` (a pass), never a failure. A `tern` on PATH whose `--version` is not Tern's `tern VERSION (COMMIT)` also reports `skipped`.
-- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane. The window then shows that session. Recipe: [`tern/RECIPE.md`](../tern/RECIPE.md).
+- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane and a `tackroom status` pane side by side, and a `tackroom cron collect --table` pane across the full width below them. The window then shows that session. Recipe: [`tern/RECIPE.md`](../tern/RECIPE.md).
   - `--dry-run` prints the `tern` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`.
 - A crons panel: the `tackroom-crons` Tern plugin shows `tackroom cron collect` as a block, host health and per-host jobs, with Run now / Pause / Resume for launchd jobs, through the same `tackroom cron run|pause|resume` verbs as the web view and the Herdr panel.
   - Install from a checkout with `tern plugin link ./tern/plugins/tackroom-crons` (or `tern plugin install` for a copy), then open it from the palette or `Ctrl+Alt+C`. Recipe: [`tern/plugins/tackroom-crons/RECIPE.md`](../tern/plugins/tackroom-crons/RECIPE.md).
@@ -198,7 +198,7 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 ### Shipped
 
 - `tackroom doctor` checks Rex (`checkRex`): it runs `rex version`. With Rex absent it reports `skipped`, which counts as a pass. With Rex installed but not runnable it warns. Otherwise it prints the version line.
-- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a shell pane, a `tackroom status` pane, and a `tackroom cron collect --table` pane, then asks the Rex app to show it. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
+- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a shell pane and a `tackroom status` pane side by side, and a `tackroom cron collect --table` pane across the full width below them, then asks the Rex app to show it. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
   - The panes run the same `tackroom` that opened them, by its absolute path.
   - Showing the session needs the app open with Remote Control turned on in its settings; otherwise `tackroom rex` prints one line saying to open the session from Rex's sidebar.
   - A second run shows the existing `tackroom` session instead of opening another.

@@ -252,9 +252,10 @@ type runOptions struct {
 	// ReplaceConflicts moves native files that differ from the canonical copy
 	// into a timestamped backup and links them. Setup always sets it.
 	ReplaceConflicts bool
-	// Verbose expands `status` back to the full per-surface managed and
-	// external skill lists and native root paths instead of the concise view,
-	// and makes setup print every step and the full sync report.
+	// Verbose adds to `status` a block for every harness, with the full
+	// per-surface managed and external skill lists and native root paths, where
+	// the default view has a block only for a harness that needs attention. It
+	// also makes setup print every step and the full sync report.
 	Verbose bool
 	// NoCron makes setup skip installing the periodic sync job.
 	NoCron bool
@@ -413,8 +414,8 @@ func parseStatusFlags(args []string) (runOptions, error) {
 	fs.StringVar(&opts.ConfigPath, "config", "", "Path to tackroom YAML config")
 	fs.StringVar(&opts.Agents, "agents", "", "Comma-separated agent names to use for this run")
 	fs.BoolVar(&opts.SkipPackageAge, "skip-package-age", false, "Skip external package publish-age checks")
-	fs.BoolVar(&opts.Verbose, "verbose", false, "Show full managed/external skill lists and native root paths")
-	fs.BoolVar(&opts.Verbose, "v", false, "Show full managed/external skill lists and native root paths")
+	fs.BoolVar(&opts.Verbose, "verbose", false, "Show a block for every harness, with full managed/external skill lists and native root paths")
+	fs.BoolVar(&opts.Verbose, "v", false, "Show a block for every harness, with full managed/external skill lists and native root paths")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the status as JSON (exit code 1 when anything is out of sync)")
 	fs.BoolVar(&opts.ExitCode, "exit-code", false, "Exit 0 when in sync, 1 when anything is pending, 2 on error")
 

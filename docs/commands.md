@@ -14,7 +14,7 @@ tackroom <command> --help            # flags of one command (exit code 0)
 | `tackroom setup` | Creates the config root, imports what your harnesses have, runs the first sync, installs the periodic job and prints a short summary. See [setup.md](setup.md). |
 | `tackroom sync` | Writes each harness's native config from the repo. |
 | `tackroom sync --plan-digest DIGEST` | Syncs only if the plan is still the one a dry run printed. |
-| `tackroom status` | Shows per harness what is synced, drifted, in cooldown or blocked. |
+| `tackroom status` | Shows on one screen what is synced, drifted, in cooldown or blocked. |
 | `tackroom pull` | Runs `git pull --ff-only` in the config root, then `sync`. This is what the periodic job runs. |
 | `tackroom restore` | Lists the backups of native files, newest first, or puts one back. |
 | `tackroom cron` | Installs, replaces or removes the periodic sync job. |
@@ -208,7 +208,7 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 
 ### Crons in detail
 
-- `tackroom cron collect [--hosts local,HOST...] [--table]` prints JSON, or a table with `--table`.
+- `tackroom cron collect [--hosts local,HOST...] [--table]` prints JSON, or tables with `--table`: the access table, the jobs, then Outputs and Problems. On a terminal a table wider than the window loses its borders and then columns until it fits; into a pipe or a file it keeps every column.
 - `tackroom cron apply [--dry-run]`
 - `tackroom cron run|pause|resume [--host HOST] ID`
 - `tackroom cron schedule ID "MIN HOUR DOM MON DOW"`
@@ -258,7 +258,7 @@ The config root cannot be, or sit inside, a linked git worktree. Machine-local s
 `status`, `sync`, `doctor`, `hosts` and `cron collect --table` use color for the status marks and bold and dim for structure when they write to a terminal. When the output goes to a pipe or a file there are no escape codes at all, and reports wrap at 100 columns instead of the terminal width. Other commands, such as `skill list`, `mcp list` and `hook list`, always print plain text.
 
 - `NO_COLOR` set to any non-empty value drops the color on a terminal; bold and dim stay. `CLICOLOR_FORCE=1` keeps the styling in a pipe.
-- `sync` prints a summary of what the run changed, with harnesses that changed alike grouped, then a table with one row per harness and the managed items per harness. `status` stays compact and `--verbose` adds the full lists and native paths.
+- `sync` prints a summary of what the run changed, with harnesses that changed alike grouped, then a table with one row per harness and the managed items per harness. `status` fits one screen: the overall state, the repo link, the sources and the lock check, then a table with one row per harness, and a block only for a harness that needs attention. `--verbose` adds a block for every harness, with the full lists and native paths.
 - `--json` on `status`, `sync`, `doctor`, `doctor audit`, `setup`, `publish`, `hosts` and `skill sources` prints one JSON document on stdout. `cron collect` and `config inventory` print JSON by default. `hook list` prints tab-separated lines. `status --json`, `sync --json` and `sync --dry-run --json` list the items sync skips (in cooldown or blocked) under `skipped`, `[]` when there are none.
 - Warnings and notes go to stderr, so a pipe sees only the report.
 
