@@ -109,10 +109,10 @@ function downHosts(d) {
 }
 const downDetail = (d, h) => d.access.find((a) => a.host === h && (a.detail || "").startsWith("probe failed"))?.detail ?? "";
 
-// Healthy, paused and one-time jobs not run yet, as "12 healthy, 2 paused, 1 not run yet".
+// Every job that is not failing, as "1 last run failed, 12 healthy, 2 paused, 1 not run yet".
 function restCounts(jobs) {
   const n = (h) => jobs.filter((j) => j.health === h).length;
-  return [n("ok") ? `${n("ok")} healthy` : "", n("paused") ? `${n("paused")} paused` : "", n("idle") ? `${n("idle")} not run yet` : ""]
+  return [n("warn") ? `${n("warn")} last run failed` : "", n("ok") ? `${n("ok")} healthy` : "", n("paused") ? `${n("paused")} paused` : "", n("idle") ? `${n("idle")} not run yet` : ""]
     .filter(Boolean).join(", ");
 }
 
@@ -955,7 +955,7 @@ export default class Tackroom extends View {
     return this.fold(`j:${key(j)}`, [
       div().flex_1().min_w(0).truncate().text_size(12).text_color(off ? t.dim : t.foreground).child(jobName(j)),
       div().flex_none().w(112).truncate().text_size(11.5).text_color(off ? t.dim : t.muted).child(sched),
-      div().flex_none().w(64).text_right().text_size(11).text_color(off ? t.dim : t.muted).child(last),
+      div().flex_none().w(80).whitespace_nowrap().text_right().text_size(11).text_color(off ? t.dim : t.muted).child(last),
     ], () => this.jobDetail(j, true, t), t, { indent: 6 });
   }
 
