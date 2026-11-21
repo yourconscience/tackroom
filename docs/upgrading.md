@@ -7,6 +7,7 @@ What changed in each release since 2.0, newest first, with what to do on every m
 Nothing to migrate by hand.
 
 - Fixed: the audit missed a command split over lines in a script. A download whose `| sh` sat on the next line, after a backslash or after a pipe at the end of the line, did not block. A line that ends with a backslash or a pipe is now also read together with the line after it, so `curl ... \` followed by `| sh` is CRITICAL like the one-line form. Markdown is unchanged. Nothing is retroactive: a pin already in the lock keeps syncing ([skills.md](skills.md#the-audit-gate)).
+- Fixed: the Crons tab of the Herdr panel and of the web view left a job whose last run failed out of the line under the headline, so "2 of 18 jobs failing" was followed by counts that added up to 17. The line now starts with it ("1 last run failed, 12 healthy, 2 paused, 1 not run yet"). In the panel, a last run such as "16 min ago" no longer wraps onto a second line in the per-machine list. The web view's fix comes with the release; if you use the Herdr panel, copy the mods from `herdr/tackroom/mods/` again.
 
 ## To 3.0
 
