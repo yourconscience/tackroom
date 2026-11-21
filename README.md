@@ -49,7 +49,7 @@ Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GE
 
 ## Agents
 
-Claude Code, Codex, Factory Droid, OMP, OpenCode, Pi, Qwen Code, Cursor, Devin, Gemini CLI, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp. What each one gets is in the [capability matrix](https://yourconscience.github.io/tackroom/docs/harnesses/).
+Claude Code, Codex, Factory Droid, OMP, OpenCode, Pi, Qwen Code, Cursor, Devin, Kiro, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp. What each one gets is in the [capability matrix](https://yourconscience.github.io/tackroom/docs/harnesses/).
 
 Terminals: a `tackroom tmux` workspace for [tmux](https://yourconscience.github.io/tackroom/docs/terminals/#tmux), a `tackroom zellij` workspace for [zellij](https://yourconscience.github.io/tackroom/docs/terminals/#zellij), a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/terminals/#herdr-panel) (one line to your agent from Herdr's mod gallery), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/terminals/#tern), and a `tackroom rex` workspace and palette actions for [Rex](https://yourconscience.github.io/tackroom/docs/terminals/#rex). A recipe for [cmux](https://yourconscience.github.io/tackroom/docs/terminals/#cmux) is on the same page.
 

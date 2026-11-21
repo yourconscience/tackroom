@@ -67,7 +67,7 @@ Rules:
 - No initial-letter tiles or other shapes that stand in for a logo.
 - On the site each agent is one item: its mark at 28px on the silver tile `--tr-mark-bg` (`#aeb1b8`, same in light and dark) with a `--tr-mark-line` hairline, then its display name. Keys live on the capability matrix page.
 - Show a mark unmodified and in its own colours. Never recolour, mask, redraw, crop or animate one, and never put one on the brand accent.
-- Only marks whose terms clearly allow this use go in the slot. Six products (Claude Code, Codex, GitHub Copilot CLI, Gemini CLI, Antigravity CLI, Grok Build) need permission first, and two have no official mark. Until a mark is cleared, its plate ships without one.
+- Only marks whose terms clearly allow this use go in the slot. Five products (Claude Code, Codex, GitHub Copilot CLI, Antigravity CLI, Grok Build) need permission first, two have no official mark, and Kiro's mark and brand terms are not retrieved yet. Until a mark is cleared, its plate ships without one.
 - The identity must work with every slot empty. No layout, colour or icon decision depends on a vendor mark.
 - Each mark that ships is recorded with source, version and licence in `THIRD_PARTY_NOTICES.md`.
 
@@ -86,7 +86,7 @@ Use these exact names in every surface. The CLI prints the key.
 | Qwen Code | `qwen-code` |
 | Cursor | `cursor` |
 | Devin | `devin` |
-| Gemini CLI | `gemini` |
+| Kiro | `kiro` |
 | GitHub Copilot CLI | `copilot` |
 | Grok Build | `grok` |
 | DeepSeek Harness | `dsh` |

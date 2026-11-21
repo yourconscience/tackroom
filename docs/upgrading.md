@@ -2,6 +2,12 @@
 
 What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
+## To 3.1
+
+- Removed: Gemini CLI support. Its [README](https://github.com/google-gemini/gemini-cli) now limits it to Gemini Code Assist Standard and Enterprise licenses, and free and Google AI Pro or Ultra accounts moved to Antigravity CLI on 2026-06-18 ([transition post](https://developers.googleblog.com/an-important-update-transitioning-gemini-cli-to-antigravity-cli/)); tackroom keeps supporting Antigravity CLI as `agy`. A config that still names `gemini` loads and syncs: the `gemini` agent entry is ignored, and so is `gemini` in the `agents:` list of an MCP server or hook and in `exclude_agents` or `mcp_agents` of an external skill source. A server, hook or source MCP whose list named only `gemini` is turned off rather than sent to every harness. Each run prints one warning. `gemini` is not read as `agy`, because the two use different files: add an `agy` entry yourself if you use Antigravity CLI. A command that rewrites `tackroom.yaml`, such as `tackroom mcp add`, saves it without the `gemini` entries.
+- Removed: what earlier syncs wrote for Gemini CLI stays where it is. tackroom does not remove its MCP servers and hooks from `~/.gemini/settings.json`, its skill links in `~/.gemini/skills` or its roles in `~/.gemini/agents`; delete them by hand if you no longer want them. Antigravity CLI also reads `~/.gemini/skills`, and `tackroom doctor` warns when a skill is there and in `~/.gemini/antigravity-cli/skills`. `~/.gemini/GEMINI.md` stays, as Antigravity CLI's root file.
+- New: Kiro (key `kiro`, detected by `kiro-cli` on `PATH`), which covers Kiro CLI and the Kiro IDE through the `~/.kiro` folder they share. It gets skills linked into `~/.kiro/skills`, stdio and remote MCP servers in `~/.kiro/settings/mcp.json`, and a root file at `~/.kiro/steering/AGENTS.md`. tackroom writes it no roles and no hooks yet: Kiro's custom agents pick tools by category tags whose members are not mapped, and how tackroom's hook events map to Kiro's triggers has not been checked. The Kiro IDE without `kiro-cli` installed is not detected. The adapter is written from Kiro's documentation and has not been run against a real Kiro install. See [Kiro](harnesses.md#kiro).
+
 ## To 3.0.1
 
 Nothing to migrate by hand.

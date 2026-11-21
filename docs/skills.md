@@ -11,7 +11,7 @@ tackroom skill list          # per harness: managed links, foreign symlinks, dri
 tackroom skill info <name>   # one skill across harnesses
 ```
 
-Harnesses that read `~/.agents/skills/` natively (OpenCode, Cursor, Devin, Gemini CLI, GitHub Copilot CLI, Grok Build, Kimi Code, DeepSeek Harness) get a mirror in their own skill root only when the config root is not `~/.agents`. Qwen Code and Amp read the canonical folder through their own settings (`skills.directories`, `amp.skills.path`), so no mirror is created.
+Harnesses that read `~/.agents/skills/` natively (OpenCode, Cursor, Devin, GitHub Copilot CLI, Grok Build, Kimi Code, DeepSeek Harness) get a mirror in their own skill root only when the config root is not `~/.agents`. Qwen Code and Amp read the canonical folder through their own settings (`skills.directories`, `amp.skills.path`), so no mirror is created.
 
 ## See where a skill came from
 
