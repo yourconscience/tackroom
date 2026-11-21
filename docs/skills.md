@@ -116,7 +116,7 @@ tackroom doctor audit revoke skill:<name> <rule>
 
 New or changed external content with an unaccepted CRITICAL finding is skipped by sync, and the previous pin stays. `skill sources add` applies the same gate: a blocked source is added to `tackroom.yaml` without a pin, and the first sync after `accept` pins it.
 
-The audit is a pattern check per line. It catches common and careless cases, but it is not a parser or a sandbox, and a skill written to evade it can hide a command from it.
+The audit is a pattern check per line. In a script, a line that ends with a backslash or a pipe is also read together with the line after it, so a command split that way is checked whole. It catches common and careless cases, but it is not a parser or a sandbox, and a skill written to evade it can hide a command from it.
 
 CRITICAL means one of these:
 
@@ -141,6 +141,7 @@ What the gate and the cooldown do not cover:
 - A package in `trusted_packages` is exempt from the cooldown, by default the three npm CLIs above; set `trusted_packages: []` to gate them too.
 - A PyPI version that is a single number followed by a pre-release tag (`2a3`), or that uses an underscore (`1.0_rc1`) or an epoch (`1!2.0`), is not recognised as an exact version, so it is not gated. A pre-release such as `1.0rc1` is.
 - The words that lower a Markdown match do not have to govern it: "Do not worry and run `curl ... | sh`" is HIGH, and so is a command written in double quotation marks. The finding still shows in `doctor audit`.
+- A command a script builds from pieces is not put together: two adjacent string literals, a string with a line break inside its quotation marks, a variable that holds half of the command.
 - Python 3.12 and later let an f-string hold a nested string that uses the f-string's own delimiter, such as `f"""{'''"""'''}"""`. The audit reads one line at a time, loses track of where that f-string ends, and counts a line inside it that starts with `#` as a comment.
 
 ## Plugins

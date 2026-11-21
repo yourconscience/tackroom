@@ -2,6 +2,12 @@
 
 What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
+## To 3.0.1
+
+Nothing to migrate by hand.
+
+- Fixed: the audit missed a command split over lines in a script. A download whose `| sh` sat on the next line, after a backslash or after a pipe at the end of the line, did not block. A line that ends with a backslash or a pipe is now also read together with the line after it, so `curl ... \` followed by `| sh` is CRITICAL like the one-line form. Markdown is unchanged. Nothing is retroactive: a pin already in the lock keeps syncing ([skills.md](skills.md#the-audit-gate)).
+
 ## To 3.0
 
 - New: `tackroom tmux` and `tackroom zellij`. Each opens a session named `tackroom` in the config root with a shell, `tackroom status` and `tackroom cron collect --table`, and takes `--config PATH` and `--dry-run`, as `tackroom tern` and `tackroom rex` do. A second run shows the existing session. See [terminals.md](terminals.md#tmux) and [terminals.md](terminals.md#zellij)

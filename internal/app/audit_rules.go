@@ -386,8 +386,9 @@ func hiddenLineBreak(line string) bool {
 	return strings.ContainsRune(line, '\u2028') || strings.ContainsRune(line, '\u2029')
 }
 
-// scanText applies every rule line by line. file is the path relative to the
-// item, used for lowering decisions and the evidence hash. A lowered match
+// scanText applies every rule line by line, and in a script once more to each
+// run of lines one command spans. file is the path relative to the item, used
+// for lowering decisions and the evidence hash. A lowered match
 // counts one level lower: a script comment, a Markdown code fence, or a framed
 // match in Markdown prose.
 func scanText(file, text string) []ruleFinding {
@@ -424,6 +425,45 @@ func scanText(file, text string) []ruleFinding {
 				continue
 			}
 			add(newRuleFinding(rule, file, m, (lowered[i] || low) && !breaks && !joined))
+		}
+	}
+	// A command can span lines: a line that ends with an unescaped backslash or
+	// with a pipe goes on in the next one. Each such run is read once more as
+	// one line. Only a match that crosses a line break counts here, since the
+	// loop above has seen the rest, and it is never lowered.
+	for start := 0; script && start < len(lines); start++ {
+		var text strings.Builder
+		var cuts []int // offsets in text where the next line begins
+		end := start
+		for ; end < len(lines); end++ {
+			line := strings.TrimRight(lines[end], "\r")
+			last := end == len(lines)-1
+			if !last && pyEndsWithBackslash(line) {
+				text.WriteString(line[:len(line)-1]) // a shell drops the backslash and the break
+			} else if !last && strings.HasSuffix(strings.TrimRight(line, " \t"), "|") {
+				text.WriteString(line + " ")
+			} else {
+				text.WriteString(line)
+				break
+			}
+			cuts = append(cuts, text.Len())
+		}
+		start = end
+		if len(cuts) == 0 {
+			continue
+		}
+		joined := text.String()
+		for _, rule := range auditRules {
+			for _, loc := range rule.re.FindAllStringIndex(joined, -1) {
+				m := joined[loc[0]:loc[1]]
+				crosses := false
+				for _, c := range cuts {
+					crosses = crosses || loc[0] < c && c < loc[1]
+				}
+				if crosses && (rule.skip == nil || !rule.skip(m)) {
+					add(newRuleFinding(rule, file, m, false))
+				}
+			}
 		}
 	}
 	// Unicode rules look at runes, not lines, and are never lowered: a hidden
