@@ -123,7 +123,7 @@ CRITICAL means one of these:
 - a prompt-injection phrase;
 - a secret sent out or a credential file read;
 - invisible tag characters;
-- a download piped into a shell (rule `remote-exec`).
+- a download piped into a shell (rule `remote-exec`). The download needs an argument: `curl | sh` with nothing between the command and the pipe fetches nothing, is how text names the pattern, and is not a finding.
 
 Some matches count one level lower, so they show as HIGH and do not block:
 
