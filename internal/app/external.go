@@ -102,9 +102,10 @@ func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot
 		}
 		restoreGatedCaches(sources, home, original, gated)
 		for _, src := range missingDir {
-			outcome := "it installs nothing until that is fixed"
-			if e := previousLockEntry(original, src); e != nil && externalSkillCommitFull(filepath.Join(cacheRoot, sourceName(src))) == e.Commit {
-				outcome = "its pin and skill copies stay as they are"
+			// The same decision status and the harness sync make below.
+			outcome := "sync takes nothing from its checkout until that is fixed"
+			if _, atPin, ok := heldSource(src, original, home); ok && atPin {
+				outcome = "sync keeps it at its pin with what that commit provides"
 			}
 			fmt.Fprintf(os.Stderr, "warning: skipped external %s: %s; %s\n", sourceName(src), gated[sourceName(src)].Reason, outcome)
 		}
@@ -620,15 +621,26 @@ func heldAtPin(src externalSkillSource, home string) (externalSkillSource, bool)
 		src.SkillDirs = present
 	}
 	if len(src.Skills) > 0 {
-		everything := src
-		everything.Skills = nil
-		skills, err := discoverExternalSourceSkills(everything, home)
-		if err != nil {
-			return src, false
+		// One folder at a time: two folders may both hold a skill the
+		// allowlist leaves out, which one pass over all of them refuses.
+		folders := [][]string{nil}
+		if len(src.SkillDirs) > 0 {
+			folders = nil
+			for _, dir := range src.SkillDirs {
+				folders = append(folders, []string{dir})
+			}
 		}
-		found := make(map[string]bool, len(skills))
-		for _, skill := range skills {
-			found[skill.Name] = true
+		found := make(map[string]bool)
+		for _, dirs := range folders {
+			one := src
+			if dirs != nil {
+				one.SkillDirs = dirs
+			}
+			one.Skills = nil
+			skills, _ := discoverExternalSourceSkills(one, home)
+			for _, skill := range skills {
+				found[skill.Name] = true
+			}
 		}
 		var listed []string
 		for _, name := range src.Skills {

@@ -510,7 +510,8 @@ func runSyncDryRun(opts runOptions) error {
 	if err != nil {
 		return err
 	}
-	expected = withPendingMaterialized(expected, cfg.ExternalSkills, home)
+	// Only a source sync takes copies from; a held one adds nothing new.
+	expected = withPendingMaterialized(expected, filterGatedSources(sources, gated), home)
 	reports, err := inspectAgents(selected, expected, repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
@@ -700,12 +701,8 @@ func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agent
 	return out
 }
 
-// heldSources is sources without the gated ones, except a gated source whose
-// checkout sits on the commit of the lock entry that covers it: that one is
-// held at its pin and keeps delivering what it did, its skill links and MCP
-// servers included, so nothing installed looks stale. A gated source on any
-// other commit, or never pinned, contributes nothing: its checkout may hold
-// content the gate rejected.
+// heldSources is sources without the gated ones, except what heldSource keeps
+// of a gated source, so nothing it still delivers looks stale.
 func heldSources(sources []externalSkillSource, gated map[string]gatedItem, repoRoot string, home string) ([]externalSkillSource, error) {
 	if len(gated) == 0 {
 		return sources, nil
@@ -720,22 +717,37 @@ func heldSources(sources []externalSkillSource, gated map[string]gatedItem, repo
 			out = append(out, src)
 			continue
 		}
-		entry := previousLockEntry(lock, src)
-		if entry == nil || externalSkillCommitFull(filepath.Join(externalCacheDir(home), sourceName(src))) != entry.Commit {
-			continue
+		if held, _, ok := heldSource(src, lock, home); ok {
+			out = append(out, held)
 		}
-		if !src.Materialize {
-			// What a missing skill directory or allowlisted skill took away
-			// is absent; the rest of the pinned checkout stays linked.
-			held, ok := heldAtPin(src, home)
-			if !ok {
-				continue
-			}
-			src = held
-		}
-		out = append(out, src)
 	}
 	return out, nil
+}
+
+// heldSource decides what a gated source still delivers. With its checkout on
+// the commit of the lock entry that covers it, it is held at its pin (atPin):
+// narrowed to what that commit still has, it keeps its skill links, copies and
+// MCP servers. A materialized source on any other commit keeps its committed
+// copies and its agent exclusions, but nothing is read from the checkout, which
+// may hold content the gate rejected: no MCP server, no Codex plugin. Anything
+// else delivers nothing (ok false).
+func heldSource(src externalSkillSource, lock lockFile, home string) (held externalSkillSource, atPin bool, ok bool) {
+	entry := previousLockEntry(lock, src)
+	if entry == nil {
+		return src, false, false
+	}
+	atPin = externalSkillCommitFull(filepath.Join(externalCacheDir(home), sourceName(src))) == entry.Commit
+	switch {
+	case src.Materialize && !atPin:
+		src.MCP = false
+		return src, false, true
+	case src.Materialize:
+		return src, true, true
+	case !atPin:
+		return src, false, false
+	}
+	held, ok = heldAtPin(src, home)
+	return held, true, ok
 }
 
 // withPendingMaterialized adds the skills a real sync would copy into the config
