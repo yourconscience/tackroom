@@ -414,6 +414,8 @@ func runHostProbe(host, script string, args ...string) ([]probeSection, error) {
 	cmd.Stdin = strings.NewReader(script)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
+	// A child left holding the output pipes does not keep the probe past its timeout.
+	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.Output()
 	if err != nil {
 		msg := strings.TrimSpace(stderr.String())
