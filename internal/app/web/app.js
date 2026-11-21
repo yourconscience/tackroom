@@ -575,10 +575,10 @@ function unreachableItem(host, data) {
 function loadErrorItem(title, message, retry, extra = null) {
   return issue(title, '', [h('p', {text: message})], [h('button', {type: 'button', class: 'btn', onclick: retry, text: 'Retry'}), extra]);
 }
-// "12 healthy, 2 paused, 1 not run yet" for the jobs that neither fail nor need attention.
+// "1 last run failed, 12 healthy, 2 paused, 1 not run yet" for every job that is not failing.
 function restCounts(jobs) {
   const count = (health) => jobs.filter((job) => job.health === health).length;
-  return [count('ok') && `${count('ok')} healthy`, count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
+  return [count('warn') && `${count('warn')} last run failed`, count('ok') && `${count('ok')} healthy`, count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
 }
 const FAIL_KINDS = {job: ['a cron', 'crons'], harness: ['a harness', 'harnesses'], machine: ['a machine', 'machines']};
 
