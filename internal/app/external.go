@@ -92,14 +92,22 @@ func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot
 	original := lock
 	if gate != nil {
 		gated = gateExternalSources(sources, home, &lock, *gate)
+		var missingDir []externalSkillSource
 		for _, src := range sources {
 			if h, ok := gated[sourceName(src)]; ok && h.Kind == "blocked" {
 				if missing, ok := missingSkillDirBlock(src, home); ok && missing == h {
-					fmt.Fprintf(os.Stderr, "warning: skipped external %s: %s; its pin and skill copies stay as they are\n", sourceName(src), h.Reason)
+					missingDir = append(missingDir, src)
 				}
 			}
 		}
 		restoreGatedCaches(sources, home, original, gated)
+		for _, src := range missingDir {
+			outcome := "it installs nothing until that is fixed"
+			if e := previousLockEntry(original, src); e != nil && externalSkillCommitFull(filepath.Join(cacheRoot, sourceName(src))) == e.Commit {
+				outcome = "its pin and skill copies stay as they are"
+			}
+			fmt.Fprintf(os.Stderr, "warning: skipped external %s: %s; %s\n", sourceName(src), gated[sourceName(src)].Reason, outcome)
+		}
 		keepGatedCopies(unavailable, sources, original, gated)
 	}
 	active := filterGatedSources(sources, gated)
@@ -594,20 +602,47 @@ func (e missingSkillDirError) Error() string {
 	return fmt.Sprintf("skill directory %q not found in cloned external source %s", e.dir, e.url)
 }
 
-// withoutMissingSkillDirs drops the skill_dirs entries the source's checkout
-// lacks, so a source blocked for one of them keeps the skills of the others.
-func withoutMissingSkillDirs(src externalSkillSource, home string) externalSkillSource {
+// heldAtPin narrows a held source to what its checkout still has: the
+// skill_dirs entries that exist and, with a skills allowlist, the listed skills
+// found in them. ok is false when nothing of it is left to discover.
+func heldAtPin(src externalSkillSource, home string) (externalSkillSource, bool) {
 	cachePath := filepath.Join(externalCacheDir(home), sourceName(src))
-	var present []string
-	for _, dir := range src.SkillDirs {
-		if hasDir(filepath.Join(cachePath, filepath.FromSlash(dir))) {
-			present = append(present, dir)
+	if len(src.SkillDirs) > 0 {
+		var present []string
+		for _, dir := range src.SkillDirs {
+			if hasDir(filepath.Join(cachePath, filepath.FromSlash(dir))) {
+				present = append(present, dir)
+			}
 		}
-	}
-	if len(present) > 0 {
+		if len(present) == 0 {
+			return src, false
+		}
 		src.SkillDirs = present
 	}
-	return src
+	if len(src.Skills) > 0 {
+		everything := src
+		everything.Skills = nil
+		skills, err := discoverExternalSourceSkills(everything, home)
+		if err != nil {
+			return src, false
+		}
+		found := make(map[string]bool, len(skills))
+		for _, skill := range skills {
+			found[skill.Name] = true
+		}
+		var listed []string
+		for _, name := range src.Skills {
+			if found[strings.TrimSpace(name)] {
+				listed = append(listed, name)
+			}
+		}
+		if len(listed) == 0 {
+			return src, false
+		}
+		src.Skills = listed
+	}
+	_, err := discoverExternalSourceSkills(src, home)
+	return src, err == nil
 }
 
 // discoverSkillsAtExternalRoot lists the skills of one skill_dirs entry: the

@@ -55,7 +55,9 @@ func applyStatusGates(repoRoot, home string, cfg config, selected []agentConfig,
 	}
 	sources := cfg.ExternalSkills
 	gated := gateExternalSources(sources, home, &statusLock, gateOptions{now: timeNow()})
-	cfg.ExternalSkills = filterGatedSources(sources, gated)
+	if cfg.ExternalSkills, err = heldSources(sources, gated, repoRoot, home); err != nil {
+		return statusGates{}, err
+	}
 	cfg.configuredSources = sources
 	injectPluginMCPServersMode(&cfg, home, createPluginData)
 	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gateOptions{now: timeNow()}, false)
@@ -78,10 +80,7 @@ func inspectStatus(g statusGates) (repoLinkReport, []agentReport, error) {
 	if err != nil {
 		return repoLinkReport{}, nil, err
 	}
-	inspectCfg, err := configForInspection(g.cfg, g.sources, g.gated, g.repoRoot, g.home)
-	if err != nil {
-		return repoLinkReport{}, nil, err
-	}
+	inspectCfg := g.cfg
 	expected, err := expectedSkills(g.repoRoot, g.home, inspectCfg)
 	if err != nil {
 		return repoLinkReport{}, nil, err
@@ -239,7 +238,9 @@ func runSync(opts runOptions) error {
 	if err != nil {
 		return err
 	}
-	cfg.ExternalSkills = filterGatedSources(sources, gated)
+	if cfg.ExternalSkills, err = heldSources(sources, gated, repoRoot, home); err != nil {
+		return err
+	}
 	// Re-inject after clone so first sync picks up newly fetched plugins.
 	injectPluginMCPServers(&cfg, home)
 	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gate, true)
@@ -285,10 +286,7 @@ func runSync(opts runOptions) error {
 		fmt.Fprintf(os.Stderr, "memory/ in %s is yours now: tackroom no longer ships or updates it. See https://yourconscience.github.io/tackroom/docs/memory/\n", displayPath(repoRoot, home))
 	}
 
-	inspectCfg, err := configForInspection(cfg, sources, gated, repoRoot, home)
-	if err != nil {
-		return err
-	}
+	inspectCfg := cfg
 	expected, err := expectedSkills(repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
@@ -459,7 +457,9 @@ func runSyncDryRun(opts runOptions) error {
 	gate.dry = newDryGateNotes()
 	sources := cfg.ExternalSkills
 	gated := gateExternalSources(sources, home, &lock, gate)
-	cfg.ExternalSkills = filterGatedSources(sources, gated)
+	if cfg.ExternalSkills, err = heldSources(sources, gated, repoRoot, home); err != nil {
+		return err
+	}
 	injectPluginMCPServersMode(&cfg, home, false)
 	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gate, false)
 	if err != nil {
@@ -505,10 +505,7 @@ func runSyncDryRun(opts runOptions) error {
 		cfg.retiredMemoryHook = retiredMemoryScripts(repoRoot, home, starterPlan.Removed)
 	}
 
-	inspectCfg, err := configForInspection(cfg, sources, gated, repoRoot, home)
-	if err != nil {
-		return err
-	}
+	inspectCfg := cfg
 	expected, err := expectedSkills(repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
@@ -703,40 +700,40 @@ func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agent
 	return out
 }
 
-// configForInspection returns cfg with the previously pinned gated sources put
-// back for the inspection pass. Their caches were restored to the previous
-// pin, so their skills stay in the desired set; without them an installed link
-// would look stale and sync would remove it even though the gated copy is what
-// got synced. A source that was never pinned installs nothing and stays out,
-// and the write path keeps the filtered config: a gated source contributes no
-// new content.
-func configForInspection(cfg config, sources []externalSkillSource, gated map[string]gatedItem, repoRoot string, home string) (config, error) {
+// heldSources is sources without the gated ones, except a gated source whose
+// checkout sits on the commit of the lock entry that covers it: that one is
+// held at its pin and keeps delivering what it did, its skill links and MCP
+// servers included, so nothing installed looks stale. A gated source on any
+// other commit, or never pinned, contributes nothing: its checkout may hold
+// content the gate rejected.
+func heldSources(sources []externalSkillSource, gated map[string]gatedItem, repoRoot string, home string) ([]externalSkillSource, error) {
 	if len(gated) == 0 {
-		return cfg, nil
+		return sources, nil
 	}
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
-		return cfg, err
+		return nil, err
 	}
-	out := cfg
-	out.ExternalSkills = append([]externalSkillSource(nil), cfg.ExternalSkills...)
+	var out []externalSkillSource
 	for _, src := range sources {
 		if _, ok := gated[sourceName(src)]; !ok {
+			out = append(out, src)
 			continue
 		}
-		if previousLockEntry(lock, src) == nil {
+		entry := previousLockEntry(lock, src)
+		if entry == nil || externalSkillCommitFull(filepath.Join(externalCacheDir(home), sourceName(src))) != entry.Commit {
 			continue
 		}
 		if !src.Materialize {
-			// A gated source whose restored cache still cannot be read keeps
-			// its skills out of the plan rather than failing the whole run;
-			// one blocked for a missing skill directory keeps the others.
-			src = withoutMissingSkillDirs(src, home)
-			if _, err := discoverExternalSourceSkills(src, home); err != nil {
+			// What a missing skill directory or allowlisted skill took away
+			// is absent; the rest of the pinned checkout stays linked.
+			held, ok := heldAtPin(src, home)
+			if !ok {
 				continue
 			}
+			src = held
 		}
-		out.ExternalSkills = append(out.ExternalSkills, src)
+		out = append(out, src)
 	}
 	return out, nil
 }
