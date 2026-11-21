@@ -374,6 +374,10 @@ func pyStringPrefix(word string) bool {
 	return false
 }
 
+// rePipeEnd matches a line that ends with a pipe, with an optional shell
+// comment after it. Group 1 is the line up to and including the pipe.
+var rePipeEnd = regexp.MustCompile(`^(.*\|)[ \t]*(?:#.*)?$`)
+
 // hiddenLineBreak reports whether line holds a break that splitting on "\n"
 // does not see: a carriage return before its end, which ends a Python line, or
 // U+2028 or U+2029, which end a JavaScript comment. A file with such a break
@@ -386,8 +390,9 @@ func hiddenLineBreak(line string) bool {
 	return strings.ContainsRune(line, '\u2028') || strings.ContainsRune(line, '\u2029')
 }
 
-// scanText applies every rule line by line. file is the path relative to the
-// item, used for lowering decisions and the evidence hash. A lowered match
+// scanText applies every rule line by line, and in a script once more to each
+// run of lines one command spans. file is the path relative to the item, used
+// for lowering decisions and the evidence hash. A lowered match
 // counts one level lower: a script comment, a Markdown code fence, or a framed
 // match in Markdown prose.
 func scanText(file, text string) []ruleFinding {
@@ -424,6 +429,53 @@ func scanText(file, text string) []ruleFinding {
 				continue
 			}
 			add(newRuleFinding(rule, file, m, (lowered[i] || low) && !breaks && !joined))
+		}
+	}
+	// A command can span lines: a line that ends with an unescaped backslash or
+	// with a pipe goes on in the next one. Each such run is read once more as
+	// one line. Only a match that crosses a line break counts here, since the
+	// loop above has seen the rest, and it is never lowered.
+	//
+	// A comment or docstring line joins nothing, unless a backslash ties it to
+	// the line before: it starts no run, and a pipe waits past it.
+	comment := func(i int) bool {
+		return lowered[i] && !breaks && (i == 0 || !pyEndsWithBackslash(lines[i-1]))
+	}
+	for i := 0; script && i < len(lines); i++ {
+		if comment(i) {
+			continue
+		}
+		var text strings.Builder
+		var cuts []int // offsets in text where the next line begins
+		for ; i < len(lines); i++ {
+			line := strings.TrimRight(lines[i], "\r")
+			if pyEndsWithBackslash(line) {
+				text.WriteString(line[:len(line)-1]) // a shell drops the backslash and the break
+				cuts = append(cuts, text.Len())
+				continue
+			}
+			m := rePipeEnd.FindStringSubmatch(line)
+			if m == nil || pyEndsWithBackslash(m[1][:len(m[1])-1]) {
+				text.WriteString(line)
+				break
+			}
+			text.WriteString(m[1] + " ")
+			cuts = append(cuts, text.Len())
+			for i+1 < len(lines) && (strings.TrimSpace(lines[i+1]) == "" || comment(i+1)) {
+				i++
+			}
+		}
+		joined := text.String()
+		for _, rule := range auditRules {
+			for _, loc := range rule.re.FindAllStringIndex(joined, -1) {
+				m := joined[loc[0]:loc[1]]
+				// cuts is sorted: the first cut after the match start decides.
+				k := sort.SearchInts(cuts, loc[0]+1)
+				crosses := k < len(cuts) && cuts[k] < loc[1]
+				if crosses && (rule.skip == nil || !rule.skip(m)) {
+					add(newRuleFinding(rule, file, m, false))
+				}
+			}
 		}
 	}
 	// Unicode rules look at runes, not lines, and are never lowered: a hidden
