@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -59,9 +60,11 @@ func checkExternalPackageAgeWithResolver(repoRoot string, cfg config, skip bool,
 	var fresh []string
 	var unresolved []string
 	exempt := 0
+	var trusted []string
 	for _, ref := range refs {
-		if isPackageAgeException(ref) {
+		if cfg.trustedPackage(ref) {
 			exempt++
+			trusted = append(trusted, ref.Ecosystem+":"+ref.Package)
 			continue
 		}
 		release, err := resolver(ref)
@@ -80,7 +83,7 @@ func checkExternalPackageAgeWithResolver(repoRoot string, cfg config, skip bool,
 		return checkResult{"package age", checkStatusWarn, "registry lookup failed (offline or a wrong pin?): " + strings.Join(unresolved, "; ")}
 	}
 	if len(fresh) > 0 {
-		return checkResult{"package age", checkStatusWarn, fmt.Sprintf("package newer than %d days: %s; sync holds new MCP and Pi package references until then (see tackroom status); pin an older release or wait, or pass --skip-package-age", defaultPackageAgeMinimumDays, strings.Join(fresh, "; "))}
+		return checkResult{"package age", checkStatusWarn, fmt.Sprintf("package newer than %d days: %s; sync keeps new MCP and Pi package references in cooldown until then (see tackroom status); pin an older release or wait, or pass --skip-package-age", defaultPackageAgeMinimumDays, strings.Join(fresh, "; "))}
 	}
 	detail := fmt.Sprintf("%d references at least %d days old", len(refs)-exempt, defaultPackageAgeMinimumDays)
 	if exempt > 0 {
@@ -88,12 +91,32 @@ func checkExternalPackageAgeWithResolver(repoRoot string, cfg config, skip bool,
 		if exempt > 1 {
 			detail += "s"
 		}
+		detail += " (trusted_packages: " + strings.Join(slices.Compact(trusted), ", ") + ")"
 	}
 	return checkResult{"package age", checkStatusPass, detail}
 }
 
-func isPackageAgeException(ref packageReference) bool {
-	return ref.Ecosystem == ecosystemNPM && ref.Package == "@openai/codex"
+// defaultTrustedPackages is the trusted_packages list when tackroom.yaml has
+// no such key: vendor CLIs whose new versions skip the cooldown.
+var defaultTrustedPackages = []string{"npm:@openai/codex", "npm:@anthropic-ai/claude-code", "npm:@earendil-works/pi-coding-agent"}
+
+// trustedPackage reports whether a new version of ref skips the cooldown.
+func (c *config) trustedPackage(ref packageReference) bool {
+	trusted := defaultTrustedPackages
+	if c.TrustedPackages != nil {
+		trusted = *c.TrustedPackages
+	}
+	return slices.Contains(trusted, ref.Ecosystem+":"+ref.Package)
+}
+
+// validTrustedPackage reports whether entry is npm:<name> or pypi:<name>, with
+// the name alone and no version.
+func validTrustedPackage(entry string) bool {
+	ecosystem, name, ok := strings.Cut(entry, ":")
+	if !ok || (ecosystem != ecosystemNPM && ecosystem != ecosystemPyPI) || name == "" {
+		return false
+	}
+	return !strings.ContainsAny(name, " \t=<>") && strings.LastIndex(name, "@") <= 0
 }
 
 func collectPackageReferences(repoRoot string, cfg config) ([]packageReference, error) {

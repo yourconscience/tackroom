@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 )
 
 func loadContext(opts runOptions) (string, string, config, []agentConfig, error) {
@@ -69,10 +68,38 @@ func mergeConfig(base *config, overlay config) {
 	if overlay.Instructions != nil {
 		base.Instructions = append([]string(nil), overlay.Instructions...)
 	}
+	if overlay.TrustedPackages != nil {
+		trusted := append([]string(nil), *overlay.TrustedPackages...)
+		base.TrustedPackages = &trusted
+	}
 	if overlay.UI != nil {
-		copyUI := *overlay.UI
-		copyUI.Links = append([]uiLink(nil), overlay.UI.Links...)
-		base.UI = &copyUI
+		// Each ui key the local file sets replaces the shared one, so a
+		// machine can change ui.view without repeating ui.links.
+		merged := uiConfig{}
+		if base.UI != nil {
+			merged = *base.UI
+		}
+		if overlay.UI.Links != nil {
+			merged.Links = append([]uiLink(nil), overlay.UI.Links...)
+		}
+		if o := overlay.UI.View; o != nil {
+			view := uiViewConfig{}
+			if merged.View != nil {
+				view = *merged.View
+			}
+			if o.Addr != "" {
+				view.Addr = o.Addr
+			}
+			if o.IdleTimeout != "" {
+				view.IdleTimeout = o.IdleTimeout
+			}
+			if o.OpenBrowser != nil {
+				openBrowser := *o.OpenBrowser
+				view.OpenBrowser = &openBrowser
+			}
+			merged.View = &view
+		}
+		base.UI = &merged
 	}
 }
 
@@ -102,7 +129,6 @@ func validateConfig(cfg *config, home string, expand bool) error {
 	if cfg.Version == 0 {
 		cfg.Version = 1
 	}
-	dropRemovedAgents(cfg)
 
 	seen := make(map[string]struct{})
 	for i := range cfg.Agents {
@@ -323,6 +349,20 @@ func validateConfig(cfg *config, home string, expand bool) error {
 				return fmt.Errorf("config ui link %s must be an absolute https URL or origin-relative path", link.Name)
 			}
 		}
+		if view := cfg.UI.View; view != nil {
+			view.Addr = strings.TrimSpace(view.Addr)
+			view.IdleTimeout = strings.TrimSpace(view.IdleTimeout)
+			if view.Addr != "" {
+				if err := validateLoopbackAddr(view.Addr); err != nil {
+					return fmt.Errorf("config ui.view.addr: %w", err)
+				}
+			}
+			if view.IdleTimeout != "" {
+				if _, err := parseViewIdleTimeout(view.IdleTimeout); err != nil {
+					return fmt.Errorf("config ui.view.idle_timeout: %w", err)
+				}
+			}
+		}
 	}
 
 	seenPub := make(map[string]struct{})
@@ -381,6 +421,16 @@ func validateConfig(cfg *config, home string, expand bool) error {
 			return fmt.Errorf("config instructions lists %q more than once", path)
 		}
 		seenInstructions[path] = struct{}{}
+	}
+
+	if cfg.TrustedPackages != nil {
+		trusted := *cfg.TrustedPackages
+		for i := range trusted {
+			trusted[i] = strings.TrimSpace(trusted[i])
+			if !validTrustedPackage(trusted[i]) {
+				return fmt.Errorf("config trusted_packages entry %q must be npm:<name> or pypi:<name>", trusted[i])
+			}
+		}
 	}
 
 	return nil
@@ -541,69 +591,11 @@ func expandPath(path string, home string) string {
 	}
 }
 
-// legacyAgentNames maps former harness names to their current ones, so older
-// configs and CLI arguments keep working.
+// legacyAgentNames maps former and alternate harness names to their current
+// ones, so older configs and CLI arguments keep working.
 var legacyAgentNames = map[string]string{
 	"claude-code": agentClaudeCode,
-}
-
-// removedAgentGemini is the key of Gemini CLI, whose support was removed. It
-// is not an alias for agy: Antigravity CLI reads other files.
-const removedAgentGemini = "gemini"
-
-var removedAgentWarning sync.Once
-
-// dropRemovedAgents lets a config that still names gemini load: the agent
-// entry and every agents list item naming it are ignored, with one warning.
-// A server, hook or source MCP whose list named only gemini is turned off, so
-// the emptied list does not widen it to every harness.
-func dropRemovedAgents(cfg *config) {
-	dropped := false
-	without := func(names []string) ([]string, bool) {
-		kept := names[:0]
-		for _, name := range names {
-			if normalizeAgentName(name) == removedAgentGemini {
-				dropped = true
-				continue
-			}
-			kept = append(kept, name)
-		}
-		return kept, len(names) > 0 && len(kept) == 0
-	}
-	agents := cfg.Agents[:0]
-	for _, agent := range cfg.Agents {
-		if normalizeAgentName(agent.Name) == removedAgentGemini {
-			dropped = true
-			continue
-		}
-		agents = append(agents, agent)
-	}
-	cfg.Agents = agents
-	for i := range cfg.MCPServers {
-		var emptied bool
-		if cfg.MCPServers[i].Agents, emptied = without(cfg.MCPServers[i].Agents); emptied {
-			cfg.MCPServers[i].Enabled = false
-		}
-	}
-	for i := range cfg.Hooks {
-		var emptied bool
-		if cfg.Hooks[i].Agents, emptied = without(cfg.Hooks[i].Agents); emptied {
-			cfg.Hooks[i].Enabled = false
-		}
-	}
-	for i := range cfg.ExternalSkills {
-		src := &cfg.ExternalSkills[i]
-		src.ExcludeAgents, _ = without(src.ExcludeAgents)
-		var emptied bool
-		if src.MCPAgents, emptied = without(src.MCPAgents); emptied {
-			src.MCP = false
-		}
-	}
-	if dropped {
-		removedAgentWarning.Do(func() {
-			fmt.Fprintln(os.Stderr, `warning: tackroom no longer supports Gemini CLI; the "gemini" agent and every agents list item naming it are ignored. Use "agy" (Antigravity CLI) instead.`)
-		})
-	}
+	"qwen":        agentQwenCode,
 }
 
 // mcpServerTargetsAgent reports whether a server is meant for an agent: named

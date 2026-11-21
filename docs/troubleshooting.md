@@ -5,7 +5,7 @@ Start with `tackroom doctor`, then `tackroom status`. This page lists the messag
 ```bash
 tackroom doctor                  # health checks, one line each
 tackroom status --verbose        # full per-harness lists and native paths
-tackroom sync --dry-run          # what a real sync would change, including held and blocked items
+tackroom sync --dry-run          # what a real sync would change, including items in cooldown and blocked items
 ```
 
 `doctor` validates skill frontmatter, roles, the lock and materialized copies, native hook registrations and the periodic sync job, and audits external sources. `--json` works on `status`, `sync` and `doctor`.
@@ -22,7 +22,13 @@ tackroom restore latest --dry-run    # preview putting the newest one back
 
 Backups live in `$XDG_STATE_HOME/tackroom/backups/<time>/` (default `~/.local/state/tackroom/backups/`).
 
-**"role ... has ... that the shared role does not" or "role ... is a link to ...".** A harness's own role file sits where the shared role of the same name would be written, and replacing it would lose something: a field tackroom cannot write for that harness (for example Claude Code's `permissionMode` or Codex's `sandbox_mode`), different instructions, or a link that keeps it live from somewhere else. `setup` and `sync --replace-conflicts` never replace such a file; sync leaves that one file alone and syncs everything else into the harness. Rename the file to keep it next to the shared role, or move it out of the harness's agents folder to use the shared role, then run `tackroom setup` (or `tackroom sync`).
+**"role ... has ... that the shared role does not" or "role ... is a link to ...".** A harness's own role file sits where the shared role of the same name would be written, and replacing it would lose something:
+
+- a field tackroom cannot write for that harness (for example Claude Code's `permissionMode` or Codex's `sandbox_mode`);
+- different instructions;
+- a link that keeps it live from somewhere else.
+
+`setup` and `sync --replace-conflicts` never replace such a file; sync leaves that one file alone and syncs everything else into the harness. Rename the file to keep it next to the shared role, or move it out of the harness's agents folder to use the shared role. Then run `tackroom setup` (or `tackroom sync`).
 
 **A sync proposed removals you did not expect.** Setup asks about removals and role overwrites only with `--review`, per harness, defaulting to no; without it, setup leaves them and lists them in its summary for `tackroom sync`. Answer `n`, then inspect with `tackroom status`.
 
@@ -32,9 +38,9 @@ Backups live in `$XDG_STATE_HOME/tackroom/backups/<time>/` (default `~/.local/st
 
 ## External content
 
-**An item is "held".** A new or changed external skill pin, or exact npm or PyPI version, waits 72 hours after its publish time. `tackroom status` shows the reason, the hold end and the override; `tackroom sync --allow-fresh` (or `--allow-fresh=<item> --reason "..."`) releases it. See [skills.md](skills.md#the-72-hour-hold).
+**An item is "in cooldown".** A new or changed external skill pin, or exact npm or PyPI version, waits 72 hours after its publish time. `tackroom status` shows the reason, the cooldown end and the override; `tackroom sync --allow-fresh` (or `--allow-fresh=<item> --reason "..."`) skips the cooldown. See [skills.md](skills.md#the-72-hour-cooldown).
 
-**An item is "blocked".** Sync skips new or changed external content with an unaccepted CRITICAL audit finding and keeps the previous pin. Run `tackroom doctor audit`, then `accept` the finding or fix the source. See [skills.md](skills.md#the-audit-gate).
+**An item is "blocked".** Sync skips new or changed external content with an unaccepted CRITICAL audit finding and keeps the previous pin. Run `tackroom doctor audit`, then `accept` the finding or fix the source. See [skills.md](skills.md#the-audit-gate). A source whose reason is `skill directory "..." not found` lacks a folder listed in its `skill_dirs`; sync keeps it as it is until you remove or rename that folder in `tackroom.yaml` ([skills.md](skills.md#what-add-writes)).
 
 ## Hooks
 

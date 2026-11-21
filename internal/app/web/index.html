@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="color-scheme" content="dark light">
-  <meta name="theme-color" content="#141416" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#121417" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f5f6f7" media="(prefers-color-scheme: light)">
   <meta name="apple-mobile-web-app-title" content="tackroom">
   <title>tackroom</title>
   <link rel="manifest" href="./manifest.webmanifest">
@@ -77,81 +77,93 @@
     <symbol id="i-plus" viewBox="0 0 256 256"><path fill="currentColor" d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></symbol>
     <symbol id="i-pin" viewBox="0 0 256 256"><path fill="currentColor" d="M235.32,81.37,174.63,20.69a16,16,0,0,0-22.63,0L98.37,74.49c-10.66-3.34-35-7.37-60.4,13.14a16,16,0,0,0-1.29,23.78L85,159.71,42.34,202.34a8,8,0,0,0,11.32,11.32L96.29,171l48.29,48.29A16,16,0,0,0,155.9,224c.38,0,.75,0,1.13,0a15.93,15.93,0,0,0,11.64-6.33c19.64-26.1,17.75-47.32,13.19-60L235.33,104A16,16,0,0,0,235.32,81.37ZM224,92.69h0l-57.27,57.46a8,8,0,0,0-1.49,9.22c9.46,18.93-1.8,38.59-9.34,48.62L48,100.08c12.08-9.74,23.64-12.31,32.48-12.31A40.13,40.13,0,0,1,96.81,91a8,8,0,0,0,9.25-1.51L163.32,32,224,92.68Z"/></symbol>
     <symbol id="i-audit" viewBox="0 0 256 256"><path fill="currentColor" d="M220,160a12,12,0,1,1-12-12A12,12,0,0,1,220,160Zm-4.55,39.29A48.08,48.08,0,0,1,168,240H144a48.05,48.05,0,0,1-48-48V151.49A64,64,0,0,1,40,88V40a8,8,0,0,1,8-8H72a8,8,0,0,1,0,16H56V88a48,48,0,0,0,48.64,48c26.11-.34,47.36-22.25,47.36-48.83V48H136a8,8,0,0,1,0-16h24a8,8,0,0,1,8,8V87.17c0,32.84-24.53,60.29-56,64.31V192a32,32,0,0,0,32,32h24a32.06,32.06,0,0,0,31.22-25,40,40,0,1,1,16.23.27ZM232,160a24,24,0,1,0-24,24A24,24,0,0,0,232,160Z"/></symbol>
+    <symbol id="logo-mark" viewBox="0 0 64 64"><path d="M13 18H51" stroke="currentColor" stroke-width="8" stroke-linecap="round"/><path d="M27 18V38a8.5 8.5 0 0 0 17 0" fill="none" stroke="currentColor" stroke-width="8" stroke-linecap="round"/></symbol>
   </svg>
 
-  <div class="app">
-    <aside class="side">
-      <div class="side-head">
-        <a class="brand" href="#overview"><svg class="mark" aria-hidden="true"><use href="#logo"/></svg><span>tackroom</span></a>
-        <p class="scope" id="scope" title="Config root"></p>
-        <button id="open-nav" class="icon-button quiet nav-toggle" type="button" aria-label="Menu" aria-expanded="false" aria-controls="views"><svg aria-hidden="true"><use href="#i-menu"/></svg></button>
-      </div>
-      <nav id="views" class="tabs" aria-label="Views">
-        <a href="#overview" data-view="overview" title="Overview"><svg class="ico" aria-hidden="true"><use href="#i-overview"/></svg><span class="label">Overview</span></a>
-        <a href="#skills" data-view="skills" title="Skills"><svg class="ico" aria-hidden="true"><use href="#i-skills"/></svg><span class="label">Skills</span> <span class="count" data-count="skills"></span></a>
-        <a href="#roles" data-view="roles" title="Roles"><svg class="ico" aria-hidden="true"><use href="#i-roles"/></svg><span class="label">Roles</span> <span class="count" data-count="roles"></span></a>
-        <a href="#wiring" data-view="wiring" title="MCP & hooks"><svg class="ico" aria-hidden="true"><use href="#i-wiring"/></svg><span class="label">MCP &amp; hooks</span> <span class="count" data-count="wiring"></span></a>
-        <a href="#unmanaged" data-view="unmanaged" title="Unmanaged"><svg class="ico" aria-hidden="true"><use href="#i-unmanaged"/></svg><span class="label">Unmanaged</span> <span class="count" data-count="unmanaged"></span></a>
-        <a href="#crons" data-view="crons" title="Crons"><svg class="ico" aria-hidden="true"><use href="#i-crons"/></svg><span class="label">Crons</span> <span class="count" data-count="crons"></span></a>
-        <a href="#config" data-view="config" title="Config"><svg class="ico" aria-hidden="true"><use href="#i-config"/></svg><span class="label">Config</span></a>
-      </nav>
-      <div class="side-foot">
-        <details id="links-menu" class="menu" hidden><summary><svg class="ico" aria-hidden="true"><use href="#i-out"/></svg><span class="label">Links</span></summary><nav id="links" class="menu-list" aria-label="Configured links"></nav></details>
-      </div>
-    </aside>
+  <!-- Below 900px: a top bar, one column and a bottom dock. From 900px: a fixed sidebar and one column beside it. -->
+  <header class="top">
+    <a class="brand" href="#overview"><svg class="ic" aria-hidden="true"><use href="#logo-mark"/></svg>tackroom</a>
+    <button id="menu-btn" class="icon-btn" type="button" aria-label="Menu"><svg class="ic" aria-hidden="true"><use href="#i-menu"/></svg></button>
+  </header>
 
-    <header class="topbar">
-      <h1 class="page-title"><span id="crumb"></span><span id="help" class="help" tabindex="0" role="note"><svg aria-hidden="true"><use href="#i-info"/></svg></span></h1>
-      <div class="top-actions">
-        <div id="view-actions" class="view-actions"></div>
-        <button id="open-sync" class="sync-button" type="button"><svg aria-hidden="true"><use href="#i-sync"/></svg><span id="sync-label">Sync</span></button>
-      </div>
-    </header>
-
-    <main id="main" class="main">
-      <section id="view-overview" class="view" data-view="overview"></section>
-      <section id="view-skills" class="view" data-view="skills" hidden></section>
-      <section id="view-roles" class="view" data-view="roles" hidden></section>
-      <section id="view-wiring" class="view" data-view="wiring" hidden></section>
-      <section id="view-unmanaged" class="view" data-view="unmanaged" hidden></section>
-      <section id="view-crons" class="view" data-view="crons" hidden></section>
-      <section id="view-config" class="view" data-view="config" hidden></section>
-    </main>
-  </div>
-
-  <dialog id="sync-panel" class="panel" aria-labelledby="sync-title">
-    <div class="panel-head">
-      <div><p class="eyebrow">Sync to agents</p><h2 id="sync-title">Review changes</h2></div>
-      <button id="close-sync" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button>
+  <aside class="side" aria-label="tackroom">
+    <a class="brand" href="#overview"><svg class="ic" aria-hidden="true"><use href="#logo-mark"/></svg>tackroom</a>
+    <nav id="views" class="side-nav" aria-label="Views">
+      <a href="#overview" data-view="overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"/></svg><span class="label">Overview</span></a>
+      <a href="#skills" data-view="skills"><svg class="ic" aria-hidden="true"><use href="#i-skills"/></svg><span class="label">Skills</span><span class="badge" data-badge="skills" hidden></span></a>
+      <a href="#roles" data-view="roles"><svg class="ic" aria-hidden="true"><use href="#i-roles"/></svg><span class="label">Roles</span></a>
+      <a href="#wiring" data-view="wiring"><svg class="ic" aria-hidden="true"><use href="#i-wiring"/></svg><span class="label">MCP &amp; hooks</span></a>
+      <a href="#crons" data-view="crons"><svg class="ic" aria-hidden="true"><use href="#i-crons"/></svg><span class="label">Crons</span><span class="badge" data-badge="crons" hidden></span></a>
+      <a href="#config" data-view="config"><svg class="ic" aria-hidden="true"><use href="#i-config"/></svg><span class="label">Config</span></a>
+    </nav>
+    <nav id="links" class="side-nav side-links" aria-label="Configured links" hidden></nav>
+    <div class="side-foot">
+      <button id="open-sync" class="btn primary" type="button"><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg><span id="sync-label">Sync</span></button>
+      <span id="stamp" class="snap"></span>
     </div>
-    <div id="sync-body" class="panel-body"></div>
-    <div class="panel-foot">
+  </aside>
+
+  <main id="main" class="main">
+    <section id="view-overview" class="view" data-view="overview"></section>
+    <section id="view-skills" class="view" data-view="skills" hidden></section>
+    <section id="view-roles" class="view" data-view="roles" hidden></section>
+    <section id="view-wiring" class="view" data-view="wiring" hidden></section>
+    <section id="view-unmanaged" class="view" data-view="unmanaged" hidden></section>
+    <section id="view-crons" class="view" data-view="crons" hidden></section>
+    <section id="view-config" class="view" data-view="config" hidden></section>
+  </main>
+
+  <nav class="dock" aria-label="Main">
+    <a href="#overview" data-dock="overview"><svg class="ic" aria-hidden="true"><use href="#i-overview"/></svg>Status</a>
+    <a href="#crons" data-dock="crons"><svg class="ic" aria-hidden="true"><use href="#i-crons"/></svg>Crons<span class="badge" data-badge="crons" hidden></span></a>
+    <button id="dock-sync" class="sync" type="button"><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg><span id="dock-sync-label">Sync</span><span id="dock-sync-badge" class="badge warn" hidden></span></button>
+    <button id="open-menu" type="button" data-dock="menu"><svg class="ic" aria-hidden="true"><use href="#i-menu"/></svg>More</button>
+  </nav>
+
+  <!-- Sheets slide up on a phone and in from the right from 900px. -->
+  <dialog id="sync-panel" class="sheet" aria-labelledby="sync-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <div class="sheet-titles"><h2 id="sync-title" class="sheet-title">Sync</h2><p id="sync-sub" class="sheet-sub"></p></div>
+      <button id="close-sync" class="sheet-x" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <div id="sync-body" class="sheet-body"></div>
+    <div class="sheet-foot">
       <p id="sync-note" class="note"></p>
-      <div class="foot-actions">
-        <button id="cancel-sync" type="button">Cancel</button>
-        <button id="apply-sync" class="primary" type="button" disabled>Apply sync</button>
-      </div>
+      <button id="apply-sync" class="btn primary wide" type="button" disabled><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg>Apply sync</button>
     </div>
   </dialog>
 
-  <dialog id="job-panel" class="panel" aria-labelledby="job-title">
+  <dialog id="job-panel" class="sheet" aria-labelledby="job-title">
     <form id="job-form" novalidate>
-      <div class="panel-head">
-        <div><p class="eyebrow">Scheduled job</p><h2 id="job-title"></h2></div>
-        <button id="close-job" class="icon-button" type="button" aria-label="Close"><svg aria-hidden="true"><use href="#i-close"/></svg></button>
+      <div class="sheet-grip" aria-hidden="true"></div>
+      <div class="sheet-head">
+        <div class="sheet-titles"><p class="sheet-sub">Scheduled job</p><h2 id="job-title" class="sheet-title"></h2></div>
+        <button id="close-job" class="sheet-x" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
       </div>
-      <div id="job-body" class="panel-body"></div>
-      <div class="panel-foot">
+      <div id="job-body" class="sheet-body"></div>
+      <div class="sheet-foot">
         <p id="job-note" class="note bad" role="alert" hidden></p>
         <div class="foot-actions">
-          <button id="cancel-job" type="button">Cancel</button>
-          <button id="submit-job" class="primary" type="submit"></button>
+          <button id="cancel-job" class="btn" type="button">Cancel</button>
+          <button id="submit-job" class="btn primary" type="submit"></button>
         </div>
       </div>
     </form>
   </dialog>
 
-  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <!-- Job details, a job's log and the phone menu. -->
+  <dialog id="sheet" class="sheet" aria-labelledby="sheet-title">
+    <div class="sheet-grip" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <div class="sheet-titles"><h2 id="sheet-title" class="sheet-title"></h2><p id="sheet-sub" class="sheet-sub"></p></div>
+      <button id="close-sheet" class="sheet-x" type="button" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="#i-close"/></svg></button>
+    </div>
+    <div id="sheet-body" class="sheet-body"></div>
+  </dialog>
+
+  <div id="view-stopped" class="stopped" role="alert" hidden>tackroom view stopped; run <code>tackroom view</code></div>
+  <div id="toast" class="toast" role="status" aria-live="polite" popover="manual" hidden></div>
   <script type="module" src="./app.js"></script>
 </body>
 </html>

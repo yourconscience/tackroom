@@ -143,7 +143,7 @@ main section.hero { border-top: 0; padding: 40px 0 48px; }
 .state-body .real { justify-self: stretch; display: block; font: 400 var(--tr-fs-caption)/1.5 var(--tr-font-mono); color: var(--tr-muted); white-space: pre; overflow-x: auto; }
 
 /* Status tags. Glyph, icon and shape carry the meaning; colour follows.
-   pinned: solid stamp; held and findings: dashed; pass: outlined; blocked: 2px solid fill. */
+   pinned: solid stamp; cooldown and findings: dashed; pass: outlined; blocked: 2px solid fill. */
 .tag { display: inline-flex; align-items: stretch; max-width: 100%; border: 1px solid; border-radius: var(--tr-radius-chip); font-size: var(--tr-fs-body); line-height: 1; overflow: hidden; }
 .tag .g { display: grid; place-items: center; min-width: 30px; padding: 0 6px; font: 500 var(--tr-fs-body)/1 var(--tr-font-mono); }
 .tag .w { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; padding: 7px 10px 7px 8px; min-width: 0; font-weight: 600; }
@@ -156,11 +156,11 @@ main section.hero { border-top: 0; padding: 40px 0 48px; }
 .t-bad .w code { color: inherit; background: transparent; }
 .t-pin { color: var(--tr-surface); border-color: var(--tr-pin); background: var(--tr-pin); }
 .t-pin .w code { padding: 3px 6px; background: var(--tr-surface); border-radius: 2px; letter-spacing: .04em; }
-.hold { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; width: 100%; max-width: 320px; }
-.hold-track { position: relative; height: 6px; background: var(--tr-line); }
-.hold-track i { position: absolute; inset: 0 auto 0 0; width: 56.9%; background: repeating-linear-gradient(90deg, var(--tr-warn) 0 6px, transparent 6px 9px); }
-.hold-track b { position: absolute; top: -4px; right: 0; width: 2px; height: 14px; background: var(--tr-text); }
-.hold-meta { font: 400 var(--tr-fs-caption)/1 var(--tr-font-mono); color: var(--tr-muted); }
+.cooldown { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; width: 100%; max-width: 320px; }
+.cooldown-track { position: relative; height: 6px; background: var(--tr-line); }
+.cooldown-track i { position: absolute; inset: 0 auto 0 0; width: 56.9%; background: repeating-linear-gradient(90deg, var(--tr-warn) 0 6px, transparent 6px 9px); }
+.cooldown-track b { position: absolute; top: -4px; right: 0; width: 2px; height: 14px; background: var(--tr-text); }
+.cooldown-meta { font: 400 var(--tr-fs-caption)/1 var(--tr-font-mono); color: var(--tr-muted); }
 .lock-foot { margin-top: 22px; color: var(--tr-muted); max-width: 62ch; }
 
 /* First five minutes */
@@ -208,6 +208,7 @@ footer nav a { min-height: 44px; display: inline-flex; align-items: center; }
   main section { padding: 56px 0; }
   .hero h1 { font-size: var(--tr-fs-h1); }
   .wall { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: var(--tr-space-4); }
+  .wall-harnesses { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .steps > li { grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 24px; align-items: start; }
 }
 @media (min-width: 960px) {
@@ -217,6 +218,7 @@ footer nav a { min-height: 44px; display: inline-flex; align-items: center; }
   .hero h1 { font-size: var(--tr-fs-display); }
   .hero-copy { padding-top: 8px; }
   .wall { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+  .wall-harnesses { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .lock-grid { grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 48px; align-items: start; }
   .lock-grid .term { position: sticky; top: 24px; }
 }

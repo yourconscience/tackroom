@@ -2,11 +2,11 @@
 
 # tackroom
 
-tackroom syncs one `~/.agents` repo into 15 coding agents and pins every outside skill to a commit.
+One repo for everything your coding agents read, including the parts that never port: MCP servers, hooks and subagents. 16 harnesses, each in its own format.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/tackroom-dark.svg">
-  <img src="docs/images/tackroom-light.svg" width="688" alt="Output of tackroom setup and tackroom sync: config root ~/.agents, seven agents synced, the acme/agent-skills source pinned at b09718b, one item blocked and one held.">
+  <img src="docs/images/tackroom-light.svg" width="688" alt="Output of tackroom setup and tackroom sync: config root ~/.agents, seven agents synced, the acme/agent-skills source pinned at b09718b, one item blocked and one in cooldown.">
 </picture>
 
 [Website](https://yourconscience.github.io/tackroom/) · [Docs](https://yourconscience.github.io/tackroom/docs/) · [Releases](https://github.com/yourconscience/tackroom/releases)
@@ -24,9 +24,9 @@ With npm: `npm install -g tackroom && tackroom setup`. Both install the same che
 After that, you work in the view; the commands do the same from a shell or a script:
 
 ```bash
-tackroom view     # the dashboard: sync state, pins, holds, crons; desktop or phone
+tackroom view     # the dashboard: sync state, pins, cooldowns, crons; desktop or phone
 tackroom sync     # write each agent's native config from the repo
-tackroom status   # what is synced, held or blocked
+tackroom status   # what is synced, in cooldown or blocked
 tackroom doctor   # check skills, roles, pins, audits and hooks
 tackroom hosts    # every machine in crons.hosts: version, sync state, config commit
 ```
@@ -45,28 +45,30 @@ Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GE
 
 - **Pin**: each external skill source is locked to a commit in `tackroom.lock`. Only `tackroom skill update` moves it.
 - **Audit**: outside content is scanned. An unaccepted CRITICAL finding stops it from syncing and the previous pin stays.
-- **Hold**: a new pin, or a new exact npm or PyPI version, waits until it is 72 hours old. `tackroom sync --allow-fresh` releases it.
+- **Cooldown**: a new pin, or a new exact npm or PyPI version, waits until it is 72 hours old, unless a published advisory names that version as a security fix. `tackroom sync --allow-fresh` skips the cooldown.
 
 ## Agents
 
-Claude Code, Codex, Factory Droid, OMP, OpenCode, Pi, Qwen Code, Cursor, Devin, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp. What each one gets is in the [capability matrix](https://yourconscience.github.io/tackroom/docs/harnesses/).
+Claude Code, Codex, Factory Droid, OMP, OpenCode, Pi, Qwen Code, Cursor, Devin, Gemini CLI, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp. What each one gets is in the [capability matrix](https://yourconscience.github.io/tackroom/docs/harnesses/).
 
 Terminals: a `tackroom tmux` workspace for [tmux](https://yourconscience.github.io/tackroom/docs/terminals/#tmux), a `tackroom zellij` workspace for [zellij](https://yourconscience.github.io/tackroom/docs/terminals/#zellij), a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/terminals/#herdr-panel) (one line to your agent from Herdr's mod gallery), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/terminals/#tern), and a `tackroom rex` workspace and palette actions for [Rex](https://yourconscience.github.io/tackroom/docs/terminals/#rex). A recipe for [cmux](https://yourconscience.github.io/tackroom/docs/terminals/#cmux) is on the same page.
 
 ## Docs
 
 - [Philosophy](https://yourconscience.github.io/tackroom/docs/philosophy/): why it works this way
-- [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from` and `--overlay`, settings
-- [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
+- [Setup](https://yourconscience.github.io/tackroom/docs/setup/): first run, `--review`, more machines with `--from` and `--overlay`, settings, upgrade and uninstall
 - [Commands](https://yourconscience.github.io/tackroom/docs/commands/): every command and flag
-- [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
-- [Web view](https://yourconscience.github.io/tackroom/docs/view/): the dashboard, on a desktop or a phone
-- [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and holds
+- [Harnesses](https://yourconscience.github.io/tackroom/docs/harnesses/): the capability matrix
+- [Skills](https://yourconscience.github.io/tackroom/docs/skills/): writing skills, external sources, pins, audits and cooldowns
 - [Roles](https://yourconscience.github.io/tackroom/docs/roles/): role format, model tiers, per-agent output
+- [MCP servers](https://yourconscience.github.io/tackroom/docs/mcp/) and [hooks](https://yourconscience.github.io/tackroom/docs/hooks/)
+- [Plugins](https://yourconscience.github.io/tackroom/docs/plugins/): Claude Code plugins, agent-plugins-spec sources and the Claude Code and Pi panels
 - [Memory](https://yourconscience.github.io/tackroom/docs/memory/): a memory file in every harness, and native memory settings
 - [Crons](https://yourconscience.github.io/tackroom/docs/crons/): every scheduled job, here and over SSH
-- [Comparison](https://yourconscience.github.io/tackroom/docs/comparison/) and [moving from skillshare](https://yourconscience.github.io/tackroom/docs/skillshare-migration/)
-- [Upgrading](https://yourconscience.github.io/tackroom/docs/upgrading/) and [Troubleshooting](https://yourconscience.github.io/tackroom/docs/troubleshooting/)
+- [Web view](https://yourconscience.github.io/tackroom/docs/view/): the dashboard, on a desktop or a phone
+- [Terminals](https://yourconscience.github.io/tackroom/docs/terminals/): tmux, zellij, Herdr, Tern, Rex and cmux
+- [Comparison](https://yourconscience.github.io/tackroom/docs/comparison/), with [moving from skillshare](https://yourconscience.github.io/tackroom/docs/comparison/#moving-from-skillshare)
+- [Troubleshooting](https://yourconscience.github.io/tackroom/docs/troubleshooting/) and the [release notes](https://yourconscience.github.io/tackroom/docs/upgrading/)
 
 Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
 

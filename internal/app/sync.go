@@ -23,18 +23,18 @@ func runStatus(opts runOptions) error {
 }
 
 // statusGates is what status settles before it looks at any harness: the lock
-// and the external sources and packages sync would hold or block.
+// and the external sources and packages sync would put in cooldown or block.
 type statusGates struct {
 	repoRoot string
 	home     string
-	cfg      config // held sources dropped, held MCP servers marked
+	cfg      config // gated sources dropped, MCP servers in cooldown marked
 	selected []agentConfig
-	sources  []externalSkillSource // as configured, held ones included
+	sources  []externalSkillSource // as configured, gated ones included
 	lock     lockFile
-	held     map[string]heldItem // held sources by name; held packages as "package-hold:"+item
+	gated    map[string]gatedItem // gated sources by name; packages in cooldown as "package-gate:"+item
 }
 
-// loadStatusGates reads the config and the lock and applies the freshness and
+// loadStatusGates reads the config and the lock and applies the cooldown and
 // audit gates with no registry lookup and no lock write. createPluginData
 // keeps the plugin data directories status has always created; a read-only
 // caller passes false.
@@ -54,20 +54,23 @@ func applyStatusGates(repoRoot, home string, cfg config, selected []agentConfig,
 		return statusGates{}, err
 	}
 	sources := cfg.ExternalSkills
-	held := gateExternalSources(sources, home, &statusLock, gateOptions{now: timeNow()})
-	cfg.ExternalSkills = filterHeldSources(sources, held)
+	gated := gateExternalSources(sources, home, &statusLock, gateOptions{now: timeNow()})
+	if cfg.ExternalSkills, err = heldSources(sources, gated, repoRoot, home); err != nil {
+		return statusGates{}, err
+	}
+	cfg.configuredSources = sources
 	injectPluginMCPServersMode(&cfg, home, createPluginData)
-	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gateOptions{now: timeNow()}, false)
+	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gateOptions{now: timeNow()}, false)
 	if err != nil {
 		return statusGates{}, err
 	}
-	for k, v := range pkgHeld {
-		held["package-hold:"+k] = v
+	for k, v := range pkgGated {
+		gated["package-gate:"+k] = v
 	}
-	for k, v := range pendingUpdateHolds(sources, home, statusLock, timeNow()) {
-		held[k] = v
+	for k, v := range pendingUpdateGates(sources, home, statusLock, timeNow()) {
+		gated[k] = v
 	}
-	return statusGates{repoRoot: repoRoot, home: home, cfg: cfg, selected: selected, sources: sources, lock: statusLock, held: held}, nil
+	return statusGates{repoRoot: repoRoot, home: home, cfg: cfg, selected: selected, sources: sources, lock: statusLock, gated: gated}, nil
 }
 
 // inspectStatus compares the repo link and every selected harness with what
@@ -77,10 +80,7 @@ func inspectStatus(g statusGates) (repoLinkReport, []agentReport, error) {
 	if err != nil {
 		return repoLinkReport{}, nil, err
 	}
-	inspectCfg, err := configForInspection(g.cfg, g.sources, g.held, g.repoRoot, g.home)
-	if err != nil {
-		return repoLinkReport{}, nil, err
-	}
+	inspectCfg := g.cfg
 	expected, err := expectedSkills(g.repoRoot, g.home, inspectCfg)
 	if err != nil {
 		return repoLinkReport{}, nil, err
@@ -101,10 +101,11 @@ func statusReport(opts runOptions) error {
 	if err != nil {
 		return err
 	}
-	repoRoot, home, cfg, held := g.repoRoot, g.home, g.cfg, g.held
+	repoRoot, home, cfg, gated := g.repoRoot, g.home, g.cfg, g.gated
 
 	if opts.JSONOutput {
 		view := buildStatusJSON(repoRoot, repoReport, reports)
+		view.Skipped = skippedJSON(gated)
 		if err := encodeJSON(setupStreams(opts).out, view); err != nil {
 			return err
 		}
@@ -117,7 +118,7 @@ func statusReport(opts runOptions) error {
 		return nil
 	}
 	printStatusReport(setupStreams(opts).out, repoRoot, repoReport, reports, home, cfg, opts.Verbose)
-	printHeldSection(setupStreams(opts).out, held)
+	printGatedSection(setupStreams(opts).out, gated)
 	for _, problem := range periodicSyncProblems(repoRoot, home, cfg) {
 		fmt.Fprintln(setupStreams(opts).out, "warning: "+problem)
 	}
@@ -136,30 +137,30 @@ func statusReport(opts runOptions) error {
 	return nil
 }
 
-// printHeldSection lists held and blocked items; status and sync --dry-run
+// printGatedSection lists items in cooldown and blocked items; status and sync --dry-run
 // share it so both show the same lines.
-func printHeldSection(w io.Writer, held map[string]heldItem) {
-	lines := heldLines(held)
+func printGatedSection(w io.Writer, gated map[string]gatedItem) {
+	lines := gatedLines(gated)
 	if len(lines) == 0 {
 		return
 	}
-	fmt.Fprintln(w, "\nheld or blocked (skipped by sync)")
+	fmt.Fprintln(w, "\nin cooldown or blocked (skipped by sync)")
 	for _, line := range lines {
 		fmt.Fprintf(w, "  %s\n", line)
 	}
 }
 
 // printDryGateNotes reports what a dry run could not decide without a registry
-// lookup and what --allow-fresh would release.
+// lookup and what --allow-fresh would let through.
 func printDryGateNotes(w io.Writer, notes *dryGateNotes) {
 	if len(notes.unchecked) > 0 {
-		fmt.Fprintln(w, "\nfreshness not checked (a dry run makes no registry lookup; a real sync may hold these)")
+		fmt.Fprintln(w, "\nminimum release age not checked (a dry run makes no registry lookup; a real sync may put these in cooldown)")
 		for _, item := range sortedKeys(notes.unchecked) {
 			fmt.Fprintf(w, "  %s %s\n", item, notes.unchecked[item])
 		}
 	}
 	if len(notes.released) > 0 {
-		fmt.Fprintln(w, "\nwould release with --allow-fresh (nothing recorded)")
+		fmt.Fprintln(w, "\nwould skip the cooldown with --allow-fresh (nothing recorded)")
 		for _, item := range sortedKeys(notes.released) {
 			fmt.Fprintf(w, "  %s %s\n", item, notes.released[item])
 		}
@@ -214,6 +215,9 @@ func runSync(opts runOptions) error {
 	if err != nil {
 		return err
 	}
+	if err := checkSharedLock(opts.ConfigPath, home, cfg); err != nil {
+		return err
+	}
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
 	if err != nil {
@@ -229,27 +233,31 @@ func runSync(opts runOptions) error {
 	}
 
 	sources := cfg.ExternalSkills
-	held, err := syncExternalReposGated(sources, home, repoRoot, ptrGate(gateOptionsFor(opts)))
+	gate := gateOptionsFor(opts)
+	gated, err := syncExternalReposGated(sources, home, repoRoot, ptrGate(gate))
 	if err != nil {
 		return err
 	}
-	cfg.ExternalSkills = filterHeldSources(sources, held)
+	if cfg.ExternalSkills, err = heldSources(sources, gated, repoRoot, home); err != nil {
+		return err
+	}
 	// Re-inject after clone so first sync picks up newly fetched plugins.
 	injectPluginMCPServers(&cfg, home)
-	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gateOptionsFor(opts), true)
+	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gate, true)
 	if err != nil {
 		return err
 	}
-	for k, v := range pkgHeld {
-		held["package-hold:"+k] = v
+	for k, v := range pkgGated {
+		gated["package-gate:"+k] = v
 	}
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
 		return err
 	}
-	for k, v := range pendingUpdateHolds(sources, home, lock, timeNow()) {
-		held[k] = v
+	for k, v := range pendingUpdateGates(sources, home, lock, timeNow()) {
+		gated[k] = v
 	}
+	warnUnmatchedAllowFresh(os.Stderr, gate, gated)
 	if err := renderCommittedArtifacts(repoRoot); err != nil {
 		return err
 	}
@@ -265,19 +273,20 @@ func runSync(opts runOptions) error {
 		// Setup prints its own summary instead of the report.
 		reportOut = io.Discard
 	}
-	starterChanges, err := reconcileStarterFiles(repoRoot, streams, opts.ConfirmRemovals, memoryHooksInUse(cfg, repoRoot, home))
+	keepMemory := memoryHooksInUse(cfg, repoRoot, home)
+	starterChanges, err := reconcileStarterFiles(repoRoot, streams, opts.ConfirmRemovals, keepMemory)
 	if err != nil {
 		return err
+	}
+	if !keepMemory {
+		cfg.retiredMemoryHook = retiredMemoryScripts(repoRoot, home, starterChanges.Removed)
 	}
 	starterChanges.report(reportOut)
 	if starterChanges.Released {
 		fmt.Fprintf(os.Stderr, "memory/ in %s is yours now: tackroom no longer ships or updates it. See https://yourconscience.github.io/tackroom/docs/memory/\n", displayPath(repoRoot, home))
 	}
 
-	inspectCfg, err := configForInspection(cfg, sources, held, repoRoot, home)
-	if err != nil {
-		return err
-	}
+	inspectCfg := cfg
 	expected, err := expectedSkills(repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
@@ -375,15 +384,16 @@ func runSync(opts runOptions) error {
 	repoReport.Linked = linkingRepo && repoReport.State == stateSynced
 
 	printReport(reportOut, true, repoReport, reports, home, cfg)
-	printHeldSummary(reportOut, held)
+	printGatedSummary(reportOut, gated)
 	if opts.setupResult != nil {
 		*opts.setupResult = setupSyncResult{
 			done: true, repo: repoReport, reports: reports, conflicts: conflicts,
-			changes: changes, backupDir: backupDir, moved: moved, held: len(held),
+			changes: changes, backupDir: backupDir, moved: moved, gated: len(gated),
 		}
 	}
 	if opts.JSONOutput {
 		view := buildStatusJSON(repoRoot, repoReport, reports)
+		view.Skipped = skippedJSON(gated)
 		for _, c := range conflicts {
 			view.Synced = false
 			view.Agents = appendConflict(view.Agents, c)
@@ -428,13 +438,16 @@ func runSyncDryRun(opts runOptions) error {
 	if err != nil {
 		return err
 	}
+	if err := checkSharedLock(opts.ConfigPath, home, cfg); err != nil {
+		return err
+	}
 
 	// A dry run never fetches or clones. External sources whose cache is
 	// absent are dropped from the plan and reported as "not fetched" below.
 	var notFetched []string
 	cfg, notFetched = withoutMissingSources(cfg, home)
 
-	// Held and blocked items come from the local cache and the lock only: a
+	// Items in cooldown and blocked items come from the local cache and the lock only: a
 	// dry run reads the lock, never writes it, and makes no registry lookup.
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
@@ -443,18 +456,24 @@ func runSyncDryRun(opts runOptions) error {
 	gate := gateOptionsFor(opts)
 	gate.dry = newDryGateNotes()
 	sources := cfg.ExternalSkills
-	held := gateExternalSources(sources, home, &lock, gate)
-	cfg.ExternalSkills = filterHeldSources(sources, held)
+	gated := gateExternalSources(sources, home, &lock, gate)
+	if cfg.ExternalSkills, err = heldSources(sources, gated, repoRoot, home); err != nil {
+		return err
+	}
 	injectPluginMCPServersMode(&cfg, home, false)
-	pkgHeld, err := gatePackages(&cfg, selected, repoRoot, home, gate, false)
+	pkgGated, err := gatePackages(&cfg, selected, repoRoot, home, gate, false)
 	if err != nil {
 		return err
 	}
-	for k, v := range pkgHeld {
-		held["package-hold:"+k] = v
+	for k, v := range pkgGated {
+		gated["package-gate:"+k] = v
 	}
-	for k, v := range pendingUpdateHolds(sources, home, lock, gate.now) {
-		held[k] = v
+	for k, v := range pendingUpdateGates(sources, home, lock, gate.now) {
+		gated[k] = v
+	}
+	if opts.PlanDigest == "" {
+		// With --plan-digest this is the plan check; the sync that follows warns.
+		warnUnmatchedAllowFresh(os.Stderr, gate, gated)
 	}
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
@@ -475,14 +494,24 @@ func runSyncDryRun(opts runOptions) error {
 
 	repoReport.Linked = repoReport.State != stateSynced
 
-	inspectCfg, err := configForInspection(cfg, sources, held, repoRoot, home)
+	// Starter files a real sync would scaffold, refresh or retire. Read before
+	// the harnesses, since a retired memory script retires its hooks too.
+	keepMemory := memoryHooksInUse(cfg, repoRoot, home)
+	starterPlan, err := previewStarterFiles(repoRoot, keepMemory)
 	if err != nil {
 		return err
 	}
+	if !keepMemory {
+		cfg.retiredMemoryHook = retiredMemoryScripts(repoRoot, home, starterPlan.Removed)
+	}
+
+	inspectCfg := cfg
 	expected, err := expectedSkills(repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
 	}
+	// Only a source sync takes copies from; a held one adds nothing new.
+	expected = withPendingMaterialized(expected, filterGatedSources(sources, gated), home)
 	reports, err := inspectAgents(selected, expected, repoRoot, home, inspectCfg)
 	if err != nil {
 		return err
@@ -491,12 +520,6 @@ func runSyncDryRun(opts runOptions) error {
 		// A real sync links or rewrites the root doc; say so in the plan headline.
 		r := &reports[i]
 		r.RootLinked = r.Detected && len(blockingConflicts(*r)) == 0 && r.RootPath != "" && (r.RootState == stateMissing || r.RootState == stateDrifted)
-	}
-
-	// Starter files a real sync would scaffold, refresh or retire.
-	starterPlan, err := previewStarterFiles(repoRoot, memoryHooksInUse(cfg, repoRoot, home))
-	if err != nil {
-		return err
 	}
 
 	changes, harnesses := countSyncChanges(repoReport, reports, opts.ReplaceConflicts)
@@ -509,7 +532,7 @@ func runSyncDryRun(opts runOptions) error {
 		if opts.ReplaceConflicts {
 			replaceable = replaceableConflictPaths(reports)
 		}
-		view := buildDryRunJSON(repoRoot, repoReport, reports, starterPlan, held, gate.dry, notFetched, replaceable, changes, harnesses)
+		view := buildDryRunJSON(repoRoot, repoReport, reports, starterPlan, gated, gate.dry, notFetched, replaceable, changes, harnesses)
 		view.Plan = nonNil(summarizeSyncPlan(reports))
 		view.Destructive = nonNil(destructiveSyncItems(reports))
 		// Starter files count as changes, so the plan names them too.
@@ -542,7 +565,7 @@ func runSyncDryRun(opts runOptions) error {
 	starterPlan.report(streams.out)
 	printReport(streams.out, false, repoReport, reports, home, cfg)
 
-	printHeldSection(streams.out, held)
+	printGatedSection(streams.out, gated)
 	printDryGateNotes(streams.out, gate.dry)
 	for _, name := range notFetched {
 		fmt.Fprintf(streams.out, "not fetched: %s\n", name)
@@ -572,7 +595,7 @@ type syncDryRunJSON struct {
 	Harnesses          int               `json:"harnesses"`
 	Agents             []agentStatusJSON `json:"agents"`
 	StarterFiles       starterPlanJSON   `json:"starter_files"`
-	Held               []heldItemJSON    `json:"held"`
+	Skipped            []gatedItemJSON   `json:"skipped"`
 	NotFetched         []string          `json:"not_fetched"`
 	FreshnessUnchecked map[string]string `json:"freshness_unchecked,omitempty"`
 	WouldRelease       map[string]string `json:"would_release_with_allow_fresh,omitempty"`
@@ -631,7 +654,7 @@ type starterPlanJSON struct {
 	KeptModified []string `json:"kept_modified"`
 }
 
-type heldItemJSON struct {
+type gatedItemJSON struct {
 	Item    string `json:"item"`
 	Kind    string `json:"kind"`
 	Reason  string `json:"reason"`
@@ -639,7 +662,17 @@ type heldItemJSON struct {
 	Command string `json:"command"`
 }
 
-func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agentReport, starter starterChanges, held map[string]heldItem, notes *dryGateNotes, notFetched []string, replaceable []string, changes, harnesses int) syncDryRunJSON {
+// skippedJSON lists the items sync skips, in the order of their keys in gated;
+// an empty list is [], never null.
+func skippedJSON(gated map[string]gatedItem) []gatedItemJSON {
+	out := []gatedItemJSON{}
+	for _, name := range sortedKeysNative(gated) {
+		out = append(out, gatedItemJSON(gated[name]))
+	}
+	return out
+}
+
+func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agentReport, starter starterChanges, gated map[string]gatedItem, notes *dryGateNotes, notFetched []string, replaceable []string, changes, harnesses int) syncDryRunJSON {
 	status := buildStatusJSON(repoRoot, repoReport, reports)
 	out := syncDryRunJSON{
 		ConfigRoot: status.ConfigRoot,
@@ -655,13 +688,9 @@ func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agent
 			Removed:      nonNil(starter.Removed),
 			KeptModified: nonNil(starter.KeptModified),
 		},
-		Held:        []heldItemJSON{},
+		Skipped:     skippedJSON(gated),
 		NotFetched:  nonNil(notFetched),
 		Replaceable: nonNil(replaceable),
-	}
-	for _, name := range sortedKeysNative(held) {
-		h := held[name]
-		out.Held = append(out.Held, heldItemJSON(h))
 	}
 	if len(notes.unchecked) > 0 {
 		out.FreshnessUnchecked = notes.unchecked
@@ -672,40 +701,76 @@ func buildDryRunJSON(repoRoot string, repoReport repoLinkReport, reports []agent
 	return out
 }
 
-// configForInspection returns cfg with the previously pinned held sources put
-// back for the inspection pass. Their caches were restored to the previous
-// pin, so their skills stay in the desired set; without them an installed link
-// would look stale and sync would remove it even though the held copy is what
-// got synced. A source that was never pinned installs nothing and stays out,
-// and the write path keeps the filtered config: a held source contributes no
-// new content.
-func configForInspection(cfg config, sources []externalSkillSource, held map[string]heldItem, repoRoot string, home string) (config, error) {
-	if len(held) == 0 {
-		return cfg, nil
+// heldSources is sources without the gated ones, except what heldSource keeps
+// of a gated source, so nothing it still delivers looks stale.
+func heldSources(sources []externalSkillSource, gated map[string]gatedItem, repoRoot string, home string) ([]externalSkillSource, error) {
+	if len(gated) == 0 {
+		return sources, nil
 	}
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
-		return cfg, err
+		return nil, err
 	}
-	out := cfg
-	out.ExternalSkills = append(make([]externalSkillSource, 0, len(cfg.ExternalSkills)+len(held)), cfg.ExternalSkills...)
+	var out []externalSkillSource
 	for _, src := range sources {
-		if _, ok := held[sourceName(src)]; !ok {
+		if _, ok := gated[sourceName(src)]; !ok {
+			out = append(out, src)
 			continue
 		}
-		if findLockEntry(lock, sourceName(src)) == nil {
-			continue
+		if held, _, ok := heldSource(src, lock, home); ok {
+			out = append(out, held)
 		}
-		if !src.Materialize {
-			// A held source whose restored cache still cannot be read keeps
-			// its skills out of the plan rather than failing the whole run.
-			if _, err := discoverExternalSourceSkills(src, home); err != nil {
-				continue
-			}
-		}
-		out.ExternalSkills = append(out.ExternalSkills, src)
 	}
 	return out, nil
+}
+
+// heldSource decides what a gated source still delivers. With its checkout on
+// the commit of the lock entry that covers it, it is held at its pin (atPin):
+// narrowed to what that commit still has, it keeps its skill links, copies and
+// MCP servers. A materialized source on any other commit keeps its committed
+// copies and its agent exclusions, but nothing is read from the checkout, which
+// may hold content the gate rejected: no MCP server, no Codex plugin. Anything
+// else delivers nothing (ok false).
+func heldSource(src externalSkillSource, lock lockFile, home string) (held externalSkillSource, atPin bool, ok bool) {
+	entry := previousLockEntry(lock, src)
+	if entry == nil {
+		return src, false, false
+	}
+	atPin = externalSkillCommitFull(filepath.Join(externalCacheDir(home), sourceName(src))) == entry.Commit
+	switch {
+	case src.Materialize && !atPin:
+		src.MCP = false
+		return src, false, true
+	case src.Materialize:
+		return src, true, true
+	case !atPin:
+		return src, false, false
+	}
+	held, ok = heldAtPin(src, home)
+	return held, true, ok
+}
+
+// withPendingMaterialized adds the skills a real sync would copy into the config
+// root from a materialized source's checkout and that are not there yet, so the
+// plan links them as the sync will. Their path is the checkout's, because the
+// copy does not exist before the sync. A source whose checkout is absent adds
+// nothing: a real sync clones it first.
+func withPendingMaterialized(expected map[string]string, sources []externalSkillSource, home string) map[string]string {
+	for _, src := range sources {
+		if !src.Materialize {
+			continue
+		}
+		skills, err := discoverExternalSourceSkills(src, home)
+		if err != nil {
+			continue
+		}
+		for _, skill := range skills {
+			if _, ok := expected[skill.Name]; !ok {
+				expected[skill.Name] = skill.Path
+			}
+		}
+	}
+	return expected
 }
 
 // withoutMissingSources drops non-materialized external sources whose cache is
@@ -856,7 +921,7 @@ func replaceAllConflicts(reports []agentReport, home string, streams setupIO, co
 }
 
 func applyAgentRootInstructionSync(reports []agentReport) error {
-	// A root file two agents share is written once.
+	// Gemini CLI and Antigravity CLI share ~/.gemini/GEMINI.md: write it once.
 	written := map[string]bool{}
 	for _, report := range reports {
 		if !report.Detected || report.RootPath == "" || written[report.RootPath] {

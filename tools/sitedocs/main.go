@@ -1,6 +1,8 @@
 // Command sitedocs assembles the published tackroom site: everything in
 // docs/site, plus every docs/*.md as a rendered page (docs/<name>/) and as the
-// raw markdown next to it (docs/<name>.md), and an llms.txt at the root.
+// raw markdown next to it (docs/<name>.md), and an llms.txt at the root. The
+// sidebar lists the pages docs/README.md links, in its order; a page it does
+// not link is built and listed in llms.txt but kept out of the sidebar.
 //
 // Local build, from anywhere inside the checkout (the output folder must be
 // new or empty; pass an absolute path because go -C changes directory):
@@ -92,6 +94,7 @@ type builder struct {
 	byFile map[string]*doc // repo path (docs/setup.md) to doc
 	index  *doc
 	nav    []*doc // reading order, index excluded
+	extra  []*doc // pages docs/README.md does not link: built and in llms.txt, not in the sidebar
 
 	missing []string // relative links whose target is not in the repo; the build fails on any
 }
@@ -150,8 +153,13 @@ func run(repo, out, base string) error {
 		}
 	}
 	b.checkAnchors()
-	fmt.Fprintf(os.Stderr, "sitedocs: wrote %d docs pages to %s\n", len(b.nav)+1, out)
+	fmt.Fprintf(os.Stderr, "sitedocs: wrote %d docs pages to %s\n", len(b.pages()), out)
 	return nil
+}
+
+// pages is every page the build writes: the index, the sidebar pages, then the rest.
+func (b *builder) pages() []*doc {
+	return append(append([]*doc{b.index}, b.nav...), b.extra...)
 }
 
 // movedPages keeps the address of a page that was merged into another one
@@ -160,7 +168,9 @@ var movedPages = map[string]string{
 	"docs/herdr": "../terminals/#herdr-panel",
 	"docs/tern":  "../terminals/#tern",
 	"docs/rex":   "../terminals/#rex",
-	"docs/tui":   "../terminals/#terminal-view-deprecated",
+	"docs/tui":   "../terminals/",
+
+	"docs/skillshare-migration": "../comparison/#moving-from-skillshare",
 }
 
 func findRoot(repo string) (string, error) {
@@ -234,12 +244,18 @@ func (b *builder) load() error {
 			return ast.WalkContinue, nil
 		})
 	}
+	// Without docs/README.md every page is in the sidebar; with it, a page it
+	// does not link is still built but left out of the sidebar.
 	for _, d := range docs {
-		if !seen[d] {
+		switch {
+		case seen[d]:
+		case b.index.root == nil:
 			b.nav = append(b.nav, d)
+		default:
+			b.extra = append(b.extra, d)
 		}
 	}
-	for _, d := range append([]*doc{b.index}, b.nav...) {
+	for _, d := range b.pages() {
 		if d.root != nil {
 			b.rewriteLinks(d)
 		}
@@ -360,7 +376,7 @@ func (b *builder) writePages(out string) error {
 	if err != nil {
 		return err
 	}
-	for _, d := range append([]*doc{b.index}, b.nav...) {
+	for _, d := range b.pages() {
 		p := page{
 			Title:    d.Title,
 			Summary:  d.Summary,
@@ -492,9 +508,9 @@ func (b *builder) llms() string {
 		s.WriteString("> " + b.index.Summary + "\n\n")
 	}
 	s.WriteString("## Docs\n\n")
-	docs := b.nav
-	if b.index.root != nil {
-		docs = append([]*doc{b.index}, docs...)
+	docs := b.pages()
+	if b.index.root == nil {
+		docs = docs[1:]
 	}
 	for _, d := range docs {
 		fmt.Fprintf(&s, "- [%s](%s/docs/%s)", d.Title, b.base, d.File)
@@ -508,7 +524,7 @@ func (b *builder) llms() string {
 
 // checkAnchors warns about links to headings that do not exist; the site still builds.
 func (b *builder) checkAnchors() {
-	for _, d := range append([]*doc{b.index}, b.nav...) {
+	for _, d := range b.pages() {
 		for _, r := range d.refs {
 			if r.frag != "" && r.to.root != nil && !r.to.ids[r.frag] {
 				fmt.Fprintf(os.Stderr, "sitedocs: warning: %s links to %s#%s, which has no such heading\n", d.File, r.to.File, r.frag)

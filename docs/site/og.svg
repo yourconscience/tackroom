@@ -8,10 +8,11 @@
     <path d="M27 18V38a8.5 8.5 0 0 0 17 0" fill="none" stroke="#aeb1b8" stroke-width="8" stroke-linecap="round"/>
   </g>
   <text x="80" y="330" fill="#f2f2f3" font-family="Helvetica Neue" font-weight="700" font-size="104" letter-spacing="-2.6">tackroom</text>
-  <text font-family="Helvetica Neue" font-size="38" fill="#b3b3b8">
-    <tspan x="80" y="408">tackroom syncs one ~/.agents repo into 15 coding agents</tspan>
-    <tspan x="80" y="458">and pins every outside skill to a commit.</tspan>
+  <text font-family="Helvetica Neue" font-size="36" fill="#b3b3b8">
+    <tspan x="80" y="398">One repo for everything your coding agents read,</tspan>
+    <tspan x="80" y="444">including the parts that never port: MCP servers, hooks</tspan>
+    <tspan x="80" y="490">and subagents. 16 harnesses, each in its own format.</tspan>
   </text>
   <rect x="80" y="520" width="1040" height="1" fill="#303035"/>
-  <text y="576" font-family="Menlo" font-size="26" xml:space="preserve"><tspan x="80" fill="#6aaef0">✓ pinned b09718b</tspan><tspan x="430" fill="#f0a54a">! held 41h of 72h</tspan><tspan x="780" fill="#ff7086">✗ blocked</tspan></text>
+  <text y="576" font-family="Menlo" font-size="26" xml:space="preserve"><tspan x="80" fill="#6aaef0">✓ pinned b09718b</tspan><tspan x="430" fill="#f0a54a">! cooldown 41h of 72h</tspan><tspan x="830" fill="#ff7086">✗ blocked</tspan></text>
 </svg>

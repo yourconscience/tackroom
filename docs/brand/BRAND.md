@@ -2,11 +2,11 @@
 
 ## Current theme: Graphite
 
-The site, docs pages, README pictures and `tackroom view` use Graphite (`tokens-graphite.css`, copied to `docs/site/tokens.css`; the view carries the same values in its own variables in `internal/app/web/style.css`, light and dark following the OS). The Herdr and Tern panels take their colours from the host app's theme slots and tones, so they follow the user's Herdr or Tern theme rather than Graphite. It is monochrome: the accent is the ink itself (`#111113` light, `#f2f2f3` dark) on `#fafafa` / `#141416` grounds, and hue appears only in lock states: pinned blue (`#0b5cad` / `#6aaef0`), held amber, blocked red, pass green. Pinned is a solid stamp, held and findings are dashed, pass is outlined, blocked is a 2px solid fill. Terminal blocks are light insets in light mode. The logo is a graphite tile with a silver rail and hook. Vendor marks sit on one silver tile, `--tr-mark-bg` `#aeb1b8`, the same in both themes, with a per-theme hairline `--tr-mark-line`. Why Graphite won: `THEMES.md`. The sections below describe the earlier A and B proposals and are kept for history.
+The site, docs pages, README pictures and `tackroom view` use Graphite (`tokens-graphite.css`, copied to `docs/site/tokens.css`; the view carries the same values in its own variables in `internal/app/web/style.css`, light and dark following the OS). The Herdr and Tern panels take their colours from the host app's theme slots and tones, so they follow the user's Herdr or Tern theme rather than Graphite. It is monochrome: the accent is the ink itself (`#111113` light, `#f2f2f3` dark) on `#fafafa` / `#141416` grounds, and hue appears only in lock states: pinned blue (`#0b5cad` / `#6aaef0`), cooldown amber, blocked red, pass green. Pinned is a solid stamp, cooldown and findings are dashed, pass is outlined, blocked is a 2px solid fill. Terminal blocks are light insets in light mode. The logo is a graphite tile with a silver rail and hook. Vendor marks sit on one silver tile, `--tr-mark-bg` `#aeb1b8`, the same in both themes, with a per-theme hairline `--tr-mark-line`. Why Graphite won: `THEMES.md`. The sections below describe the earlier A and B proposals and are kept for history.
 
 ## Positioning
 
-tackroom is the strict one: one `~/.agents` repo synced into 15 coding agents, with every external skill pinned to a commit in `tackroom.lock`, audited, and held until it is 72 hours old.
+tackroom is the strict one: one `~/.agents` repo synced into 16 coding agents, with every external skill pinned to a commit in `tackroom.lock`, audited, and in cooldown until it is 72 hours old.
 
 ## Two directions
 
@@ -48,7 +48,7 @@ The glyph is the severity and is identical in the CLI, dashboard, site and panel
 |---|---|---|---|---|
 | synced | `✓` | ok (green) | none | native config matches the repo |
 | pinned | `✓` | pin (blue in Graphite, brass in A) | push-pin | external skill locked to a commit; show the short hash in mono |
-| held | `!` | warn (orange) | timer | new pin younger than 72h; show `41h of 72h` and the time rail |
+| cooldown | `!` | warn (orange) | timer | new pin younger than 72h; show `41h of 72h` and the time rail |
 | audit pass | `✓` | ok | stethoscope | no findings in the pinned content |
 | audit finding | `!` | warn | stethoscope | open finding; an unaccepted CRITICAL renders `✗ blocked` in bad |
 | drifted | `!` | warn | arrows | agent copy edited by hand; the next sync repairs it |
@@ -67,7 +67,7 @@ Rules:
 - No initial-letter tiles or other shapes that stand in for a logo.
 - On the site each agent is one item: its mark at 28px on the silver tile `--tr-mark-bg` (`#aeb1b8`, same in light and dark) with a `--tr-mark-line` hairline, then its display name. Keys live on the capability matrix page.
 - Show a mark unmodified and in its own colours. Never recolour, mask, redraw, crop or animate one, and never put one on the brand accent.
-- Only marks whose terms clearly allow this use go in the slot. Five products (Claude Code, Codex, GitHub Copilot CLI, Antigravity CLI, Grok Build) need permission first, and two have no official mark. Until a mark is cleared, its plate ships without one.
+- Only marks whose terms clearly allow this use go in the slot. Six products (Claude Code, Codex, GitHub Copilot CLI, Gemini CLI, Antigravity CLI, Grok Build) need permission first, and two have no official mark. Until a mark is cleared, its plate ships without one.
 - The identity must work with every slot empty. No layout, colour or icon decision depends on a vendor mark.
 - Each mark that ships is recorded with source, version and licence in `THIRD_PARTY_NOTICES.md`.
 
@@ -86,6 +86,7 @@ Use these exact names in every surface. The CLI prints the key.
 | Qwen Code | `qwen-code` |
 | Cursor | `cursor` |
 | Devin | `devin` |
+| Gemini CLI | `gemini` |
 | GitHub Copilot CLI | `copilot` |
 | Grok Build | `grok` |
 | DeepSeek Harness | `dsh` |
@@ -93,7 +94,7 @@ Use these exact names in every surface. The CLI prints the key.
 | Kimi Code | `kimi` |
 | Amp | `amp` |
 
-Terminals: Herdr (panel), Tern (workspace), Rex (workspace). They sit in their own row and are never counted among the 15 harnesses.
+Terminals: Herdr (panel), Tern (workspace), Rex (workspace). They sit in their own row and are never counted among the 16 harnesses.
 
 ## Icons
 
@@ -101,7 +102,7 @@ One set: Phosphor Regular 2.1.1 (MIT), already shipped by the dashboard. Site, d
 
 ## Do
 
-- Put the lockfile on the hero. A pinned hash, a held countdown and an audit result say what no competitor shows.
+- Put the lockfile on the hero. A pinned hash, the time left in a cooldown and an audit result say what no competitor shows.
 - Keep the README's first screen to the mark, one line, the install command and one status block.
 - Use one tagline everywhere: site title, README, GitHub About, npm and Homebrew.
 - Ship vector files for every mark and a 1200x630 social card with the name and line on it.

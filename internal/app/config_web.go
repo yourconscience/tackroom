@@ -14,12 +14,16 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/charmbracelet/x/term"
 	"gopkg.in/yaml.v3"
 )
 
@@ -35,18 +39,15 @@ type configWebServer struct {
 	origin       string
 	token        string
 	csrf         string
+	// pid and idleTimeout answer the startup handshake, so a later
+	// `tackroom view` can report and stop this process.
+	pid         int
+	idleTimeout string
 }
 
 var configSyncMu sync.Mutex
 
 func runConfigServe(opts configServeOptions) error {
-	doc, _, err := openConfigDocument(configCommandOptions{ConfigPath: opts.ConfigPath})
-	if err != nil {
-		return err
-	}
-	if err := validateLoopbackAddr(opts.Addr); err != nil {
-		return err
-	}
 	if opts.TokenFile == "" {
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -54,28 +55,65 @@ func runConfigServe(opts configServeOptions) error {
 		}
 		opts.TokenFile = filepath.Join(tackroomStateDir(home), "view.token")
 	}
+	tokenFile, err := filepath.Abs(opts.TokenFile)
+	if err != nil {
+		return err
+	}
+	opts.TokenFile = tokenFile
+	files := viewStateFiles(opts.TokenFile)
+	if opts.Stop {
+		if err := validateLoopbackAddr(opts.Addr); err != nil {
+			return err
+		}
+		return stopView(opts, files)
+	}
+	if !opts.Foreground && !opts.JSON && runByServiceManager(os.Getenv, term.IsTerminal(os.Stdout.Fd())) {
+		// A launchd job or systemd unit that runs plain `tackroom view` keeps
+		// serving, instead of starting a background view and exiting.
+		fmt.Fprintln(os.Stdout, "tackroom view runs under launchd or systemd; serving in the foreground.")
+		opts.Foreground = true
+	}
+	doc, _, err := openConfigDocument(configCommandOptions{ConfigPath: opts.ConfigPath})
+	if err != nil {
+		return err
+	}
+	idle := applyViewSettings(&opts, doc.effective.UI)
+	if err := validateLoopbackAddr(opts.Addr); err != nil {
+		return err
+	}
 	token, err := resolveServerToken(opts.TokenFile)
 	if err != nil {
 		return err
 	}
+	if !opts.Foreground {
+		return ensureView(doc, opts, files, token)
+	}
+	return serveView(doc, opts, files, token, idle)
+}
+
+// serveView serves the view in this process until it is interrupted, stopped
+// or, when started in the background, idle for idle.
+func serveView(doc *configDocument, opts configServeOptions, files viewFiles, token, idle string) error {
 	remote := os.Getenv("SSH_CONNECTION") != ""
 	sshHost := resolveSSHHost(opts.SSHHost, os.Getenv)
-	addrFile := strings.TrimSuffix(opts.TokenFile, filepath.Ext(opts.TokenFile)) + ".addr"
-	if running := runningViewURL(opts, addrFile, token); running != "" {
+	if running, ok := runningView(opts, files.addr, token); ok {
 		fmt.Fprintln(os.Stdout, "\ntackroom view is already running; opening it instead of starting another.")
-		announceView(os.Stdout, running, opts, remote, sshHost)
+		announceView(os.Stdout, running.URL, opts, remote, sshHost)
 		return nil
 	}
 	listener, err := net.Listen("tcp", opts.Addr)
 	if err != nil && !opts.AddrSet {
-		listener, err = listenFallback(opts.Addr, addrFile, err)
+		listener, err = listenFallback(opts.Addr, files.addr, err)
 	}
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", opts.Addr, err)
 	}
 	defer listener.Close()
 	// Recorded so a later `tackroom view` without --addr finds this one.
-	_ = os.WriteFile(addrFile, []byte(listener.Addr().String()+"\n"), 0o600)
+	_ = os.WriteFile(files.addr, []byte(listener.Addr().String()+"\n"), 0o600)
+	pid := os.Getpid()
+	_ = os.WriteFile(files.pid, []byte(strconv.Itoa(pid)+"\n"), 0o600)
+	defer removeViewPID(files.pid, pid)
 	csrf, err := randomToken(24)
 	if err != nil {
 		return err
@@ -84,18 +122,49 @@ func runConfigServe(opts configServeOptions) error {
 	if host, _, splitErr := net.SplitHostPort(listener.Addr().String()); splitErr == nil {
 		origin = "http://" + net.JoinHostPort(host, portString(listener.Addr()))
 	}
-	server := &configWebServer{doc: doc, secureCookie: opts.SecureCookie, origin: origin, token: token, csrf: csrf}
+	// Only a view started in the background exits when idle.
+	if os.Getenv(viewDetachedEnv) != "1" {
+		idle = "0"
+	}
+	server := &configWebServer{doc: doc, secureCookie: opts.SecureCookie, origin: origin, token: token, csrf: csrf, pid: pid, idleTimeout: idle}
 	startURL := origin + "/?token=" + url.QueryEscape(token)
 	announceView(os.Stdout, startURL, opts, remote, sshHost)
 	go restartOnUpgrade()
 	httpServer := &http.Server{Handler: server.handler(), ReadHeaderTimeout: 5 * time.Second}
-	return httpServer.Serve(listener)
+	if d, _ := parseViewIdleTimeout(idle); d > 0 {
+		httpServer.Handler = exitWhenIdle(httpServer, httpServer.Handler, d)
+	}
+	signals := make(chan os.Signal, 1)
+	// A signal the caller ignores stays ignored: under nohup SIGHUP, and SIGINT
+	// for a job started with & from a script.
+	for _, sig := range []os.Signal{os.Interrupt, syscall.SIGTERM, syscall.SIGHUP} {
+		if !signal.Ignored(sig) {
+			signal.Notify(signals, sig)
+		}
+	}
+	go func() {
+		<-signals
+		_ = httpServer.Close()
+	}()
+	if err := httpServer.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
 }
 
-// runningViewURL returns the startup URL of a tackroom view that already
-// serves this token at --addr or, when --addr was not given, at the address
-// the last view recorded. It returns "" when no such view answers.
-func runningViewURL(opts configServeOptions, addrFile, token string) string {
+// runningViewInfo is what a running view answers the startup handshake with.
+type runningViewInfo struct {
+	URL  string
+	Addr string
+	// PID and IdleTimeout are empty for a view an older tackroom started.
+	PID         int
+	IdleTimeout string
+}
+
+// runningView returns the view that already serves this token at --addr or,
+// when --addr was not given, at the address the last view recorded. It
+// reports false when no such view answers.
+func runningView(opts configServeOptions, addrFile, token string) (runningViewInfo, bool) {
 	addrs := []string{opts.Addr}
 	if !opts.AddrSet {
 		if recorded := recordedViewAddr(addrFile, opts.Addr); recorded != "" {
@@ -116,10 +185,11 @@ func runningViewURL(opts configServeOptions, addrFile, token string) string {
 		// Only a view holding this token answers its startup URL with the
 		// redirect that sets the session cookie.
 		if resp.StatusCode == http.StatusSeeOther {
-			return startURL
+			pid, _ := strconv.Atoi(resp.Header.Get("X-Tackroom-View-Pid"))
+			return runningViewInfo{URL: startURL, Addr: addr, PID: pid, IdleTimeout: resp.Header.Get("X-Tackroom-View-Idle-Timeout")}, true
 		}
 	}
-	return ""
+	return runningViewInfo{}, false
 }
 
 // recordedViewAddr returns the loopback address the last view recorded in
@@ -193,8 +263,16 @@ func restartOnUpgrade() {
 			continue
 		}
 		fmt.Fprintf(os.Stderr, "tackroom binary at %s changed; restarting view\n", path)
-		// --no-open keeps the restart from opening another browser tab.
-		args := append(append([]string{}, os.Args...), "--no-open")
+		// The restart serves in place (--foreground) without opening another
+		// browser tab (--no-open). Each is added once, so repeated upgrades do
+		// not pile them up. A background view keeps its environment, so it
+		// still exits when idle.
+		args := append([]string{}, os.Args...)
+		for _, flag := range []string{"--no-open", "--foreground"} {
+			if !slices.Contains(args[1:], flag) && !slices.Contains(args[1:], flag[1:]) {
+				args = append(args, flag)
+			}
+		}
 		err = syscall.Exec(path, args, os.Environ())
 		fmt.Fprintf(os.Stderr, "view restart failed, still serving the old version: %v\n", err)
 		return
@@ -244,7 +322,8 @@ func resolveServerToken(tokenFile string) (string, error) {
 	if tokenFile == "" {
 		return randomToken(32)
 	}
-	switch data, err := os.ReadFile(tokenFile); {
+	data, err := os.ReadFile(tokenFile)
+	switch {
 	case err == nil:
 		if tok := strings.TrimSpace(string(data)); tok != "" {
 			return tok, nil
@@ -252,6 +331,7 @@ func resolveServerToken(tokenFile string) (string, error) {
 	case !errors.Is(err, os.ErrNotExist):
 		return "", fmt.Errorf("read token file %s: %w", tokenFile, err)
 	}
+	missing := err != nil
 	tok, err := randomToken(32)
 	if err != nil {
 		return "", err
@@ -259,10 +339,44 @@ func resolveServerToken(tokenFile string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(tokenFile), 0o700); err != nil {
 		return "", fmt.Errorf("create token file directory: %w", err)
 	}
+	if missing {
+		// Created by hard link, so concurrent first runs never see a half
+		// written file and all take the token of the one that linked first.
+		if winner, ok := linkNewToken(tokenFile, tok); ok {
+			return winner, nil
+		}
+	}
 	if err := os.WriteFile(tokenFile, []byte(tok+"\n"), 0o600); err != nil {
 		return "", fmt.Errorf("write token file %s: %w", tokenFile, err)
 	}
 	return tok, nil
+}
+
+// linkNewToken creates tokenFile holding tok unless it exists, and returns the
+// token the file then holds. It reports false when the file system cannot do
+// it, and the caller writes the file directly.
+func linkNewToken(tokenFile, tok string) (string, bool) {
+	tmp, err := os.CreateTemp(filepath.Dir(tokenFile), ".view-token-*")
+	if err != nil {
+		return "", false
+	}
+	defer os.Remove(tmp.Name())
+	_, writeErr := tmp.WriteString(tok + "\n")
+	if err := tmp.Close(); err != nil || writeErr != nil {
+		return "", false
+	}
+	err = os.Link(tmp.Name(), tokenFile)
+	if err == nil {
+		return tok, true
+	}
+	if !errors.Is(err, os.ErrExist) {
+		return "", false
+	}
+	data, err := os.ReadFile(tokenFile)
+	if winner := strings.TrimSpace(string(data)); err == nil && winner != "" {
+		return winner, true
+	}
+	return "", false
 }
 
 func (s *configWebServer) handler() http.Handler {
@@ -287,6 +401,11 @@ func (s *configWebServer) handler() http.Handler {
 			s.handleSyncApply(w, r)
 		case "/api/status":
 			s.handleStatus(w, r)
+		case "/api/ping":
+			// The open page's heartbeat; the request alone keeps a background view up.
+			if r.Method == http.MethodGet && s.authorizeAPI(w, r, false) {
+				w.WriteHeader(http.StatusNoContent)
+			}
 		case "/api/inventory":
 			s.handleInventory(w, r)
 		case "/api/crons":
@@ -321,6 +440,10 @@ func (s *configWebServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	token := r.URL.Query().Get("token")
 	if token != "" && token == s.token {
 		s.setSessionCookies(w, r)
+		if s.pid != 0 {
+			w.Header().Set("X-Tackroom-View-Pid", strconv.Itoa(s.pid))
+			w.Header().Set("X-Tackroom-View-Idle-Timeout", s.idleTimeout)
+		}
 		// Relative, so a view served under a path (tailscale serve --set-path)
 		// lands on its own page and not on the proxy's root.
 		w.Header().Set("Location", "./")
@@ -748,7 +871,10 @@ func (s *configWebServer) handleSyncPreview(w http.ResponseWriter, r *http.Reque
 		writeCandidateError(w, err)
 		return
 	}
-	plan, _, revision, err := buildConfigSyncPlan(s.doc)
+	plan, cfg, revision, err := buildConfigSyncPlan(s.doc)
+	if err == nil {
+		err = checkSharedLock(s.doc.sharedPath, s.doc.home, cfg)
+	}
 	if err != nil {
 		writeCandidateError(w, err)
 		return

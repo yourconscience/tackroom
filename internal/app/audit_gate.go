@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -23,13 +24,13 @@ type acceptedFinding struct {
 	At       string `yaml:"at"`
 }
 
-// heldItem is an external item sync skipped: blocked by an audit finding or
-// held for freshness.
-type heldItem struct {
+// gatedItem is an external item sync skipped: blocked by an audit finding or
+// in cooldown.
+type gatedItem struct {
 	Item    string
-	Kind    string // "blocked" or "held"
+	Kind    string // "blocked" or "cooldown"
 	Reason  string
-	Until   string // hold end, RFC 3339; empty for blocked
+	Until   string // cooldown end, RFC 3339; empty for blocked
 	Command string // the exact command that overrides it
 }
 
@@ -62,7 +63,7 @@ func unacceptedCritical(item auditItem, lock lockFile) []ruleFinding {
 }
 
 // isLocalSourceURL is true for a source on this machine; it is audited like any
-// external source but has no publish time to hold on.
+// external source but has no publish time for a cooldown.
 func isLocalSourceURL(url string) bool {
 	u := strings.TrimSpace(url)
 	return strings.HasPrefix(u, "/") || strings.HasPrefix(u, "./") || strings.HasPrefix(u, "../") ||
@@ -71,40 +72,47 @@ func isLocalSourceURL(url string) bool {
 
 // gateExternalSources decides, for every external source whose pin is new or
 // would change, whether sync may use it. A source already pinned in the lock is
-// never gated here. The candidate content is the checkout under home's external
-// cache, so a caller staging a candidate passes the staging home.
-func gateExternalSources(sources []externalSkillSource, home string, lock *lockFile, opts gateOptions) map[string]heldItem {
-	held := map[string]heldItem{}
+// gated here only when its checkout lacks a configured skill directory. The
+// candidate content is the checkout under home's external cache, so a caller
+// staging a candidate passes the staging home.
+func gateExternalSources(sources []externalSkillSource, home string, lock *lockFile, opts gateOptions) map[string]gatedItem {
+	gated := map[string]gatedItem{}
 	for _, src := range sources {
-		if lockEntryFor(*lock, src) != nil {
-			continue
-		}
 		name := sourceName(src)
 		if !hasDir(filepath.Join(externalCacheDir(home), name, ".git")) {
 			continue
 		}
+		// One source missing a skill directory, say one upstream deleted, stays
+		// where it is instead of failing the run for every other source.
+		if h, ok := missingSkillDirBlock(src, home); ok {
+			gated[name] = h
+			continue
+		}
+		if lockEntryFor(*lock, src) != nil {
+			continue
+		}
 		item := externalSourceItem(src, home)
 		if h, ok := auditBlock(item, *lock); ok {
-			held[name] = h
+			gated[name] = h
 			continue
 		}
 		if isLocalSourceURL(src.URL) {
-			continue // freshness applies to remote content only
+			continue // the cooldown applies to remote content only
 		}
 		if h, ok := gateSourceFreshness(src, home, item.ID(), lock, opts); ok {
-			held[name] = h
+			gated[name] = h
 		}
 	}
-	return held
+	return gated
 }
 
 // auditBlock blocks an external item with an unaccepted CRITICAL finding.
-func auditBlock(item auditItem, lock lockFile) (heldItem, bool) {
+func auditBlock(item auditItem, lock lockFile) (gatedItem, bool) {
 	blockers := unacceptedCritical(item, lock)
 	if len(blockers) == 0 {
-		return heldItem{}, false
+		return gatedItem{}, false
 	}
-	return heldItem{
+	return gatedItem{
 		Item:    item.ID(),
 		Kind:    "blocked",
 		Reason:  fmt.Sprintf("%s in %s", blockers[0].Rule, blockers[0].File),
@@ -112,49 +120,84 @@ func auditBlock(item auditItem, lock lockFile) (heldItem, bool) {
 	}, true
 }
 
-// filterHeldSources drops held sources from the list sync works with.
-func filterHeldSources(sources []externalSkillSource, held map[string]heldItem) []externalSkillSource {
-	if len(held) == 0 {
+// missingSkillDirBlock blocks a source whose checkout under home lacks one of
+// its configured skill directories.
+func missingSkillDirBlock(src externalSkillSource, home string) (gatedItem, bool) {
+	var missing missingSkillDirError
+	if _, err := discoverExternalSourceSkills(src, home); !errors.As(err, &missing) {
+		return gatedItem{}, false
+	}
+	name := sourceName(src)
+	return gatedItem{
+		Item:    externalSourceItem(src, home).ID(),
+		Kind:    "blocked",
+		Reason:  fmt.Sprintf("%v at %s", missing, externalSkillCommit(filepath.Join(externalCacheDir(home), name))),
+		Command: fmt.Sprintf("remove or rename %s in skill_dirs of %s in tackroom.yaml", missing.dir, name),
+	}, true
+}
+
+// filterGatedSources drops gated sources from the list sync works with.
+func filterGatedSources(sources []externalSkillSource, gated map[string]gatedItem) []externalSkillSource {
+	if len(gated) == 0 {
 		return sources
 	}
 	var out []externalSkillSource
 	for _, src := range sources {
-		if _, ok := held[sourceName(src)]; !ok {
+		if _, ok := gated[sourceName(src)]; !ok {
 			out = append(out, src)
 		}
 	}
 	return out
 }
 
-// keepHeldLockEntries restores the previous lock entry of every held source
-// and drops the new pin of sources that were never pinned.
-func keepHeldLockEntries(entries []externalLockEntry, prev lockFile, held map[string]heldItem) []externalLockEntry {
-	if len(held) == 0 {
-		return entries
-	}
+// keepGatedLockEntries drops the new entry of every gated source, then keeps
+// the previous entry of each configured source left without one: a gated
+// source keeps its pin (or stays unpinned), and a source the rebuild could not
+// read, such as one whose url changed and whose checkout is gone, keeps its own.
+func keepGatedLockEntries(entries []externalLockEntry, prev lockFile, sources []externalSkillSource, gated map[string]gatedItem) []externalLockEntry {
 	var out []externalLockEntry
+	have := make(map[string]bool, len(entries))
 	for _, e := range entries {
-		if _, ok := held[e.Name]; !ok {
+		if _, ok := gated[e.Name]; !ok {
 			out = append(out, e)
+			have[e.Name] = true
 		}
 	}
-	for name := range held {
-		if e := findLockEntry(prev, name); e != nil {
+	for _, src := range sources {
+		if have[sourceName(src)] {
+			continue
+		}
+		if e := previousLockEntry(prev, src); e != nil && !have[e.Name] {
 			out = append(out, *e)
+			have[e.Name] = true
 		}
 	}
 	sortLockEntries(out)
 	return out
 }
 
-// restoreHeldCaches puts each held source's cache back on its previous pin so
-// the shared cache never serves a pin the gate rejected.
-func restoreHeldCaches(sources []externalSkillSource, home string, prev lockFile, held map[string]heldItem) {
+// keepGatedCopies adds to keep each gated source and the lock entry that
+// covers it, so planMaterializedSkills neither refreshes nor removes its copies.
+func keepGatedCopies(keep map[string]bool, sources []externalSkillSource, prev lockFile, gated map[string]gatedItem) {
 	for _, src := range sources {
-		if _, ok := held[sourceName(src)]; !ok {
+		if _, ok := gated[sourceName(src)]; !ok {
 			continue
 		}
-		if e := findLockEntry(prev, sourceName(src)); e != nil {
+		keep[sourceName(src)] = true
+		if e := previousLockEntry(prev, src); e != nil {
+			keep[e.Name] = true
+		}
+	}
+}
+
+// restoreGatedCaches puts each gated source's cache back on its previous pin so
+// the shared cache never serves a pin the gate rejected.
+func restoreGatedCaches(sources []externalSkillSource, home string, prev lockFile, gated map[string]gatedItem) {
+	for _, src := range sources {
+		if _, ok := gated[sourceName(src)]; !ok {
+			continue
+		}
+		if e := previousLockEntry(prev, src); e != nil {
 			_ = gitCheckoutCommit(filepath.Join(externalCacheDir(home), sourceName(src)), e.Commit, src.Branch)
 		}
 	}
@@ -196,42 +239,42 @@ func acceptAuditItems(repoRoot, home string, cfg config) []auditItem {
 	return append(items, candidates...)
 }
 
-func printHeldSummary(w io.Writer, held map[string]heldItem) {
-	if len(held) == 0 {
+func printGatedSummary(w io.Writer, gated map[string]gatedItem) {
+	if len(gated) == 0 {
 		return
 	}
-	blocked, holding := 0, 0
-	for _, h := range held {
+	blocked, cooldownN := 0, 0
+	for _, h := range gated {
 		if h.Kind == "blocked" {
 			blocked++
 		} else {
-			holding++
+			cooldownN++
 		}
 	}
-	fmt.Fprintf(w, "skipped %d blocked and %d held item(s); see tackroom status\n", blocked, holding)
+	fmt.Fprintf(w, "skipped %d blocked item(s) and %d item(s) in cooldown; see tackroom status\n", blocked, cooldownN)
 }
 
-// heldBlockedNote describes held and blocked external sources in one line and
-// points at the action that resolves each; empty when nothing is held or
-// blocked. Used by the doctor external-skill checks so a held or blocked source
+// gatedNote describes external sources in cooldown or blocked in one line and
+// points at the action that resolves each; empty when nothing is in cooldown
+// or blocked. Used by the doctor external-skill checks so a source in cooldown or blocked
 // is reported as such instead of as an unpinned or missing-materialization
 // defect.
-func heldBlockedNote(held map[string]heldItem) string {
-	heldN, blockedN := 0, 0
-	for _, h := range held {
+func gatedNote(gated map[string]gatedItem) string {
+	cooldownN, blockedN := 0, 0
+	for _, h := range gated {
 		if h.Kind == "blocked" {
 			blockedN++
 		} else {
-			heldN++
+			cooldownN++
 		}
 	}
-	if heldN+blockedN == 0 {
+	if cooldownN+blockedN == 0 {
 		return ""
 	}
 	var b strings.Builder
-	fmt.Fprintf(&b, "%d held, %d blocked (skipped by sync); see tackroom status", heldN, blockedN)
-	if heldN > 0 {
-		b.WriteString("; a hold ends on its own or with sync --allow-fresh=<item>")
+	fmt.Fprintf(&b, "%d in cooldown, %d blocked (skipped by sync); see tackroom status", cooldownN, blockedN)
+	if cooldownN > 0 {
+		b.WriteString("; a cooldown ends on its own, or sync --allow-fresh=<item> skips it")
 	}
 	if blockedN > 0 {
 		b.WriteString("; a blocked item needs tackroom doctor audit accept ... or a fix upstream")
@@ -379,23 +422,23 @@ func printRuleFindings(w io.Writer, items []auditItem, lock lockFile, asJSON boo
 	return blocked
 }
 
-// lockRow is one line of the lock as the TUI and the view show it: an external
-// source with its pin, gate state and audit, or a held package.
+// lockRow is one line of the lock as the view shows it: an external
+// source with its pin, gate state and audit, or a package in cooldown.
 type lockRow struct {
 	Name     string `json:"name"`
-	Source   string `json:"source,omitempty"` // the source URL; empty for a held package
+	Source   string `json:"source,omitempty"` // the source URL; empty for a package in cooldown
 	Commit   string `json:"commit,omitempty"` // the short pin, or the cloned head while unpinned
 	Pinned   bool   `json:"pinned"`
-	State    string `json:"state"`            // pinned, held, blocked, or a pin issue such as "unpinned"
-	Reason   string `json:"reason,omitempty"` // why it is held or blocked, or the whole pin issue
-	Until    string `json:"until,omitempty"`  // hold end, RFC 3339
+	State    string `json:"state"`            // pinned, cooldown, blocked, or a pin issue such as "unpinned"
+	Reason   string `json:"reason,omitempty"` // why it is in cooldown or blocked, or the whole pin issue
+	Until    string `json:"until,omitempty"`  // cooldown end, RFC 3339
 	Command  string `json:"command,omitempty"`
 	Audited  bool   `json:"audited"` // false until the source is cloned
 	Findings int    `json:"findings"`
 	Critical int    `json:"critical"`
 }
 
-// lockRows lists every configured external source, then every held package,
+// lockRows lists every configured external source, then every package in cooldown,
 // with what status settled for each: no registry lookup, no write.
 func lockRows(g statusGates) []lockRow {
 	rows := []lockRow{}
@@ -412,12 +455,12 @@ func lockRows(g statusGates) []lockRow {
 		case cloned:
 			row.Commit = externalSkillCommit(cachePath)
 		}
-		if h, ok := g.held[name]; ok {
+		if h, ok := g.gated[name]; ok {
 			row.State, row.Reason, row.Until, row.Command = h.Kind, h.Reason, h.Until, h.Command
 		} else if issue != "" {
 			row.State, _, _ = strings.Cut(issue, " (")
 			row.Reason, row.Command = issue, "tackroom sync"
-		} else if h, ok := g.held["update-hold:"+name]; ok {
+		} else if h, ok := g.gated["update-gate:"+name]; ok {
 			row.State, row.Reason, row.Until, row.Command = h.Kind, h.Reason, h.Until, h.Command
 		}
 		if cloned {
@@ -436,26 +479,26 @@ func lockRows(g statusGates) []lockRow {
 		rows = append(rows, row)
 	}
 	var packages []string
-	for key := range g.held {
-		if strings.HasPrefix(key, "package-hold:") {
+	for key := range g.gated {
+		if strings.HasPrefix(key, "package-gate:") {
 			packages = append(packages, key)
 		}
 	}
 	sort.Strings(packages)
 	for _, key := range packages {
-		h := g.held[key]
+		h := g.gated[key]
 		rows = append(rows, lockRow{Name: h.Item, State: h.Kind, Reason: h.Reason, Until: h.Until, Command: h.Command})
 	}
 	return rows
 }
 
-// heldLines renders one status line per held or blocked item.
-func heldLines(held map[string]heldItem) []string {
+// gatedLines renders one status line per item in cooldown or blocked.
+func gatedLines(gated map[string]gatedItem) []string {
 	var lines []string
-	for _, h := range held {
+	for _, h := range gated {
 		line := fmt.Sprintf("%s %s: %s", h.Kind, h.Item, h.Reason)
 		if h.Until != "" {
-			line += "; hold ends " + h.Until
+			line += "; cooldown ends " + h.Until
 		}
 		lines = append(lines, line+"; override: "+h.Command)
 	}

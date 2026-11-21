@@ -1,6 +1,6 @@
 # MCP servers
 
-Declare an MCP server once in `tackroom.yaml` and `sync` writes it into each harness's own config file. Stdio servers reach every harness; remote servers reach six of them.
+Declare an MCP server once in `tackroom.yaml` and `sync` writes it into each harness's own config file. Stdio servers reach every harness; remote servers reach seven of them.
 
 ```bash
 tackroom mcp add docs --command npx --arg -y --arg @acme/docs-mcp --env 'DOCS_TOKEN=${DOCS_TOKEN}'
@@ -28,7 +28,7 @@ mcp_servers:
     args: [-y, "@acme/docs-mcp"]
     env:
       DOCS_TOKEN: ${DOCS_TOKEN}
-    agents: [claude, codex, agy]
+    agents: [claude, codex, gemini]
   - name: tracker
     enabled: true
     url: https://mcp.acme.example/tracker
@@ -62,6 +62,7 @@ Secrets do not come along. Each env value that is not already a `${VAR}` referen
 | Pi | `url` and `headers` |
 | Cursor | `url` and `headers`, with `${NAME}` rewritten as `${env:NAME}` |
 | Devin | `url` and `headers` |
+| Gemini CLI | `httpUrl` and `headers` |
 | Grok Build | `url` and `headers` |
 
 Factory Droid, OMP, OpenCode, Qwen Code, GitHub Copilot CLI, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp get stdio servers only. A remote server is skipped for them, and `mcp add` says which harnesses it will not reach.
@@ -103,8 +104,8 @@ Where each harness keeps its servers is in [harnesses.md](harnesses.md#where-eac
 - DeepSeek Harness gets one `tackroom-mcp-<name>` row per server in `~/.dsh/cordis.patch.yml`, for every profile.
 - Codex and Grok Build get `[mcp_servers.<name>]` tables in TOML. Keys tackroom does not manage in a Codex table, such as `startup_timeout_sec`, are kept.
 
-## Freshness hold and plugins
+## Cooldown and plugins
 
-A server command with an exact npm or PyPI version, such as `npx -y @acme/docs-mcp@1.2.0`, is held until the version is 72 hours old. While it is held, `sync` keeps the entry a harness already has and writes nothing new ([skills.md](skills.md#the-72-hour-hold)).
+A server command with an exact npm or PyPI version, such as `npx -y @acme/docs-mcp@1.2.0`, is in cooldown until the version is 72 hours old. While it is in cooldown, `sync` keeps the entry a harness already has and writes nothing new ([skills.md](skills.md#the-72-hour-cooldown)).
 
-MCP servers can also come from an agent-plugins-spec source with `mcp: true`; tackroom writes the stdio ones, and Codex installs the source as a native plugin instead ([plugins.md](plugins.md#agent-plugins-sources)).
+MCP servers can also come from an agent-plugins-spec source with `mcp: true`; tackroom writes the stdio ones, and Codex installs the source as a native plugin instead ([plugins.md](plugins.md#add-an-agent-plugins-spec-source)).

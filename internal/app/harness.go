@@ -356,6 +356,33 @@ func initHarnesses() {
 			IntegrationNote: "skills read natively from ~/.agents/skills; MCP to ~/.config/devin/mcp_config.json; roles are not rendered (Devin loads the role files in ~/.agents/agents itself when that is the config root, with their tool names as written); no hooks are written because Devin loads Claude Code's hooks by default (read_config_from.claude), as it does ~/.claude/CLAUDE.md and Claude Code's MCP servers",
 		},
 
+		agentGemini: {
+			DisplayName:      "Gemini CLI",
+			Skills:           skillsSymlink,
+			SkillsNativeRoot: readsAgentsSkillsRoot,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentGemini,
+				configPath: geminiSettingsPath,
+				inspect:    inspectJSONMCPServer,
+				patch:      patchJSONMCPServer,
+				remove:     removeJSONMCPServer,
+				read:       readJSONMCPServer,
+				rootKey:    "mcpServers",
+				remote:     &remoteMCP{urlKey: "httpUrl"},
+			}),
+			roles: roleRenderer(agentGemini),
+			Hooks: &hookTarget{
+				agentName: agentGemini,
+				inspect:   inspectGeminiHook,
+				patch:     patchGeminiHook,
+			},
+			RootInstructions: &rootInstructionsCapability{
+				Path:     func(home string) string { return filepath.Join(home, ".gemini", "GEMINI.md") },
+				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
+			},
+			IntegrationNote: "skills read natively from ~/.agents/skills; MCP servers and hooks go to ~/.gemini/settings.json",
+		},
+
 		agentCursor: {
 			DisplayName:      "Cursor",
 			Skills:           skillsSymlink,
@@ -449,14 +476,15 @@ func initHarnesses() {
 				inspect:   inspectAgyHook,
 				patch:     patchAgyHook,
 			},
-			// ~/.gemini/AGENTS.md is not used: agy loads it next to GEMINI.md,
-			// so both would inject the same text.
+			// ~/.gemini/GEMINI.md is Gemini CLI's file too; both adapters write
+			// the same link. ~/.gemini/AGENTS.md is not used: agy loads it next
+			// to GEMINI.md, so both would inject the same text.
 			RootInstructions: &rootInstructionsCapability{
 				Path:          func(home string) string { return filepath.Join(home, ".gemini", "GEMINI.md") },
 				Expected:      func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 				NoSetupImport: true,
 			},
-			IntegrationNote: "skills go to ~/.gemini/antigravity-cli/skills; MCP to ~/.gemini/config/mcp_config.json and hooks to ~/.gemini/config/hooks.json; roles are not rendered yet (agy supports custom agents in ~/.gemini/config/agents, but its tool-name mapping is unverified and `tools` defaults to empty); root file ~/.gemini/GEMINI.md",
+			IntegrationNote: "skills go to ~/.gemini/antigravity-cli/skills (CLI only, not Gemini CLI's ~/.gemini/skills); MCP to ~/.gemini/config/mcp_config.json and hooks to ~/.gemini/config/hooks.json (Gemini CLI reads neither); roles are not rendered yet (agy supports custom agents in ~/.gemini/config/agents, but its tool-name mapping is unverified and `tools` defaults to empty); root file ~/.gemini/GEMINI.md is shared with Gemini CLI",
 			doctorChecks: []doctorCheck{
 				{Name: "agy duplicate skills", Run: checkAgyDuplicateSkills},
 			},

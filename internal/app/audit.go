@@ -13,7 +13,7 @@ import (
 // Shared risky-pattern regexes, reused by the doctor external-skill audit and
 // the standalone `tackroom audit` command.
 var (
-	rePipeToShell     = regexp.MustCompile(`(?i)\b(curl|wget)\b[^|\n]*\|\s*(sudo\s+)?(ba|z)?sh\b`)
+	rePipeToShell     = regexp.MustCompile(`(?i)\b(curl|wget)\b[^|\n]*[^|\s][^|\n]*\|\s*(sudo\s+)?(ba|z)?sh\b`)
 	reBase64ToShell   = regexp.MustCompile(`(?i)\bbase64\b\s+(-d|-D|--decode)\b[^\n]*\|\s*(ba|z)?sh\b`)
 	reCredentialPaths = regexp.MustCompile(`(\$HOME|~)/\.(ssh|aws|gnupg|netrc)\b`)
 )
@@ -104,7 +104,7 @@ func checkExternalSkillAudit(cfg config, home string) checkResult {
 	if len(findings) > 0 {
 		return checkResult{checkName, checkStatusWarn, "review: " + strings.Join(findings, "; ")}
 	}
-	return checkResult{checkName, checkStatusPass, fmt.Sprintf("%d skills scanned, no risky patterns", len(skills))}
+	return checkResult{checkName, checkStatusPass, fmt.Sprintf("%d skills scanned, no audit rule matched", len(skills))}
 }
 
 func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResult {
@@ -116,13 +116,13 @@ func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResul
 	if err != nil {
 		return checkResult{checkName, checkStatusWarn, err.Error()}
 	}
-	held := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
+	gated := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
 	cacheRoot := externalCacheDir(home)
 	var issues []string
 	pinned := 0
 	for _, src := range cfg.ExternalSkills {
-		if _, ok := held[sourceName(src)]; ok {
-			continue // held or blocked: not an unpinned defect
+		if _, ok := gated[sourceName(src)]; ok {
+			continue // in cooldown or blocked: not an unpinned defect
 		}
 		if _, issue := sourcePinIssue(lock, src, cacheRoot); issue != "" {
 			issues = append(issues, sourceName(src)+" "+issue)
@@ -134,7 +134,7 @@ func checkExternalSkillLock(repoRoot string, cfg config, home string) checkResul
 		return checkResult{checkName, checkStatusWarn, strings.Join(issues, "; ")}
 	}
 	detail := fmt.Sprintf("%d sources pinned and in sync", pinned)
-	if note := heldBlockedNote(held); note != "" {
+	if note := gatedNote(gated); note != "" {
 		detail += "; " + note
 	}
 	return checkResult{checkName, checkStatusPass, detail}

@@ -191,7 +191,7 @@ func hasHerdrPathSeparator(token string) bool {
 
 // checkHerdrAutomations covers herdr-automations on a machine that has its
 // automations.yaml: the scheduler should run as a login service, and every
-// enabled automation's agent should be on PATH. See docs/crons.md section 5.
+// enabled automation's agent should be on PATH. See docs/crons.md, "herdr-automations".
 func checkHerdrAutomations(home string) checkResult {
 	const name = "herdr automations"
 	dir := os.Getenv("HERDR_PLUGIN_CONFIG_DIR")

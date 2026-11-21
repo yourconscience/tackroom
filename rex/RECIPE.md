@@ -64,7 +64,7 @@ They are under **tackroom** in the command palette. From a shell, `rex do NAME` 
 | --- | --- | --- |
 | `tackroom_workspace` | Open tackroom Workspace | Runs `tackroom rex`, then asks the app it ran in to show the `tackroom` session. Run from the palette, that works with Remote Control off. |
 | `tackroom_crons` | Open tackroom Crons | Opens `tackroom cron collect --table` in a new tab labelled `crons`, kept open after the table prints. Read-only. |
-| `tackroom_view` | Open tackroom View on Crons | Opens the running `tackroom view` on its Crons tab in the default browser, signed in with the token it saved: `http://<view.addr>/?token=<view.token>#crons`, read from `${XDG_STATE_HOME:-~/.local/state}/tackroom`, as the Tern plugin's Web button does. Run now, Pause and Resume for launchd jobs are there. |
+| `tackroom_view` | Open tackroom View on Crons | Runs `tackroom view --json`, which starts the view when none runs, and opens its `url` plus `#crons` in the default browser, as the Tern plugin's Web button does. Run now, Pause and Resume for launchd jobs are there. |
 
 ### Key binding (optional)
 
@@ -89,8 +89,8 @@ tackroom.config = "/path/to/tackroom.yaml" -- passed as --config to every tackro
 - Rex's server runs programs with the minimal PATH of a GUI app, without your shell's `PATH` or `TACKROOM_HOME`. The actions find `tackroom` as above and run `tackroom rex` with `~/.local/bin`, where Rex links its `rex` CLI, in front of that PATH. Set `tackroom.config` when your config is not `~/.agents/tackroom.yaml`.
 - With more than one `tackroom` installed, for example an old copy in `~/.local/bin` and a newer one from Homebrew, the actions take the first one found, which may be the old one. Set `tackroom.bin` to the one you want.
 - A Rex action has 30 seconds to finish; `tackroom_workspace` gives `tackroom rex` 25.
-- `tackroom_view` needs a running `tackroom view` that keeps its token in the default place. The address file stays after the view stops, so a stopped view shows up as a connection error in the browser.
-- `tackroom_view` opens the page with macOS `open`.
+- `tackroom_view` uses the view that keeps its token in the default place, and starts one when none runs; a view started with another `--token-file` is not found.
+- `tackroom_view` opens the page with macOS `open`. It needs `tackroom view --json`, from tackroom 3.0; with an older tackroom it fails with "Web needs a newer tackroom; upgrade it with brew or npm".
 - `--config` is passed to the status and crons commands only when given; every pane opens in the folder that holds the config file.
 
 ## Not planned

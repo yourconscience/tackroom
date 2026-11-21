@@ -481,10 +481,21 @@ func formatInstalls(n int) string {
 }
 
 // sourceSkill is a skill directory found in a source repo; Dir is its parent,
-// relative to the repo root, which becomes a skill_dirs entry.
+// relative to the repo root, which becomes a skill_dirs entry. Root marks the
+// repo itself as the skill (a SKILL.md at its root): Dir is "." and the skill
+// is named by rootSkillName.
 type sourceSkill struct {
 	Name string
 	Dir  string
+	Root bool
+}
+
+// path is the skill's own directory relative to the repo root.
+func (s sourceSkill) path() string {
+	if s.Root {
+		return "."
+	}
+	return path.Join(s.Dir, s.Name)
 }
 
 func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive bool) error {
@@ -521,6 +532,12 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 
 	repoRoot, home, cfg, _, err := loadContext(runOptions{ConfigPath: *configPath})
 	if err != nil {
+		return err
+	}
+	// Before the fetch and the lock write, with or without --no-sync: a second
+	// config that does not list what the shared lock pins would otherwise reuse
+	// a pinned source's checkout and replace its lock entry.
+	if err := checkSharedLock(*configPath, home, cfg); err != nil {
 		return err
 	}
 	if *branch == "" {
@@ -563,16 +580,11 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 	if err != nil {
 		return err
 	}
-	dirs := map[string]bool{}
 	var names []string
 	for _, skill := range selected {
-		dirs[skill.Dir] = true
 		names = append(names, skill.Name)
 	}
-	for dir := range dirs {
-		src.SkillDirs = append(src.SkillDirs, dir)
-	}
-	sort.Strings(src.SkillDirs)
+	src.SkillDirs = sourceSkillDirs(found, selected, !*all, hasFile(filepath.Join(cachePath, "SKILL.md")))
 	sort.Strings(names)
 	if !*all {
 		src.Skills = names
@@ -588,23 +600,29 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 		fmt.Fprintf(out, "Claude Code already has this source as plugin %s; tackroom adds it for the other agents only.\n", plugin)
 	}
 
-	// A --latest head is held like any new pin until it is 72 hours old; an
-	// older commit is never held, and a local source has no publish time.
+	// A --latest head is in cooldown like any new pin until it is 72 hours old; an
+	// older commit never is, and a local source has no publish time.
+	freshGate := gateOptionsFor(fresh)
 	var gate *gateOptions
 	if *latest && !isLocalSourceURL(src.URL) {
-		gate = ptrGate(gateOptionsFor(fresh))
+		gate = &freshGate
 	}
-	hold, held, err := writeSourceEntry(*configPath, repoRoot, home, src, commit, names, selected, cachePath, gate)
+	verdict, gated, err := writeSourceEntry(*configPath, repoRoot, home, src, commit, names, selected, cachePath, gate)
 	if err != nil {
 		return err
 	}
+	inCooldown := map[string]gatedItem{}
+	if gated {
+		inCooldown[sourceName(src)] = verdict
+	}
+	warnUnmatchedAllowFresh(os.Stderr, freshGate, inCooldown)
 	label := repoURL
 	if sub != "" {
 		label += " (" + sub + ")"
 	}
-	if held {
-		fmt.Fprintf(out, "added %s as %q: %s at %s (%s), not pinned while %s\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit), hold.Kind)
-		fmt.Fprintln(out, heldLines(map[string]heldItem{sourceName(src): hold})[0])
+	if gated {
+		fmt.Fprintf(out, "added %s as %q: %s at %s (%s), not pinned (%s)\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit), verdict.Kind)
+		fmt.Fprintln(out, gatedLines(map[string]gatedItem{sourceName(src): verdict})[0])
 	} else {
 		fmt.Fprintf(out, "added %s as %q: %s pinned at %s (%s)\n", label, sourceName(src), pluralSkills(len(names)), shortCommit(commit), gitCommitDate(cachePath, commit))
 	}
@@ -619,30 +637,30 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 // enough for another add or a sync to change them), writes the lock pin first
 // so the source is never configured without it, then the config entry. A
 // failed config write restores the previous lock. A commit with an unaccepted
-// CRITICAL finding, or (with gate set) inside its freshness hold, gets no pin,
-// so sync gates the source like any new unpinned one; the hold is returned.
-func writeSourceEntry(configPath string, repoRoot string, home string, src externalSkillSource, commit string, names []string, selected []sourceSkill, cachePath string, gate *gateOptions) (heldItem, bool, error) {
+// CRITICAL finding, or (with gate set) in cooldown, gets no pin, so sync gates
+// the source like any new unpinned one; the gate verdict is returned.
+func writeSourceEntry(configPath string, repoRoot string, home string, src externalSkillSource, commit string, names []string, selected []sourceSkill, cachePath string, gate *gateOptions) (gatedItem, bool, error) {
 	shared, sharedPath, err := loadEditableMCPConfig(configPath)
 	if err != nil {
-		return heldItem{}, false, err
+		return gatedItem{}, false, err
 	}
 	for _, existing := range shared.ExternalSkills {
 		if strings.EqualFold(sourceName(existing), sourceName(src)) || (existing.URL == src.URL && overlaps(externalSkillDirs(existing), src.SkillDirs)) {
-			return heldItem{}, false, fmt.Errorf("tackroom.yaml changed meanwhile and already has %q; run the add again", sourceName(existing))
+			return gatedItem{}, false, fmt.Errorf("tackroom.yaml changed meanwhile and already has %q; run the add again", sourceName(existing))
 		}
 	}
 	lock, err := readLockFile(repoRoot)
 	if err != nil {
-		return heldItem{}, false, err
+		return gatedItem{}, false, err
 	}
 	if err := checkCanonicalSkillTargets(selected, cachePath, repoRoot, lock, sourceName(src)); err != nil {
-		return heldItem{}, false, err
+		return gatedItem{}, false, err
 	}
-	// The same audit gate sync applies to new content, then the freshness hold.
+	// The same audit gate sync applies to new content, then the cooldown.
 	item := externalSourceItem(src, home)
-	hold, held := auditBlock(item, lock)
-	if !held && gate != nil {
-		hold, held = gateSourceFreshness(src, home, item.ID(), &lock, *gate)
+	verdict, gated := auditBlock(item, lock)
+	if !gated && gate != nil {
+		verdict, gated = gateSourceFreshness(src, home, item.ID(), &lock, *gate)
 	}
 	// Drop an entry left by a source of this name removed without a sync.
 	kept := lock.ExternalSkills[:0]
@@ -652,7 +670,7 @@ func writeSourceEntry(configPath string, repoRoot string, home string, src exter
 		}
 	}
 	lock.ExternalSkills = kept
-	if !held {
+	if !gated {
 		lock.ExternalSkills = append(kept, externalLockEntry{
 			Name: sourceName(src), URL: src.URL, Branch: src.Branch, Commit: commit,
 			Materialized: newMaterializedSkillNames(names),
@@ -661,10 +679,10 @@ func writeSourceEntry(configPath string, repoRoot string, home string, src exter
 	lockPath := lockFilePath(repoRoot)
 	previous, readErr := os.ReadFile(lockPath)
 	if readErr != nil && !errors.Is(readErr, fs.ErrNotExist) {
-		return heldItem{}, false, readErr
+		return gatedItem{}, false, readErr
 	}
 	if err := writeLockFile(repoRoot, lock); err != nil {
-		return heldItem{}, false, err
+		return gatedItem{}, false, err
 	}
 	shared.ExternalSkills = append(shared.ExternalSkills, src)
 	if err := writeEditableMCPConfig(sharedPath, shared); err != nil {
@@ -677,9 +695,9 @@ func writeSourceEntry(configPath string, repoRoot string, home string, src exter
 		if restoreErr != nil {
 			restoreErr = fmt.Errorf("restore %s: %w", lockPath, restoreErr)
 		}
-		return heldItem{}, false, errors.Join(err, restoreErr)
+		return gatedItem{}, false, errors.Join(err, restoreErr)
 	}
-	return hold, held, nil
+	return verdict, gated, nil
 }
 
 // parseInterleaved parses flags that may also follow positional arguments
@@ -867,7 +885,9 @@ func gitCommitDate(repoPath string, commit string) string {
 }
 
 // findSourceSkills lists skill directories under sub (the whole repo when
-// empty), skipping hidden directories and anything nested inside a skill.
+// empty), skipping hidden directories and anything nested inside a skill. A
+// SKILL.md at the repo root makes the repo itself the skill, and nothing else is
+// listed, as for any skill directory.
 func findSourceSkills(repoPath string, sub string) ([]sourceSkill, error) {
 	start := filepath.Join(repoPath, filepath.FromSlash(sub))
 	if !hasDir(start) {
@@ -887,14 +907,15 @@ func findSourceSkills(repoPath string, sub string) ([]sourceSkill, error) {
 		if !hasFile(filepath.Join(p, "SKILL.md")) {
 			return nil
 		}
+		if p == repoPath {
+			found = append(found, sourceSkill{Name: rootSkillName(repoPath), Dir: ".", Root: true})
+			return filepath.SkipDir
+		}
 		rel, err := filepath.Rel(repoPath, filepath.Dir(p))
 		if err != nil {
 			return err
 		}
-		// A SKILL.md at the repo root is not a skill directory tackroom can name.
-		if p != repoPath {
-			found = append(found, sourceSkill{Name: d.Name(), Dir: filepath.ToSlash(rel)})
-		}
+		found = append(found, sourceSkill{Name: d.Name(), Dir: filepath.ToSlash(rel)})
 		return filepath.SkipDir
 	})
 	sort.Slice(found, func(i, j int) bool {
@@ -904,6 +925,50 @@ func findSourceSkills(repoPath string, sub string) ([]sourceSkill, error) {
 		return found[i].Name < found[j].Name
 	})
 	return found, err
+}
+
+// rootSkillName names a skill that is the repo root, which has no folder name
+// of its own: the name in its SKILL.md frontmatter, else the directory's name,
+// which for a source's cache is the source name.
+func rootSkillName(repoPath string) string {
+	fm, err := parseSkillFrontmatter(filepath.Join(repoPath, "SKILL.md"))
+	name := strings.TrimSpace(fm.Name)
+	if err != nil || !safeSourceName(name) || strings.HasPrefix(name, ".") {
+		return filepath.Base(repoPath)
+	}
+	return name
+}
+
+// sourceSkillDirs is the skill_dirs list that makes discovery yield the selected
+// skills. A folder is listed whole when all its skills are selected, or when a
+// skills allowlist narrows it, so skills added there upstream arrive on update.
+// Otherwise each selected skill is listed by its own path, so a skipped or
+// unselected neighbour is not pulled in. A SKILL.md at the repo root makes "."
+// that one skill, so folders at the root are listed by path then.
+func sourceSkillDirs(found, selected []sourceSkill, allowlisted bool, rootSkill bool) []string {
+	inDir := map[string]int{}
+	for _, skill := range found {
+		inDir[skill.Dir]++
+	}
+	selectedInDir := map[string]int{}
+	for _, skill := range selected {
+		selectedInDir[skill.Dir]++
+	}
+	entries := map[string]bool{}
+	for _, skill := range selected {
+		whole := (allowlisted || selectedInDir[skill.Dir] == inDir[skill.Dir]) && (!rootSkill || skill.Dir != ".")
+		if whole {
+			entries[skill.Dir] = true
+		} else {
+			entries[skill.path()] = true
+		}
+	}
+	dirs := make([]string, 0, len(entries))
+	for dir := range entries {
+		dirs = append(dirs, dir)
+	}
+	sort.Strings(dirs)
+	return dirs
 }
 
 func chooseSourceSkills(found []sourceSkill, csv string, all bool, in io.Reader, out io.Writer, interactive bool) ([]sourceSkill, error) {
@@ -968,15 +1033,40 @@ func chooseSourceSkills(found []sourceSkill, csv string, all bool, in io.Reader,
 	return selected, nil
 }
 
+// uniqueSkills is the selection for --all: every skill whose name is in one
+// folder only. Each name found in several folders is skipped, with one line on
+// stderr naming the folders. It fails, with the first such name, only when
+// nothing is left to add.
 func uniqueSkills(found []sourceSkill) ([]sourceSkill, error) {
-	seen := map[string]string{}
+	dirs := map[string][]string{}
 	for _, skill := range found {
-		if dir, ok := seen[skill.Name]; ok {
-			return nil, fmt.Errorf("skill %q exists in both %s and %s; pick skills with --skills, or add the source by path", skill.Name, dir, skill.Dir)
-		}
-		seen[skill.Name] = skill.Dir
+		dirs[skill.Name] = append(dirs[skill.Name], skill.Dir)
 	}
-	return found, nil
+	var unique []sourceSkill
+	var skipped []string
+	for _, skill := range found {
+		switch len(dirs[skill.Name]) {
+		case 1:
+			unique = append(unique, skill)
+		default:
+			if skill.Dir == dirs[skill.Name][0] {
+				skipped = append(skipped, skill.Name)
+			}
+		}
+	}
+	if len(unique) == 0 && len(skipped) > 0 {
+		return nil, fmt.Errorf("skill %q exists in both %s and %s; pick skills with --skills, or add the source by path", skipped[0], dirs[skipped[0]][0], dirs[skipped[0]][1])
+	}
+	for _, name := range skipped {
+		folders := append([]string(nil), dirs[name]...)
+		for i, dir := range folders {
+			if dir == "." {
+				folders[i] = "the repository root"
+			}
+		}
+		fmt.Fprintf(os.Stderr, "skipped skill %q: it is in %s; --skills cannot choose between them, add the source by path to pick one\n", name, strings.Join(folders, ", "))
+	}
+	return unique, nil
 }
 
 // checkCanonicalSkillTargets refuses to overwrite ~/.agents/skills entries the
@@ -1000,7 +1090,7 @@ func checkCanonicalSkillTargets(selected []sourceSkill, cachePath string, repoRo
 		if _, err := os.Lstat(target); errors.Is(err, fs.ErrNotExist) {
 			continue
 		}
-		same, err := externalSkillTreesEqual(filepath.Join(cachePath, filepath.FromSlash(skill.Dir), skill.Name), target)
+		same, err := externalTreesEqual(filepath.Join(cachePath, filepath.FromSlash(skill.path())), target, true)
 		if err != nil || !same {
 			return fmt.Errorf("%s already exists and differs from this source; move it away or leave %s out with --skills", target, skill.Name)
 		}

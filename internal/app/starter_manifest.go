@@ -324,8 +324,9 @@ func reconcileStarterSetMode(root string, shipped map[string][]byte, legacy map[
 		case removed:
 			changes.Removed = append(changes.Removed, path)
 		case kept:
+			// Reported once, then untracked: no release ships this file any
+			// more, so it is the user's and the next sync leaves it alone.
 			changes.KeptModified = append(changes.KeptModified, path)
-			next[path] = manifest.Files[path]
 		}
 	}
 	// The legacy hashes bridge roots from before the manifest existed; once a
@@ -352,7 +353,11 @@ func reconcileStarterSetMode(root string, shipped map[string][]byte, legacy map[
 		}
 	}
 
-	if dryRun || (!existed && len(next) == 0) {
+	// A root with no manifest and nothing to track gets none, unless this pass
+	// retired or kept a legacy file: the manifest then records that it was
+	// decided, so the next sync does not report it again.
+	decided := len(changes.Removed)+len(changes.KeptModified) > 0
+	if dryRun || (!existed && len(next) == 0 && !decided) {
 		return changes, nil
 	}
 	manifest.Files = next
@@ -391,10 +396,13 @@ func retireStarterFile(root, path, recorded string, legacy []string, streams set
 
 // releaseMemoryFiles hands memory/ over to the user: every file stays as it
 // is, and the manifest stops listing them, so tackroom never updates or
-// removes them again. It reports whether the manifest listed any.
+// removes them again. It reports whether this pass did the handover. A root
+// from before the manifest existed gets an empty one, which records the
+// handover: without it a later sync would retire the scripts by their legacy
+// hashes once the hook is gone.
 func releaseMemoryFiles(root string) (bool, error) {
 	manifest, existed, err := loadStarterManifest(root)
-	if err != nil || !existed || len(manifest.Files) == 0 {
+	if err != nil || (existed && len(manifest.Files) == 0) {
 		return false, err
 	}
 	manifest.Files = map[string]string{}
@@ -405,22 +413,58 @@ func releaseMemoryFiles(root string) (bool, error) {
 // memory/hooks/ in the config root or in ~/.agents, where earlier releases put
 // the memory scripts.
 func memoryHooksInUse(cfg config, root string, home string) bool {
-	dirs := []string{filepath.Join(root, "memory", "hooks"), filepath.Join(home, ".agents", "memory", "hooks")}
 	for _, hook := range cfg.Hooks {
-		for _, field := range strings.Fields(hook.Command) {
-			field = strings.Trim(field, `"'`)
-			for _, prefix := range []string{"$HOME/", "${HOME}/"} {
-				if strings.HasPrefix(field, prefix) {
-					field = "~/" + strings.TrimPrefix(field, prefix)
-				}
-			}
-			path := filepath.Clean(expandPath(field, home))
-			for _, dir := range dirs {
-				if strings.HasPrefix(path, dir+string(filepath.Separator)) {
-					return true
-				}
-			}
+		if memoryScript(hook.Command, root, home) != "" {
+			return true
 		}
 	}
 	return false
+}
+
+// memoryScript returns the script under memory/hooks/ (in the config root or
+// in ~/.agents) that command runs, or "".
+func memoryScript(command string, root string, home string) string {
+	dirs := []string{filepath.Join(root, "memory", "hooks"), filepath.Join(home, ".agents", "memory", "hooks")}
+	for _, field := range strings.Fields(command) {
+		field = strings.Trim(field, `"'`)
+		for _, prefix := range []string{"$HOME/", "${HOME}/"} {
+			if strings.HasPrefix(field, prefix) {
+				field = "~/" + strings.TrimPrefix(field, prefix)
+			}
+		}
+		path := filepath.Clean(expandPath(field, home))
+		if !filepath.IsAbs(path) {
+			// A relative script path is relative to the config root, as
+			// in hookScriptPath.
+			path = filepath.Join(root, path)
+		}
+		for _, dir := range dirs {
+			if strings.HasPrefix(path, dir+string(filepath.Separator)) {
+				return path
+			}
+		}
+	}
+	return ""
+}
+
+// retiredMemoryScripts returns the check sync uses to find hook registrations
+// an older config left behind (memory hooks replaced by others, say): they run
+// a memory script that is already gone or that removed, the starter paths this
+// sync takes away, includes. A script the user modified stays, and so does a
+// registration that runs it.
+func retiredMemoryScripts(root string, home string, removed []string) func(command string) string {
+	gone := make(map[string]bool, len(removed))
+	for _, path := range removed {
+		gone[filepath.Join(root, filepath.FromSlash(path))] = true
+	}
+	return func(command string) string {
+		script := memoryScript(command, root, home)
+		if script == "" {
+			return ""
+		}
+		if _, err := os.Stat(script); gone[script] || errors.Is(err, fs.ErrNotExist) {
+			return script
+		}
+		return ""
+	}
 }

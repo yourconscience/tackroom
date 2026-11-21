@@ -10,27 +10,44 @@ import (
 // ?refresh=1 collects again.
 const cronsCacheTTL = time.Minute
 
+// viewCrons is held only to read or change the stored scan, never during a
+// collect, so an action does not wait for one. gen counts patches and
+// invalidations: a collect that began before one does not store what it read.
 var viewCrons struct {
 	sync.Mutex
 	result cronsScanResult
 	at     time.Time
+	gen    int
 }
+
+// viewCronsCollect lets one collect run at a time.
+var viewCronsCollect sync.Mutex
 
 func (s *configWebServer) handleCrons(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet || !s.authorizeAPI(w, r, false) {
 		return
 	}
+	asked := time.Now()
+	viewCronsCollect.Lock()
+	defer viewCronsCollect.Unlock()
 	viewCrons.Lock()
-	defer viewCrons.Unlock()
-	if viewCrons.at.IsZero() || time.Since(viewCrons.at) > cronsCacheTTL || r.URL.Query().Get("refresh") == "1" {
-		result, err := collectCrons(s.doc.sharedPath, nil)
-		if err != nil {
+	result, gen := viewCrons.result, viewCrons.gen
+	// A refresh that waited for a collect stored after it asked takes that one.
+	collect := viewCrons.at.IsZero() || time.Since(viewCrons.at) > cronsCacheTTL || (r.URL.Query().Get("refresh") == "1" && viewCrons.at.Before(asked))
+	viewCrons.Unlock()
+	if collect {
+		var err error
+		if result, err = collectCrons(s.doc.sharedPath, nil); err != nil {
 			writeAPIError(w, http.StatusInternalServerError, "crons_failed", err.Error())
 			return
 		}
-		viewCrons.result, viewCrons.at = result, time.Now()
+		viewCrons.Lock()
+		if viewCrons.gen == gen {
+			viewCrons.result, viewCrons.at = result, time.Now()
+		}
+		viewCrons.Unlock()
 	}
-	writeJSON(w, http.StatusOK, viewCrons.result)
+	writeJSON(w, http.StatusOK, result)
 }
 
 // patchCronScan puts a fresh record into the cached scan in place of the rows
@@ -54,11 +71,13 @@ func patchCronScan(drop func(cronJob) bool, fresh *cronJob) {
 	}
 	viewCrons.result.Jobs = jobs
 	viewCrons.at = time.Time{}
+	viewCrons.gen++
 }
 
 // invalidateCronScan makes the next GET collect again.
 func invalidateCronScan() {
 	viewCrons.Lock()
 	viewCrons.at = time.Time{}
+	viewCrons.gen++
 	viewCrons.Unlock()
 }

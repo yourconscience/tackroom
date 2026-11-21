@@ -28,6 +28,7 @@ const (
 	agentQwenCode           = "qwen-code"
 	agentCursor             = "cursor"
 	agentDevin              = "devin"
+	agentGemini             = "gemini"
 	agentCopilot            = "copilot"
 	agentGrok               = "grok"
 	agentDSH                = "dsh"
@@ -87,7 +88,6 @@ func runDoctor(opts runOptions) error {
 }
 
 // runDoctorChecks runs every doctor check in the order doctor prints them.
-// Shared by `tackroom doctor` and the terminal view.
 func runDoctorChecks(skipPackageAge bool, repoRoot, home string, cfg config, selected []agentConfig) []checkResult {
 	var results []checkResult
 
@@ -498,14 +498,21 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 			lockedNames[name] = true
 		}
 	}
-	held := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
+	gated := gateExternalSources(cfg.ExternalSkills, home, &lock, gateOptions{now: timeNow()})
 	for _, src := range cfg.ExternalSkills {
 		if !src.Materialize {
 			continue
 		}
 		name := sourceName(src)
-		if _, ok := held[name]; ok {
-			continue // held or blocked: not materialized by design, not a defect
+		if _, ok := gated[name]; ok {
+			// In cooldown or blocked: not materialized by design, not a defect,
+			// and what its pin already owns is not stale.
+			if pin := lockEntryFor(lock, src); pin != nil {
+				for _, owned := range pin.Materialized.Values() {
+					currentNames[owned] = true
+				}
+			}
+			continue
 		}
 		pin := lockEntryFor(lock, src)
 		if pin == nil {
@@ -532,7 +539,7 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 				issues = append(issues, fmt.Sprintf("%s canonical copy missing", skill.Name))
 			} else if err != nil {
 				issues = append(issues, fmt.Sprintf("%s canonical copy unreadable: %v", skill.Name, err))
-			} else if equal, err := externalSkillTreesEqual(skill.Path, canonical); err != nil {
+			} else if equal, err := externalTreesEqual(skill.Path, canonical, true); err != nil {
 				issues = append(issues, fmt.Sprintf("%s drift check failed: %v", skill.Name, err))
 			} else if !equal {
 				issues = append(issues, fmt.Sprintf("%s canonical copy drifted from lock", skill.Name))
@@ -576,19 +583,19 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 	if len(issues) > 0 {
 		sort.Strings(issues)
 		detail := strings.Join(issues, "; ")
-		if note := heldBlockedNote(held); note != "" {
+		if note := gatedNote(gated); note != "" {
 			detail += "; " + note
 		}
 		return checkResult{"materialized external skills", checkStatusFail, detail}
 	}
 	if checked == 0 {
-		if note := heldBlockedNote(held); note != "" {
+		if note := gatedNote(gated); note != "" {
 			return checkResult{"materialized external skills", checkStatusPass, note}
 		}
 		return checkResult{"materialized external skills", checkStatusPass, "none configured"}
 	}
 	detail := fmt.Sprintf("%d canonical copies match lock", checked)
-	if note := heldBlockedNote(held); note != "" {
+	if note := gatedNote(gated); note != "" {
 		detail += "; " + note
 	}
 	return checkResult{"materialized external skills", checkStatusPass, detail}

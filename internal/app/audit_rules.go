@@ -36,7 +36,9 @@ var auditRules = []auditRule{
 	{id: "prompt-injection", severity: sevCritical, re: regexp.MustCompile(`(?i)\b(?:ignore|disregard|forget|override)\b[^.\n]{0,30}\b(?:previous|prior|above|earlier|system)\s+(?:instructions|prompts?|rules|messages|context)\b|\b(?:do not|don't|never)\s+(?:tell|inform|mention|reveal|disclose)(?:\s+\w+){0,3}\s+(?:to\s+)?the\s+user\b|\bwithout\s+(?:telling|informing|notifying)\s+the\s+user\b`)},
 	{id: "exfiltration", severity: sevCritical, re: regexp.MustCompile(`(?i)\b(?:curl|wget)\b[^\n]*\s(?:-d|--data(?:-binary|-raw|-urlencode)?|-F|--form|-T|--upload-file|--post-data|--post-file|--body-data)[= ]\s*["']?@?[^\n]*(?:` + secretRef + `)|\b(?:printenv|env)\b[^\n|]*\|\s*(?:curl|wget|nc|ncat)\b`)},
 	{id: "credential-read", severity: sevCritical, re: regexp.MustCompile(`(?i)\b(?:cat|less|more|head|tail|cp|scp|tar|zip|base64|read_text|readfile\w*)\b[^\n]*(?:(?:~|\$HOME|/Users/\w+|/home/\w+)/\.(?:ssh|aws|gnupg|netrc)\b|(?:^|[\s'"/])\.env(?:\.[a-z0-9]+)?\b)|\bsecurity\s+(?:find-(?:generic|internet)-password|dump-keychain)\b|\bsecret-tool\s+lookup\b`)},
-	{id: "remote-exec", severity: sevCritical, re: regexp.MustCompile(`(?i)\b(?:curl|wget)\b[^|\n]*\|\s*(?:sudo\s+)?(?:ba|z)?sh\b|\bbase64\b\s+(?:-d|-D|--decode)\b[^\n]*\|\s*(?:ba|z)?sh\b|\b(?:ba|z)?sh\s+<\(\s*(?:curl|wget)\b`)},
+	// A download needs an argument: a bare `curl | sh` is how prose names the
+	// pattern. It fetches something only where a .curlrc supplies the URL.
+	{id: "remote-exec", severity: sevCritical, re: regexp.MustCompile(`(?i)\b(?:curl|wget)\b[^|\n]*[^|\s][^|\n]*\|\s*(?:sudo\s+)?(?:ba|z)?sh\b|\bbase64\b\s+(?:-d|-D|--decode)\b[^\n]*\|\s*(?:ba|z)?sh\b|\b(?:ba|z)?sh\s+<\(\s*(?:curl|wget)\b`)},
 	{id: "destructive", severity: sevHigh, re: regexp.MustCompile(`\brm\s+(?:-[a-zA-Z]+\s+)*-[a-zA-Z]*[rR][a-zA-Z]*\s+(?:-[a-zA-Z]+\s+)*(?:/|~|\$HOME|/\*|~/\*)(?:\s|$|["'])|(?:^\s*(?:\$\s+)?|[;&|]\s*)sudo\s+\S`)},
 	{id: "agent-config-write", severity: sevHigh, re: regexp.MustCompile(`(?:>>?|\btee(?:\s+-a)?|\bcp|\bmv|\bsed\s+-i\S*)\s[^\n]*?(?:~|\$HOME)/\.(?:claude|codex|pi|omp|gemini|agents)/(?:[\w.-]+/)*(?:settings\.json|config\.toml|hooks\.json|CLAUDE\.md|AGENTS\.md|SOUL\.md)\b|\bopen\([^)\n]*\.(?:claude|codex|gemini)/[^)\n]*(?:settings\.json|CLAUDE\.md|AGENTS\.md)[^)\n]*["'](?:w|a)\+?["']`)},
 	{id: "hardcoded-secret", severity: sevHigh, mask: true, re: regexp.MustCompile(`\b(?:sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9_-]{24,}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{10,})`), skip: isPlaceholderSecret},
@@ -126,36 +128,98 @@ func newRuleFinding(rule auditRule, file, match string, lowered bool) ruleFindin
 	return f
 }
 
+func isMarkdownFile(file string) bool {
+	ext := strings.ToLower(filepath.Ext(file))
+	return ext == ".md" || ext == ".markdown"
+}
+
+// proseLines marks the lines of a Markdown file outside a code fence, where a
+// match is lowered one by one, when it is framed.
+func proseLines(file string, lines []string) []bool {
+	out := make([]bool, len(lines))
+	if !isMarkdownFile(file) {
+		return out
+	}
+	inFence := false
+	for i, line := range lines {
+		t := strings.TrimSpace(line)
+		if strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~") {
+			inFence = !inFence
+			continue
+		}
+		out[i] = !inFence
+	}
+	return out
+}
+
+// reFraming is a word that turns the clause after it into a warning or an
+// example: "do not run ...", "for example a page that says ...".
+var reFraming = regexp.MustCompile(`(?i)\b(?:never|do not|don['’]t|avoid\w*|instead of|for example|such as|flag\w*|detect\w*|warn\w*)\b`)
+
+// reClauseEnd ends a clause: a comma, semicolon or sentence end before a space.
+var reClauseEnd = regexp.MustCompile(`[,;.!?]\s`)
+
+// framed reports whether the match at line[start:end] only describes the
+// pattern: it sits inside double quotation marks, or a framing word comes
+// before it in the same clause.
+func framed(line string, start, end int) bool {
+	before, after := line[:start], line[end:]
+	if strings.Count(before, `"`)%2 == 1 && strings.Contains(after, `"`) {
+		return true
+	}
+	if strings.LastIndex(before, "“") > strings.LastIndex(before, "”") && strings.Contains(after, "”") {
+		return true
+	}
+	if locs := reClauseEnd.FindAllStringIndex(before, -1); len(locs) > 0 {
+		before = before[locs[len(locs)-1][1]:]
+	}
+	return reFraming.MatchString(before)
+}
+
+// ruleMatch returns the first match of rule on line that is not a placeholder.
+// On a Markdown prose line it prefers a match that is not framed and reports
+// lowered only when every match on the line is framed.
+func ruleMatch(rule auditRule, line string, prose bool) (match string, lowered bool) {
+	if !prose {
+		m := rule.re.FindString(line)
+		if m == "" || (rule.skip != nil && rule.skip(m)) {
+			return "", false
+		}
+		return m, false
+	}
+	for _, loc := range rule.re.FindAllStringIndex(line, -1) {
+		m := line[loc[0]:loc[1]]
+		if rule.skip != nil && rule.skip(m) {
+			continue
+		}
+		if !framed(line, loc[0], loc[1]) {
+			return m, false
+		}
+		if match == "" {
+			match, lowered = m, true
+		}
+	}
+	return match, lowered
+}
+
 // loweredLines marks lines inside a Markdown code fence (for .md files) or a
 // comment or docstring (for scripts). A match there is usually documentation.
 func loweredLines(file string, lines []string) []bool {
 	out := make([]bool, len(lines))
-	ext := strings.ToLower(filepath.Ext(file))
-	if ext == ".md" || ext == ".markdown" {
-		inFence := false
-		for i, line := range lines {
-			t := strings.TrimSpace(line)
-			if strings.HasPrefix(t, "```") || strings.HasPrefix(t, "~~~") {
-				inFence = !inFence
-				out[i] = true
-				continue
-			}
-			out[i] = inFence
+	if isMarkdownFile(file) {
+		for i, prose := range proseLines(file, lines) {
+			out[i] = !prose
 		}
 		return out
 	}
-	inDoc := false
+	ext := strings.ToLower(filepath.Ext(file))
+	if ext == ".py" {
+		return pyLoweredLines(lines)
+	}
 	inBlock := false
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
 		switch {
-		case ext == ".py" && (strings.Count(t, `"""`)+strings.Count(t, `'''`))%2 == 1:
-			out[i] = true
-			inDoc = !inDoc
-		case inDoc:
-			out[i] = true
-		case ext == ".py" && (strings.HasPrefix(t, `"""`) || strings.HasPrefix(t, `'''`)):
-			out[i] = true // one-line docstring
 		case inBlock:
 			out[i] = true
 			if strings.Contains(t, "*/") {
@@ -173,8 +237,166 @@ func loweredLines(file string, lines []string) []bool {
 	return out
 }
 
-// scanText applies every rule line by line. file is the path relative to the
-// item, used for lowering decisions and the evidence hash.
+// pyLoweredLines marks the lines of a Python file that are comments or
+// docstrings. It reads the file as Python does: strings by their own delimiter
+// with escapes, brackets and backslashes joining physical lines into logical
+// ones. A docstring is a logical line that is one string literal and nothing
+// else, and is the first statement of the file or follows a def or class
+// header. Any other string is data the script can run: it is not lowered.
+func pyLoweredLines(lines []string) []bool {
+	out := make([]bool, len(lines))
+	var (
+		delim      string // delimiter of the string a line starts in, "" outside one
+		depth      int    // open brackets
+		joined     bool   // the previous line ended with a backslash outside a string
+		start      = -1   // first physical line of the logical line being read
+		strs       int    // string literals in it
+		code       bool   // anything else in it
+		last       byte   // its last character outside strings and comments
+		prevHeader bool   // the logical line before it was a def or class header
+		first      = true // no logical line has ended yet
+	)
+	for i, line := range lines {
+		if delim == "" {
+			t := strings.TrimSpace(line)
+			if strings.HasPrefix(t, "#") {
+				out[i] = !strings.HasPrefix(t, "#!")
+				continue
+			}
+			if t == "" && start < 0 {
+				continue
+			}
+		}
+		if start < 0 {
+			start, strs, code, last = i, 0, false, 0
+		}
+		joined = false
+		for pos := 0; pos < len(line); {
+			if delim != "" {
+				end := pyStringEnd(line, pos, delim)
+				if end < 0 {
+					if len(delim) == 1 && !pyEndsWithBackslash(line) {
+						delim = "" // an unterminated one-line string ends with its line
+					}
+					pos = len(line)
+					continue
+				}
+				pos, delim = end+len(delim), ""
+				continue
+			}
+			c := line[pos]
+			switch {
+			case c == ' ' || c == '\t' || c == '\r':
+				pos++
+			case c == '#':
+				pos = len(line)
+			case c == '"' || c == '\'':
+				delim = line[pos : pos+1]
+				if strings.HasPrefix(line[pos:], delim+delim+delim) {
+					delim = line[pos : pos+3]
+				}
+				strs++
+				pos += len(delim)
+			case c == '\\' && strings.TrimSpace(line[pos+1:]) == "":
+				joined = true
+				pos = len(line)
+			case c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z':
+				end := pos
+				for end < len(line) && (line[end] == '_' || line[end] >= '0' && line[end] <= '9' || line[end] >= 'a' && line[end] <= 'z' || line[end] >= 'A' && line[end] <= 'Z') {
+					end++
+				}
+				if end < len(line) && (line[end] == '"' || line[end] == '\'') && pyStringPrefix(line[pos:end]) {
+					// An f- or t-string runs the code in its braces, so it is
+					// never a docstring.
+					code = code || strings.ContainsAny(line[pos:end], "fFtT")
+					pos = end // r"...", b'...', f"""...""": part of the string
+					continue
+				}
+				code, last, pos = true, line[end-1], end
+			default:
+				switch c {
+				case '(', '[', '{':
+					depth++
+				case ')', ']', '}':
+					if depth > 0 {
+						depth--
+					}
+				}
+				code, last = true, c
+				pos++
+			}
+		}
+		if delim != "" || depth > 0 || joined {
+			continue // the logical line goes on
+		}
+		sole := strs == 1 && !code
+		if sole && (first || prevHeader) {
+			for k := start; k <= i; k++ {
+				out[k] = true
+			}
+		}
+		head := strings.TrimSpace(lines[start])
+		prevHeader = !sole && last == ':' && (strings.HasPrefix(head, "def ") || strings.HasPrefix(head, "async def ") || strings.HasPrefix(head, "class "))
+		first, start = false, -1
+	}
+	return out
+}
+
+// pyStringEnd returns the index of the first delim in line at or after pos that
+// is not escaped by a backslash, or -1.
+func pyStringEnd(line string, pos int, delim string) int {
+	for j := pos; j < len(line); j++ {
+		if line[j] == '\\' {
+			j++
+			continue
+		}
+		if strings.HasPrefix(line[j:], delim) {
+			return j
+		}
+	}
+	return -1
+}
+
+// pyEndsWithBackslash reports whether the line ends with an unescaped backslash.
+func pyEndsWithBackslash(line string) bool {
+	line = strings.TrimRight(line, "\r")
+	n := 0
+	for n < len(line) && line[len(line)-1-n] == '\\' {
+		n++
+	}
+	return n%2 == 1
+}
+
+// pyStringPrefix reports whether word is a Python string prefix such as r, b, f or rb.
+func pyStringPrefix(word string) bool {
+	switch strings.ToLower(word) {
+	case "r", "u", "b", "f", "t", "br", "rb", "fr", "rf", "tr", "rt":
+		return true
+	}
+	return false
+}
+
+// rePipeEnd matches a line that ends with a pipe, with an optional shell
+// comment after it. Group 1 is the line up to and including the pipe.
+var rePipeEnd = regexp.MustCompile(`^(.*\|)[ \t]*(?:#.*)?$`)
+
+// hiddenLineBreak reports whether line holds a break that splitting on "\n"
+// does not see: a carriage return before its end, which ends a Python line, or
+// U+2028 or U+2029, which end a JavaScript comment. A file with such a break
+// lowers nothing: the code after it may run, and it shifts how later lines are
+// read.
+func hiddenLineBreak(line string) bool {
+	if i := strings.IndexByte(line, '\r'); i >= 0 && i < len(line)-1 {
+		return true
+	}
+	return strings.ContainsRune(line, '\u2028') || strings.ContainsRune(line, '\u2029')
+}
+
+// scanText applies every rule line by line, and in a script once more to each
+// run of lines one command spans. file is the path relative to the item, used
+// for lowering decisions and the evidence hash. A lowered match
+// counts one level lower: a script comment, a Markdown code fence, or a framed
+// match in Markdown prose.
 func scanText(file, text string) []ruleFinding {
 	var out []ruleFinding
 	seen := map[string]int{}
@@ -191,13 +413,71 @@ func scanText(file, text string) []ruleFinding {
 	}
 	lines := strings.Split(text, "\n")
 	lowered := loweredLines(file, lines)
+	prose := proseLines(file, lines)
+	// Nothing in a Markdown file runs, so the two rules below apply to scripts
+	// only. In Markdown a backslash ends a hard line break or a fenced example.
+	script := !isMarkdownFile(file)
+	breaks := false
+	for _, line := range lines {
+		breaks = breaks || script && hiddenLineBreak(line)
+	}
 	for i, line := range lines {
+		// A line after one that ends with an unescaped backslash continues it in
+		// a shell and in most languages, so it is never lowered.
+		joined := script && i > 0 && pyEndsWithBackslash(lines[i-1])
 		for _, rule := range auditRules {
-			m := rule.re.FindString(line)
-			if m == "" || (rule.skip != nil && rule.skip(m)) {
+			m, low := ruleMatch(rule, line, prose[i])
+			if m == "" {
 				continue
 			}
-			add(newRuleFinding(rule, file, m, lowered[i]))
+			add(newRuleFinding(rule, file, m, (lowered[i] || low) && !breaks && !joined))
+		}
+	}
+	// A command can span lines: a line that ends with an unescaped backslash or
+	// with a pipe goes on in the next one. Each such run is read once more as
+	// one line. Only a match that crosses a line break counts here, since the
+	// loop above has seen the rest, and it is never lowered.
+	//
+	// A comment or docstring line joins nothing, unless a backslash ties it to
+	// the line before: it starts no run, and a pipe waits past it.
+	comment := func(i int) bool {
+		return lowered[i] && !breaks && (i == 0 || !pyEndsWithBackslash(lines[i-1]))
+	}
+	for i := 0; script && i < len(lines); i++ {
+		if comment(i) {
+			continue
+		}
+		var text strings.Builder
+		var cuts []int // offsets in text where the next line begins
+		for ; i < len(lines); i++ {
+			line := strings.TrimRight(lines[i], "\r")
+			if pyEndsWithBackslash(line) {
+				text.WriteString(line[:len(line)-1]) // a shell drops the backslash and the break
+				cuts = append(cuts, text.Len())
+				continue
+			}
+			m := rePipeEnd.FindStringSubmatch(line)
+			if m == nil || pyEndsWithBackslash(m[1][:len(m[1])-1]) {
+				text.WriteString(line)
+				break
+			}
+			text.WriteString(m[1] + " ")
+			cuts = append(cuts, text.Len())
+			for i+1 < len(lines) && (strings.TrimSpace(lines[i+1]) == "" || comment(i+1)) {
+				i++
+			}
+		}
+		joined := text.String()
+		for _, rule := range auditRules {
+			for _, loc := range rule.re.FindAllStringIndex(joined, -1) {
+				m := joined[loc[0]:loc[1]]
+				// cuts is sorted: the first cut after the match start decides.
+				k := sort.SearchInts(cuts, loc[0]+1)
+				crosses := k < len(cuts) && cuts[k] < loc[1]
+				if crosses && (rule.skip == nil || !rule.skip(m)) {
+					add(newRuleFinding(rule, file, m, false))
+				}
+			}
 		}
 	}
 	// Unicode rules look at runes, not lines, and are never lowered: a hidden

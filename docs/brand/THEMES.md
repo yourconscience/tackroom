@@ -4,13 +4,13 @@ Graphite is the applied theme: `docs/site/tokens.css` and `tokens-graphite.css` 
 
 ## Diagnosis
 
-1. Brass does three jobs. It is the accent, the pinned state and the rail, so pinned and the accent are one colour (OKLab distance 0.05 in dark) and held orange sits beside both (0.07; 0.09 in light). Spent on the large Copy slab and a rail redrawn on every row of the phone grid, it reads as mustard.
+1. Brass does three jobs. It is the accent, the pinned state and the rail, so pinned and the accent are one colour (OKLab distance 0.05 in dark) and cooldown orange sits beside both (0.07; 0.09 in light). Spent on the large Copy slab and a rail redrawn on every row of the phone grid, it reads as mustard.
 2. No clear ground. In dark the surface (`#131217`) is darker than the page (`#171719`); plates carry a double border; vendor marks sit on white patches; black terminal slabs are a third ground in both modes.
 3. A UI product sold through terminal dumps. The hero's most detailed object is a wrapped `tackroom status` log that overflows on phones, and the dashboard uses yet another palette (white primary, blue focus, dark only).
 
 ## Candidates
 
-Every candidate keeps the `--tr-*` names of `docs/site/tokens.css`; a pick is a file swap (`tokens-<slug>.css`). Status shapes are fixed across themes: pinned is a solid stamp, held and findings are dashed, pass is outlined, blocked is a 2px solid fill, each with its glyph (`✓ ! ✗`) and word. Marks keep one slot shape (32px, 22% radius): marks that bring their own tile are shown full size with no backing, the rest sit on a neutral backing, never recoloured.
+Every candidate keeps the `--tr-*` names of `docs/site/tokens.css`; a pick is a file swap (`tokens-<slug>.css`). Status shapes are fixed across themes: pinned is a solid stamp, cooldown and findings are dashed, pass is outlined, blocked is a 2px solid fill, each with its glyph (`✓ ! ✗`) and word. Marks keep one slot shape (32px, 22% radius): marks that bring their own tile are shown full size with no backing, the rest sit on a neutral backing, never recoloured.
 
 | Theme | Ground (light / dark) | Accent | Type | Pinned |
 |---|---|---|---|---|
@@ -39,7 +39,7 @@ The web view (`tackroom view`) becomes the primary surface; the CLI is the same 
 
 - **Site and README (restyle plus new assets).** Hero: headline, install command, a desktop frame of the view with the phone view overlapping it (real screenshots from the demo home, the slot already marked in `docs/site/index.html`). Order: hero, the lock as UI components, the agents rail (one rail, vertical on phones), first five minutes ending in `tackroom view`, one compact terminal block without box-drawing tables, comparison, name, FAQ. README's first screen swaps its status block for the view screenshot; `docs/brand/BRAND.md` "Do" needs the same edit.
 - **Dashboard restyle.** Map `internal/app/web/style.css` variables (`--ground`, `--surface`, `--primary`, `--focus`, pills) onto `--tr-*`, add the light theme and the prefers-color-scheme guards, raise body text from 13px to 14px and controls from 34px to 44px on touch.
-- **Dashboard new work.** A Lock view (pins, holds with the 72-hour bar, audit results, actions; needs to check that the inventory JSON carries holds and audit state); a phone layout with a bottom tab bar instead of the folded top menu; a compact panel mode for widths of 320 to 420px (container queries, no rail); a web app manifest and icons for install, which only helps once the phone can reach the local server.
+- **Dashboard new work.** A Lock view (pins, cooldowns with the 72-hour bar, audit results, actions; needs to check that the inventory JSON carries cooldowns and audit state); a phone layout with a bottom tab bar instead of the folded top menu; a compact panel mode for widths of 320 to 420px (container queries, no rail); a web app manifest and icons for install, which only helps once the phone can reach the local server.
 - **Philosophy.** `docs/philosophy.md` has a section "The CLI is the product". It needs rewording to say the CLI is the source of truth and the view the primary surface; not edited here.
 
 ## Applying the pick to each surface

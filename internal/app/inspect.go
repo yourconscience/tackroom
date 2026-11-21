@@ -107,7 +107,7 @@ func expectedSkillsForAgent(base map[string]string, repoRoot string, home string
 	}
 	for _, src := range excluded {
 		var names []string
-		if pin := lockEntryFor(lock, src); src.Materialize && pin != nil {
+		if pin := previousLockEntry(lock, src); src.Materialize && pin != nil {
 			names = pin.Materialized.Values()
 		} else if skills, err := discoverExternalSourceSkills(src, home); err == nil {
 			for _, skill := range skills {

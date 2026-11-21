@@ -380,16 +380,13 @@ func buildViewInventory(doc *configDocument) (viewInventory, error) {
 			selected = append(selected, agent)
 		}
 	}
-	// The same gates as status: a held or blocked source is not missing from
+	// The same gates as status: a source in cooldown or blocked is not missing from
 	// the agents, it is waiting in the lock.
 	g, err := applyStatusGates(snapshot.repoRoot, snapshot.home, snapshot.cfg, selected, true)
 	if err != nil {
 		return viewInventory{}, err
 	}
-	cfg, err := configForInspection(g.cfg, g.sources, g.held, g.repoRoot, g.home)
-	if err != nil {
-		return viewInventory{}, err
-	}
+	cfg := g.cfg
 	expected, err := expectedSkills(snapshot.repoRoot, snapshot.home, cfg)
 	if err != nil {
 		return viewInventory{}, err
