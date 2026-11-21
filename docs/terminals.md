@@ -200,6 +200,7 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 - `tackroom doctor` checks Rex (`checkRex`): it runs `rex version`. With Rex absent it reports `skipped`, which counts as a pass. With Rex installed but not runnable it warns. Otherwise it prints the version line.
 - `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a shell pane and a `tackroom status` pane side by side, and a `tackroom cron collect --table` pane across the full width below them, then asks the Rex app to show it. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
   - The panes run the same `tackroom` that opened them, by its absolute path.
+  - The status and crons panes are labelled `status` and `crons`. Each waits after its command: Enter in the pane runs the command again.
   - Showing the session needs the app open with Remote Control turned on in its settings; otherwise `tackroom rex` prints one line saying to open the session from Rex's sidebar.
   - A second run shows the existing `tackroom` session instead of opening another.
   - `--dry-run` prints the `rex` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `rex` is an error.

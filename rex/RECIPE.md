@@ -15,19 +15,19 @@ Rex has no plugin or panel API: its blocks are terminals. So Rex shows your sche
 - `tackroom status`, top right,
 - `tackroom cron collect --table` across the full width below both.
 
-Each pane is kept open after its command ends, so the output stays readable. The panes run the same `tackroom` that opened them, by the absolute path it was started as (not resolved through symlinks, so a Homebrew link stays valid across upgrades), so an older `tackroom` earlier on your PATH cannot answer for it. `--dry-run` prints the `rex` commands without touching Rex.
+The status and crons panes are labelled `status` and `crons`. Each runs its command, then waits: press Enter in the pane to run the command again. The panes run the same `tackroom` that opened them, by the absolute path it was started as (not resolved through symlinks, so a Homebrew link stays valid across upgrades), so an older `tackroom` earlier on your PATH cannot answer for it. `--dry-run` prints the `rex` commands without touching Rex.
 
 It shells out to the `rex` CLI:
 
 ```
 rex ls --json
 rex new tackroom -c <root> --window tackroom --json
-rex split -s <session> -b <shell> --split below -c <root> --keep-open --focus=false --json -- <tackroom> cron collect --table
-rex split -s <session> -b <shell> --split right -c <root> --keep-open --focus=false --json -- <tackroom> status
+rex split -s <session> -b <shell> --split below -c <root> --label crons --keep-open --focus=false --json -- sh -c '<again>' sh <tackroom> cron collect --table
+rex split -s <session> -b <shell> --split right -c <root> --label status --keep-open --focus=false --json -- sh -c '<again>' sh <tackroom> status
 rex do session.select session_id=<session>
 ```
 
-`<tackroom>` is the absolute path of the running `tackroom`. `<session>` and `<shell>` are `.session_id` and `.initial_windows[0].block_ids[0]` from `rex new`. The crons pane splits off first so it spans the full width; the status pane then splits the shell above it. When `rex ls` already lists a session labelled `tackroom`, nothing is created and only the last command runs, with that session's id.
+`<tackroom>` is the absolute path of the running `tackroom`. `<again>` is the loop that runs the command, prints `Enter runs it again` and waits for Enter; `--dry-run` prints it in full. `<session>` and `<shell>` are `.session_id` and `.initial_windows[0].block_ids[0]` from `rex new`. The crons pane splits off first so it spans the full width; the status pane then splits the shell above it. When `rex ls` already lists a session labelled `tackroom`, nothing is created and only the last command runs, with that session's id.
 
 `rex new` does not make the Rex app show the new session; the last command asks it to. That is an action of the app, which it takes only while it is open with Remote Control turned on in its settings. When it refuses, `tackroom rex` prints one line saying to open the `tackroom` session from Rex's sidebar, with Rex's reason, and still exits 0.
 

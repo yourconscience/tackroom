@@ -1415,9 +1415,11 @@ func printCronsTable(result cronsScanResult) {
 // borders, and then columns, until it does (cronJobsLayouts).
 func renderCronsTable(result cronsScanResult, width int, fit bool) string {
 	var b strings.Builder
-	b.WriteString(renderCronAccess(result.Access, width, fit))
+	// Both tables are drawn the same way: bordered only where both fit.
+	jobs, bordered := renderCronJobs(result.Jobs, width, fit)
+	b.WriteString(renderCronAccess(result.Access, width, fit && !bordered))
 	b.WriteString("\n\n")
-	b.WriteString(renderCronJobs(result.Jobs, width, fit))
+	b.WriteString(jobs)
 	b.WriteString("\n")
 
 	var outputs []string
@@ -1486,23 +1488,25 @@ func cronJobsLayouts() []cronJobsLayout {
 	}
 }
 
-func renderCronJobs(jobs []cronJob, width int, fit bool) string {
+// renderCronJobs is the jobs table in the first layout that fits width, or the
+// narrowest one, and whether that layout is the bordered one.
+func renderCronJobs(jobs []cronJob, width int, fit bool) (string, bool) {
 	layouts := cronJobsLayouts()
 	if !fit {
 		layouts = layouts[:1]
 	}
-	out := ""
+	out, bordered := "", false
 	for _, layout := range layouts {
 		t := newReportTable(layout.bordered, layout.columns...)
 		for _, j := range jobs {
 			t.Row(cronJobRow(j, layout)...)
 		}
-		out = t.String()
+		out, bordered = t.String(), layout.bordered
 		if lipgloss.Width(out) <= width {
 			break
 		}
 	}
-	return out
+	return out, bordered
 }
 
 // cronJobRow is the cells of one job in the columns of layout. The bordered
@@ -1548,9 +1552,9 @@ func shortenMiddle(s string, n int) string {
 	return string(r[:head]) + "…" + string(r[len(r)-(n-1-head):])
 }
 
-// renderCronAccess is the table of what each host's scan could read. Bordered
-// where it fits width; otherwise without borders, with the detail cut to the
-// room left, or left out when under 10 columns are left.
+// renderCronAccess is the table of what each host's scan could read. With fit
+// false it is bordered; otherwise it has no borders, and its detail is cut to
+// the room left, or left out when under 10 columns are left.
 func renderCronAccess(access []cronAccess, width int, fit bool) string {
 	render := func(bordered bool, detailLen int) string {
 		headers := []string{"host", "source", "access", "jobs"}
@@ -1567,8 +1571,10 @@ func renderCronAccess(access []cronAccess, width int, fit bool) string {
 		}
 		return t.String()
 	}
-	full := render(true, 90)
-	if !fit || lipgloss.Width(full) <= width {
+	if !fit {
+		return render(true, 90)
+	}
+	if full := render(false, 90); lipgloss.Width(full) <= width {
 		return full
 	}
 	// Without the detail column the table is as wide as it will be; the detail

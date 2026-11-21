@@ -40,7 +40,7 @@ func renderReport(applied bool, repoReport repoLinkReport, reports []agentReport
 		{label: "repo", value: repoLine(repoReport)},
 	}
 	label := "sources"
-	for _, line := range sourceLines(cfg, home) {
+	for _, line := range sourceLines(cfg, home, true) {
 		head = append(head, field{label: label, value: line})
 		label = ""
 	}
@@ -158,7 +158,7 @@ func rootDocLine(r agentReport) string {
 }
 
 // sourceLines describes each external skill source, names aligned.
-func sourceLines(cfg config, home string) []string {
+func sourceLines(cfg config, home string, urls bool) []string {
 	cacheRoot := externalCacheDir(home)
 	nameWidth := 0
 	for _, src := range cfg.ExternalSkills {
@@ -171,7 +171,11 @@ func sourceLines(cfg config, home string) []string {
 		if hasDir(filepath.Join(cacheRoot, name, ".git")) {
 			state = ui.Mark("ok") + " " + externalSkillCommit(filepath.Join(cacheRoot, name))
 		}
-		lines = append(lines, fmt.Sprintf("%-*s  %s  %s", nameWidth, name, state, ui.Dim.Render(src.URL)))
+		line := fmt.Sprintf("%-*s  %s", nameWidth, name, state)
+		if urls {
+			line += "  " + ui.Dim.Render(src.URL)
+		}
+		lines = append(lines, line)
 	}
 	return lines
 }
@@ -660,8 +664,13 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 
 	fmt.Fprintf(&b, "%s  %s\n\n", ui.Bold.Render("tackroom status"), reportState(reportProblems(repoReport, reports)))
 	head := []field{{label: "repo", value: repoLine(repoReport)}}
+	// A source is one line: where its URL would wrap, the URLs are left out.
+	sources := sourceLines(cfg, home, true)
+	if slices.ContainsFunc(sources, func(line string) bool { return len("sources  ")+lipgloss.Width(line) > width }) {
+		sources = sourceLines(cfg, home, false)
+	}
 	label := "sources"
-	for _, line := range sourceLines(cfg, home) {
+	for _, line := range sources {
 		head = append(head, field{label: label, value: line})
 		label = ""
 	}

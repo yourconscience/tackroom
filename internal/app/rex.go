@@ -63,12 +63,30 @@ func runRexCommand(args []string) error {
 		crons = append(crons, "--config", configPath)
 	}
 
+	// A command pane runs its command, waits for Enter and runs it again, so the
+	// pane can be refreshed and Rex has no ended command to mark. The command
+	// gets its words as "$@"; the hint stays on the cursor's line, so it takes
+	// no row from the output.
+	pane := func(command []string) []string {
+		return append([]string{"sh", "-c", `while :; do clear; "$@"; printf "\033[2mEnter runs it again\033[0m"; read -r _ || exit 0; done`, "sh"}, command...)
+	}
+
+	// line is a rex command as a shell would take it; only the pane script
+	// needs quotes, so the placeholders of --dry-run stay bare.
+	line := func(args []string) string {
+		words := append([]string{rex}, args...)
+		for i, w := range words {
+			if strings.ContainsAny(w, " \t'\"$;") {
+				words[i] = shellQuote(w)
+			}
+		}
+		return strings.Join(words, " ")
+	}
 	// run prints a rex command under --dry-run, and otherwise runs it and
 	// returns what it printed.
 	run := func(args ...string) ([]byte, error) {
-		cmd := append([]string{rex}, args...)
 		if *dryRun {
-			fmt.Println(strings.Join(cmd, " "))
+			fmt.Println(line(args))
 			return nil, nil
 		}
 		out, err := exec.Command(rex, args...).Output()
@@ -77,7 +95,7 @@ func runRexCommand(args []string) error {
 			if errors.As(err, &exit) {
 				out = append(out, exit.Stderr...)
 			}
-			return nil, fmt.Errorf("%s: %w\n%s", strings.Join(cmd, " "), err, out)
+			return nil, fmt.Errorf("%s: %w\n%s", line(args), err, out)
 		}
 		return out, nil
 	}
@@ -145,25 +163,16 @@ func runRexCommand(args []string) error {
 		}
 		session, shell = made.SessionID, made.InitialWindows[0].BlockIDs[0]
 	}
-	split := func(placeholder, anchor, direction string, command []string) (string, error) {
-		out, err := run(append([]string{"split", "-s", session, "-b", anchor, "--split", direction, "-c", root, "--keep-open", "--focus=false", "--json", "--"}, command...)...)
-		if err != nil || *dryRun {
-			return placeholder, err
-		}
-		var made struct {
-			BlockIDs []string `json:"block_ids"`
-		}
-		if err := json.Unmarshal(out, &made); err != nil || len(made.BlockIDs) == 0 || made.BlockIDs[0] == "" {
-			return "", fmt.Errorf("rex split: no block id in output: %s", out)
-		}
-		return made.BlockIDs[0], nil
+	split := func(label, direction string, command []string) error {
+		_, err := run(append([]string{"split", "-s", session, "-b", shell, "--split", direction, "-c", root, "--label", label, "--keep-open", "--focus=false", "--json", "--"}, pane(command)...)...)
+		return err
 	}
 	// The crons pane splits off first, so it spans the full width; the status
 	// pane then splits the shell above it.
-	if _, err := split("", shell, "below", crons); err != nil {
+	if err := split("crons", "below", crons); err != nil {
 		return err
 	}
-	if _, err := split("", shell, "right", status); err != nil {
+	if err := split("status", "right", status); err != nil {
 		return err
 	}
 	if hint := show(session); hint != "" {
