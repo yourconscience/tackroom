@@ -49,7 +49,7 @@ const store = {
   cronsError: '',
   cronsLoading: false,
   cronPatches: [],
-  cronBusy: '',
+  cronBusy: {},
   hosts: null,
   hostsLoading: true,
   hostsError: '',
@@ -1074,12 +1074,14 @@ function lastRunText(job) {
   if (!job.last_run) return 'never run';
   return `last run ${ago(job.last_run)}${(job.inferred || []).includes('last_run') ? ' (from the log file)' : ''}`;
 }
-// Run, pause and resume a launchd job.
+// Run, pause and resume a launchd job. While an action on this job runs, its
+// buttons are off and the clicked one says what it does; other jobs stay live.
+const CRON_DOING = {run: 'Starting…', pause: 'Pausing…', resume: 'Resuming…', schedule: 'Saving…'};
 function runButtons(job) {
   if (!(job.source === 'launchd' && job.unit)) return null;
-  const busy = Boolean(store.cronBusy);
+  const busy = store.cronBusy[cronKey(job)];
   const off = ['disabled', 'not_loaded'].includes(job.state);
-  const button = (label, action, primary) => h('button', {type: 'button', class: primary ? 'btn primary' : 'btn', disabled: busy || undefined, onclick: () => cronAction(job, action), text: label});
+  const button = (label, action, primary) => h('button', {type: 'button', class: primary ? 'btn primary' : 'btn', disabled: Boolean(busy) || undefined, onclick: () => cronAction(job, action), text: busy === action ? CRON_DOING[action] : label});
   return off ? [button('Resume', 'resume', true)] : [button('Run now', 'run', true), button('Pause', 'pause')];
 }
 // A failing or attention row: what is wrong, the schedule, and its actions.
@@ -1322,7 +1324,7 @@ function logNode(job) {
 function cronActions(job) {
   const launchd = job.source === 'launchd' && job.unit;
   if (!launchd && !job.editable && !job.edit_note) return h('p', {class: 'note', text: job.source === 'claude-desktop' ? 'Run and pause this task in Claude Desktop.' : 'No actions for this job.'});
-  const busy = Boolean(store.cronBusy);
+  const busy = store.cronBusy[cronKey(job)];
   const input = launchd && job.owned && job.host === 'local' && job.state !== 'disabled'
     ? h('input', {type: 'text', value: store.scheduleDrafts[cronKey(job)] ?? job.declared_schedule ?? '', placeholder: '0 9 * * *', 'aria-label': 'Schedule (cron expression)', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off',
       oninput: (event) => { store.scheduleDrafts[cronKey(job)] = event.target.value; }})
@@ -1331,16 +1333,15 @@ function cronActions(job) {
     h('div', {class: 'acts sheet-acts'},
       runButtons(job),
       job.editable ? [
-        h('button', {type: 'button', class: 'btn', disabled: busy || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('edit', job); }, text: 'Edit'}),
-        h('button', {type: 'button', class: 'btn danger', disabled: busy || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('delete', job); }, text: 'Delete'}),
+        h('button', {type: 'button', class: 'btn', disabled: Boolean(busy) || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('edit', job); }, text: 'Edit'}),
+        h('button', {type: 'button', class: 'btn danger', disabled: Boolean(busy) || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('delete', job); }, text: 'Delete'}),
       ] : null),
     input ? h('form', {class: 'cron-schedule', onsubmit: (event) => { event.preventDefault(); cronAction(job, 'schedule', input.value); }},
-      input, h('button', {type: 'submit', class: 'btn', disabled: busy || undefined, text: 'Save schedule'})) : null,
-    store.cronBusy === cronKey(job) ? h('p', {class: 'note', text: 'Working…'}) : null,
+      input, h('button', {type: 'submit', class: 'btn', disabled: Boolean(busy) || undefined, text: busy === 'schedule' ? CRON_DOING.schedule : 'Save schedule'})) : null,
     !job.editable && job.edit_note ? h('p', {class: 'note'}, h('b', {text: 'No edit or delete. '}), job.edit_note) : null);
 }
 async function cronAction(job, action, schedule) {
-  store.cronBusy = cronKey(job);
+  store.cronBusy[cronKey(job)] = action;
   renderView();
   renderSheet();
   const done = {run: 'Started', pause: 'Paused', resume: 'Resumed', schedule: 'New schedule applied to'}[action];
@@ -1354,7 +1355,7 @@ async function cronAction(job, action, schedule) {
   } catch (error) {
     toast(error.message, true);
   }
-  store.cronBusy = '';
+  delete store.cronBusy[cronKey(job)];
   renderView();
   renderSheet();
   loadCrons(true);
