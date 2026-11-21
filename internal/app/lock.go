@@ -197,6 +197,16 @@ func lockEntryFor(lock lockFile, src externalSkillSource) *externalLockEntry {
 	return nil
 }
 
+// previousLockEntry is the lock entry that last covered src: the pin
+// lockEntryFor accepts, which may still sit under the repo name, else the entry
+// under its name pinned for an older url or branch; nil when there is none.
+func previousLockEntry(lock lockFile, src externalSkillSource) *externalLockEntry {
+	if entry := lockEntryFor(lock, src); entry != nil {
+		return entry
+	}
+	return findLockEntry(lock, sourceName(src))
+}
+
 func findLockEntry(lock lockFile, name string) *externalLockEntry {
 	for i := range lock.ExternalSkills {
 		if lock.ExternalSkills[i].Name == name {

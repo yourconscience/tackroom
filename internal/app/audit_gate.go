@@ -150,25 +150,44 @@ func filterGatedSources(sources []externalSkillSource, gated map[string]gatedIte
 	return out
 }
 
-// keepGatedLockEntries restores the previous lock entry of every gated source
-// and drops the new pin of sources that were never pinned.
-func keepGatedLockEntries(entries []externalLockEntry, prev lockFile, gated map[string]gatedItem) []externalLockEntry {
-	if len(gated) == 0 {
-		return entries
-	}
+// keepGatedLockEntries drops the new entry of every gated source, then keeps
+// the previous entry of each configured source left without one: a gated
+// source keeps its pin (or stays unpinned), and a source the rebuild could not
+// read, such as one whose url changed and whose checkout is gone, keeps its own.
+func keepGatedLockEntries(entries []externalLockEntry, prev lockFile, sources []externalSkillSource, gated map[string]gatedItem) []externalLockEntry {
 	var out []externalLockEntry
+	have := make(map[string]bool, len(entries))
 	for _, e := range entries {
 		if _, ok := gated[e.Name]; !ok {
 			out = append(out, e)
+			have[e.Name] = true
 		}
 	}
-	for name := range gated {
-		if e := findLockEntry(prev, name); e != nil {
+	for _, src := range sources {
+		if have[sourceName(src)] {
+			continue
+		}
+		if e := previousLockEntry(prev, src); e != nil && !have[e.Name] {
 			out = append(out, *e)
+			have[e.Name] = true
 		}
 	}
 	sortLockEntries(out)
 	return out
+}
+
+// keepGatedCopies adds to keep each gated source and the lock entry that
+// covers it, so planMaterializedSkills neither refreshes nor removes its copies.
+func keepGatedCopies(keep map[string]bool, sources []externalSkillSource, prev lockFile, gated map[string]gatedItem) {
+	for _, src := range sources {
+		if _, ok := gated[sourceName(src)]; !ok {
+			continue
+		}
+		keep[sourceName(src)] = true
+		if e := previousLockEntry(prev, src); e != nil {
+			keep[e.Name] = true
+		}
+	}
 }
 
 // restoreGatedCaches puts each gated source's cache back on its previous pin so
@@ -178,7 +197,7 @@ func restoreGatedCaches(sources []externalSkillSource, home string, prev lockFil
 		if _, ok := gated[sourceName(src)]; !ok {
 			continue
 		}
-		if e := findLockEntry(prev, sourceName(src)); e != nil {
+		if e := previousLockEntry(prev, src); e != nil {
 			_ = gitCheckoutCommit(filepath.Join(externalCacheDir(home), sourceName(src)), e.Commit, src.Branch)
 		}
 	}

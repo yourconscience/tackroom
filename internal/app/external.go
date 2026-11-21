@@ -100,16 +100,14 @@ func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot
 			}
 		}
 		restoreGatedCaches(sources, home, original, gated)
-		for name := range gated {
-			unavailable[name] = true
-		}
+		keepGatedCopies(unavailable, sources, original, gated)
 	}
 	active := filterGatedSources(sources, gated)
 	plan, err := planMaterializedSkills(active, home, repoRoot, lock, true, unavailable)
 	if err != nil {
 		return nil, err
 	}
-	if err := writeLockIfChanged(active, home, repoRoot, lock, gated); err != nil {
+	if err := writeLockIfChanged(sources, home, repoRoot, lock, gated); err != nil {
 		return nil, err
 	}
 	if err := applyMaterializedSkills(plan); err != nil {
@@ -213,9 +211,7 @@ func updateExternalRepos(sources []externalSkillSource, home string, repoRoot st
 		fmt.Printf("skipped %s: %s %s; %s\n", name, h.Kind, h.Reason, h.Command)
 	}
 	keep := make(map[string]bool, len(gated))
-	for name := range gated {
-		keep[name] = true
-	}
+	keepGatedCopies(keep, selected, lock, gated)
 	plan, err := planMaterializedSkills(updated, home, repoRoot, lock, false, keep)
 	if err != nil {
 		return err
@@ -381,11 +377,11 @@ func externalSourceNames(sources []externalSkillSource) []string {
 	return names
 }
 
-// writeLockIfChanged records the pins of active sources. A gated source keeps
-// its previous entry (or none), so its candidate commit is never locked.
+// writeLockIfChanged records the pins of the sources not gated. A gated source
+// keeps its previous entry (or none), so its candidate commit is never locked.
 func writeLockIfChanged(sources []externalSkillSource, home string, repoRoot string, lock lockFile, gated map[string]gatedItem) error {
 	previous := lock
-	entries := keepGatedLockEntries(rebuildLockEntries(sources, home, lock), previous, gated)
+	entries := keepGatedLockEntries(rebuildLockEntries(filterGatedSources(sources, gated), home, lock), previous, sources, gated)
 	if lockEntriesEqual(lock.ExternalSkills, entries) && !cooldownsChanged(repoRoot, lock) {
 		return nil
 	}
@@ -416,17 +412,14 @@ func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot s
 			if !pinned {
 				// An unpinned source that was not updated is in cooldown, blocked or
 				// not synced yet: only its own gate may pin it. An entry it has under
-				// an old URL or branch stays, so updating another source never drops
-				// its pin or its materialized skills.
-				if prev := findLockEntry(lock, entry.Name); prev != nil {
-					entries = append(entries, *prev)
-				}
+				// an old URL or branch stays (keepGatedLockEntries), so updating
+				// another source never drops its pin or its materialized skills.
 				continue
 			}
 		}
 		entries = append(entries, entry)
 	}
-	entries = keepGatedLockEntries(entries, lock, gated)
+	entries = keepGatedLockEntries(entries, lock, sources, gated)
 	if lockEntriesEqual(lock.ExternalSkills, entries) && !cooldownsChanged(repoRoot, lock) {
 		return nil
 	}

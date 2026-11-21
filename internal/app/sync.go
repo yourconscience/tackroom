@@ -724,7 +724,7 @@ func configForInspection(cfg config, sources []externalSkillSource, gated map[st
 		if _, ok := gated[sourceName(src)]; !ok {
 			continue
 		}
-		if findLockEntry(lock, sourceName(src)) == nil {
+		if previousLockEntry(lock, src) == nil {
 			continue
 		}
 		if !src.Materialize {
