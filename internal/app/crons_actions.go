@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -177,6 +178,12 @@ func runLaunchdAction(job cronJob, action string) (string, error) {
 		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", job.Host, "sh -s -- "+strings.Join(quoted, " "))
 	}
 	cmd.Stdin = strings.NewReader(launchdActionScript)
+	// The timeout kills the whole process group, so no launchctl started here
+	// changes the job after the call has failed and the next action has begun.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
+	// A child left holding the output pipe does not keep the call past its timeout.
+	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return "", fmt.Errorf("%s %s on %s: %s", action, job.Unit, job.Host, commandFailure(out, err))
