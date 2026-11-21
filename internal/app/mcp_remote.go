@@ -10,7 +10,7 @@ import (
 // remoteMCP says how a target writes a remote (streamable HTTP) MCP server.
 // Targets without one do not get remote servers.
 type remoteMCP struct {
-	urlKey string                 // "url", or "httpUrl" for Gemini CLI
+	urlKey string                 // the key that holds the URL, "url"
 	fields map[string]interface{} // fixed fields, e.g. Claude Code's "type": "http"
 	// envRef renders a ${NAME} reference in a header the way the agent
 	// expands it; nil keeps ${NAME}.
