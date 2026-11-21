@@ -469,10 +469,9 @@ func scanText(file, text string) []ruleFinding {
 		for _, rule := range auditRules {
 			for _, loc := range rule.re.FindAllStringIndex(joined, -1) {
 				m := joined[loc[0]:loc[1]]
-				crosses := false
-				for _, c := range cuts {
-					crosses = crosses || loc[0] < c && c < loc[1]
-				}
+				// cuts is sorted: the first cut after the match start decides.
+				k := sort.SearchInts(cuts, loc[0]+1)
+				crosses := k < len(cuts) && cuts[k] < loc[1]
 				if crosses && (rule.skip == nil || !rule.skip(m)) {
 					add(newRuleFinding(rule, file, m, false))
 				}
