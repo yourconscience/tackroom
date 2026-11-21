@@ -453,9 +453,19 @@ function harnessDetail(agent) {
 function issue(title, on, body, acts = []) {
   const buttons = nodes([acts]);
   return h('article', {class: 'item'},
-    h('h3', {}, title, on ? h('span', {text: ` ${on}`}) : null),
+    h('h3', {}, title, on ? [' ', h('span', {class: 'tag', text: on})] : null),
     body,
     buttons.length ? h('div', {class: 'acts'}, buttons) : null);
+}
+// A group's header: its name and how many cards it holds.
+function groupHead(cls, label, count) { return h('h2', {class: `gh ${cls}`}, label, h('span', {class: 'count', text: String(count)})); }
+// Failing or Needs attention cards, each opening with the group's status icon in a tinted disc.
+function cards([iconId, cls], ...items) {
+  return h('div', {class: 'items'}, nodes(items).map((node) => {
+    node.classList.add('marked');
+    node.prepend(h('span', {class: `marker ${cls}`}, icon(iconId)));
+    return node;
+  }));
 }
 function harnessItem(agent, state) {
   const where = agent.skill_root ? h('p', {class: 'meta', text: tilde(agent.skill_root)}) : null;
@@ -625,10 +635,10 @@ function renderOverview(root) {
   ].filter(Boolean).join(' ');
   mount(root,
     hero(fail.length ? FAIL : warn.length ? WARN : pending.length ? IDLE : OK, title, said),
-    h('div', {class: 'cols'},
+    h('div', {class: fail.length || warn.length ? 'cols split' : 'cols'},
       fail.length || warn.length ? h('section', {},
-        fail.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, fail.map(([, node]) => node))] : null,
-        warn.length ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'), h('div', {class: 'items'}, warn.map(([, node]) => node))] : null) : null,
+        fail.length ? [groupHead('st-fail', 'Failing', fail.length), cards(FAIL, fail.map(([, node]) => node))] : null,
+        warn.length ? [groupHead('st-warn', 'Needs attention', warn.length), cards(WARN, warn.map(([, node]) => node))] : null) : null,
       h('section', {},
         h('h2', {class: 'gh'}, 'Everything else'),
         h('ul', {class: 'rest'}, everythingElse(syncWaiting)))));
@@ -1085,7 +1095,7 @@ function runButtons(job) {
 // A failing or attention row: what is wrong, the schedule, and its actions.
 function jobItem(job) {
   return h('article', {class: 'item'},
-    h('h3', {}, job.short_name, h('span', {text: ` on ${hostName(job.host)}`})),
+    h('h3', {}, job.short_name, ' ', h('span', {class: 'sr', text: 'on '}), h('span', {class: 'tag', text: hostName(job.host)})),
     jobReason(job).map((text) => h('p', {text})),
     h('p', {class: 'meta', text: [jobSchedule(job), lastRunText(job)].filter(Boolean).join(', ')}),
     h('div', {class: 'acts'},
@@ -1145,9 +1155,9 @@ function renderCrons(root) {
     tools,
     h('div', {class: 'cols'},
       fails.length || down.length || warns.length || unreadable.length || stale ? h('section', {},
-        fails.length || down.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, down.map((host) => unreachableItem(host, data)), fails.map(jobItem))] : null,
-        warns.length || unreadable.length || stale ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'),
-          h('div', {class: 'items'}, stale ? staleCronsItem() : null, unreadable.map(unreadableItem), warns.map(jobItem))] : null) : null,
+        fails.length || down.length ? [groupHead('st-fail', 'Failing', down.length + fails.length), cards(FAIL, down.map((host) => unreachableItem(host, data)), fails.map(jobItem))] : null,
+        warns.length || unreadable.length || stale ? [groupHead('st-warn', 'Needs attention', warns.length + unreadable.length + (stale ? 1 : 0)),
+          cards(WARN, stale ? staleCronsItem() : null, unreadable.map(unreadableItem), warns.map(jobItem))] : null) : null,
       folds.length || strip ? h('section', {},
         h('h2', {class: 'gh'}, 'Everything else'),
         h('div', {class: 'hosts'}, folds.map(([host, list]) => hostFold(host, data, list)), strip)) : null),
