@@ -49,7 +49,7 @@ const store = {
   cronsError: '',
   cronsLoading: false,
   cronPatches: [],
-  cronBusy: '',
+  cronBusy: {},
   hosts: null,
   hostsLoading: true,
   hostsError: '',
@@ -453,9 +453,19 @@ function harnessDetail(agent) {
 function issue(title, on, body, acts = []) {
   const buttons = nodes([acts]);
   return h('article', {class: 'item'},
-    h('h3', {}, title, on ? h('span', {text: ` ${on}`}) : null),
+    h('h3', {}, title, on ? [' ', h('span', {class: 'tag', text: on})] : null),
     body,
     buttons.length ? h('div', {class: 'acts'}, buttons) : null);
+}
+// A group's header: its name and how many cards it holds.
+function groupHead(cls, label, count) { return h('h2', {class: `gh ${cls}`}, label, h('span', {class: 'count', text: String(count)})); }
+// Failing or Needs attention cards, each opening with the group's status icon in a tinted disc.
+function cards([iconId, cls], ...items) {
+  return h('div', {class: 'items'}, nodes(items).map((node) => {
+    node.classList.add('marked');
+    node.prepend(h('span', {class: `marker ${cls}`}, icon(iconId)));
+    return node;
+  }));
 }
 function harnessItem(agent, state) {
   const where = agent.skill_root ? h('p', {class: 'meta', text: tilde(agent.skill_root)}) : null;
@@ -565,10 +575,10 @@ function unreachableItem(host, data) {
 function loadErrorItem(title, message, retry, extra = null) {
   return issue(title, '', [h('p', {text: message})], [h('button', {type: 'button', class: 'btn', onclick: retry, text: 'Retry'}), extra]);
 }
-// "12 healthy, 2 paused, 1 not run yet" for the jobs that neither fail nor need attention.
+// "1 last run failed, 12 healthy, 2 paused, 1 not run yet" for every job that is not failing.
 function restCounts(jobs) {
   const count = (health) => jobs.filter((job) => job.health === health).length;
-  return [count('ok') && `${count('ok')} healthy`, count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
+  return [count('warn') && `${count('warn')} last run failed`, count('ok') && `${count('ok')} healthy`, count('paused') && `${count('paused')} paused`, count('idle') && `${count('idle')} not run yet`].filter(Boolean).join(', ');
 }
 const FAIL_KINDS = {job: ['a cron', 'crons'], harness: ['a harness', 'harnesses'], machine: ['a machine', 'machines']};
 
@@ -625,10 +635,10 @@ function renderOverview(root) {
   ].filter(Boolean).join(' ');
   mount(root,
     hero(fail.length ? FAIL : warn.length ? WARN : pending.length ? IDLE : OK, title, said),
-    h('div', {class: 'cols'},
+    h('div', {class: fail.length || warn.length ? 'cols split' : 'cols'},
       fail.length || warn.length ? h('section', {},
-        fail.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, fail.map(([, node]) => node))] : null,
-        warn.length ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'), h('div', {class: 'items'}, warn.map(([, node]) => node))] : null) : null,
+        fail.length ? [groupHead('st-fail', 'Failing', fail.length), cards(FAIL, fail.map(([, node]) => node))] : null,
+        warn.length ? [groupHead('st-warn', 'Needs attention', warn.length), cards(WARN, warn.map(([, node]) => node))] : null) : null,
       h('section', {},
         h('h2', {class: 'gh'}, 'Everything else'),
         h('ul', {class: 'rest'}, everythingElse(syncWaiting)))));
@@ -1074,18 +1084,20 @@ function lastRunText(job) {
   if (!job.last_run) return 'never run';
   return `last run ${ago(job.last_run)}${(job.inferred || []).includes('last_run') ? ' (from the log file)' : ''}`;
 }
-// Run, pause and resume a launchd job.
+// Run, pause and resume a launchd job. While an action on this job runs, its
+// buttons are off and the clicked one says what it does; other jobs stay live.
+const CRON_DOING = {run: 'Starting…', pause: 'Pausing…', resume: 'Resuming…', schedule: 'Saving…'};
 function runButtons(job) {
   if (!(job.source === 'launchd' && job.unit)) return null;
-  const busy = Boolean(store.cronBusy);
+  const busy = store.cronBusy[cronKey(job)];
   const off = ['disabled', 'not_loaded'].includes(job.state);
-  const button = (label, action, primary) => h('button', {type: 'button', class: primary ? 'btn primary' : 'btn', disabled: busy || undefined, onclick: () => cronAction(job, action), text: label});
+  const button = (label, action, primary) => h('button', {type: 'button', class: primary ? 'btn primary' : 'btn', disabled: Boolean(busy) || undefined, onclick: () => cronAction(job, action), text: busy === action ? CRON_DOING[action] : label});
   return off ? [button('Resume', 'resume', true)] : [button('Run now', 'run', true), button('Pause', 'pause')];
 }
 // A failing or attention row: what is wrong, the schedule, and its actions.
 function jobItem(job) {
   return h('article', {class: 'item'},
-    h('h3', {}, job.short_name, h('span', {text: ` on ${hostName(job.host)}`})),
+    h('h3', {}, job.short_name, ' ', h('span', {class: 'sr', text: 'on '}), h('span', {class: 'tag', text: hostName(job.host)})),
     jobReason(job).map((text) => h('p', {text})),
     h('p', {class: 'meta', text: [jobSchedule(job), lastRunText(job)].filter(Boolean).join(', ')}),
     h('div', {class: 'acts'},
@@ -1145,9 +1157,9 @@ function renderCrons(root) {
     tools,
     h('div', {class: 'cols'},
       fails.length || down.length || warns.length || unreadable.length || stale ? h('section', {},
-        fails.length || down.length ? [h('h2', {class: 'gh st-fail'}, 'Failing'), h('div', {class: 'items'}, down.map((host) => unreachableItem(host, data)), fails.map(jobItem))] : null,
-        warns.length || unreadable.length || stale ? [h('h2', {class: 'gh st-warn'}, 'Needs attention'),
-          h('div', {class: 'items'}, stale ? staleCronsItem() : null, unreadable.map(unreadableItem), warns.map(jobItem))] : null) : null,
+        fails.length || down.length ? [groupHead('st-fail', 'Failing', down.length + fails.length), cards(FAIL, down.map((host) => unreachableItem(host, data)), fails.map(jobItem))] : null,
+        warns.length || unreadable.length || stale ? [groupHead('st-warn', 'Needs attention', warns.length + unreadable.length + (stale ? 1 : 0)),
+          cards(WARN, stale ? staleCronsItem() : null, unreadable.map(unreadableItem), warns.map(jobItem))] : null) : null,
       folds.length || strip ? h('section', {},
         h('h2', {class: 'gh'}, 'Everything else'),
         h('div', {class: 'hosts'}, folds.map(([host, list]) => hostFold(host, data, list)), strip)) : null),
@@ -1322,7 +1334,7 @@ function logNode(job) {
 function cronActions(job) {
   const launchd = job.source === 'launchd' && job.unit;
   if (!launchd && !job.editable && !job.edit_note) return h('p', {class: 'note', text: job.source === 'claude-desktop' ? 'Run and pause this task in Claude Desktop.' : 'No actions for this job.'});
-  const busy = Boolean(store.cronBusy);
+  const busy = store.cronBusy[cronKey(job)];
   const input = launchd && job.owned && job.host === 'local' && job.state !== 'disabled'
     ? h('input', {type: 'text', value: store.scheduleDrafts[cronKey(job)] ?? job.declared_schedule ?? '', placeholder: '0 9 * * *', 'aria-label': 'Schedule (cron expression)', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off',
       oninput: (event) => { store.scheduleDrafts[cronKey(job)] = event.target.value; }})
@@ -1331,16 +1343,15 @@ function cronActions(job) {
     h('div', {class: 'acts sheet-acts'},
       runButtons(job),
       job.editable ? [
-        h('button', {type: 'button', class: 'btn', disabled: busy || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('edit', job); }, text: 'Edit'}),
-        h('button', {type: 'button', class: 'btn danger', disabled: busy || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('delete', job); }, text: 'Delete'}),
+        h('button', {type: 'button', class: 'btn', disabled: Boolean(busy) || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('edit', job); }, text: 'Edit'}),
+        h('button', {type: 'button', class: 'btn danger', disabled: Boolean(busy) || undefined, onclick: () => { closeDialog(document.getElementById('sheet'), true); openJobPanel('delete', job); }, text: 'Delete'}),
       ] : null),
     input ? h('form', {class: 'cron-schedule', onsubmit: (event) => { event.preventDefault(); cronAction(job, 'schedule', input.value); }},
-      input, h('button', {type: 'submit', class: 'btn', disabled: busy || undefined, text: 'Save schedule'})) : null,
-    store.cronBusy === cronKey(job) ? h('p', {class: 'note', text: 'Working…'}) : null,
+      input, h('button', {type: 'submit', class: 'btn', disabled: Boolean(busy) || undefined, text: busy === 'schedule' ? CRON_DOING.schedule : 'Save schedule'})) : null,
     !job.editable && job.edit_note ? h('p', {class: 'note'}, h('b', {text: 'No edit or delete. '}), job.edit_note) : null);
 }
 async function cronAction(job, action, schedule) {
-  store.cronBusy = cronKey(job);
+  store.cronBusy[cronKey(job)] = action;
   renderView();
   renderSheet();
   const done = {run: 'Started', pause: 'Paused', resume: 'Resumed', schedule: 'New schedule applied to'}[action];
@@ -1354,7 +1365,7 @@ async function cronAction(job, action, schedule) {
   } catch (error) {
     toast(error.message, true);
   }
-  store.cronBusy = '';
+  delete store.cronBusy[cronKey(job)];
   renderView();
   renderSheet();
   loadCrons(true);

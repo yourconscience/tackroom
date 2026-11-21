@@ -69,6 +69,7 @@ The key is what you write in `tackroom.yaml`, in `--agents`, and in the `agents:
 - `setup` detects every harness above except Amp; add that with `--agents amp`.
 - Pi and OMP are separate harnesses: `pi` is not counted as detected when its `--version` output starts with `omp/`.
 - Claude Code is `claude`. The former key `claude-code` is still accepted and read as `claude`. A tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config ([release notes](upgrading.md#the-claude-key)).
+- Qwen Code is `qwen-code`. `qwen`, the name of its executable, is accepted too and read as `qwen-code`, in the config, in `--agents` and in an `agents:` list ([release notes](upgrading.md#to-301)).
 - Gemini CLI (`gemini`) is no longer supported. A config that still names it loads and syncs: the `gemini` agent entry and every `agents:` list item naming it are ignored, with one warning ([release notes](upgrading.md#to-31)).
 
 ## Where each surface lands

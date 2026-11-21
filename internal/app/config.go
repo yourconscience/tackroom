@@ -593,10 +593,11 @@ func expandPath(path string, home string) string {
 	}
 }
 
-// legacyAgentNames maps former harness names to their current ones, so older
-// configs and CLI arguments keep working.
+// legacyAgentNames maps former and alternate harness names to their current
+// ones, so older configs and CLI arguments keep working.
 var legacyAgentNames = map[string]string{
 	"claude-code": agentClaudeCode,
+	"qwen":        agentQwenCode,
 }
 
 // removedAgentGemini is the key of Gemini CLI, whose support was removed. It
