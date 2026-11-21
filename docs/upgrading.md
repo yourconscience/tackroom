@@ -4,7 +4,7 @@ What changed in each release since 2.0, newest first, with what to do on every m
 
 ## To 3.0.1
 
-Nothing to migrate by hand.
+Nothing to migrate by hand, with two things to know. If you use the Herdr panel, copy the mods from `herdr/tackroom/mods/` again. A sync run with a second config file next to `tackroom.yaml`, such as a web view started with `--config`, now stops with an error unless that file lists the pinned skill sources as `tackroom.yaml` does.
 
 - Changed: the web view has a new look. In a window 1100 px wide or more, the Overview puts what is failing or needs attention in the main column and everything else in a rail on the right. Issues and cron jobs are cards with a status icon, section headings carry a count, and on a desktop with a mouse the buttons are 36 px tall instead of 44. Nothing was renamed or moved to another page, and the buttons do what they did.
 - Fixed: the audit missed a command split over lines in a script. A download whose `| sh` sat on the next line, after a backslash or after a pipe at the end of the line, did not block. A line that ends with a backslash or a pipe is now also read together with the line after it, so `curl ... \` followed by `| sh` is CRITICAL like the one-line form. Markdown is unchanged. Nothing is retroactive: a pin already in the lock keeps syncing ([skills.md](skills.md#the-audit-gate)).
