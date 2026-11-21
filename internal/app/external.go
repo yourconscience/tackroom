@@ -415,7 +415,12 @@ func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot s
 			}
 			if !pinned {
 				// An unpinned source that was not updated is in cooldown, blocked or
-				// not synced yet: only its own gate may pin it.
+				// not synced yet: only its own gate may pin it. An entry it has under
+				// an old URL or branch stays, so updating another source never drops
+				// its pin or its materialized skills.
+				if prev := findLockEntry(lock, entry.Name); prev != nil {
+					entries = append(entries, *prev)
+				}
 				continue
 			}
 		}
