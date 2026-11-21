@@ -439,7 +439,7 @@ func scanText(file, text string) []ruleFinding {
 	// A comment or docstring line joins nothing, unless a backslash ties it to
 	// the line before: it starts no run, and a pipe waits past it.
 	comment := func(i int) bool {
-		return lowered[i] && !breaks && !(i > 0 && pyEndsWithBackslash(lines[i-1]))
+		return lowered[i] && !breaks && (i == 0 || !pyEndsWithBackslash(lines[i-1]))
 	}
 	for i := 0; script && i < len(lines); i++ {
 		if comment(i) {
