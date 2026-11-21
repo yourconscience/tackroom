@@ -308,6 +308,9 @@ function sourceLock(skill) {
   return (store.inv?.lock || []).find((row) => (row.state === 'blocked' || row.state === 'cooldown') && sourceRepo(row) === repo) || null;
 }
 function blockedSource(skill) { const lock = sourceLock(skill); return lock?.state === 'blocked' ? lock : null; }
+// The audit blocks a source with the command that accepts its finding; any other block, such as a skill_dirs
+// folder upstream removed, comes with its own fix.
+function byAudit(row) { return /^tackroom doctor audit accept /.test(row.command || ''); }
 // The states that count against a skill. A skill of a source in cooldown stays with the rest, as on Overview
 // and in the Herdr panel: sync waits for the cooldown on its own, so only a conflict or an unreadable config counts.
 function skillStates(skill) {
@@ -521,11 +524,11 @@ function syncItem(outOfSync) {
     h('p', {class: 'meta', text: 'Sync shows the plan before it changes anything.'}),
   ], [syncButton('Sync')]);
 }
-// A source the audit blocked, with the command that accepts the finding.
+// A blocked source, with the command that accepts the audit finding or fixes the block.
 function blockedItem(row) {
   return issue(row.name, 'blocked', [
     h('p', {text: `${sentence(row.reason || 'blocked by the audit')}${/\.$/.test(row.reason || '') ? '' : '.'}`}),
-    row.command ? [h('p', {class: 'meta', text: 'Read the finding with tackroom doctor audit; to sync it anyway, accept it:'}), command(row.command)] : null,
+    row.command ? [h('p', {class: 'meta', text: byAudit(row) ? 'Read the finding with tackroom doctor audit; to sync it anyway, accept it:' : 'Sync keeps it as it is until you fix it:'}), command(row.command)] : null,
     row.source ? h('p', {class: 'meta', text: [row.source.replace(/^https:\/\//, ''), row.commit && !row.pinned ? `new ${row.commit}` : ''].filter(Boolean).join(', ')}) : null]);
 }
 // A cooldown as "owner/repo@4b4c947 · 37h left of 72h"; tackroom's own reason when there is no end time.
@@ -545,7 +548,7 @@ function sourceWhy(row) {
   const until = Date.parse(row.until);
   return {
     cooldown: until ? 'Sync skips it until then and your agents keep what they have. To take it now:' : `In cooldown: ${row.reason}. To take it anyway:`,
-    blocked: `Sync skips it: ${row.reason}. Read the finding with tackroom doctor audit; to sync it anyway, accept it:`,
+    blocked: `Sync skips it: ${row.reason}. ${byAudit(row) ? 'Read the finding with tackroom doctor audit; to sync it anyway, accept it:' : 'Fix it with:'}`,
   }[row.state] || `${sentence(row.reason || row.state)}. Fix it with:`;
 }
 function cronHosts(data) { return [...new Set([...(data.access || []).map((entry) => entry.host), ...(data.jobs || []).map((job) => job.host)])]; }
@@ -723,7 +726,8 @@ function renderSkills(root) {
       : allOk ? `${skills.length} skills, in place everywhere` : `${plural(skills.length, 'skill')}, none needs attention`;
   const fromBlocked = blocked.map((row) => {
     const from = skills.filter((skill) => blockedSource(skill) === row).map((skill) => skill.name);
-    return from.length ? `${names(from)} come${from.length === 1 ? 's' : ''} from ${sourceRepo(row) || row.name}, which the audit blocked.` : `${sourceRepo(row) || row.name} is blocked by the audit.`;
+    const by = byAudit(row) ? 'the audit' : 'sync';
+    return from.length ? `${names(from)} come${from.length === 1 ? 's' : ''} from ${sourceRepo(row) || row.name}, which ${by} blocked.` : `${sourceRepo(row) || row.name} is blocked by ${by}.`;
   }).join(' ');
   const said = [
     fromBlocked,
@@ -794,9 +798,9 @@ function skillRow(skill) {
       Object.keys(STATE_LABELS).filter((state) => byState[state]).map((state) => [h('dt', {text: STATE_LABELS[state]}), h('dd', {}, chipsFor(state, state === 'conflict' || state === 'error' ? 'st-fail' : 'st-warn'))]),
       h('dt', {text: 'Path'}), h('dd', {class: 'mono', text: tilde(skill.path)}),
       h('dt', {text: 'Origin'}), h('dd', {text: skill.origin === 'local' ? 'yours' : skill.origin}),
-      lock ? [h('dt', {text: 'Source'}), h('dd', {class: lock.state === 'blocked' ? 'st-warn' : '', text: lock.state === 'blocked' ? `blocked by the audit: ${lock.reason || 'see Needs attention'}`
+      lock ? [h('dt', {text: 'Source'}), h('dd', {class: lock.state === 'blocked' ? 'st-warn' : '', text: lock.state === 'blocked' ? `blocked by ${byAudit(lock) ? 'the audit' : 'sync'}: ${lock.reason || 'see Needs attention'}`
         : `in cooldown${Date.parse(lock.until) ? ` until ${weekdayClock(Date.parse(lock.until))}` : ''}; sync takes it when the cooldown ends`})] : null,
-      lock?.command ? [h('dt', {text: lock.state === 'blocked' ? 'Accept' : 'Take it now'}), h('dd', {}, command(lock.command))] : null,
+      lock?.command ? [h('dt', {text: lock.state !== 'blocked' ? 'Take it now' : byAudit(lock) ? 'Accept' : 'Fix'}), h('dd', {}, command(lock.command))] : null,
       h('dt', {text: 'Listing'}), h('dd', {text: `${tokens(skill.tokens)} tokens in each harness (est.)`})));
   const row = h('button', {class: 'srow', type: 'button', 'aria-expanded': String(open), onclick: () => {
     const next = !store.openRows.has(key);
