@@ -386,10 +386,7 @@ func buildViewInventory(doc *configDocument) (viewInventory, error) {
 	if err != nil {
 		return viewInventory{}, err
 	}
-	cfg, err := configForInspection(g.cfg, g.sources, g.gated, g.repoRoot, g.home)
-	if err != nil {
-		return viewInventory{}, err
-	}
+	cfg := g.cfg
 	expected, err := expectedSkills(snapshot.repoRoot, snapshot.home, cfg)
 	if err != nil {
 		return viewInventory{}, err

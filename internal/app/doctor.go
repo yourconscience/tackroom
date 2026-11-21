@@ -505,7 +505,14 @@ func checkMaterializedExternalSkills(repoRoot string, cfg config, home string) c
 		}
 		name := sourceName(src)
 		if _, ok := gated[name]; ok {
-			continue // in cooldown or blocked: not materialized by design, not a defect
+			// In cooldown or blocked: not materialized by design, not a defect,
+			// and what its pin already owns is not stale.
+			if pin := lockEntryFor(lock, src); pin != nil {
+				for _, owned := range pin.Materialized.Values() {
+					currentNames[owned] = true
+				}
+			}
+			continue
 		}
 		pin := lockEntryFor(lock, src)
 		if pin == nil {

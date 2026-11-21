@@ -75,6 +75,7 @@ external_skills:
 - `materialize: true` copies the selected skills into `~/.agents/skills/`, so the content is versioned in your repo and diffable on update.
 - `tackroom.lock` pins the source to an exact commit. Harnesses only ever see the pinned tree.
 - `tackroom skill update [name ...]` is the only command that advances a pin. Updates are deliberate, never implicit.
+- A folder listed in `skill_dirs` that the source does not have, say one upstream deleted, blocks that source only. Sync keeps its pin and its skill copies, prints a warning and syncs everything else; `skill update` keeps the previous pin. `status` lists the source as blocked with the folder and the commit until you remove or rename the folder in `tackroom.yaml`.
 - `tackroom doctor` scans external sources for risky patterns and detects drift between the lock and the materialized copies.
 
 ## The 72 hour cooldown

@@ -233,7 +233,7 @@ tackroom reads one config file, chosen in this order:
 2. `$TACKROOM_HOME/tackroom.yaml`
 3. `~/.agents/tackroom.yaml`
 
-It never looks in the current project. The folder holding the file is the config root. A `tackroom.local.yaml` next to the file overlays entries for one machine. Every command that reads config takes `--config`; `restore` does not.
+It never looks in the current project. The folder holding the file is the config root. A `tackroom.local.yaml` next to the file overlays entries for one machine. Every command that reads config takes `--config`; `restore` does not. Every config file in one folder shares its `tackroom.lock` and `skills/`, so `sync`, `pull`, `skill sources add` and the web view's Sync stop with an error before they touch the lock, `skills/` or a harness when they run with a second file next to `tackroom.yaml` that does not list every source the lock pins with the same url, branch and `materialize`. `pull` runs its `git pull` first, so a commit that adds the sources to that file lets it sync.
 
 The config root cannot be, or sit inside, a linked git worktree. Machine-local state goes under `$XDG_STATE_HOME/tackroom` (default `~/.local/state/tackroom`): backups, the web view token, the record of MCP servers tackroom wrote, and pull status.
 

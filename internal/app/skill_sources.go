@@ -534,6 +534,12 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 	if err != nil {
 		return err
 	}
+	// Before the fetch and the lock write, with or without --no-sync: a second
+	// config that does not list what the shared lock pins would otherwise reuse
+	// a pinned source's checkout and replace its lock entry.
+	if err := checkSharedLock(*configPath, home, cfg); err != nil {
+		return err
+	}
 	if *branch == "" {
 		if *branch, err = gitDefaultBranch(repoURL); err != nil {
 			return err

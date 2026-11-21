@@ -871,7 +871,10 @@ func (s *configWebServer) handleSyncPreview(w http.ResponseWriter, r *http.Reque
 		writeCandidateError(w, err)
 		return
 	}
-	plan, _, revision, err := buildConfigSyncPlan(s.doc)
+	plan, cfg, revision, err := buildConfigSyncPlan(s.doc)
+	if err == nil {
+		err = checkSharedLock(s.doc.sharedPath, s.doc.home, cfg)
+	}
 	if err != nil {
 		writeCandidateError(w, err)
 		return

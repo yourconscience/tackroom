@@ -172,7 +172,7 @@ external_skills:
     materialize: true
 ```
 
-`tackroom.lock` records exact commits and materialized ownership. `sync` repairs drift to the pin; `skill update` explicitly advances it. `doctor` audits external source content and fails on materialization drift.
+`tackroom.lock` records exact commits and materialized ownership. `sync` repairs drift to the pin; `skill update` explicitly advances it. `doctor` audits external source content and fails on materialization drift. A `skill_dirs` folder the source lacks (deleted or renamed upstream) blocks that source only: `sync` and `skill update` keep its pin and copies and sync the rest, and `status` lists it as blocked until the folder is removed or renamed in `tackroom.yaml`.
 
 Add a source without editing YAML: `tackroom skill sources add mattpocock/skills --skills tdd,grill-me` (or `--all`; without either, an attended run lists the skills to pick and an unattended one fails with the list). It pins the newest commit at least 3 days old (`--latest` pins the head, in cooldown like any new pin while it is younger than 72 hours), writes the entry with `materialize: true`, refuses to overwrite a different `~/.agents/skills/<name>` (an identical copy, as `npx skills add` leaves it, is adopted), then syncs. `tackroom skill sources` lists configured sources and the ones installed outside tackroom (Claude Code plugins, `npx skills`); `search` queries skills.sh. A source that Claude Code already has as a plugin gets `exclude_agents: [claude]`, so Claude does not load its skills twice. Two repos with the same basename need a distinct `name:`; `add` picks `<owner>-<repo>` itself.
 
