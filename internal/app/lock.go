@@ -138,9 +138,9 @@ func writeLockFile(repoRoot string, lock lockFile) error {
 
 // checkSharedLock stops a sync with a config file other than tackroom.yaml
 // that sits beside a tackroom.yaml and does not list every source the lock
-// pins as the lock pins it. The lock and the materialized copies belong to the config root, which
-// every config file in it shares, so such a sync would drop the pins and copies
-// tackroom.yaml owns.
+// pins, either as the lock has it or as tackroom.yaml has it. The lock and the
+// materialized copies belong to the config root, which every config file in it
+// shares, so such a sync would drop the pins and copies tackroom.yaml owns.
 func checkSharedLock(configPath string, home string, cfg config) error {
 	path, err := resolveConfigPath(configPath, home)
 	if err != nil {
@@ -161,12 +161,21 @@ func checkSharedLock(configPath string, home string, cfg config) error {
 	if err != nil {
 		return err
 	}
-	// A pin counts as listed only when this config keeps it as it is: the url
-	// and branch lockEntryFor accepts, and materialize when the pin owns copies.
+	// A pin counts as listed when this config keeps it as the lock has it (the
+	// url and branch lockEntryFor accepts, and materialize when the pin owns
+	// copies) or lists it as tackroom.yaml does, such as a source tackroom.yaml
+	// moved to a new url while the lock keeps the old pin. When tackroom.yaml
+	// does not load, only the first counts.
+	own, ownErr := loadConfig(root, home, main)
 	listed := make(map[string]bool, len(cfg.ExternalSkills))
 	for _, src := range cfg.ExternalSkills {
 		if pin := lockEntryFor(lock, src); pin != nil && (src.Materialize || pin.Materialized == "") {
 			listed[pin.Name] = true
+		}
+		for _, mine := range own.ExternalSkills {
+			if ownErr == nil && sourceName(mine) == sourceName(src) && mine.URL == src.URL && mine.Branch == src.Branch && mine.Materialize == src.Materialize {
+				listed[sourceName(src)] = true
+			}
 		}
 	}
 	var dropped []string
@@ -178,7 +187,7 @@ func checkSharedLock(configPath string, home string, cfg config) error {
 	if len(dropped) == 0 {
 		return nil
 	}
-	return fmt.Errorf("%s shares %s with tackroom.yaml and does not list %s with the url, branch and materialize setting the lock has; syncing it would drop or change their pins and skill copies. Sync with tackroom.yaml, list them in %s as tackroom.yaml does, or move %s to a folder of its own",
+	return fmt.Errorf("%s shares %s with tackroom.yaml and does not list %s with the url, branch and materialize setting the lock or tackroom.yaml has; syncing it would drop or change their pins and skill copies. Sync with tackroom.yaml, list them in %s as tackroom.yaml does, or move %s to a folder of its own",
 		name, lockFileName, strings.Join(dropped, ", "), name, name)
 }
 
