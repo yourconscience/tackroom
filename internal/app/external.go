@@ -92,6 +92,13 @@ func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot
 	original := lock
 	if gate != nil {
 		gated = gateExternalSources(sources, home, &lock, *gate)
+		for _, src := range sources {
+			if h, ok := gated[sourceName(src)]; ok && h.Kind == "blocked" {
+				if missing, ok := missingSkillDirBlock(src, home); ok && missing == h {
+					fmt.Fprintf(os.Stderr, "warning: skipped external %s: %s; its pin and skill copies stay as they are\n", sourceName(src), h.Reason)
+				}
+			}
+		}
 		restoreGatedCaches(sources, home, original, gated)
 		for name := range gated {
 			unavailable[name] = true
@@ -299,6 +306,17 @@ func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile,
 	}
 	gated := gateExternalSources(candidates, externalCandidateHome(home), &probe, gate)
 	lock.Cooldowns = probe.Cooldowns
+	// A candidate still on its pin is not gated above, but one that lacks a
+	// configured skill directory keeps its pin all the same.
+	for _, candidate := range staged {
+		name := sourceName(candidate.src)
+		if _, ok := gated[name]; ok {
+			continue
+		}
+		if h, ok := missingSkillDirBlock(candidate.src, externalCandidateHome(home)); ok {
+			gated[name] = h
+		}
+	}
 	for name, h := range gated {
 		if h.Kind == "cooldown" {
 			// sync never moves an existing pin, so only update skips its cooldown.
@@ -316,10 +334,17 @@ func pendingUpdateGates(sources []externalSkillSource, home string, lock lockFil
 	var staged []externalCandidate
 	for _, src := range sources {
 		path := externalCandidatePath(home, sourceName(src))
-		if lockEntryFor(lock, src) == nil || !hasDir(filepath.Join(path, ".git")) {
+		pin := lockEntryFor(lock, src)
+		if pin == nil || !hasDir(filepath.Join(path, ".git")) {
 			continue
 		}
-		staged = append(staged, externalCandidate{src: src, path: path, commit: externalSkillCommitFull(path)})
+		commit := externalSkillCommitFull(path)
+		if commit == pin.Commit {
+			// A candidate on its pin holds what the shared checkout holds, and
+			// the sync gate already reports that.
+			continue
+		}
+		staged = append(staged, externalCandidate{src: src, path: path, commit: commit})
 	}
 	lock.Cooldowns = append([]cooldownEntry(nil), lock.Cooldowns...)
 	out := map[string]gatedItem{}
@@ -525,7 +550,7 @@ func discoverExternalSourceSkills(src externalSkillSource, home string) ([]disco
 			if pluginRelaxed {
 				continue
 			}
-			return nil, fmt.Errorf("skill directory %q not found in cloned external source %s", clean, src.URL)
+			return nil, missingSkillDirError{dir: clean, url: src.URL}
 		}
 		resolvedBase, err := filepath.EvalSymlinks(skillBase)
 		if err != nil {
@@ -558,6 +583,33 @@ func discoverExternalSourceSkills(src externalSkillSource, home string) ([]disco
 		return nil, fmt.Errorf("external source %s: no skills found in configured skill directories", src.URL)
 	}
 	return discoveredSkillValues(discovered), nil
+}
+
+// missingSkillDirError is a configured skill directory that a source's checkout
+// does not have, such as one upstream deleted or renamed.
+type missingSkillDirError struct {
+	dir string
+	url string
+}
+
+func (e missingSkillDirError) Error() string {
+	return fmt.Sprintf("skill directory %q not found in cloned external source %s", e.dir, e.url)
+}
+
+// withoutMissingSkillDirs drops the skill_dirs entries the source's checkout
+// lacks, so a source blocked for one of them keeps the skills of the others.
+func withoutMissingSkillDirs(src externalSkillSource, home string) externalSkillSource {
+	cachePath := filepath.Join(externalCacheDir(home), sourceName(src))
+	var present []string
+	for _, dir := range src.SkillDirs {
+		if hasDir(filepath.Join(cachePath, filepath.FromSlash(dir))) {
+			present = append(present, dir)
+		}
+	}
+	if len(present) > 0 {
+		src.SkillDirs = present
+	}
+	return src
 }
 
 // discoverSkillsAtExternalRoot lists the skills of one skill_dirs entry: the

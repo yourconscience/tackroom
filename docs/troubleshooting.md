@@ -40,7 +40,7 @@ Backups live in `$XDG_STATE_HOME/tackroom/backups/<time>/` (default `~/.local/st
 
 **An item is "in cooldown".** A new or changed external skill pin, or exact npm or PyPI version, waits 72 hours after its publish time. `tackroom status` shows the reason, the cooldown end and the override; `tackroom sync --allow-fresh` (or `--allow-fresh=<item> --reason "..."`) skips the cooldown. See [skills.md](skills.md#the-72-hour-cooldown).
 
-**An item is "blocked".** Sync skips new or changed external content with an unaccepted CRITICAL audit finding and keeps the previous pin. Run `tackroom doctor audit`, then `accept` the finding or fix the source. See [skills.md](skills.md#the-audit-gate).
+**An item is "blocked".** Sync skips new or changed external content with an unaccepted CRITICAL audit finding and keeps the previous pin. Run `tackroom doctor audit`, then `accept` the finding or fix the source. See [skills.md](skills.md#the-audit-gate). A source whose reason is `skill directory "..." not found` lacks a folder listed in its `skill_dirs`; sync keeps it as it is until you remove or rename that folder in `tackroom.yaml` ([skills.md](skills.md#what-add-writes)).
 
 ## Hooks
 

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -71,16 +72,23 @@ func isLocalSourceURL(url string) bool {
 
 // gateExternalSources decides, for every external source whose pin is new or
 // would change, whether sync may use it. A source already pinned in the lock is
-// never gated here. The candidate content is the checkout under home's external
-// cache, so a caller staging a candidate passes the staging home.
+// gated here only when its checkout lacks a configured skill directory. The
+// candidate content is the checkout under home's external cache, so a caller
+// staging a candidate passes the staging home.
 func gateExternalSources(sources []externalSkillSource, home string, lock *lockFile, opts gateOptions) map[string]gatedItem {
 	gated := map[string]gatedItem{}
 	for _, src := range sources {
-		if lockEntryFor(*lock, src) != nil {
-			continue
-		}
 		name := sourceName(src)
 		if !hasDir(filepath.Join(externalCacheDir(home), name, ".git")) {
+			continue
+		}
+		// One source missing a skill directory, say one upstream deleted, stays
+		// where it is instead of failing the run for every other source.
+		if h, ok := missingSkillDirBlock(src, home); ok {
+			gated[name] = h
+			continue
+		}
+		if lockEntryFor(*lock, src) != nil {
 			continue
 		}
 		item := externalSourceItem(src, home)
@@ -109,6 +117,22 @@ func auditBlock(item auditItem, lock lockFile) (gatedItem, bool) {
 		Kind:    "blocked",
 		Reason:  fmt.Sprintf("%s in %s", blockers[0].Rule, blockers[0].File),
 		Command: fmt.Sprintf("tackroom doctor audit accept %s %s --reason \"...\"", item.ID(), blockers[0].Rule),
+	}, true
+}
+
+// missingSkillDirBlock blocks a source whose checkout under home lacks one of
+// its configured skill directories.
+func missingSkillDirBlock(src externalSkillSource, home string) (gatedItem, bool) {
+	var missing missingSkillDirError
+	if _, err := discoverExternalSourceSkills(src, home); !errors.As(err, &missing) {
+		return gatedItem{}, false
+	}
+	name := sourceName(src)
+	return gatedItem{
+		Item:    externalSourceItem(src, home).ID(),
+		Kind:    "blocked",
+		Reason:  fmt.Sprintf("%v at %s", missing, externalSkillCommit(filepath.Join(externalCacheDir(home), name))),
+		Command: fmt.Sprintf("remove or rename %s in skill_dirs of %s in tackroom.yaml", missing.dir, name),
 	}, true
 }
 

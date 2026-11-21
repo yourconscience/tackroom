@@ -723,7 +723,9 @@ func configForInspection(cfg config, sources []externalSkillSource, gated map[st
 		}
 		if !src.Materialize {
 			// A gated source whose restored cache still cannot be read keeps
-			// its skills out of the plan rather than failing the whole run.
+			// its skills out of the plan rather than failing the whole run;
+			// one blocked for a missing skill directory keeps the others.
+			src = withoutMissingSkillDirs(src, home)
 			if _, err := discoverExternalSourceSkills(src, home); err != nil {
 				continue
 			}
