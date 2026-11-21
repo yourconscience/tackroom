@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"charm.land/lipgloss/v2"
@@ -414,6 +415,9 @@ func runHostProbe(host, script string, args ...string) ([]probeSection, error) {
 	cmd.Stdin = strings.NewReader(script)
 	var stderr strings.Builder
 	cmd.Stderr = &stderr
+	// The timeout kills the whole process group, so nothing the probe started runs on.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.Cancel = func() error { return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL) }
 	// A child left holding the output pipes does not keep the probe past its timeout.
 	cmd.WaitDelay = 5 * time.Second
 	out, err := cmd.Output()
