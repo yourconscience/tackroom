@@ -116,7 +116,7 @@ tackroom doctor audit revoke skill:<name> <rule>
 
 New or changed external content with an unaccepted CRITICAL finding is skipped by sync, and the previous pin stays. `skill sources add` applies the same gate: a blocked source is added to `tackroom.yaml` without a pin, and the first sync after `accept` pins it.
 
-The audit is a pattern check per line. In a script, a line that ends with a backslash or a pipe is also read together with the line after it, so a command split that way is checked whole. It catches common and careless cases, but it is not a parser or a sandbox, and a skill written to evade it can hide a command from it.
+The audit is a pattern check per line. In a script, a line that ends with a backslash or a pipe is also read together with the line after it, so a command split that way is checked whole, also when a comment sits between the two halves. It catches common and careless cases, but it is not a parser or a sandbox, and a skill written to evade it can hide a command from it.
 
 CRITICAL means one of these:
 
