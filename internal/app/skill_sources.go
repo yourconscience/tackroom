@@ -534,6 +534,12 @@ func runSkillSourcesAdd(args []string, in io.Reader, out io.Writer, interactive 
 	if err != nil {
 		return err
 	}
+	if !*noSync {
+		// The sync at the end would refuse; refuse before writing anything.
+		if err := checkSharedLock(*configPath, home, cfg); err != nil {
+			return err
+		}
+	}
 	if *branch == "" {
 		if *branch, err = gitDefaultBranch(repoURL); err != nil {
 			return err

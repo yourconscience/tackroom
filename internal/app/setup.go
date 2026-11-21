@@ -449,8 +449,12 @@ func configSkillsDirValue(home string, target string) string {
 }
 
 func runPull(opts runOptions) error {
-	repoRoot, home, _, _, err := loadContext(opts)
+	repoRoot, home, cfg, _, err := loadContext(opts)
 	if err != nil {
+		return err
+	}
+	// Before the git step, so a pull that cannot sync changes nothing.
+	if err := checkSharedLock(opts.ConfigPath, home, cfg); err != nil {
 		return err
 	}
 

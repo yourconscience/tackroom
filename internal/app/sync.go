@@ -216,6 +216,9 @@ func runSync(opts runOptions) error {
 	if err != nil {
 		return err
 	}
+	if err := checkSharedLock(opts.ConfigPath, home, cfg); err != nil {
+		return err
+	}
 
 	repoReport, err := inspectRepoLink(repoRoot, home)
 	if err != nil {
@@ -435,6 +438,9 @@ func runSyncDryRun(opts runOptions) error {
 	}
 	repoRoot, home, cfg, selected, err := loadContext(opts)
 	if err != nil {
+		return err
+	}
+	if err := checkSharedLock(opts.ConfigPath, home, cfg); err != nil {
 		return err
 	}
 
