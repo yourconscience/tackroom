@@ -99,9 +99,9 @@ end
 rex.action({
 	name = "tackroom_workspace",
 	title = "Open tackroom Workspace",
-	description = "Runs tackroom rex: a tackroom session with a shell, tackroom status and tackroom cron collect.",
+	description = "Runs tackroom rex: a tackroom session with tackroom dash, the sync state and the crons, above a shell.",
 	category = "tackroom",
-	keywords = "tackroom workspace session status crons",
+	keywords = "tackroom workspace session dash status crons",
 	run = function(ctx, args)
 		local b = bin()
 		local r, err = rex.exec(command(b, { "rex" }), { env = env(b), timeout = 25 })
@@ -135,7 +135,7 @@ rex.action({
 rex.action({
 	name = "tackroom_crons",
 	title = "Open tackroom Crons",
-	description = "tackroom cron collect --table in a new tab: every scheduled job on every host. Act on one from the web view.",
+	description = "tackroom cron collect --table in a new tab: every scheduled job on every host. Act on one from the workspace's dash or the web view.",
 	category = "tackroom",
 	keywords = "tackroom cron crons jobs launchd collect",
 	run = function(ctx, args)

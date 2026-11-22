@@ -26,25 +26,26 @@ tackroom dash [--config PATH]
 From the top:
 
 - A header with the overall state as `tackroom status` decides it (`synced` or `needs attention`), the number of detected harnesses and of pinned skill sources, and the time of the last refresh, or `refreshing…` while one runs.
-- A crons line with the number of jobs, how many failed their last run, how many have problems, and any host in `crons.hosts` that could not be reached. Then one row per job: host, id, state, last run (`2m ago`, `3h ago`, `8d ago`) and result (`exit N`, red when it failed, or `problem` for a job with problems). Jobs whose last run failed come first, then jobs with problems, then the rest in the order `cron collect` finds them. The list scrolls and says how many more jobs are above or below.
+- A crons line with the number of jobs, how many are failing and how many failed their last run, and any host in `crons.hosts` that could not be reached. These come from the job health the web view uses: a job with problems is failing, a job whose last exit or last status says it failed has a last run that failed, and a paused job is neither, whatever its last exit. Then one row per job: host, id, state, last run (`2m ago`, `3h ago`, `8d ago`) and result (`exit N` or the last status, or `problem` for a job with problems and no failed exit), red for a failing job, yellow for a last run that failed and dim for a paused job. Failing jobs come first, then the ones whose last run failed, then the rest in the order `cron collect` finds them. The list scrolls and says how many more jobs are above or below.
 - Under the list, the selected job's schedule, source and problems.
 - The harnesses: one that drifted or failed comes first, on a line of its own with what is wrong, then every other one with `✓`, and those not detected last. Then how many items are in cooldown or blocked, and the lock check when it did not pass.
-- A line with the result of the last action or the error of the last refresh, and the keys.
+- A message line with a question, the result of the last action or sync, or else the error of a refresh, and the keys.
 
-Rows are cut, never wrapped, and a resized pane is drawn again at once. In a narrow pane the jobs lose the state column, then the last run, and a long id is shortened in the middle. In a short pane the harnesses become one line, such as `12 harnesses: 11 synced, 1 drifted (qwen-code)`, the list scrolls, and then the detail lines go. The header, three job rows and the keys always fit.
+Rows are cut, never wrapped, and a resized pane is drawn again at once. In a narrow pane the jobs lose the state column, then the last run, and a long id is shortened in the middle. From 8 lines up (fewer with three jobs or less) the header, the crons line, three job rows, the message line and the keys always fit; a shorter pane first shows the harnesses as one line, such as `12 harnesses: 11 synced, 1 drifted (qwen-code)`, then scrolls the list, then drops the detail lines. Below 8 lines the harness block and the detail go, the message line takes the place of the keys whenever it has something to say, and the list shrinks down to the selected job; at 3 lines the crons line goes too, at 2 lines the header. From 2 lines up, a question waiting for y or n and the selected job are always on screen.
 
 | Key | Action |
 | --- | --- |
 | `↑` `↓`, `k` `j` | Select a job; `g` and `G`, or Home and End, go to the first and the last |
-| Enter | Run the selected job now |
-| `p` | Pause the selected job, or resume it when it is paused or disabled |
+| Enter | Run the selected job now; for a paused job (disabled or not loaded), only `p` |
+| `p` | Pause the selected job, or resume it when it is disabled or not loaded |
 | `r` | Refresh everything now |
 | `s` | Sync as `tackroom sync` does, then show what changed |
-| `q`, Ctrl-C | Quit |
+| `q` | Quit; while an action or a sync runs, it waits, so a sync is not cut off mid-write |
+| Ctrl-C | Quit at once |
 
-Enter, `p` and `s` ask first in the message line, for example `run ai.knowledge-sync on m1 now? y/n`; any key other than `y` cancels. Run now, Pause and Resume work on launchd jobs, on this machine or on a host in `crons.hosts`, and run the same `launchctl` commands as the web view ([crons.md](crons.md#run-pause-and-resume-jobs)); for any other job the message line says they work on launchd jobs only.
+Enter, `p` and `s` ask first in the message line, for example `run ai.knowledge-sync on m1 now? y/n`; any key other than `y` cancels. At `y` the job must still be in the last scan, or nothing runs and the message line says to press `r`. Run now, Pause and Resume work on launchd jobs, on this machine or on a host in `crons.hosts`, and run the same `launchctl` commands as the web view ([crons.md](crons.md#run-pause-and-resume-jobs)), which offers the same ones: Resume alone for a paused job. For any other job, Enter and `p` say they work on launchd jobs only, without asking. A launchd service, a job that runs on load or stays alive rather than on a schedule, is not paused here: the scan leaves a disabled service out, so nothing would be left to resume.
 
-The dash refreshes while it runs: the sync state every 30 seconds, which reads only this machine, and the crons every 5 minutes, after Run now, Pause or Resume (the job's host), and on `r`. A crons collect probes every host over SSH and can take a while; the screen stays usable meanwhile. A refresh that fails leaves the last data on screen and puts its error in the message line. Warnings and git output from the collectors and sync are kept off the screen; `tackroom status` and `tackroom sync` print them.
+The dash refreshes while it runs: the sync state every 30 seconds, which reads only this machine, and the crons every 5 minutes, after Run now, Pause or Resume (the job's host), and on `r`. A crons collect probes every host over SSH and can take a while; the screen stays usable meanwhile. A refresh that fails leaves the last data on screen, marked: the header says the status is unknown and the harnesses say when they are from, or the crons line says stale. Its error shows in the message line when no question or result is there, and goes when that refresh next succeeds. Warnings and git output from the collectors and sync are kept off the screen; `tackroom status` and `tackroom sync` print them. A sync from the dash never asks anything on the terminal: git runs with `GIT_TERMINAL_PROMPT=0` and, unless you set `GIT_SSH_COMMAND`, `GIT_SSH` or git's `core.sshCommand` yourself, with ssh in batch mode, so a clone that needs a password or an unknown host key fails and the message line shows the error.
 
 It needs a terminal on stdout; otherwise it prints `tackroom dash needs a terminal; use tackroom status and tackroom cron collect --table` and exits 1. It follows `NO_COLOR`.
 
