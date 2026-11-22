@@ -374,6 +374,7 @@ func initHarnesses() {
 				remove:     removeJSONMCPServer,
 				read:       readJSONMCPServer,
 				rootKey:    "mcpServers",
+				defaults:   map[string]interface{}{"disabled": false},
 				remote:     &remoteMCP{urlKey: "url"},
 			}),
 			RootInstructions: &rootInstructionsCapability{

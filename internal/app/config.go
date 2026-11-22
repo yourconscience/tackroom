@@ -265,8 +265,9 @@ func validateConfig(cfg *config, home string, expand bool) error {
 		if err := validateMCPTransport(cfg.MCPServers[i]); err != nil {
 			return err
 		}
-		// Fail before sync writes anything, not halfway through the agents.
-		if server := cfg.MCPServers[i]; server.URL != "" && mcpServerTargetsAgent(*cfg, server, agentCodex) {
+		// Fail before sync writes anything, not halfway through the agents. A
+		// server that is off is written nowhere, so its headers are not checked.
+		if server := cfg.MCPServers[i]; server.Enabled && server.URL != "" && mcpServerTargetsAgent(*cfg, server, agentCodex) {
 			if _, err := splitCodexHeaders(server.Headers); err != nil {
 				return fmt.Errorf("config MCP server %s: %w, or leave codex out of its agents list", server.Name, err)
 			}

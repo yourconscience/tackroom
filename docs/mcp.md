@@ -99,7 +99,7 @@ Before `sync` removes a server it copies that harness config to `backups/<time>/
 
 Where each harness keeps its servers is in [harnesses.md](harnesses.md#where-each-surface-lands). A few harnesses need extra fields, which tackroom adds:
 
-- Claude Code gets `"type": "stdio"` on stdio entries, Factory Droid `"type": "stdio"` and `"disabled": false`, and GitHub Copilot CLI `"type": "local"` and `"tools": ["*"]` when the entry has no `tools`.
+- Claude Code gets `"type": "stdio"` on stdio entries, Factory Droid `"type": "stdio"` and `"disabled": false`, Kiro `"disabled": false`, and GitHub Copilot CLI `"type": "local"` and `"tools": ["*"]` when the entry has no `tools`.
 - OpenCode gets a `mcp` block with `type: local`, a single `command` array, `environment` and `enabled: true`.
 - DeepSeek Harness gets one `tackroom-mcp-<name>` row per server in `~/.dsh/cordis.patch.yml`, for every profile.
 - Codex and Grok Build get `[mcp_servers.<name>]` tables in TOML. Keys tackroom does not manage in a Codex table, such as `startup_timeout_sec`, are kept.

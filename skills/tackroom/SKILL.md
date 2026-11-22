@@ -131,7 +131,7 @@ Missing, drifted, conflicting, stale managed, and unrelated external entries are
 
 Reconciles only configured managed entries. Unrelated native content remains untouched.
 
-For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Qwen Code uses `skills.directories: ["~/.agents/skills"]` and consumes the canonical tree without creating a duplicate mirror. OpenCode, Cursor, Devin, GitHub Copilot CLI, Grok Build and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
+For symlink-based harnesses, skills point to canonical directories under `~/.agents/skills`. Qwen Code uses `skills.directories: ["~/.agents/skills"]` and consumes the canonical tree without creating a duplicate mirror. OpenCode, Cursor, Devin, GitHub Copilot CLI, Grok Build, Kimi Code and DeepSeek Harness read `~/.agents/skills` themselves; tackroom mirrors into their skill roots only when the config root is elsewhere.
 
 Agent roles are canonical Markdown files under `~/.agents/agents/` and render to:
 

@@ -70,7 +70,7 @@ The key is what you write in `tackroom.yaml`, in `--agents`, and in the `agents:
 - Pi and OMP are separate harnesses: `pi` is not counted as detected when its `--version` output starts with `omp/`.
 - Claude Code is `claude`. The former key `claude-code` is still accepted and read as `claude`. A tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config ([release notes](upgrading.md#the-claude-key)).
 - Qwen Code is `qwen-code`. `qwen`, the name of its executable, is accepted too and read as `qwen-code`, in the config, in `--agents` and in an `agents:` list ([release notes](upgrading.md#to-301)).
-- Gemini CLI (`gemini`) is no longer supported. A config that still names it loads and syncs: the `gemini` agent entry and every `agents:` list item naming it are ignored, with one warning ([release notes](upgrading.md#to-31)).
+- Gemini CLI (`gemini`) is no longer supported. A config that still names it loads and syncs: the `gemini` agent entry and every `agents:` list item naming it are ignored, with one warning. If `gemini` was the only enabled agent, nothing is left to sync to and `status` and `sync` stop with `config has no enabled agents`; run `tackroom setup` again to add the harnesses installed on the machine ([release notes](upgrading.md#to-31)).
 
 ## Where each surface lands
 
@@ -176,7 +176,7 @@ That also stops Devin loading Claude Code's hooks, so Devin then runs none of yo
 Kiro means Kiro CLI and the Kiro IDE, which share one configuration in `~/.kiro`. It is detected by `kiro-cli` on `PATH`, so the Kiro IDE without the CLI installed is not detected. The adapter is written from Kiro's documentation and has not been run against a real Kiro install, so whether Kiro follows the links tackroom makes for skills and the root file is not verified.
 
 - **Skills.** Kiro reads global skills from `~/.kiro/skills`, not from `~/.agents/skills`, so tackroom links every skill there.
-- **MCP.** Stdio and remote servers go to `mcpServers` in `~/.kiro/settings/mcp.json`, which Kiro CLI and the Kiro IDE both read. A stdio server gets `command`, `args` and `env`, a remote server `url` and `headers`. Kiro's docs show `${NAME}` in both `env` and headers, so it is written as given. Your own servers and other keys in the file stay as they are.
+- **MCP.** Stdio and remote servers go to `mcpServers` in `~/.kiro/settings/mcp.json`, which Kiro CLI and the Kiro IDE both read. A stdio server gets `command`, `args`, `env` and `"disabled": false`, so one you turned off in Kiro's file is turned on again by the next sync; a remote server gets `url` and `headers`. Kiro's docs show `${NAME}` in both `env` and headers, so it is written as given. Your own servers and other keys in the file stay as they are.
 - **Root file.** `~/.kiro/steering/AGENTS.md`. Kiro loads an `AGENTS.md` in its global steering folder in every workspace and always includes it.
 - **Roles.** Not rendered. Kiro reads custom agents from `~/.kiro/agents/` as Markdown with front matter, but its `tools` field takes category tags such as `read`, `write`, `shell` and `web`, and the docs read for this adapter do not list which built-in tools each tag covers. Where `Grep`, `Glob` or `Edit` would land is a guess, so no role is written.
 - **Hooks.** Not written yet. Kiro CLI V3 loads hook files from `~/.kiro/hooks/`, but how tackroom's events map to Kiro's triggers has not been checked.
