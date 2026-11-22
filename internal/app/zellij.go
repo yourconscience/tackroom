@@ -17,11 +17,10 @@ import (
 const zellijSessionName = "tackroom"
 
 // runZellijCommand opens a tackroom workspace in zellij: a session named
-// "tackroom" in the config root, with a `tackroom status` pane above a shell
-// pane on the left, and a `tackroom cron collect --table` pane at full height
-// on the right. Run inside zellij, it adds the workspace as a tab of the
-// current session. It is the optional zellij integration; an absent zellij is
-// an error, not a silent no-op.
+// "tackroom" in the config root, with a `tackroom dash` pane across the full
+// width on top and the shell below it. Run inside zellij, it adds the
+// workspace as a tab of the current session. It is the optional zellij
+// integration; an absent zellij is an error, not a silent no-op.
 func runZellijCommand(args []string) error {
 	fs := flag.NewFlagSet("zellij", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -49,21 +48,19 @@ func runZellijCommand(args []string) error {
 	}
 	root := filepath.Dir(configPath)
 
-	// The panes run this tackroom, by the path it was started as, so an older
-	// tackroom earlier on the login shell's PATH cannot answer for it. The path
-	// is not resolved through symlinks, so a package manager's link stays
-	// valid across upgrades.
+	// The dash pane runs this tackroom, by the path it was started as, so an
+	// older tackroom earlier on the login shell's PATH cannot answer for it.
+	// The path is not resolved through symlinks, so a package manager's link
+	// stays valid across upgrades.
 	self, err := os.Executable()
 	if err != nil {
 		self = "tackroom"
 	}
-	status := []string{self, "status"}
-	crons := []string{self, "cron", "collect", "--table"}
+	dash := []string{self, "dash"}
 	if *config != "" {
-		status = append(status, "--config", configPath)
-		crons = append(crons, "--config", configPath)
+		dash = append(dash, "--config", configPath)
 	}
-	layout := zellijLayout(root, status, crons)
+	layout := zellijLayout(root, dash)
 
 	if *dryRun {
 		fmt.Print(layout)
@@ -142,24 +139,18 @@ func runZellijCommand(args []string) error {
 	return launch(command[1:]...)
 }
 
-// zellijLayout is the KDL layout of the workspace: on the left the status pane
-// above the shell, which has the focus, and on the right the crons pane.
-func zellijLayout(root string, status, crons []string) string {
-	pane := func(indent, name, size string, command []string) string {
-		args := make([]string, len(command)-1)
-		for i, a := range command[1:] {
-			args[i] = kdlString(a)
-		}
-		return fmt.Sprintf("%spane name=%s%s command=%s { args %s; }\n", indent, kdlString(name), size, kdlString(command[0]), strings.Join(args, " "))
+// zellijLayout is the KDL layout of the workspace: the dash pane across the
+// full width with 70% of the height, above the shell, which has the focus.
+func zellijLayout(root string, dash []string) string {
+	args := make([]string, len(dash)-1)
+	for i, a := range dash[1:] {
+		args[i] = kdlString(a)
 	}
 	return "layout {\n" +
 		"    cwd " + kdlString(root) + "\n" +
-		"    pane split_direction=\"vertical\" {\n" +
-		"        pane split_direction=\"horizontal\" {\n" +
-		pane("            ", "status", " size=\"70%\"", status) +
-		"            pane name=\"shell\" focus=true\n" +
-		"        }\n" +
-		pane("        ", "crons", "", crons) +
+		"    pane split_direction=\"horizontal\" {\n" +
+		fmt.Sprintf("        pane name=\"dash\" size=\"70%%\" command=%s { args %s; }\n", kdlString(dash[0]), strings.Join(args, " ")) +
+		"        pane name=\"shell\" focus=true\n" +
 		"    }\n" +
 		"}\n"
 }
