@@ -31,6 +31,11 @@ tackroom doctor   # check skills, roles, pins, audits and hooks
 tackroom hosts    # every machine in crons.hosts: version, sync state, config commit
 ```
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/overview-dark.svg">
+  <img src="docs/images/overview-light.svg" width="640" alt="tackroom view, Overview, from a demo home and sped up: all six installed harnesses in sync. In a loop, Codex is edited by hand and needs a sync, Sync hangs it back on the rail, and a cooldown runs out so a second outside source is pinned.">
+</picture>
+
 ## What it syncs
 
 - **Skills**: one folder with a `SKILL.md` per skill ([agentskills.io](https://agentskills.io)), made available to every agent.
