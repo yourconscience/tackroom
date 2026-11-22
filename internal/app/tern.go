@@ -45,7 +45,14 @@ func runTernCommand(args []string) error {
 	}
 	root := filepath.Dir(configPath)
 
-	dash := []string{"tackroom", "dash"}
+	// The dash pane runs this tackroom, by the path it was started as, so an
+	// older tackroom earlier on Tern's PATH, which has no dash, cannot answer
+	// for it.
+	self, err := os.Executable()
+	if err != nil {
+		self = "tackroom"
+	}
+	dash := []string{self, "dash"}
 	if *config != "" {
 		dash = append(dash, "--config", configPath)
 	}

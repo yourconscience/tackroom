@@ -17,11 +17,11 @@ It shells out to the `tern` CLI:
 
 ```
 tern new session tackroom --cwd <root> --keep-open --json
-tern split <shell> down --cwd <root> --keep-open --json -- tackroom dash
+tern split <shell> down --cwd <root> --keep-open --json -- <tackroom> dash
 tern focus <shell> --json
 ```
 
-`<shell>` is the block id `tern new session` prints. Tern splits only right and down and has no size option, so the shell is the upper pane here and the two share the height. Tern does not show a new session by itself, so `@focused` would be the pane you are working in; the last command makes the window show the new session.
+`<shell>` is the block id `tern new session` prints, and `<tackroom>` is the absolute path of the running `tackroom`, so an older one earlier on the PATH cannot answer for it. Tern splits only right and down and has no size option, so the shell is the upper pane here and the two share the height. Tern does not show a new session by itself, so `@focused` would be the pane you are working in; the last command makes the window show the new session.
 
 ## Watch out
 

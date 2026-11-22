@@ -817,12 +817,19 @@ func (m dashModel) cronsTitle() string {
 			failed++
 		}
 	}
-	// A host whose probe failed has no jobs listed; say so, or its jobs
-	// would just be missing.
+	// A host whose probe failed has no jobs listed, and a source that could
+	// not be read lists none of its own; say so, or the jobs would just be
+	// missing.
 	var unreached []string
+	unreadable := 0
 	for _, a := range m.crons.Access {
-		if strings.HasPrefix(a.Detail, "probe failed") && !slices.Contains(unreached, a.Host) {
-			unreached = append(unreached, a.Host)
+		switch {
+		case strings.HasPrefix(a.Detail, "probe failed"):
+			if !slices.Contains(unreached, a.Host) {
+				unreached = append(unreached, a.Host)
+			}
+		case a.State == "unreadable":
+			unreadable++
 		}
 	}
 	// A narrow pane gets "1 failed" for "1 last run failed".
@@ -839,6 +846,13 @@ func (m dashModel) cronsTitle() string {
 		}
 		if len(unreached) > 0 {
 			parts = append(parts, ui.Red.Render(strings.Join(unreached, ", ")+" not reached"))
+		}
+		if unreadable > 0 {
+			word := "sources"
+			if unreadable == 1 {
+				word = "source"
+			}
+			parts = append(parts, ui.Red.Render(fmt.Sprintf("%d %s unreadable", unreadable, word)))
 		}
 		return line + strings.Join(parts, " · ")
 	}
