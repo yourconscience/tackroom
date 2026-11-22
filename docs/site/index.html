@@ -458,7 +458,7 @@ in cooldown or blocked (skipped by sync)
     });
     at(8000, function () {
       lv.dataset.cool = "run";
-      for (var h = 1; h <= 31; h++) at(8000 + h * 50, function (h) { return function () { left.textContent = 31 - h + "h"; }; }(h));
+      for (var h = 1; h <= 31; h++) at(h * 50, function (h) { return function () { left.textContent = 31 - h + "h"; }; }(h));
     });
     at(9700, function () { lv.dataset.cool = "done"; plates.forEach(function (plate, i) { swing(plate, 3.5, i * 45); }); });
     at(13200, function () { lv.classList.add("out"); });
