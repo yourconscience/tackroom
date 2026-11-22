@@ -324,6 +324,8 @@ func run(args []string) error {
 		return runMCP(args[1:])
 	case "hook":
 		return runHookCommand(args[1:])
+	case "dash":
+		return runDashCommand(args[1:])
 	case "tern":
 		return runTernCommand(args[1:])
 	case "rex":
@@ -384,7 +386,7 @@ func run(args []string) error {
 	default:
 		printUsage()
 		if args[0] == "tui" {
-			fmt.Fprintln(os.Stderr, "tackroom tui was removed in 3.0. Use tackroom view, or tackroom status in a terminal.")
+			fmt.Fprintln(os.Stderr, "tackroom tui was removed in 3.0. Use tackroom dash in a terminal, or tackroom view.")
 		}
 		return fmt.Errorf("unknown subcommand %q", args[0])
 	}
@@ -655,6 +657,7 @@ func printUsage() {
 	fmt.Println("  config   Validate or print the canonical YAML")
 	fmt.Println("  restore  List backups or put backed-up native files back")
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
+	fmt.Println("  dash     Live screen for a terminal pane: sync state and crons, with actions")
 	fmt.Println("  hosts    Show tackroom on every machine in crons.hosts; fix one or set one up")
 	fmt.Println()
 	fmt.Println("Command groups:")
@@ -691,6 +694,7 @@ var canonicalForms = []string{
 	"  tackroom restore [<backup> | latest] [--dry-run]",
 	"  tackroom hook list [--agents ...] [query]",
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
+	"  tackroom dash [--config PATH]                     # live screen for a terminal pane: sync state, crons; run, pause, resume, sync",
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
 	"  tackroom rex [--config PATH] [--dry-run]          # open a tackroom workspace in the Rex terminal",
 	"  tackroom tmux [--config PATH] [--dry-run]         # open a tackroom workspace in tmux",

@@ -14,10 +14,10 @@ import (
 
 // runTernCommand opens a tackroom workspace in the Tern terminal: a session
 // named "tackroom" in the config root, with a shell pane above a `tackroom
-// status` pane on the left, and a `tackroom cron collect --table` pane at full
-// height on the right, and shows that session in the window. Tern splits only
-// right and down, so here the shell is the upper pane. It is the optional Tern
-// terminal integration; an absent Tern is an error, not a silent no-op.
+// dash` pane, and shows that session in the window. Tern splits only right and
+// down, with no size option, so here the shell is the upper pane and the two
+// share the height. It is the optional Tern terminal integration; an absent
+// Tern is an error, not a silent no-op.
 func runTernCommand(args []string) error {
 	fs := flag.NewFlagSet("tern", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -45,11 +45,16 @@ func runTernCommand(args []string) error {
 	}
 	root := filepath.Dir(configPath)
 
-	status := []string{"tackroom", "status"}
-	crons := []string{"tackroom", "cron", "collect", "--table"}
+	// The dash pane runs this tackroom, by the path it was started as, so an
+	// older tackroom earlier on Tern's PATH, which has no dash, cannot answer
+	// for it.
+	self, err := os.Executable()
+	if err != nil {
+		self = "tackroom"
+	}
+	dash := []string{self, "dash"}
 	if *config != "" {
-		status = append(status, "--config", configPath)
-		crons = append(crons, "--config", configPath)
+		dash = append(dash, "--config", configPath)
 	}
 
 	// Blocks are addressed by the ids tern prints, never by @focused: a new
@@ -83,12 +88,8 @@ func runTernCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	// The crons pane takes the right half at full height, because its tables
-	// are the longest output; the status pane then splits the left half.
-	if _, err := step("", append(append([]string{"split", shell, "right"}, launch...), append([]string{"--"}, crons...)...)...); err != nil {
-		return err
-	}
-	if _, err := step("", append(append([]string{"split", shell, "down"}, launch...), append([]string{"--"}, status...)...)...); err != nil {
+	// The dash goes below the shell: Tern splits only right and down.
+	if _, err := step("", append(append([]string{"split", shell, "down"}, launch...), append([]string{"--"}, dash...)...)...); err != nil {
 		return err
 	}
 	// The window shows the new session only once one of its blocks is focused.

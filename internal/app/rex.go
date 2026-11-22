@@ -16,11 +16,10 @@ import (
 const rexSessionLabel = "tackroom"
 
 // runRexCommand opens a tackroom workspace in the Rex terminal: a session
-// labelled "tackroom" in the config root, with a `tackroom status` pane above
-// a shell pane on the left, and a `tackroom cron collect --table` pane at full
-// height on the right, then asks the Rex app to show that session. It is the
-// optional Rex terminal integration; an absent Rex is an error, not a silent
-// no-op.
+// labelled "tackroom" in the config root, with a `tackroom dash` pane across
+// the full width on top and the shell below it, then asks the Rex app to show
+// that session. It is the optional Rex terminal integration; an absent Rex is
+// an error, not a silent no-op.
 func runRexCommand(args []string) error {
 	fs := flag.NewFlagSet("rex", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -48,35 +47,26 @@ func runRexCommand(args []string) error {
 	}
 	root := filepath.Dir(configPath)
 
-	// The panes run this tackroom, by the path it was started as, so an older
-	// tackroom earlier on the login shell's PATH cannot answer for it. The path
-	// is not resolved through symlinks, so a package manager's link stays
-	// valid across upgrades.
+	// The dash pane runs this tackroom, by the path it was started as, so an
+	// older tackroom earlier on the login shell's PATH cannot answer for it.
+	// The path is not resolved through symlinks, so a package manager's link
+	// stays valid across upgrades.
 	self, err := os.Executable()
 	if err != nil {
 		self = "tackroom"
 	}
-	status := []string{self, "status"}
-	crons := []string{self, "cron", "collect", "--table"}
+	dash := []string{self, "dash"}
 	if *config != "" {
-		status = append(status, "--config", configPath)
-		crons = append(crons, "--config", configPath)
+		dash = append(dash, "--config", configPath)
 	}
 
-	// A command pane runs its command, waits for Enter and runs it again, so the
-	// pane can be refreshed and Rex has no ended command to mark. The command
-	// gets its words as "$@"; the hint stays on the cursor's line, so it takes
-	// no row from the output.
-	pane := func(command []string) []string {
-		return append([]string{"sh", "-c", `while :; do clear; "$@"; printf "\033[2mEnter runs it again\033[0m"; read -r _ || exit 0; done`, "sh"}, command...)
-	}
-
-	// line is a rex command as a shell would take it; only the pane script
-	// needs quotes, so the placeholders of --dry-run stay bare.
+	// line is a rex command as a shell would take it: a word with anything a
+	// shell reads is quoted. The placeholders of --dry-run (<session>,
+	// session_id=<session>) stay bare, so < > and = do not count.
 	line := func(args []string) string {
 		words := append([]string{rex}, args...)
 		for i, w := range words {
-			if strings.ContainsAny(w, " \t'\"$;") {
+			if w == "" || strings.Trim(w, plainShellWord+"<>=") != "" {
 				words[i] = shellQuote(w)
 			}
 		}
@@ -163,22 +153,11 @@ func runRexCommand(args []string) error {
 		}
 		session, shell = made.SessionID, made.InitialWindows[0].BlockIDs[0]
 	}
-	split := func(label, direction, ratio string, command []string) error {
-		args := []string{"split", "-s", session, "-b", shell, "--split", direction}
-		if ratio != "" {
-			args = append(args, "--ratio", ratio)
-		}
-		args = append(args, "-c", root, "--label", label, "--keep-open", "--focus=false", "--json", "--")
-		_, err := run(append(args, pane(command)...)...)
-		return err
-	}
-	// The crons pane takes the right half at full height, because its tables
-	// are the longest output; the status pane then takes most of the left
-	// half, above the shell.
-	if err := split("crons", "right", "", crons); err != nil {
-		return err
-	}
-	if err := split("status", "above", "70", status); err != nil {
+	// The dash takes the full width above the shell, with 70% of the height;
+	// the shell keeps the focus. --keep-open leaves an ended dash, or its
+	// crash, on screen.
+	split := []string{"split", "-s", session, "-b", shell, "--split", "above", "--ratio", "70", "-c", root, "--label", "dash", "--keep-open", "--focus=false", "--json", "--"}
+	if _, err := run(append(split, dash...)...); err != nil {
 		return err
 	}
 	if hint := show(session); hint != "" {

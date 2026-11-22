@@ -678,14 +678,7 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 	writeFields(&b, 0, labelWidth, head, width)
 	flush()
 
-	lockCfg := cfg
-	if cfg.configuredSources != nil {
-		lockCfg.ExternalSkills = cfg.configuredSources
-	}
-	lockCheck := checkExternalSkillLock(repoRoot, lockCfg, home)
-	// The items and their commands are listed below, so the pointer back to
-	// this command and the advice that follows it are dropped here.
-	lockCheck.detail, _, _ = strings.Cut(lockCheck.detail, "; see tackroom status")
+	lockCheck := statusLockCheck(repoRoot, cfg, home)
 	writeFields(&b, 0, labelWidth, []field{{label: "lock", value: ui.Mark(checkMarkKind(lockCheck.status)) + " " + ui.Dim.Render(lockCheck.detail)}}, width)
 	if len(reports) > 0 {
 		b.WriteString("\n" + harnessTable(reports, width) + "\n")
@@ -721,6 +714,19 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 		fmt.Fprintln(&b)
 		b.WriteString(todo.String())
 	}
+}
+
+// statusLockCheck is the lock check status and the dash show: it counts every
+// configured source, the ones in cooldown or blocked included. The items and
+// their commands are listed with it, so the pointer back to `tackroom status`
+// and the advice that follows it are dropped.
+func statusLockCheck(repoRoot string, cfg config, home string) checkResult {
+	if cfg.configuredSources != nil {
+		cfg.ExternalSkills = cfg.configuredSources
+	}
+	check := checkExternalSkillLock(repoRoot, cfg, home)
+	check.detail, _, _ = strings.Cut(check.detail, "; see tackroom status")
+	return check
 }
 
 // hasStatusNews is whether a harness has a block in the compact status: it

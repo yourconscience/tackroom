@@ -3,13 +3,14 @@
 -- Put this file beside Rex's init.lua and add `require("tackroom")` to
 -- init.lua; see RECIPE.md. tackroom never edits Rex config.
 --
---   tackroom_workspace  runs `tackroom rex`: a tackroom session with a shell,
---                       `tackroom status` and `tackroom cron collect --table`
+--   tackroom_workspace  runs `tackroom rex`: a tackroom session with
+--                       `tackroom dash` above a shell
 --   tackroom_crons      opens `tackroom cron collect --table` in a new tab
 --   tackroom_view       opens `tackroom view` on its Crons tab, starting it
 --                       when none runs; Run now, Pause and Resume are there
 --
--- Rex has no panel API, so acting on a job goes through the web view.
+-- Rex has no panel API, so acting on a job goes through the workspace's
+-- `tackroom dash` or the web view.
 --
 -- Optional settings, after the require:
 --
@@ -98,9 +99,9 @@ end
 rex.action({
 	name = "tackroom_workspace",
 	title = "Open tackroom Workspace",
-	description = "Runs tackroom rex: a tackroom session with a shell, tackroom status and tackroom cron collect.",
+	description = "Runs tackroom rex: a tackroom session with tackroom dash, the sync state and the crons, above a shell.",
 	category = "tackroom",
-	keywords = "tackroom workspace session status crons",
+	keywords = "tackroom workspace session dash status crons",
 	run = function(ctx, args)
 		local b = bin()
 		local r, err = rex.exec(command(b, { "rex" }), { env = env(b), timeout = 25 })
@@ -134,7 +135,7 @@ rex.action({
 rex.action({
 	name = "tackroom_crons",
 	title = "Open tackroom Crons",
-	description = "tackroom cron collect --table in a new tab: every scheduled job on every host. Act on one from the web view.",
+	description = "tackroom cron collect --table in a new tab: every scheduled job on every host. Act on one from the workspace's dash or the web view.",
 	category = "tackroom",
 	keywords = "tackroom cron crons jobs launchd collect",
 	run = function(ctx, args)
