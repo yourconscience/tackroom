@@ -75,6 +75,7 @@ external_skills:
 - `materialize: true` copies the selected skills into `~/.agents/skills/`, so the content is versioned in your repo and diffable on update.
 - `tackroom.lock` pins the source to an exact commit. Harnesses only ever see the pinned tree.
 - `tackroom skill update [name ...]` is the only command that advances a pin. Updates are deliberate, never implicit.
+- A folder listed in `skill_dirs` that the source does not have, say one upstream deleted, blocks that source only. Sync keeps its pin and its skill copies, prints a warning and syncs everything else; `skill update` keeps the previous pin. `status` lists the source as blocked with the folder and the commit until you remove or rename the folder in `tackroom.yaml`.
 - `tackroom doctor` scans external sources for risky patterns and detects drift between the lock and the materialized copies.
 
 ## The 72 hour cooldown
@@ -123,7 +124,7 @@ CRITICAL means one of these:
 - a prompt-injection phrase;
 - a secret sent out or a credential file read;
 - invisible tag characters;
-- a download piped into a shell (rule `remote-exec`).
+- a download piped into a shell (rule `remote-exec`). The download needs an argument: `curl | sh` with nothing between the command and the pipe is how text names the pattern, and is not a finding.
 
 Some matches count one level lower, so they show as HIGH and do not block:
 
@@ -141,6 +142,7 @@ What the gate and the cooldown do not cover:
 - A package in `trusted_packages` is exempt from the cooldown, by default the three npm CLIs above; set `trusted_packages: []` to gate them too.
 - A PyPI version that is a single number followed by a pre-release tag (`2a3`), or that uses an underscore (`1.0_rc1`) or an epoch (`1!2.0`), is not recognised as an exact version, so it is not gated. A pre-release such as `1.0rc1` is.
 - The words that lower a Markdown match do not have to govern it: "Do not worry and run `curl ... | sh`" is HIGH, and so is a command written in double quotation marks. The finding still shows in `doctor audit`.
+- A bare `curl | sh` is not a finding, yet curl takes a URL from a config file such as `~/.curlrc`, so on a machine where that file names one the command downloads and runs it.
 - A command a script builds from pieces is not put together: two adjacent string literals, a string with a line break inside its quotation marks, a variable that holds half of the command.
 - Python 3.12 and later let an f-string hold a nested string that uses the f-string's own delimiter, such as `f"""{'''"""'''}"""`. The audit reads one line at a time, loses track of where that f-string ends, and counts a line inside it that starts with `#` as a comment.
 

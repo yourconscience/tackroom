@@ -17,11 +17,11 @@ import (
 const zellijSessionName = "tackroom"
 
 // runZellijCommand opens a tackroom workspace in zellij: a session named
-// "tackroom" in the config root, with a shell pane, a `tackroom status` pane
-// on the right, and a `tackroom cron collect --table` pane below it. Run
-// inside zellij, it adds the workspace as a tab of the current session. It is
-// the optional zellij integration; an absent zellij is an error, not a silent
-// no-op.
+// "tackroom" in the config root, with a `tackroom status` pane above a shell
+// pane on the left, and a `tackroom cron collect --table` pane at full height
+// on the right. Run inside zellij, it adds the workspace as a tab of the
+// current session. It is the optional zellij integration; an absent zellij is
+// an error, not a silent no-op.
 func runZellijCommand(args []string) error {
 	fs := flag.NewFlagSet("zellij", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -142,24 +142,24 @@ func runZellijCommand(args []string) error {
 	return launch(command[1:]...)
 }
 
-// zellijLayout is the KDL layout of the workspace: a shell on the left, and on
-// the right the status pane above the crons pane.
+// zellijLayout is the KDL layout of the workspace: on the left the status pane
+// above the shell, which has the focus, and on the right the crons pane.
 func zellijLayout(root string, status, crons []string) string {
-	pane := func(name string, command []string) string {
+	pane := func(indent, name, size string, command []string) string {
 		args := make([]string, len(command)-1)
 		for i, a := range command[1:] {
 			args[i] = kdlString(a)
 		}
-		return fmt.Sprintf("            pane name=%s command=%s { args %s; }\n", kdlString(name), kdlString(command[0]), strings.Join(args, " "))
+		return fmt.Sprintf("%spane name=%s%s command=%s { args %s; }\n", indent, kdlString(name), size, kdlString(command[0]), strings.Join(args, " "))
 	}
 	return "layout {\n" +
 		"    cwd " + kdlString(root) + "\n" +
 		"    pane split_direction=\"vertical\" {\n" +
-		"        pane name=\"shell\"\n" +
 		"        pane split_direction=\"horizontal\" {\n" +
-		pane("status", status) +
-		pane("crons", crons) +
+		pane("            ", "status", " size=\"70%\"", status) +
+		"            pane name=\"shell\" focus=true\n" +
 		"        }\n" +
+		pane("        ", "crons", "", crons) +
 		"    }\n" +
 		"}\n"
 }

@@ -92,17 +92,31 @@ func syncExternalReposGated(sources []externalSkillSource, home string, repoRoot
 	original := lock
 	if gate != nil {
 		gated = gateExternalSources(sources, home, &lock, *gate)
-		restoreGatedCaches(sources, home, original, gated)
-		for name := range gated {
-			unavailable[name] = true
+		var missingDir []externalSkillSource
+		for _, src := range sources {
+			if h, ok := gated[sourceName(src)]; ok && h.Kind == "blocked" {
+				if missing, ok := missingSkillDirBlock(src, home); ok && missing == h {
+					missingDir = append(missingDir, src)
+				}
+			}
 		}
+		restoreGatedCaches(sources, home, original, gated)
+		for _, src := range missingDir {
+			// The same decision status and the harness sync make below.
+			outcome := "sync takes nothing from its checkout until that is fixed"
+			if _, atPin, ok := heldSource(src, original, home); ok && atPin {
+				outcome = "sync keeps it at its pin with what that commit provides"
+			}
+			fmt.Fprintf(os.Stderr, "warning: skipped external %s: %s; %s\n", sourceName(src), gated[sourceName(src)].Reason, outcome)
+		}
+		keepGatedCopies(unavailable, sources, original, gated)
 	}
 	active := filterGatedSources(sources, gated)
 	plan, err := planMaterializedSkills(active, home, repoRoot, lock, true, unavailable)
 	if err != nil {
 		return nil, err
 	}
-	if err := writeLockIfChanged(active, home, repoRoot, lock, gated); err != nil {
+	if err := writeLockIfChanged(sources, home, repoRoot, lock, gated); err != nil {
 		return nil, err
 	}
 	if err := applyMaterializedSkills(plan); err != nil {
@@ -206,9 +220,7 @@ func updateExternalRepos(sources []externalSkillSource, home string, repoRoot st
 		fmt.Printf("skipped %s: %s %s; %s\n", name, h.Kind, h.Reason, h.Command)
 	}
 	keep := make(map[string]bool, len(gated))
-	for name := range gated {
-		keep[name] = true
-	}
+	keepGatedCopies(keep, selected, lock, gated)
 	plan, err := planMaterializedSkills(updated, home, repoRoot, lock, false, keep)
 	if err != nil {
 		return err
@@ -299,6 +311,17 @@ func gateUpdatedSources(staged []externalCandidate, home string, lock *lockFile,
 	}
 	gated := gateExternalSources(candidates, externalCandidateHome(home), &probe, gate)
 	lock.Cooldowns = probe.Cooldowns
+	// A candidate still on its pin is not gated above, but one that lacks a
+	// configured skill directory keeps its pin all the same.
+	for _, candidate := range staged {
+		name := sourceName(candidate.src)
+		if _, ok := gated[name]; ok {
+			continue
+		}
+		if h, ok := missingSkillDirBlock(candidate.src, externalCandidateHome(home)); ok {
+			gated[name] = h
+		}
+	}
 	for name, h := range gated {
 		if h.Kind == "cooldown" {
 			// sync never moves an existing pin, so only update skips its cooldown.
@@ -316,10 +339,17 @@ func pendingUpdateGates(sources []externalSkillSource, home string, lock lockFil
 	var staged []externalCandidate
 	for _, src := range sources {
 		path := externalCandidatePath(home, sourceName(src))
-		if lockEntryFor(lock, src) == nil || !hasDir(filepath.Join(path, ".git")) {
+		pin := lockEntryFor(lock, src)
+		if pin == nil || !hasDir(filepath.Join(path, ".git")) {
 			continue
 		}
-		staged = append(staged, externalCandidate{src: src, path: path, commit: externalSkillCommitFull(path)})
+		commit := externalSkillCommitFull(path)
+		if commit == pin.Commit {
+			// A candidate on its pin holds what the shared checkout holds, and
+			// the sync gate already reports that.
+			continue
+		}
+		staged = append(staged, externalCandidate{src: src, path: path, commit: commit})
 	}
 	lock.Cooldowns = append([]cooldownEntry(nil), lock.Cooldowns...)
 	out := map[string]gatedItem{}
@@ -356,11 +386,11 @@ func externalSourceNames(sources []externalSkillSource) []string {
 	return names
 }
 
-// writeLockIfChanged records the pins of active sources. A gated source keeps
-// its previous entry (or none), so its candidate commit is never locked.
+// writeLockIfChanged records the pins of the sources not gated. A gated source
+// keeps its previous entry (or none), so its candidate commit is never locked.
 func writeLockIfChanged(sources []externalSkillSource, home string, repoRoot string, lock lockFile, gated map[string]gatedItem) error {
 	previous := lock
-	entries := keepGatedLockEntries(rebuildLockEntries(sources, home, lock), previous, gated)
+	entries := keepGatedLockEntries(rebuildLockEntries(filterGatedSources(sources, gated), home, lock), previous, sources, gated)
 	if lockEntriesEqual(lock.ExternalSkills, entries) && !cooldownsChanged(repoRoot, lock) {
 		return nil
 	}
@@ -390,13 +420,15 @@ func writeLockAfterUpdate(sources []externalSkillSource, home string, repoRoot s
 			}
 			if !pinned {
 				// An unpinned source that was not updated is in cooldown, blocked or
-				// not synced yet: only its own gate may pin it.
+				// not synced yet: only its own gate may pin it. An entry it has under
+				// an old URL or branch stays (keepGatedLockEntries), so updating
+				// another source never drops its pin or its materialized skills.
 				continue
 			}
 		}
 		entries = append(entries, entry)
 	}
-	entries = keepGatedLockEntries(entries, lock, gated)
+	entries = keepGatedLockEntries(entries, lock, sources, gated)
 	if lockEntriesEqual(lock.ExternalSkills, entries) && !cooldownsChanged(repoRoot, lock) {
 		return nil
 	}
@@ -525,7 +557,7 @@ func discoverExternalSourceSkills(src externalSkillSource, home string) ([]disco
 			if pluginRelaxed {
 				continue
 			}
-			return nil, fmt.Errorf("skill directory %q not found in cloned external source %s", clean, src.URL)
+			return nil, missingSkillDirError{dir: clean, url: src.URL}
 		}
 		resolvedBase, err := filepath.EvalSymlinks(skillBase)
 		if err != nil {
@@ -558,6 +590,71 @@ func discoverExternalSourceSkills(src externalSkillSource, home string) ([]disco
 		return nil, fmt.Errorf("external source %s: no skills found in configured skill directories", src.URL)
 	}
 	return discoveredSkillValues(discovered), nil
+}
+
+// missingSkillDirError is a configured skill directory that a source's checkout
+// does not have, such as one upstream deleted or renamed.
+type missingSkillDirError struct {
+	dir string
+	url string
+}
+
+func (e missingSkillDirError) Error() string {
+	return fmt.Sprintf("skill directory %q not found in cloned external source %s", e.dir, e.url)
+}
+
+// heldAtPin narrows a held source to what its checkout still has: the
+// skill_dirs entries that exist and, with a skills allowlist, the listed skills
+// found in them. ok is false when nothing of it is left to discover.
+func heldAtPin(src externalSkillSource, home string) (externalSkillSource, bool) {
+	cachePath := filepath.Join(externalCacheDir(home), sourceName(src))
+	if len(src.SkillDirs) > 0 {
+		var present []string
+		for _, dir := range src.SkillDirs {
+			if hasDir(filepath.Join(cachePath, filepath.FromSlash(dir))) {
+				present = append(present, dir)
+			}
+		}
+		if len(present) == 0 {
+			return src, false
+		}
+		src.SkillDirs = present
+	}
+	if len(src.Skills) > 0 {
+		// One folder at a time: two folders may both hold a skill the
+		// allowlist leaves out, which one pass over all of them refuses.
+		folders := [][]string{nil}
+		if len(src.SkillDirs) > 0 {
+			folders = nil
+			for _, dir := range src.SkillDirs {
+				folders = append(folders, []string{dir})
+			}
+		}
+		found := make(map[string]bool)
+		for _, dirs := range folders {
+			one := src
+			if dirs != nil {
+				one.SkillDirs = dirs
+			}
+			one.Skills = nil
+			skills, _ := discoverExternalSourceSkills(one, home)
+			for _, skill := range skills {
+				found[skill.Name] = true
+			}
+		}
+		var listed []string
+		for _, name := range src.Skills {
+			if found[strings.TrimSpace(name)] {
+				listed = append(listed, name)
+			}
+		}
+		if len(listed) == 0 {
+			return src, false
+		}
+		src.Skills = listed
+	}
+	_, err := discoverExternalSourceSkills(src, home)
+	return src, err == nil
 }
 
 // discoverSkillsAtExternalRoot lists the skills of one skill_dirs entry: the

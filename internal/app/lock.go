@@ -136,6 +136,61 @@ func writeLockFile(repoRoot string, lock lockFile) error {
 	return atomicConfigWrite(lockFilePath(repoRoot), append(header, data...), 0o644)
 }
 
+// checkSharedLock stops a sync with a config file other than tackroom.yaml
+// that sits beside a tackroom.yaml and does not list every source the lock
+// pins, either as the lock has it or as tackroom.yaml has it. The lock and the
+// materialized copies belong to the config root, which every config file in it
+// shares, so such a sync would drop the pins and copies tackroom.yaml owns.
+func checkSharedLock(configPath string, home string, cfg config) error {
+	path, err := resolveConfigPath(configPath, home)
+	if err != nil {
+		return err
+	}
+	root, name := filepath.Dir(path), filepath.Base(path)
+	main := defaultConfigPath(root)
+	if path == main || !hasFile(main) {
+		return nil
+	}
+	// The same file under another spelling, such as on a case-insensitive volume.
+	if info, err := os.Stat(path); err == nil {
+		if mainInfo, err := os.Stat(main); err == nil && os.SameFile(info, mainInfo) {
+			return nil
+		}
+	}
+	lock, err := readLockFile(root)
+	if err != nil {
+		return err
+	}
+	// A pin counts as listed when this config keeps it as the lock has it (the
+	// url and branch lockEntryFor accepts, and materialize when the pin owns
+	// copies) or lists it as tackroom.yaml does, such as a source tackroom.yaml
+	// moved to a new url while the lock keeps the old pin. When tackroom.yaml
+	// does not load, only the first counts.
+	own, ownErr := loadConfig(root, home, main)
+	listed := make(map[string]bool, len(cfg.ExternalSkills))
+	for _, src := range cfg.ExternalSkills {
+		if pin := lockEntryFor(lock, src); pin != nil && (src.Materialize || pin.Materialized == "") {
+			listed[pin.Name] = true
+		}
+		for _, mine := range own.ExternalSkills {
+			if ownErr == nil && sourceName(mine) == sourceName(src) && mine.URL == src.URL && mine.Branch == src.Branch && mine.Materialize == src.Materialize {
+				listed[sourceName(src)] = true
+			}
+		}
+	}
+	var dropped []string
+	for _, entry := range lock.ExternalSkills {
+		if !listed[entry.Name] {
+			dropped = append(dropped, entry.Name)
+		}
+	}
+	if len(dropped) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s shares %s with tackroom.yaml and does not list %s with the url, branch and materialize setting the lock or tackroom.yaml has; syncing it would drop or change their pins and skill copies. Sync with tackroom.yaml, list them in %s as tackroom.yaml does, or move %s to a folder of its own",
+		name, lockFileName, strings.Join(dropped, ", "), name, name)
+}
+
 // lockEntryFor returns the lock entry pinning a source, or nil when the source
 // is unpinned or the config branch/URL changed since the lock was written.
 func lockEntryFor(lock lockFile, src externalSkillSource) *externalLockEntry {
@@ -157,6 +212,16 @@ func lockEntryFor(lock lockFile, src externalSkillSource) *externalLockEntry {
 		return entry
 	}
 	return nil
+}
+
+// previousLockEntry is the lock entry that last covered src: the pin
+// lockEntryFor accepts, which may still sit under the repo name, else the entry
+// under its name pinned for an older url or branch; nil when there is none.
+func previousLockEntry(lock lockFile, src externalSkillSource) *externalLockEntry {
+	if entry := lockEntryFor(lock, src); entry != nil {
+		return entry
+	}
+	return findLockEntry(lock, sourceName(src))
 }
 
 func findLockEntry(lock lockFile, name string) *externalLockEntry {

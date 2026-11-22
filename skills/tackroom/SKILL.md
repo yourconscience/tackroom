@@ -59,7 +59,7 @@ tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host 
 tackroom cron remove ID [--dry-run] [--no-apply]    # delete an owned job's declaration and unit
 ```
 
-`sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` stays compact; `--verbose` adds the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.
+`sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` fits one screen: the overall state, the repo link, sources and lock check, a table with one row per harness, and a block only for a harness that needs attention; `--verbose` adds a block for every harness with the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.
 
 `view` (browser web UI) is the primary surface, on a desktop, a phone or a narrow
 pane: a dashboard with per-agent sync state, outside sources with their pins, cooldowns
@@ -171,7 +171,7 @@ external_skills:
     materialize: true
 ```
 
-`tackroom.lock` records exact commits and materialized ownership. `sync` repairs drift to the pin; `skill update` explicitly advances it. `doctor` audits external source content and fails on materialization drift.
+`tackroom.lock` records exact commits and materialized ownership. `sync` repairs drift to the pin; `skill update` explicitly advances it. `doctor` audits external source content and fails on materialization drift. A `skill_dirs` folder the source lacks (deleted or renamed upstream) blocks that source only: `sync` and `skill update` keep its pin and copies and sync the rest, and `status` lists it as blocked until the folder is removed or renamed in `tackroom.yaml`.
 
 Add a source without editing YAML: `tackroom skill sources add mattpocock/skills --skills tdd,grill-me` (or `--all`; without either, an attended run lists the skills to pick and an unattended one fails with the list). It pins the newest commit at least 3 days old (`--latest` pins the head, in cooldown like any new pin while it is younger than 72 hours), writes the entry with `materialize: true`, refuses to overwrite a different `~/.agents/skills/<name>` (an identical copy, as `npx skills add` leaves it, is adopted), then syncs. `tackroom skill sources` lists configured sources and the ones installed outside tackroom (Claude Code plugins, `npx skills`); `search` queries skills.sh. A source that Claude Code already has as a plugin gets `exclude_agents: [claude]`, so Claude does not load its skills twice. Two repos with the same basename need a distinct `name:`; `add` picks `<owner>-<repo>` itself.
 

@@ -75,6 +75,9 @@ function logPath(log) {
 }
 // Items sync skips, in cooldown or blocked; a tackroom older than 3.0 names the list `held`.
 const skippedItems = (d) => d.skipped ?? d.held ?? [];
+// The audit blocks a source with the command that accepts its finding; any other block,
+// such as a skill_dirs folder upstream removed, comes with its own fix.
+const byAudit = (x) => /^tackroom doctor audit accept /.test(x?.command ?? "");
 
 // A harness of the plan: off when not installed, fail on a conflict or an
 // unreadable config, warn while it waits for a sync.
@@ -400,8 +403,8 @@ export default class Tackroom extends View {
           name: s.name, states: s.states, kind: "skill", note: s.description, lock,
           tag: lock?.state === "blocked" ? "source blocked" : lock ? "in cooldown" : s.origin === "local" ? "" : s.origin.replace(/^[^/]+\//, ""),
           fields: [["Origin", s.origin === "local" ? "yours" : s.origin], ["Path", s.path.replace(inv.home, "~")],
-            ...(lock ? [["Source", lock.state === "blocked" ? "blocked by the audit" : `in cooldown${lock.until ? ` until ${lock.until}` : ""}`],
-              ["Reason", lock.state === "blocked" ? lock.reason : ""], ["Override", lock.command]] : [])],
+            ...(lock ? [["Source", lock.state === "blocked" ? `blocked by ${byAudit(lock) ? "the audit" : "sync"}` : `in cooldown${lock.until ? ` until ${lock.until}` : ""}`],
+              ["Reason", lock.state === "blocked" ? lock.reason : ""], [lock.state === "blocked" && !byAudit(lock) ? "Fix" : "Override", lock.command]] : [])],
         };
       });
     } else if (id === "roles") {
@@ -670,7 +673,7 @@ export default class Tackroom extends View {
       }, t);
     }
     if (i.kind === "blocked") {
-      return this.card(`blocked:${i.h.item}`, { name: i.h.item, where: "blocked", why: sentence(cap(i.h.reason)), notes: [`Override: ${i.h.command}`] }, t);
+      return this.card(`blocked:${i.h.item}`, { name: i.h.item, where: "blocked", why: sentence(cap(i.h.reason)), notes: [`${byAudit(i.h) ? "Override" : "Fix"}: ${i.h.command}`] }, t);
     }
     if (i.kind === "down") {
       const c = this.src.crons.data;
@@ -838,7 +841,7 @@ export default class Tackroom extends View {
     if (asks || blocked.length) {
       out.push(this.group("Needs attention", level, [
         ...(blocked.length ? [v_flex().gap(12).pt(2).pb(8).children(blocked.map((l) => this.card(`lock:${l.name}`, {
-          name: sourceRepo(l) || l.name, where: "blocked", why: sentence(cap(l.reason || "blocked by the audit")), notes: [l.command ? `Override: ${l.command}` : ""],
+          name: sourceRepo(l) || l.name, where: "blocked", why: sentence(cap(l.reason || "blocked by the audit")), notes: [l.command ? `${byAudit(l) ? "Override" : "Fix"}: ${l.command}` : ""],
         }, t)))] : []),
         ...worse.map((r) => this.invRow(r, t)),
       ], t, { column: worse.length ? "in place" : "" }));
@@ -859,8 +862,9 @@ export default class Tackroom extends View {
     const sources = new Set(inv.skills.filter((s) => s.origin !== "local").map((s) => s.origin.split("@")[0])).size;
     const from = blocked.map((l) => {
       const names = rows.filter((r) => r.lock === l).map((r) => r.name);
-      return names.length ? `${andList(names)} come${names.length === 1 ? "s" : ""} from ${sourceRepo(l) || l.name}, which the audit blocked.`
-        : `${sourceRepo(l) || l.name} is blocked by the audit.`;
+      const by = byAudit(l) ? "the audit" : "sync";
+      return names.length ? `${andList(names)} come${names.length === 1 ? "s" : ""} from ${sourceRepo(l) || l.name}, which ${by} blocked.`
+        : `${sourceRepo(l) || l.name} is blocked by ${by}.`;
     });
     const lead = [...from, this.lead(rows.filter((r) => bad(r.level) && r.lock?.state !== "blocked"))].filter(Boolean).join(" ");
     return this.invTab([["Skills", rows]], `${plural(rows.length, "skill")}, in place everywhere`,

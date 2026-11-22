@@ -307,14 +307,18 @@ skipped 1 blocked item(s) and 1 item(s) in cooldown; see tackroom status</pre>
           </div>
           <figure class="term">
             <figcaption>$ tackroom status (excerpt, demo home)</figcaption>
-<pre>repo   <span class="o">✓</span> ~/.agents
-sources
-  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>  https://github.com/acme/agent-skills
+<pre>tackroom status  <span class="o">✓ synced</span>
 
-claude   <span class="o">✓ synced</span>
-  managed     3 skills · 6 agents · 1 mcp
+repo     <span class="o">✓</span> ~/.agents
+sources  agent-skills  <span class="o">✓</span> <span class="h">b09718b</span>  https://github.com/acme/agent-skills
 <span class="d">...</span>
-Everything is synced.
+╭─────────┬──────────┬────────┬────────┬─────┬───────┬─────────┬──────────╮
+│ harness │ state    │ skills │ agents │ mcp │ hooks │ plugins │ packages │
+├─────────┼──────────┼────────┼────────┼─────┼───────┼─────────┼──────────┤
+│ claude  │ <span class="o">✓ synced</span> │ 3      │ 6      │ 1   │ -     │ -       │ -        │
+│ codex   │ <span class="o">✓ synced</span> │ 3      │ 6      │ 1   │ -     │ -       │ -        │
+<span class="d">...</span>
+╰─────────┴──────────┴────────┴────────┴─────┴───────┴─────────┴──────────╯
 
 in cooldown or blocked (skipped by sync)
   <span class="r"><b>blocked</b></span> skill:shell-kit: exfiltration in skills/shell-runner/scripts/report.sh; override: tackroom doctor audit accept skill:shell-kit exfiltration --reason "..."

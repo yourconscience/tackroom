@@ -2,9 +2,9 @@
 
 [Tern](https://stencil.so/tern) is the multiplexing terminal by Stencil Labs. `tackroom tern` opens a Tern session named "tackroom" in the config root, with three panes:
 
-- a shell in the config root,
-- `tackroom status` on the right,
-- `tackroom cron collect --table` below the status pane.
+- a shell in the config root, top left,
+- `tackroom status` below it,
+- `tackroom cron collect --table` at full height on the right.
 
 ## What you get
 
@@ -18,12 +18,12 @@ It shells out to the `tern` CLI:
 
 ```
 tern new session tackroom --cwd <root> --keep-open --json
-tern split <shell> right --cwd <root> --keep-open --json -- tackroom status
-tern split <status> down --cwd <root> --keep-open --json -- tackroom cron collect --table
+tern split <shell> right --cwd <root> --keep-open --json -- tackroom cron collect --table
+tern split <shell> down --cwd <root> --keep-open --json -- tackroom status
 tern focus <shell> --json
 ```
 
-`<shell>` and `<status>` are the block ids the earlier commands print. Tern does not show a new session by itself, so `@focused` would be the pane you are working in; the last command makes the window show the new session.
+`<shell>` is the block id `tern new session` prints. The crons pane splits off first so it takes the full height on the right; the status pane then splits the left half. Tern splits only right and down, so the shell is the upper pane here. Tern does not show a new session by itself, so `@focused` would be the pane you are working in; the last command makes the window show the new session.
 
 ## Watch out
 

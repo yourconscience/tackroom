@@ -19,7 +19,7 @@ tackroom config print                          # shared, local and effective con
 Flags and reruns:
 
 - `--addr` is the listen address, default `ui.view.addr`, else `127.0.0.1:8765`. It must be loopback: `127.0.0.1`, `::1` or `localhost`. Anything else is refused. When another program holds that port and `--addr` was not given, `view` takes a free port, says so and prints that URL; later runs reuse the same port while it stays free. An explicit `--addr` that is taken is an error.
-- `--config PATH` opens another config file; without it the file is [resolved as for every command](commands.md#config-resolution).
+- `--config PATH` opens another config file; without it the file is [resolved as for every command](commands.md#config-resolution). A second file next to `tackroom.yaml` shares its lock, so Sync refuses to run with one that does not list every source the lock pins with the same url, branch and `materialize`.
 - A second `tackroom view` finds the running one, prints its URL and starts nothing. Without `--addr` it looks where the last view recorded its address.
 - `--foreground` serves in the terminal you run it from until Ctrl-C, as `view` used to, for SSH sessions, `tailscale serve` and debugging. It never exits when idle. Under `nohup` it keeps running after the terminal closes.
 - `--secure-cookie` implies `--foreground`: access through a proxy needs a view that does not exit when idle.

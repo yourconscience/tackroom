@@ -15,6 +15,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -23,7 +24,7 @@ import (
 	"time"
 
 	"charm.land/lipgloss/v2"
-	"charm.land/lipgloss/v2/table"
+	"github.com/charmbracelet/x/term"
 	"github.com/yourconscience/tackroom/internal/ui"
 	"gopkg.in/yaml.v3"
 )
@@ -1401,39 +1402,32 @@ func expandCronOutput(output, host string) string {
 	return output
 }
 
+// printCronsTable prints the scan as tables. On a terminal the tables fit its
+// width; anywhere else they keep every column.
 func printCronsTable(result cronsScanResult) {
-	out := ui.Writer(os.Stdout)
-	newTable := func(headers ...string) *table.Table {
-		return table.New().
-			Border(lipgloss.RoundedBorder()).
-			BorderStyle(ui.Dim).
-			Headers(headers...).
-			StyleFunc(func(row, col int) lipgloss.Style {
-				s := lipgloss.NewStyle().Padding(0, 1)
-				if row == table.HeaderRow {
-					return s.Inherit(ui.Bold)
-				}
-				return s
-			})
-	}
+	fmt.Fprint(ui.Writer(os.Stdout), renderCronsTable(result, ui.Width(os.Stdout), term.IsTerminal(os.Stdout.Fd())))
+}
 
-	jobs := newTable("host", "source", "id", "schedule", "state", "last run", "result", "runs", "problems")
-	for _, j := range result.Jobs {
-		res, lastRun := cronResultAndLastRun(j)
-		runs := ""
-		if j.Runs != nil {
-			runs = strconv.Itoa(*j.Runs)
+// renderCronsTable is the access table, the jobs table, then the outputs and
+// problems the jobs list, so a pane that shows only the tail shows the jobs
+// and problems. With fit false the tables are bordered with every column, for
+// a pipe or a file. With fit true a table that does not fit width loses its
+// borders, and then columns, until it does (cronJobsLayouts).
+func renderCronsTable(result cronsScanResult, width int, fit bool) string {
+	var b strings.Builder
+	// Both tables are drawn the same way: bordered only where both fit.
+	access := renderCronAccess(result.Access, width, false)
+	jobs, bordered := renderCronJobs(result.Jobs, width, fit, true)
+	if fit && (!bordered || lipgloss.Width(access) > width) {
+		access = renderCronAccess(result.Access, width, true)
+		if bordered {
+			jobs, _ = renderCronJobs(result.Jobs, width, fit, false)
 		}
-		jobs.Row(j.Host, j.Source, truncate(j.ID, 40), truncate(j.Schedule, 28), j.State, lastRun, res, runs, strconv.Itoa(len(j.Problems)))
 	}
-	fmt.Fprintln(out, jobs.String())
-	fmt.Fprintln(out)
-
-	access := newTable("host", "source", "access", "jobs", "detail")
-	for _, a := range result.Access {
-		access.Row(a.Host, a.Source, a.State, strconv.Itoa(a.Jobs), truncate(a.Detail, 90))
-	}
-	fmt.Fprintln(out, access.String())
+	b.WriteString(access)
+	b.WriteString("\n\n")
+	b.WriteString(jobs)
+	b.WriteString("\n")
 
 	var outputs []string
 	for _, j := range result.Jobs {
@@ -1445,13 +1439,22 @@ func printCronsTable(result cronsScanResult) {
 			outputs = append(outputs, fmt.Sprintf("%s %s %s: %s", j.Host, j.Source, j.ID, path))
 		}
 	}
-	if len(outputs) > 0 {
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "Outputs:")
-		for _, o := range outputs {
-			fmt.Fprintln(out, "  "+o)
+	// A line of a list wraps between words on a terminal, with its
+	// continuation indented; into a pipe it stays one line.
+	list := func(title string, lines []string) {
+		if len(lines) == 0 {
+			return
+		}
+		b.WriteString("\n" + title + "\n")
+		for _, line := range lines {
+			parts := []string{line}
+			if fit {
+				parts = packItems(strings.Split(line, " "), "", max(width-4, 10))
+			}
+			b.WriteString("  " + strings.Join(parts, "\n    ") + "\n")
 		}
 	}
+	list("Outputs:", outputs)
 
 	var problems []string
 	for _, j := range result.Jobs {
@@ -1459,13 +1462,145 @@ func printCronsTable(result cronsScanResult) {
 			problems = append(problems, fmt.Sprintf("%s %s %s: %s", j.Host, j.Source, j.ID, prob))
 		}
 	}
-	if len(problems) > 0 {
-		fmt.Fprintln(out)
-		fmt.Fprintln(out, "Problems:")
-		for _, prob := range problems {
-			fmt.Fprintln(out, "  "+prob)
+	list("Problems:", problems)
+	return b.String()
+}
+
+// cronJobsLayout is one way to draw the jobs table: the border, the columns,
+// and how far the id and schedule cells are cut.
+type cronJobsLayout struct {
+	bordered    bool
+	columns     []string
+	idLen       int
+	scheduleLen int
+	shortRun    bool // last run as MM-DD HH:MM
+}
+
+// cronJobsLayouts lists the layouts from the full bordered table, which is also
+// what a pipe gets, to the narrowest, each cutting more than the one before.
+func cronJobsLayouts() []cronJobsLayout {
+	all := []string{"host", "source", "id", "schedule", "state", "last run", "result", "runs", "problems"}
+	without := func(columns []string, names ...string) []string {
+		return slices.DeleteFunc(slices.Clone(columns), func(c string) bool { return slices.Contains(names, c) })
+	}
+	noProblems := without(all, "problems") // the Problems section lists them
+	noRuns := without(noProblems, "runs")
+	noSource := without(noRuns, "source")
+	noSchedule := without(noSource, "schedule")
+	return []cronJobsLayout{
+		{true, all, 40, 28, false},
+		{false, all, 40, 28, false},
+		{false, noProblems, 40, 28, false},
+		{false, noRuns, 40, 28, false},
+		{false, noRuns, 40, 16, false},
+		{false, noSource, 40, 16, false},
+		{false, noSchedule, 40, 16, false},
+		{false, noSchedule, 24, 16, true},
+		{false, []string{"host", "id", "state", "result"}, 24, 16, true},
+		{false, []string{"host", "id", "state", "result"}, 18, 16, true},
+	}
+}
+
+// renderCronJobs is the jobs table in the first layout that fits width, or the
+// narrowest one, and whether that layout is the bordered one. With border
+// false the bordered layout is not tried.
+func renderCronJobs(jobs []cronJob, width int, fit, border bool) (string, bool) {
+	layouts := cronJobsLayouts()
+	switch {
+	case !fit:
+		layouts = layouts[:1]
+	case !border:
+		layouts = layouts[1:]
+	}
+	out, bordered := "", false
+	for _, layout := range layouts {
+		t := newReportTable(layout.bordered, layout.columns...)
+		for _, j := range jobs {
+			t.Row(cronJobRow(j, layout)...)
+		}
+		out, bordered = t.String(), layout.bordered
+		if lipgloss.Width(out) <= width {
+			break
 		}
 	}
+	return out, bordered
+}
+
+// cronJobRow is the cells of one job in the columns of layout. The bordered
+// layout cuts the end of a long id, as before; the borderless ones cut its
+// middle, because launchd labels share a long prefix.
+func cronJobRow(j cronJob, layout cronJobsLayout) []string {
+	result, lastRun := cronResultAndLastRun(j)
+	if j.LastExit != nil && *j.LastExit != 0 {
+		result = ui.Red.Render(result)
+	}
+	if layout.shortRun {
+		if t, err := time.Parse("2006-01-02 15:04", lastRun); err == nil {
+			lastRun = t.Format("01-02 15:04")
+		}
+	}
+	id := shortenMiddle(j.ID, layout.idLen)
+	if layout.bordered {
+		id = truncate(j.ID, layout.idLen)
+	}
+	runs := ""
+	if j.Runs != nil {
+		runs = strconv.Itoa(*j.Runs)
+	}
+	cells := map[string]string{
+		"host": j.Host, "source": j.Source, "id": id, "schedule": truncate(j.Schedule, layout.scheduleLen),
+		"state": j.State, "last run": lastRun, "result": result, "runs": runs, "problems": strconv.Itoa(len(j.Problems)),
+	}
+	row := make([]string, len(layout.columns))
+	for i, column := range layout.columns {
+		row[i] = cells[column]
+	}
+	return row
+}
+
+// shortenMiddle cuts s to n cells by replacing its middle with an ellipsis,
+// keeping the head and the tail.
+func shortenMiddle(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	head := (n - 1) / 2
+	return string(r[:head]) + "…" + string(r[len(r)-(n-1-head):])
+}
+
+// renderCronAccess is the table of what each host's scan could read. With fit
+// false it is bordered; otherwise it has no borders, and its detail is cut to
+// the room left, or left out when under 10 columns are left.
+func renderCronAccess(access []cronAccess, width int, fit bool) string {
+	render := func(bordered bool, detailLen int) string {
+		headers := []string{"host", "source", "access", "jobs"}
+		if detailLen > 0 {
+			headers = append(headers, "detail")
+		}
+		t := newReportTable(bordered, headers...)
+		for _, a := range access {
+			row := []string{a.Host, a.Source, a.State, strconv.Itoa(a.Jobs)}
+			if detailLen > 0 {
+				row = append(row, truncate(a.Detail, detailLen))
+			}
+			t.Row(row...)
+		}
+		return t.String()
+	}
+	if !fit {
+		return render(true, 90)
+	}
+	if full := render(false, 90); lipgloss.Width(full) <= width {
+		return full
+	}
+	// Without the detail column the table is as wide as it will be; the detail
+	// column takes what is left of width, less its two columns of padding.
+	left := width - lipgloss.Width(render(false, 0)) - 2
+	if left < 10 {
+		return render(false, 0)
+	}
+	return render(false, left)
 }
 
 // Missed-run check for schedulers that record their own last run. Log mtimes
