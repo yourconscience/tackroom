@@ -764,34 +764,37 @@ func writeHarnessStatus(b *strings.Builder, report agentReport, repoRoot string,
 		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("warn"), ui.Yellow.Render("drifted"))
 	}
 
+	// Rows wrap between words at width, with continuation lines under the value.
+	var rows []field
 	if verbose {
-		fmt.Fprintf(b, "  skill root  %s\n", ui.Dim.Render(report.SkillRoot))
+		rows = append(rows, field{label: "skill root", value: ui.Dim.Render(report.SkillRoot)})
 		if report.AgentRoot != "" {
-			fmt.Fprintf(b, "  agent root  %s\n", ui.Dim.Render(report.AgentRoot))
+			rows = append(rows, field{label: "agent root", value: ui.Dim.Render(report.AgentRoot)})
 		}
 	}
 	if h := harnessFor(report.Name); h != nil && h.IntegrationNote != "" {
-		fmt.Fprintf(b, "  integration %s\n", ui.Dim.Render(h.IntegrationNote))
+		rows = append(rows, field{label: "integration", value: ui.Dim.Render(h.IntegrationNote)})
 	}
 	if report.RootPath != "" {
-		fmt.Fprintf(b, "  root doc    %s\n", rootDocLine(report))
+		rows = append(rows, field{label: "root doc", value: rootDocLine(report)})
 	}
-
-	fmt.Fprintf(b, "  managed     %s\n", surfaceCounts(report))
+	rows = append(rows, field{label: "managed", value: surfaceCounts(report)})
 	contextSkills := contextSkillsForReport(cfg, repoRoot, home, report)
 	listingBytes := skillListingBytes(contextSkills)
-	fmt.Fprintf(b, "  context     %s\n", ui.Dim.Render(fmt.Sprintf("%d skills, %d bytes, %s", len(contextSkills), listingBytes, formatTokenEstimate(estimateTokens(listingBytes)))))
+	rows = append(rows, field{label: "context", value: ui.Dim.Render(fmt.Sprintf("%d skills, %d bytes, %s", len(contextSkills), listingBytes, formatTokenEstimate(estimateTokens(listingBytes))))})
+	writeFields(b, 2, len("integration"), rows, width)
 
 	if verbose {
 		writeFields(b, 2, 0, managedRows(report), width)
 	}
 
+	var drift []field
 	for _, bucket := range driftBuckets(report) {
-		if len(bucket.items) == 0 {
-			continue
+		if len(bucket.items) > 0 {
+			drift = append(drift, field{label: ui.Mark("fail") + " " + bucket.label + ":", items: bucket.items, sep: ","})
 		}
-		fmt.Fprintf(b, "  %s %s: %s\n", ui.Mark("fail"), bucket.label, displayList(bucket.items))
 	}
+	writeFields(b, 2, 0, drift, width)
 }
 
 // surfaceCounts summarizes the managed surfaces a harness carries, omitting

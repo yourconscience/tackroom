@@ -1432,12 +1432,22 @@ func renderCronsTable(result cronsScanResult, width int, fit bool) string {
 			outputs = append(outputs, fmt.Sprintf("%s %s %s: %s", j.Host, j.Source, j.ID, path))
 		}
 	}
-	if len(outputs) > 0 {
-		b.WriteString("\nOutputs:\n")
-		for _, o := range outputs {
-			b.WriteString("  " + o + "\n")
+	// A line of a list wraps between words on a terminal, with its
+	// continuation indented; into a pipe it stays one line.
+	list := func(title string, lines []string) {
+		if len(lines) == 0 {
+			return
+		}
+		b.WriteString("\n" + title + "\n")
+		for _, line := range lines {
+			parts := []string{line}
+			if fit {
+				parts = packItems(strings.Split(line, " "), "", max(width-4, 10))
+			}
+			b.WriteString("  " + strings.Join(parts, "\n    ") + "\n")
 		}
 	}
+	list("Outputs:", outputs)
 
 	var problems []string
 	for _, j := range result.Jobs {
@@ -1445,12 +1455,7 @@ func renderCronsTable(result cronsScanResult, width int, fit bool) string {
 			problems = append(problems, fmt.Sprintf("%s %s %s: %s", j.Host, j.Source, j.ID, prob))
 		}
 	}
-	if len(problems) > 0 {
-		b.WriteString("\nProblems:\n")
-		for _, prob := range problems {
-			b.WriteString("  " + prob + "\n")
-		}
-	}
+	list("Problems:", problems)
 	return b.String()
 }
 
@@ -1485,6 +1490,7 @@ func cronJobsLayouts() []cronJobsLayout {
 		{false, noSchedule, 40, 16, false},
 		{false, noSchedule, 24, 16, true},
 		{false, []string{"host", "id", "state", "result"}, 24, 16, true},
+		{false, []string{"host", "id", "state", "result"}, 18, 16, true},
 	}
 }
 

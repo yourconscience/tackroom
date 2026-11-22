@@ -16,11 +16,11 @@ import (
 const rexSessionLabel = "tackroom"
 
 // runRexCommand opens a tackroom workspace in the Rex terminal: a session
-// labelled "tackroom" in the config root, with a shell pane and a `tackroom
-// status` pane side by side, and a `tackroom cron collect --table` pane across
-// the full width below them, then asks the Rex app to show that session. It is
-// the optional Rex terminal integration; an absent Rex is an error, not a
-// silent no-op.
+// labelled "tackroom" in the config root, with a `tackroom status` pane above
+// a shell pane on the left, and a `tackroom cron collect --table` pane at full
+// height on the right, then asks the Rex app to show that session. It is the
+// optional Rex terminal integration; an absent Rex is an error, not a silent
+// no-op.
 func runRexCommand(args []string) error {
 	fs := flag.NewFlagSet("rex", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -163,16 +163,22 @@ func runRexCommand(args []string) error {
 		}
 		session, shell = made.SessionID, made.InitialWindows[0].BlockIDs[0]
 	}
-	split := func(label, direction string, command []string) error {
-		_, err := run(append([]string{"split", "-s", session, "-b", shell, "--split", direction, "-c", root, "--label", label, "--keep-open", "--focus=false", "--json", "--"}, pane(command)...)...)
+	split := func(label, direction, ratio string, command []string) error {
+		args := []string{"split", "-s", session, "-b", shell, "--split", direction}
+		if ratio != "" {
+			args = append(args, "--ratio", ratio)
+		}
+		args = append(args, "-c", root, "--label", label, "--keep-open", "--focus=false", "--json", "--")
+		_, err := run(append(args, pane(command)...)...)
 		return err
 	}
-	// The crons pane splits off first, so it spans the full width; the status
-	// pane then splits the shell above it.
-	if err := split("crons", "below", crons); err != nil {
+	// The crons pane takes the right half at full height, because its tables
+	// are the longest output; the status pane then takes most of the left
+	// half, above the shell.
+	if err := split("crons", "right", "", crons); err != nil {
 		return err
 	}
-	if err := split("status", "right", status); err != nil {
+	if err := split("status", "above", "70", status); err != nil {
 		return err
 	}
 	if hint := show(session); hint != "" {
