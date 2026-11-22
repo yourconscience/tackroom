@@ -34,10 +34,9 @@ func shellWords(words []string) string {
 }
 
 // runTmuxCommand opens a tackroom workspace in tmux: a session named
-// "tackroom" in the config root, with a `tackroom status` pane above a shell
-// pane on the left, and a `tackroom cron collect --table` pane at full height
-// on the right, then shows that session. It is the optional tmux integration;
-// an absent tmux is an error, not a silent no-op.
+// "tackroom" in the config root, with a `tackroom dash` pane across the full
+// width on top and the shell below it, then shows that session. It is the
+// optional tmux integration; an absent tmux is an error, not a silent no-op.
 func runTmuxCommand(args []string) error {
 	fs := flag.NewFlagSet("tmux", flag.ContinueOnError)
 	config := fs.String("config", "", "Path to tackroom YAML config")
@@ -65,19 +64,17 @@ func runTmuxCommand(args []string) error {
 	}
 	root := filepath.Dir(configPath)
 
-	// The panes run this tackroom, by the path it was started as, so an older
-	// tackroom earlier on the login shell's PATH cannot answer for it. The path
-	// is not resolved through symlinks, so a package manager's link stays
-	// valid across upgrades.
+	// The dash pane runs this tackroom, by the path it was started as, so an
+	// older tackroom earlier on the login shell's PATH cannot answer for it.
+	// The path is not resolved through symlinks, so a package manager's link
+	// stays valid across upgrades.
 	self, err := os.Executable()
 	if err != nil {
 		self = "tackroom"
 	}
-	status := []string{self, "status"}
-	crons := []string{self, "cron", "collect", "--table"}
+	dash := []string{self, "dash"}
 	if *config != "" {
-		status = append(status, "--config", configPath)
-		crons = append(crons, "--config", configPath)
+		dash = append(dash, "--config", configPath)
 	}
 	// tmux runs the arguments after the pane's flags without a shell, so
 	// neither the default shell's syntax nor a space in a path matters. The
@@ -112,7 +109,7 @@ func runTmuxCommand(args []string) error {
 	exists := false
 	if *dryRun {
 		_, _ = run("", "has-session", "-t", target)
-		fmt.Println("# the next four commands run only when has-session fails")
+		fmt.Println("# the next three commands run only when has-session fails")
 	} else {
 		exists = exec.Command(tmux, "has-session", "-t", target).Run() == nil
 	}
@@ -125,13 +122,9 @@ func runTmuxCommand(args []string) error {
 		if err != nil {
 			return err
 		}
-		// The crons pane takes the right half at full height, because its
-		// tables are the longest output; the status pane then takes most of the
-		// left half, above the shell.
-		if _, err := run("", append([]string{"split-window", "-h", "-t", shell, "-c", root}, pane(crons)...)...); err != nil {
-			return err
-		}
-		if _, err := run("", append([]string{"split-window", "-v", "-b", "-l", "70%", "-t", shell, "-c", root}, pane(status)...)...); err != nil {
+		// The dash takes the full width above the shell, with 70% of the
+		// height; the shell then gets the focus back.
+		if _, err := run("", append([]string{"split-window", "-v", "-b", "-l", "70%", "-t", shell, "-c", root}, pane(dash)...)...); err != nil {
 			return err
 		}
 		if _, err := run("", "select-pane", "-t", shell); err != nil {

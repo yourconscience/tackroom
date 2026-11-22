@@ -1559,14 +1559,20 @@ func cronJobRow(j cronJob, layout cronJobsLayout) []string {
 }
 
 // shortenMiddle cuts s to n cells by replacing its middle with an ellipsis,
-// keeping the head and the tail.
+// keeping the head and the tail. A wide character takes two cells.
 func shortenMiddle(s string, n int) string {
-	r := []rune(s)
-	if len(r) <= n {
+	if lipgloss.Width(s) <= n {
 		return s
 	}
-	head := (n - 1) / 2
-	return string(r[:head]) + "…" + string(r[len(r)-(n-1-head):])
+	r := []rune(s)
+	head, tail := 0, len(r)
+	for room := (n - 1) / 2; head < len(r) && lipgloss.Width(string(r[head])) <= room; head++ {
+		room -= lipgloss.Width(string(r[head]))
+	}
+	for room := n - 1 - (n-1)/2; tail > head && lipgloss.Width(string(r[tail-1])) <= room; tail-- {
+		room -= lipgloss.Width(string(r[tail-1]))
+	}
+	return string(r[:head]) + "…" + string(r[tail:])
 }
 
 // renderCronAccess is the table of what each host's scan could read. With fit

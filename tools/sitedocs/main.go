@@ -168,7 +168,7 @@ var movedPages = map[string]string{
 	"docs/herdr": "../terminals/#herdr-panel",
 	"docs/tern":  "../terminals/#tern",
 	"docs/rex":   "../terminals/#rex",
-	"docs/tui":   "../terminals/",
+	"docs/tui":   "../terminals/#dash",
 
 	"docs/skillshare-migration": "../comparison/#moving-from-skillshare",
 }
