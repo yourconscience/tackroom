@@ -267,9 +267,9 @@ type runOptions struct {
 	// Overlay names overlays/NAME.yaml in the config root, which setup copies
 	// to tackroom.local.yaml before the first sync.
 	Overlay string
-	// setupResult, set by setup and by the dash's sync, receives what the sync
-	// did, so the caller can print its short summary. The sync report itself
-	// is then printed only with Verbose.
+	// setupResult, set by setup, receives what the setup-driven sync did, so
+	// setup can print its short summary. The sync report itself is then
+	// printed only with Verbose.
 	setupResult *setupSyncResult
 	// ExitCode makes `status` map drift to exit 1 and errors to exit 2
 	// (instead of the default 1 for any failure).

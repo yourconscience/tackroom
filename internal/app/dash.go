@@ -7,9 +7,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -55,11 +57,11 @@ func runDashCommand(args []string) error {
 	if cw, ok := ui.Writer(screen).(*colorprofile.Writer); ok {
 		programOpts = append(programOpts, tea.WithColorProfile(cw.Profile))
 	}
-	dashKeepGitOffTerminal()
-	// The collectors and sync print config warnings and git output on stderr
-	// and a README line on stdout, which would land in the middle of the
-	// screen. While it is up both go to a pipe that keeps the tail; the tail is
-	// printed only when the screen fails, so a crash stays readable.
+	// Status collection prints config and plugin warnings on stderr, which
+	// would land in the middle of the screen. While it is up stdout and stderr
+	// go to a pipe that keeps the tail; the tail is printed only when the
+	// screen fails, so a crash, which bubbletea reports on stderr, stays
+	// readable. A sync runs as a child with output of its own (dashSync).
 	stop, err := dashCaptureOutput()
 	if err != nil {
 		return err
@@ -71,25 +73,6 @@ func runDashCommand(args []string) error {
 		return fmt.Errorf("tackroom dash: %w", runErr)
 	}
 	return nil
-}
-
-// dashKeepGitOffTerminal keeps the git a sync runs from asking anything on
-// the terminal the dash draws on: a password (GIT_TERMINAL_PROMPT=0) or an
-// unknown host key over ssh (BatchMode). The clone or fetch fails instead and
-// sync's error shows in the message line. A setting of the user's own, in the
-// environment or in git's core.sshCommand, is kept.
-func dashKeepGitOffTerminal() {
-	if _, ok := os.LookupEnv("GIT_TERMINAL_PROMPT"); !ok {
-		_ = os.Setenv("GIT_TERMINAL_PROMPT", "0")
-	}
-	_, sshCommand := os.LookupEnv("GIT_SSH_COMMAND")
-	_, ssh := os.LookupEnv("GIT_SSH")
-	if sshCommand || ssh {
-		return
-	}
-	if out, _ := exec.Command("git", "config", "--get", "core.sshCommand").Output(); strings.TrimSpace(string(out)) == "" {
-		_ = os.Setenv("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
-	}
 }
 
 // dashCaptureOutput points os.Stdout and os.Stderr at a pipe and keeps the
@@ -189,9 +172,10 @@ type dashActionMsg struct {
 	fresh *cronJob
 }
 
+// dashSyncMsg is the outcome line of a sync: what it changed, or why it failed.
 type dashSyncMsg struct {
-	result setupSyncResult
-	err    error
+	text   string
+	failed bool
 }
 
 type dashTickMsg struct{ crons bool }
@@ -318,7 +302,10 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, next
 	case dashActionMsg:
-		m.busy, m.quitHeld = "", false
+		m.busy = ""
+		if m.quitHeld {
+			return m, tea.Quit
+		}
 		where := msg.job.ID + " on " + msg.job.Host
 		if msg.err != nil {
 			m.say(firstLine(msg.err.Error()), true)
@@ -346,11 +333,10 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.refreshCrons()
 		}
 	case dashSyncMsg:
-		m.busy, m.syncing, m.quitHeld = "", false, false
-		if msg.err != nil {
-			m.say("sync: "+firstLine(msg.err.Error()), true)
-		} else {
-			m.say("synced, changes: "+changesLine(msg.result.repo, msg.result.reports), false)
+		m.busy, m.syncing = "", false
+		m.say(msg.text, msg.failed)
+		if m.quitHeld {
+			return m, tea.Quit
 		}
 		return m, m.refreshStatus()
 	case tea.KeyPressMsg:
@@ -374,7 +360,7 @@ func (m dashModel) key(key string) (tea.Model, tea.Cmd) {
 	jobs := m.jobs()
 	switch key {
 	case "q":
-		// Quitting would cut a sync in this process mid-write.
+		// q waits for an action or a sync that runs, and quits when it ends.
 		if m.busy != "" {
 			m.quitHeld = true
 			return m, nil
@@ -389,6 +375,7 @@ func (m dashModel) key(key string) (tea.Model, tea.Cmd) {
 	case "end", "G":
 		m.move(len(jobs))
 	case "r":
+		m.result, m.failed = "", false
 		var cmds []tea.Cmd
 		if !m.statusBusy && !m.syncing {
 			cmds = append(cmds, m.refreshStatus())
@@ -453,13 +440,7 @@ func (m dashModel) start(p dashPending) (tea.Model, tea.Cmd) {
 	configPath := m.configPath
 	if p.verb == "sync" {
 		m.busy, m.syncing, m.result = "syncing…", true, ""
-		return m, func() tea.Msg {
-			// As `tackroom sync` runs it; the report is not printed, and
-			// result receives what the run changed.
-			var result setupSyncResult
-			err := runSync(runOptions{ConfigPath: configPath, Stdout: io.Discard, Stdin: strings.NewReader(""), setupResult: &result})
-			return dashSyncMsg{result: result, err: err}
-		}
+		return m, func() tea.Msg { return dashSync(configPath) }
 	}
 	i := slices.IndexFunc(m.jobs(), func(j cronJob) bool { return sameCronJob(j, p.job) })
 	if i < 0 {
@@ -480,6 +461,100 @@ func (m dashModel) start(p dashPending) (tea.Model, tea.Cmd) {
 		out, err := doCronAction(job, p.verb, "", configPath)
 		return dashActionMsg{job: job, verb: p.verb, out: out, err: err, fresh: refreshedCronJob(configPath, job)}
 	}
+}
+
+// dashSync runs `tackroom sync` as a child of this binary in a session of its
+// own, with no controlling terminal and stdin from /dev/null, so nothing it
+// starts (git, ssh, or an ssh command of the user's own) can ask anything on
+// the terminal the dash draws on: a question that needs the terminal fails
+// instead. Its output goes to unlinked temporary files, not pipes, so a child
+// whose dash quit runs to the end on its own.
+func dashSync(configPath string) dashSyncMsg {
+	self, err := os.Executable()
+	if err != nil {
+		return dashSyncMsg{text: "sync: " + err.Error(), failed: true}
+	}
+	args := []string{"sync"}
+	if configPath != "" {
+		args = append(args, "--config", configPath)
+	}
+	var out [2]*os.File // stdout, stderr
+	for i := range out {
+		f, err := os.CreateTemp("", "tackroom-dash-sync-")
+		if err != nil {
+			return dashSyncMsg{text: "sync: " + err.Error(), failed: true}
+		}
+		defer f.Close()
+		_ = os.Remove(f.Name())
+		out[i] = f
+	}
+	cmd := exec.Command(self, args...)
+	cmd.Stdout, cmd.Stderr = out[0], out[1]
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	runErr := cmd.Run()
+	read := func(f *os.File) string {
+		_, _ = f.Seek(0, io.SeekStart)
+		data, _ := io.ReadAll(f)
+		return ansi.Strip(string(data))
+	}
+	if runErr != nil {
+		reason := dashSyncFailure(read(out[1]))
+		if reason == "" {
+			reason = runErr.Error()
+		}
+		return dashSyncMsg{text: "sync: " + reason, failed: true}
+	}
+	if changes := dashChangesLine(read(out[0])); changes != "" {
+		return dashSyncMsg{text: "synced, changes: " + changes}
+	}
+	return dashSyncMsg{text: "synced"}
+}
+
+// dashChangesLine is the "changes" field of a `tackroom sync` report (report.go,
+// renderReport) with its wrapped lines joined: the label at the start of a line,
+// its value after it, and continuation lines indented under the value.
+func dashChangesLine(report string) string {
+	var parts []string
+	for _, line := range strings.Split(report, "\n") {
+		switch {
+		case parts == nil && strings.HasPrefix(line, "changes "):
+			parts = append(parts, strings.TrimSpace(strings.TrimPrefix(line, "changes")))
+		case parts != nil && strings.HasPrefix(line, " ") && strings.TrimSpace(line) != "":
+			parts = append(parts, strings.TrimSpace(line))
+		case parts != nil:
+			return strings.Join(parts, " ")
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+// dashExitStatus matches an error that says only that a command exited.
+var dashExitStatus = regexp.MustCompile(`exit status \d+$`)
+
+// dashSyncFailure is why a sync failed: the last line it printed, which is its
+// error, and when that says only that a command such as git exited, the first
+// line before it from ssh or git that says why.
+func dashSyncFailure(stderr string) string {
+	var lines []string
+	for _, line := range strings.Split(stderr, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) == 0 {
+		return ""
+	}
+	last := lines[len(lines)-1]
+	if !dashExitStatus.MatchString(last) {
+		return last
+	}
+	for _, line := range lines[:len(lines)-1] {
+		if strings.HasPrefix(line, "ssh:") || strings.HasPrefix(line, "fatal:") || strings.HasPrefix(line, "error:") ||
+			strings.Contains(line, "verification failed") || strings.Contains(line, "Permission denied") {
+			return last + " (" + line + ")"
+		}
+	}
+	return last
 }
 
 func (m dashModel) jobs() []cronJob {
@@ -1008,16 +1083,18 @@ func (m dashModel) harnessSummary() string {
 func (m dashModel) messageLine() string {
 	switch {
 	case m.pending != nil:
-		// A narrow pane shortens the job's id, then the middle, so the
-		// question keeps its "y/n".
-		question := m.pending.question
-		if over := lipgloss.Width(question) - m.width; over > 0 && m.pending.job.ID != "" {
-			id := m.pending.job.ID
-			question = strings.Replace(question, id, shortenMiddle(id, max(lipgloss.Width(id)-over, 1)), 1)
+		// A narrow pane drops " on <host>", then shortens the job's id, then
+		// the middle, so the question keeps the job's name and its "y/n".
+		question, job := m.pending.question, m.pending.job
+		if lipgloss.Width(question) > m.width && job.ID != "" {
+			question = strings.Replace(question, " on "+job.Host, "", 1)
+		}
+		if over := lipgloss.Width(question) - m.width; over > 0 && job.ID != "" {
+			question = strings.Replace(question, job.ID, shortenMiddle(job.ID, max(lipgloss.Width(job.ID)-over, 1)), 1)
 		}
 		return ui.Bold.Render(shortenMiddle(question, max(m.width, 1)))
 	case m.busy != "" && m.quitHeld:
-		return ui.Bold.Render(m.busy + " q waits for it to end; ctrl+c quits anyway")
+		return ui.Bold.Render(m.busy + " quitting when it ends; ctrl+c quits now")
 	case m.busy != "":
 		return ui.Dim.Render(m.busy)
 	case m.result != "" && m.failed:
