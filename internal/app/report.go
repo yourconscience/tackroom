@@ -724,8 +724,8 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 }
 
 // hasStatusNews is whether a harness has a block in the compact status: it
-// failed, it drifted, or a drift bucket lists something even though it is
-// synced. A harness that is not detected has only its row in the table.
+// failed, it drifted, an instructions file it is configured with is missing,
+// or a drift bucket lists something even though it is synced. A harness that is not detected has only its row in the table.
 func hasStatusNews(r agentReport) bool {
 	if r.Error != "" {
 		return true
@@ -733,7 +733,7 @@ func hasStatusNews(r agentReport) bool {
 	if !r.Detected {
 		return false
 	}
-	return !r.Synced || slices.ContainsFunc(driftBuckets(r), func(b driftBucket) bool { return len(b.items) > 0 })
+	return !r.Synced || len(r.RootMissing) > 0 || slices.ContainsFunc(driftBuckets(r), func(b driftBucket) bool { return len(b.items) > 0 })
 }
 
 // checkMarkKind maps a checkResult status to a ui.Mark kind.
@@ -791,7 +791,9 @@ func writeHarnessStatus(b *strings.Builder, report agentReport, repoRoot string,
 	var drift []field
 	for _, bucket := range driftBuckets(report) {
 		if len(bucket.items) > 0 {
-			drift = append(drift, field{label: ui.Mark("fail") + " " + bucket.label + ":", items: bucket.items, sep: ","})
+			// A value, not items: a conflict message has spaces of its own
+			// and wraps between its words too.
+			drift = append(drift, field{label: ui.Mark("fail") + " " + bucket.label + ":", value: displayList(bucket.items)})
 		}
 	}
 	writeFields(b, 2, 0, drift, width)

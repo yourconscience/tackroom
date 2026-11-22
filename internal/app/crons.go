@@ -1416,8 +1416,15 @@ func printCronsTable(result cronsScanResult) {
 func renderCronsTable(result cronsScanResult, width int, fit bool) string {
 	var b strings.Builder
 	// Both tables are drawn the same way: bordered only where both fit.
-	jobs, bordered := renderCronJobs(result.Jobs, width, fit)
-	b.WriteString(renderCronAccess(result.Access, width, fit && !bordered))
+	access := renderCronAccess(result.Access, width, false)
+	jobs, bordered := renderCronJobs(result.Jobs, width, fit, true)
+	if fit && (!bordered || lipgloss.Width(access) > width) {
+		access = renderCronAccess(result.Access, width, true)
+		if bordered {
+			jobs, _ = renderCronJobs(result.Jobs, width, fit, false)
+		}
+	}
+	b.WriteString(access)
 	b.WriteString("\n\n")
 	b.WriteString(jobs)
 	b.WriteString("\n")
@@ -1495,11 +1502,15 @@ func cronJobsLayouts() []cronJobsLayout {
 }
 
 // renderCronJobs is the jobs table in the first layout that fits width, or the
-// narrowest one, and whether that layout is the bordered one.
-func renderCronJobs(jobs []cronJob, width int, fit bool) (string, bool) {
+// narrowest one, and whether that layout is the bordered one. With border
+// false the bordered layout is not tried.
+func renderCronJobs(jobs []cronJob, width int, fit, border bool) (string, bool) {
 	layouts := cronJobsLayouts()
-	if !fit {
+	switch {
+	case !fit:
 		layouts = layouts[:1]
+	case !border:
+		layouts = layouts[1:]
 	}
 	out, bordered := "", false
 	for _, layout := range layouts {
