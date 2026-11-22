@@ -467,9 +467,6 @@ in cooldown or blocked (skipped by sync)
   function go() { if (!held && seen && !document.hidden && !still.matches) run(); else stop(); }
   pause.hidden = still.matches;
   pause.addEventListener("click", function () { held = !held; pause.textContent = held ? "Play" : "Pause"; go(); });
-  plates.forEach(function (plate) {
-    plate.addEventListener("pointerenter", function (e) { if (!timers.length && !plate.getAnimations().length && !still.matches) swing(plate, e.offsetX < plate.offsetWidth / 2 ? -6 : 6); });
-  });
   new IntersectionObserver(function (entries) { var now = entries[entries.length - 1].isIntersecting; if (now !== seen) { seen = now; go(); } }).observe(lv);
   document.addEventListener("visibilitychange", go);
   still.addEventListener("change", function () { pause.hidden = still.matches; go(); });
