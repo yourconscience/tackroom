@@ -19,7 +19,7 @@ Guides and reference for the tackroom CLI, in reading order. Philosophy says wha
 - [Memory](memory.md): deliver a memory file to every harness, native memory settings, and separate tools such as rem.
 - [Crons](crons.md): inventory every job on every host, run and pause launchd jobs, declare your own.
 - [Web view](view.md): the loopback dashboard, its token, remote access and what it can change.
-- [Terminals](terminals.md): the tmux, zellij, Tern and Rex workspaces, the Herdr panel and a cmux recipe.
+- [Terminals](terminals.md): `tackroom dash`, the tmux, zellij, Tern and Rex workspaces that open it, the Herdr panel and a cmux recipe.
 
 ## More
 

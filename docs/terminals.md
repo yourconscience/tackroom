@@ -3,7 +3,7 @@
 tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe for cmux. Each integration is optional and calls the same `tackroom` commands you can run in any shell. There are three kinds of integration:
 
 - A panel is tackroom's own interface inside the terminal.
-- A workspace command opens a session in the terminal with a shell, `tackroom status` and `tackroom cron collect --table`.
+- A workspace command opens a session in the terminal with a shell and [`tackroom dash`](#dash).
 - A recipe is a snippet you add or run yourself.
 
 | Tool | Panel | Workspace command | Recipe |
@@ -15,6 +15,39 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 | <img src="site/marks/rex.png" alt="Rex logo" width="20" height="20"> [Rex](#rex) | - | `tackroom rex` | palette actions |
 | [cmux](#cmux) | - | - | `cmux new-workspace`, not run here |
 
+## Dash
+
+`tackroom dash` is a live screen for a terminal pane, and the four workspace commands open it next to a shell: above it in tmux, zellij and Rex, below it in Tern. It answers two questions at a glance: is everything in sync, and which scheduled jobs fail.
+
+```bash
+tackroom dash [--config PATH]
+```
+
+From the top:
+
+- A header with the overall state as `tackroom status` decides it (`synced` or `needs attention`), the number of detected harnesses and of pinned skill sources, and the time of the last refresh, or `refreshing…` while one runs.
+- A crons line with the number of jobs, how many failed their last run, how many have problems, and any host in `crons.hosts` that could not be reached. Then one row per job: host, id, state, last run (`2m ago`, `3h ago`, `8d ago`) and result (`exit N`, red when it failed, or `problem` for a job with problems). Jobs whose last run failed come first, then jobs with problems, then the rest in the order `cron collect` finds them. The list scrolls and says how many more jobs are above or below.
+- Under the list, the selected job's schedule, source and problems.
+- The harnesses: one that drifted or failed comes first, on a line of its own with what is wrong, then every other one with `✓`, and those not detected last. Then how many items are in cooldown or blocked, and the lock check when it did not pass.
+- A line with the result of the last action or the error of the last refresh, and the keys.
+
+Rows are cut, never wrapped, and a resized pane is drawn again at once. In a narrow pane the jobs lose the state column, then the last run, and a long id is shortened in the middle. In a short pane the harnesses become one line, such as `12 harnesses: 11 synced, 1 drifted (qwen-code)`, the list scrolls, and then the detail lines go. The header, three job rows and the keys always fit.
+
+| Key | Action |
+| --- | --- |
+| `↑` `↓`, `k` `j` | Select a job; `g` and `G`, or Home and End, go to the first and the last |
+| Enter | Run the selected job now |
+| `p` | Pause the selected job, or resume it when it is paused or disabled |
+| `r` | Refresh everything now |
+| `s` | Sync as `tackroom sync` does, then show what changed |
+| `q`, Ctrl-C | Quit |
+
+Enter, `p` and `s` ask first in the message line, for example `run ai.knowledge-sync on m1 now? y/n`; any key other than `y` cancels. Run now, Pause and Resume work on launchd jobs, on this machine or on a host in `crons.hosts`, and run the same `launchctl` commands as the web view ([crons.md](crons.md#run-pause-and-resume-jobs)); for any other job the message line says they work on launchd jobs only.
+
+The dash refreshes while it runs: the sync state every 30 seconds, which reads only this machine, and the crons every 5 minutes, after Run now, Pause or Resume (the job's host), and on `r`. A crons collect probes every host over SSH and can take a while; the screen stays usable meanwhile. A refresh that fails leaves the last data on screen and puts its error in the message line. Warnings and git output from the collectors and sync are kept off the screen; `tackroom status` and `tackroom sync` print them.
+
+It needs a terminal on stdout; otherwise it prints `tackroom dash needs a terminal; use tackroom status and tackroom cron collect --table` and exits 1. It follows `NO_COLOR`.
+
 ## tmux
 
 <img src="site/marks/tmux.svg" alt="tmux logo" width="20" height="20"> [tmux](https://github.com/tmux/tmux) is the terminal multiplexer. `tackroom tmux` opens a tackroom workspace in it.
@@ -23,9 +56,9 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 tackroom tmux [--config PATH] [--dry-run]
 ```
 
-It creates a session named `tackroom` in the config root with three panes: `tackroom status` above a shell on the left, and `tackroom cron collect --table` at full height on the right. The status pane takes 70% of the left half. Then it shows the session. Outside tmux it attaches to it; inside tmux it switches your client to it; with no terminal on stdin or stdout it prints the `tmux attach-session` command instead.
+It creates a session named `tackroom` in the config root with two panes: [`tackroom dash`](#dash) across the full width on top, with 70% of the height, and a shell below it, which has the focus. Then it shows the session. Outside tmux it attaches to it; inside tmux it switches your client to it; with no terminal on stdin or stdout it prints the `tmux attach-session` command instead.
 
-The two command panes run the same `tackroom` that opened them, by its absolute path, and keep a shell open when the command ends so you can read what it printed.
+The dash pane runs the same `tackroom` that opened it, by its absolute path, and keeps a shell open when the dash ends, so an error stays readable.
 
 A second run shows the existing `tackroom` session instead of creating another. `--dry-run` prints the `tmux` commands and runs nothing. `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `tmux` is an error.
 
@@ -54,19 +87,16 @@ It writes this layout to a temporary file, never into zellij's own config folder
 ```kdl
 layout {
     cwd "/home/you/.agents"
-    pane split_direction="vertical" {
-        pane split_direction="horizontal" {
-            pane name="status" size="70%" command="/usr/local/bin/tackroom" { args "status"; }
-            pane name="shell" focus=true
-        }
-        pane name="crons" command="/usr/local/bin/tackroom" { args "cron" "collect" "--table"; }
+    pane split_direction="horizontal" {
+        pane name="dash" size="70%" command="/usr/local/bin/tackroom" { args "dash"; }
+        pane name="shell" focus=true
     }
 }
 ```
 
 Run inside zellij, it adds the workspace to the session you are in as a tab named `tackroom`, and each run adds another tab. Run outside zellij, it attaches to the session named `tackroom` if there is one, and otherwise starts that session with the layout.
 
-zellij needs a terminal to create or attach to a session, so with no terminal on stdin or stdout `tackroom zellij` prints the `zellij` command to run instead. The two command panes stay open when the command ends, with its exit code in the pane frame.
+zellij needs a terminal to create or attach to a session, so with no terminal on stdin or stdout `tackroom zellij` prints the `zellij` command to run instead. The dash pane stays open when the dash ends, with its exit code in the pane frame.
 
 `--dry-run` prints the layout and the `zellij` commands and runs nothing. `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `zellij` is an error.
 
@@ -178,7 +208,7 @@ tackroom has not checked whether terminals in the Herdr app set `HERDR_ENV`. See
 ### Shipped
 
 - `tackroom doctor` checks Tern: installed, version, runnable (`checkTern`). An absent Tern reports `skipped` (a pass), never a failure. A `tern` on PATH whose `--version` is not Tern's `tern VERSION (COMMIT)` also reports `skipped`.
-- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane above a `tackroom status` pane on the left, and a `tackroom cron collect --table` pane at full height on the right. The window then shows that session. Recipe: [`tern/RECIPE.md`](../tern/RECIPE.md).
+- `tackroom tern` opens a tackroom workspace in Tern: a "tackroom" session in the config root with a shell pane above a [`tackroom dash`](#dash) pane, in equal halves, because Tern splits only right and down and has no size option. The window then shows that session. Recipe: [`tern/RECIPE.md`](../tern/RECIPE.md).
   - `--dry-run` prints the `tern` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`.
 - A crons panel: the `tackroom-crons` Tern plugin shows `tackroom cron collect` as a block, host health and per-host jobs, with Run now / Pause / Resume for launchd jobs, through the same `tackroom cron run|pause|resume` verbs as the web view and the Herdr panel.
   - Install from a checkout with `tern plugin link ./tern/plugins/tackroom-crons` (or `tern plugin install` for a copy), then open it from the palette or `Ctrl+Alt+C`. Recipe: [`tern/plugins/tackroom-crons/RECIPE.md`](../tern/plugins/tackroom-crons/RECIPE.md).
@@ -198,9 +228,8 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 ### Shipped
 
 - `tackroom doctor` checks Rex (`checkRex`): it runs `rex version`. With Rex absent it reports `skipped`, which counts as a pass. With Rex installed but not runnable it warns. Otherwise it prints the version line.
-- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a `tackroom status` pane above a shell pane on the left, and a `tackroom cron collect --table` pane at full height on the right, then asks the Rex app to show it. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
-  - The panes run the same `tackroom` that opened them, by its absolute path.
-  - The status and crons panes are labelled `status` and `crons`. Each waits after its command: Enter in the pane runs the command again.
+- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a [`tackroom dash`](#dash) pane across the full width on top, with 70% of the height, and a shell pane below it, then asks the Rex app to show it. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
+  - The dash pane runs the same `tackroom` that opened it, by its absolute path. It is labelled `dash` and stays open when the dash ends, so an error stays readable.
   - Showing the session needs the app open with Remote Control turned on in its settings; otherwise `tackroom rex` prints one line saying to open the session from Rex's sidebar.
   - A second run shows the existing `tackroom` session instead of opening another.
   - `--dry-run` prints the `rex` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `rex` is an error.
@@ -208,7 +237,7 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
   - Open tackroom Workspace (`tackroom rex`).
   - Open tackroom Crons (`tackroom cron collect --table` in a new tab).
   - Open tackroom View on Crons (`tackroom view` on its Crons tab in the default browser, started when none runs).
-- Crons with actions: Rex has no panel API, so Run now, Pause and Resume for launchd jobs go through the web view. Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)). In Rex itself the jobs are the read-only `cron collect` table.
+- Crons with actions: Rex has no panel API, but its blocks are terminals, so the workspace's [dash](#dash) lists the jobs and has Run now, Pause and Resume for launchd jobs. The web view has them too; Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)). The Open tackroom Crons action shows the read-only `cron collect` table.
 
 ### Constraint
 

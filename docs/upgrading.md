@@ -2,6 +2,14 @@
 
 What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
+## To 3.1
+
+Nothing to migrate by hand. A workspace session that is already open keeps its old panes until you close it; run the workspace command again to get the new layout.
+
+- New: `tackroom dash`, a live screen for a terminal pane. It is a terminal view again, after `tackroom tui` was removed in 3.0, and it works differently. `tui` was read-only, with four tabs that loaded once. `dash` is one screen that refreshes itself (the sync state every 30 seconds, the crons every 5 minutes, and on `r`), draws itself again at once when the pane is resized, and acts: Enter runs the selected launchd job now, `p` pauses or resumes it, and `s` syncs, each after a y/n question. It shows the overall state, the jobs whose last run failed first, and what is wrong with a harness that drifted. It needs a terminal; elsewhere use `tackroom status` and `tackroom cron collect --table`. See [terminals.md](terminals.md#dash).
+- Changed: `tackroom rex`, `tackroom tmux`, `tackroom zellij` and `tackroom tern` open two panes instead of three: `tackroom dash` across the full width on top, with 70% of the height, and the shell below it, which has the focus. The `tackroom status` and `tackroom cron collect --table` panes are replaced by the dash. In Tern the shell is the upper pane and the two share the height, because Tern splits only right and down and has no size option. In Rex the dash pane is labelled `dash`, and the panes no longer wait for Enter to run their command again.
+- Changed: `tackroom tui` still fails as an unknown command, and now names `tackroom dash`.
+
 ## To 3.0.2
 
 Nothing to migrate by hand. If you read `tackroom status` or `tackroom cron collect --table` in a script, note the changes below; `status --json` and `cron collect` without `--table` are unchanged.

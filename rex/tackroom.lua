@@ -3,13 +3,14 @@
 -- Put this file beside Rex's init.lua and add `require("tackroom")` to
 -- init.lua; see RECIPE.md. tackroom never edits Rex config.
 --
---   tackroom_workspace  runs `tackroom rex`: a tackroom session with a shell,
---                       `tackroom status` and `tackroom cron collect --table`
+--   tackroom_workspace  runs `tackroom rex`: a tackroom session with
+--                       `tackroom dash` above a shell
 --   tackroom_crons      opens `tackroom cron collect --table` in a new tab
 --   tackroom_view       opens `tackroom view` on its Crons tab, starting it
 --                       when none runs; Run now, Pause and Resume are there
 --
--- Rex has no panel API, so acting on a job goes through the web view.
+-- Rex has no panel API, so acting on a job goes through the workspace's
+-- `tackroom dash` or the web view.
 --
 -- Optional settings, after the require:
 --

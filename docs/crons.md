@@ -52,6 +52,7 @@ Only launchd jobs have actions. crontab, systemd timers and the other sources ar
 - A launchd job's row offers Run now, Pause and Resume; an owned job on the machine the view runs on also takes a new schedule.
 - The tab has an Add cron button, and an open row of a job tackroom owns here has Edit and Delete. Any other row has neither, and says why (`edit_note`).
 - The CLI verbs do the same for scripts and other clients, such as the [Herdr panel](terminals.md#herdr-panel).
+- [`tackroom dash`](terminals.md#dash), the live screen the terminal workspaces open, runs, pauses and resumes a launchd job too, after a y/n question: Enter runs the selected job now, `p` pauses or resumes it.
 
 What each action runs:
 
