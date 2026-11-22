@@ -29,11 +29,7 @@ func printReport(w io.Writer, applied bool, repoReport repoLinkReport, reports [
 func renderReport(applied bool, repoReport repoLinkReport, reports []agentReport, home string, cfg config, width int) string {
 	var b strings.Builder
 	problems := reportProblems(repoReport, reports)
-	state := ui.Mark("ok") + " " + ui.Green.Render("synced")
-	if len(problems) > 0 {
-		state = ui.Mark("fail") + " " + ui.Yellow.Render("needs attention")
-	}
-	fmt.Fprintf(&b, "%s  %s\n\n", ui.Bold.Render("tackroom sync"), state)
+	fmt.Fprintf(&b, "%s  %s\n\n", ui.Bold.Render("tackroom sync"), reportState(problems))
 
 	changesLabel := "changes"
 	if !applied {
@@ -44,7 +40,7 @@ func renderReport(applied bool, repoReport repoLinkReport, reports []agentReport
 		{label: "repo", value: repoLine(repoReport)},
 	}
 	label := "sources"
-	for _, line := range sourceLines(cfg, home) {
+	for _, line := range sourceLines(cfg, home, true) {
 		head = append(head, field{label: label, value: line})
 		label = ""
 	}
@@ -82,6 +78,15 @@ func renderReport(applied bool, repoReport repoLinkReport, reports []agentReport
 		writeFields(&b, 0, 0, []field{{label: ui.Yellow.Render("needs attention"), items: problems, sep: ","}}, width)
 	}
 	return b.String()
+}
+
+// reportState is the overall state the title of the sync and status reports
+// carries.
+func reportState(problems []string) string {
+	if len(problems) > 0 {
+		return ui.Mark("fail") + " " + ui.Yellow.Render("needs attention")
+	}
+	return ui.Mark("ok") + " " + ui.Green.Render("synced")
 }
 
 // reportProblems names what keeps a sync from being clean, in report order.
@@ -153,7 +158,7 @@ func rootDocLine(r agentReport) string {
 }
 
 // sourceLines describes each external skill source, names aligned.
-func sourceLines(cfg config, home string) []string {
+func sourceLines(cfg config, home string, urls bool) []string {
 	cacheRoot := externalCacheDir(home)
 	nameWidth := 0
 	for _, src := range cfg.ExternalSkills {
@@ -166,7 +171,11 @@ func sourceLines(cfg config, home string) []string {
 		if hasDir(filepath.Join(cacheRoot, name, ".git")) {
 			state = ui.Mark("ok") + " " + externalSkillCommit(filepath.Join(cacheRoot, name))
 		}
-		lines = append(lines, fmt.Sprintf("%-*s  %s  %s", nameWidth, name, state, ui.Dim.Render(src.URL)))
+		line := fmt.Sprintf("%-*s  %s", nameWidth, name, state)
+		if urls {
+			line += "  " + ui.Dim.Render(src.URL)
+		}
+		lines = append(lines, line)
 	}
 	return lines
 }
@@ -252,19 +261,12 @@ func changesLine(repoReport repoLinkReport, reports []agentReport) string {
 	return strings.Join(groups, " · ")
 }
 
-// harnessTable is the at-a-glance view: state and managed counts per harness.
-// Where the table does not fit width, it falls back to one line per harness.
-func harnessTable(reports []agentReport, width int) string {
-	count := func(items []string) string {
-		if len(items) == 0 {
-			return ui.Dim.Render("-")
-		}
-		return fmt.Sprint(len(items))
-	}
+// newReportTable is a table with the report styling: bold headers and one
+// space of padding either side of every cell. Borderless, it has no outer
+// border and no separators, only the padding, so it takes the fewest columns.
+func newReportTable(bordered bool, headers ...string) *table.Table {
 	t := table.New().
-		Border(lipgloss.RoundedBorder()).
-		BorderStyle(ui.Dim).
-		Headers("harness", "state", "skills", "agents", "mcp", "hooks", "plugins", "packages").
+		Headers(headers...).
 		StyleFunc(func(row, col int) lipgloss.Style {
 			s := lipgloss.NewStyle().Padding(0, 1)
 			if row == table.HeaderRow {
@@ -272,20 +274,74 @@ func harnessTable(reports []agentReport, width int) string {
 			}
 			return s
 		})
+	if !bordered {
+		return t.BorderTop(false).BorderBottom(false).BorderLeft(false).BorderRight(false).BorderHeader(false).BorderColumn(false)
+	}
+	return t.Border(lipgloss.RoundedBorder()).BorderStyle(ui.Dim)
+}
+
+// harnessSurface is one managed-surface column of the harness table.
+type harnessSurface struct {
+	header string
+	items  func(agentReport) []string
+}
+
+// harnessTable is the at-a-glance view: state and managed counts per harness.
+// It is the bordered table where that fits width. Otherwise it is the same
+// table without borders and without the surfaces no harness manages, and where
+// even that does not fit, one line per harness.
+func harnessTable(reports []agentReport, width int) string {
+	surfaces := []harnessSurface{
+		{"skills", func(r agentReport) []string { return r.Managed }},
+		{"agents", func(r agentReport) []string { return r.ManagedAgent }},
+		{"mcp", func(r agentReport) []string { return r.ManagedMCP }},
+		{"hooks", func(r agentReport) []string { return r.ManagedHook }},
+		{"plugins", func(r agentReport) []string { return r.ManagedPlugin }},
+		{"packages", func(r agentReport) []string { return r.ManagedPackage }},
+	}
+	used := slices.DeleteFunc(slices.Clone(surfaces), func(s harnessSurface) bool {
+		return !slices.ContainsFunc(reports, func(r agentReport) bool {
+			return r.Detected && r.Error == "" && len(s.items(r)) > 0
+		})
+	})
+	count := func(items []string) string {
+		if len(items) == 0 {
+			return ui.Dim.Render("-")
+		}
+		return fmt.Sprint(len(items))
+	}
+	render := func(bordered bool, columns []harnessSurface) string {
+		headers := []string{"harness", "state"}
+		for _, c := range columns {
+			headers = append(headers, c.header)
+		}
+		t := newReportTable(bordered, headers...)
+		for _, r := range reports {
+			row := []string{r.Name, harnessState(r)}
+			for _, c := range columns {
+				cell := ""
+				if r.Error == "" && r.Detected {
+					cell = count(c.items(r))
+				}
+				row = append(row, cell)
+			}
+			t.Row(row...)
+		}
+		return t.String()
+	}
+	if out := render(true, surfaces); lipgloss.Width(out) <= width {
+		return out
+	}
+	if out := render(false, used); lipgloss.Width(out) <= width {
+		return out
+	}
 	var lines []field
 	for _, r := range reports {
-		state := harnessState(r)
-		switch {
-		case r.Error != "", !r.Detected:
-			t.Row(r.Name, state, "", "", "", "", "", "")
-			lines = append(lines, field{label: r.Name, value: state})
-		default:
-			t.Row(r.Name, state, count(r.Managed), count(r.ManagedAgent), count(r.ManagedMCP), count(r.ManagedHook), count(r.ManagedPlugin), count(r.ManagedPackage))
-			lines = append(lines, field{label: r.Name, value: state + "  " + surfaceCounts(r)})
+		value := harnessState(r)
+		if r.Error == "" && r.Detected {
+			value += "  " + surfaceCounts(r)
 		}
-	}
-	if out := t.String(); lipgloss.Width(out) <= width {
-		return out
+		lines = append(lines, field{label: r.Name, value: value})
 	}
 	var b strings.Builder
 	writeFields(&b, 0, 0, lines, width)
@@ -572,12 +628,13 @@ func hasFile(path string) bool {
 	return err == nil && !info.IsDir()
 }
 
-// printStatusReport renders a human-scannable `tackroom status`: overall health
-// first, then a compact per-harness block that leads with sync state and shows
-// only actionable drift. The identical multi-harness managed lists collapse to
-// counts; --verbose (verbose=true) restores the full lists and native roots.
-// Each section prints as soon as it is ready, so slow checks do not hold back
-// the harness blocks.
+// printStatusReport renders `tackroom status` so it fits one screen: a title
+// with the overall state, the repo link, sources and lock check, the harness
+// table, and a block only for each harness with something to report. verbose
+// adds the block of every harness, with the full managed lists and native
+// roots. What needs doing comes last, because a pane shows the tail. Each
+// section prints as soon as it is ready, so slow checks do not hold back the
+// harness blocks.
 func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, reports []agentReport, home string, cfg config, verbose bool) {
 	var b strings.Builder
 	out, width := ui.Writer(w), ui.Width(w)
@@ -587,23 +644,9 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 	}
 	defer flush()
 
-	fmt.Fprintln(&b, ui.Bold.Render("tackroom status"))
-	fmt.Fprintln(&b)
-	fmt.Fprintf(&b, "repo   %s\n", repoLine(repoReport))
-	if lines := sourceLines(cfg, home); len(lines) > 0 {
-		fmt.Fprintln(&b, ui.Dim.Render("sources"))
-		for _, line := range lines {
-			fmt.Fprintf(&b, "  %s\n", line)
-		}
-	}
-	flush()
-
 	var drifted, failed, roleHeld []string
 	fixable := false
 	for _, report := range reports {
-		fmt.Fprintln(&b)
-		writeHarnessStatus(&b, report, repoRoot, home, cfg, verbose, width)
-		flush()
 		switch {
 		case report.Error != "":
 			failed = append(failed, report.Name)
@@ -619,8 +662,22 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 		}
 	}
 
-	fmt.Fprintln(&b)
-	fmt.Fprintln(&b, ui.Dim.Render("checks"))
+	fmt.Fprintf(&b, "%s  %s\n\n", ui.Bold.Render("tackroom status"), reportState(reportProblems(repoReport, reports)))
+	head := []field{{label: "repo", value: repoLine(repoReport)}}
+	// A source is one line: where its URL would wrap, the URLs are left out.
+	sources := sourceLines(cfg, home, true)
+	if slices.ContainsFunc(sources, func(line string) bool { return len("sources  ")+lipgloss.Width(line) > width }) {
+		sources = sourceLines(cfg, home, false)
+	}
+	label := "sources"
+	for _, line := range sources {
+		head = append(head, field{label: label, value: line})
+		label = ""
+	}
+	labelWidth := labelWidthOf(append(head, field{label: "lock"}))
+	writeFields(&b, 0, labelWidth, head, width)
+	flush()
+
 	lockCfg := cfg
 	if cfg.configuredSources != nil {
 		lockCfg.ExternalSkills = cfg.configuredSources
@@ -629,39 +686,54 @@ func printStatusReport(w io.Writer, repoRoot string, repoReport repoLinkReport, 
 	// The items and their commands are listed below, so the pointer back to
 	// this command and the advice that follows it are dropped here.
 	lockCheck.detail, _, _ = strings.Cut(lockCheck.detail, "; see tackroom status")
-	checks := []checkResult{lockCheck}
-	nameWidth := 0
-	for _, chk := range checks {
-		nameWidth = max(nameWidth, len(chk.name))
+	writeFields(&b, 0, labelWidth, []field{{label: "lock", value: ui.Mark(checkMarkKind(lockCheck.status)) + " " + ui.Dim.Render(lockCheck.detail)}}, width)
+	if len(reports) > 0 {
+		b.WriteString("\n" + harnessTable(reports, width) + "\n")
 	}
-	for _, chk := range checks {
-		fmt.Fprintf(&b, "  %s %-*s  %s\n", ui.Mark(checkMarkKind(chk.status)), nameWidth, chk.name, ui.Dim.Render(chk.detail))
+	flush()
+
+	for _, report := range reports {
+		if verbose || hasStatusNews(report) {
+			fmt.Fprintln(&b)
+			writeHarnessStatus(&b, report, repoRoot, home, cfg, verbose, width)
+			flush()
+		}
 	}
 
-	fmt.Fprintln(&b)
+	var todo strings.Builder
 	if len(failed) > 0 {
-		fmt.Fprintf(&b, "%s %s (config could not be read; fix it, then run %s)\n", ui.Red.Render("failed:"), strings.Join(failed, ", "), ui.Bold.Render("tackroom sync"))
-	}
-	if len(drifted) == 0 && len(failed) == 0 && repoReport.State == stateSynced {
-		fmt.Fprintln(&b, ui.Green.Render("Everything is synced."))
-		return
-	}
-	if len(drifted) == 0 && repoReport.State == stateSynced {
-		return
+		fmt.Fprintf(&todo, "%s %s (config could not be read; fix it, then run %s)\n", ui.Red.Render("failed:"), strings.Join(failed, ", "), ui.Bold.Render("tackroom sync"))
 	}
 	if repoReport.State != stateSynced {
-		fmt.Fprintf(&b, "%s ~/.agents repo link is not synced.\n", ui.Yellow.Render("drift:"))
+		fmt.Fprintf(&todo, "%s ~/.agents repo link is not synced.\n", ui.Yellow.Render("drift:"))
 	}
 	if len(drifted) > 0 {
-		fmt.Fprintf(&b, "%s %s\n", ui.Yellow.Render("drifted:"), strings.Join(drifted, ", "))
+		fmt.Fprintf(&todo, "%s %s\n", ui.Yellow.Render("drifted:"), strings.Join(drifted, ", "))
 	}
 	if len(roleHeld) > 0 {
 		// Sync never replaces these; only the user can resolve them.
-		fmt.Fprintf(&b, "role files sync leaves in place (%s): rename each to keep it, or move it out of the agent's folder to use the shared role; the conflicts above name them.\n", strings.Join(roleHeld, ", "))
+		fmt.Fprintf(&todo, "role files sync leaves in place (%s): rename each to keep it, or move it out of the agent's folder to use the shared role; the conflicts above name them.\n", strings.Join(roleHeld, ", "))
 	}
 	if fixable || repoReport.State != stateSynced {
-		fmt.Fprintf(&b, "run %s to reconcile.\n", ui.Bold.Render("tackroom sync"))
+		fmt.Fprintf(&todo, "run %s to reconcile.\n", ui.Bold.Render("tackroom sync"))
 	}
+	if todo.Len() > 0 {
+		fmt.Fprintln(&b)
+		b.WriteString(todo.String())
+	}
+}
+
+// hasStatusNews is whether a harness has a block in the compact status: it
+// failed, it drifted, an instructions file it is configured with is missing,
+// or a drift bucket lists something even though it is synced. A harness that is not detected has only its row in the table.
+func hasStatusNews(r agentReport) bool {
+	if r.Error != "" {
+		return true
+	}
+	if !r.Detected {
+		return false
+	}
+	return !r.Synced || len(r.RootMissing) > 0 || slices.ContainsFunc(driftBuckets(r), func(b driftBucket) bool { return len(b.items) > 0 })
 }
 
 // checkMarkKind maps a checkResult status to a ui.Mark kind.
@@ -692,34 +764,39 @@ func writeHarnessStatus(b *strings.Builder, report agentReport, repoRoot string,
 		fmt.Fprintf(b, "%s   %s %s\n", ui.Bold.Render(report.Name), ui.Mark("warn"), ui.Yellow.Render("drifted"))
 	}
 
+	// Rows wrap between words at width, with continuation lines under the value.
+	var rows []field
 	if verbose {
-		fmt.Fprintf(b, "  skill root  %s\n", ui.Dim.Render(report.SkillRoot))
+		rows = append(rows, field{label: "skill root", value: ui.Dim.Render(report.SkillRoot)})
 		if report.AgentRoot != "" {
-			fmt.Fprintf(b, "  agent root  %s\n", ui.Dim.Render(report.AgentRoot))
+			rows = append(rows, field{label: "agent root", value: ui.Dim.Render(report.AgentRoot)})
 		}
 	}
 	if h := harnessFor(report.Name); h != nil && h.IntegrationNote != "" {
-		fmt.Fprintf(b, "  integration %s\n", ui.Dim.Render(h.IntegrationNote))
+		rows = append(rows, field{label: "integration", value: ui.Dim.Render(h.IntegrationNote)})
 	}
 	if report.RootPath != "" {
-		fmt.Fprintf(b, "  root doc    %s\n", rootDocLine(report))
+		rows = append(rows, field{label: "root doc", value: rootDocLine(report)})
 	}
-
-	fmt.Fprintf(b, "  managed     %s\n", surfaceCounts(report))
+	rows = append(rows, field{label: "managed", value: surfaceCounts(report)})
 	contextSkills := contextSkillsForReport(cfg, repoRoot, home, report)
 	listingBytes := skillListingBytes(contextSkills)
-	fmt.Fprintf(b, "  context     %s\n", ui.Dim.Render(fmt.Sprintf("%d skills, %d bytes, %s", len(contextSkills), listingBytes, formatTokenEstimate(estimateTokens(listingBytes)))))
+	rows = append(rows, field{label: "context", value: ui.Dim.Render(fmt.Sprintf("%d skills, %d bytes, %s", len(contextSkills), listingBytes, formatTokenEstimate(estimateTokens(listingBytes))))})
+	writeFields(b, 2, len("integration"), rows, width)
 
 	if verbose {
 		writeFields(b, 2, 0, managedRows(report), width)
 	}
 
+	var drift []field
 	for _, bucket := range driftBuckets(report) {
-		if len(bucket.items) == 0 {
-			continue
+		if len(bucket.items) > 0 {
+			// A value, not items: a conflict message has spaces of its own
+			// and wraps between its words too.
+			drift = append(drift, field{label: ui.Mark("fail") + " " + bucket.label + ":", value: displayList(bucket.items)})
 		}
-		fmt.Fprintf(b, "  %s %s: %s\n", ui.Mark("fail"), bucket.label, displayList(bucket.items))
 	}
+	writeFields(b, 2, 0, drift, width)
 }
 
 // surfaceCounts summarizes the managed surfaces a harness carries, omitting

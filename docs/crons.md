@@ -15,7 +15,7 @@ tackroom cron [--interval 15m] [--deps] [--remove]        # tackroom's own sync 
 
 ## See every job
 
-`tackroom cron collect --table` lists the jobs on each of your hosts; without `--table` it prints JSON, one record per job ([The record](#the-record)).
+`tackroom cron collect --table` lists the jobs on each of your hosts; without `--table` it prints JSON, one record per job ([The record](#the-record)). The table output is the access table, which says what each host's scan could read ([Access states](#access-states)), then the jobs, then the Outputs and Problems lists, so the jobs and what failed are the last lines on screen. On a terminal narrower than the full tables, a table loses its borders, then the `problems`, `runs`, `source` and `schedule` columns, and shortens the `id` in the middle and the `last run` to `MM-DD HH:MM`, until it fits; a last run that failed shows `exit N` in red. Into a pipe or a file every column stays.
 
 For each host, `collect` runs one POSIX `sh` probe, locally or through `ssh -o BatchMode=yes HOST sh -s`, and parses the printed scheduler state locally. Nothing is installed on, copied to or written on the scanned host.
 

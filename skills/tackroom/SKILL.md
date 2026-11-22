@@ -59,7 +59,7 @@ tackroom cron edit ID [--schedule EXPR] [--command CMD [--arg ARG ...]] [--host 
 tackroom cron remove ID [--dry-run] [--no-apply]    # delete an owned job's declaration and unit
 ```
 
-`sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` stays compact; `--verbose` adds the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.
+`sync` prints the skills, agents, MCP servers, hooks, packages and plugins the run changed (harnesses with identical changes grouped), a table with one row per harness, and every managed item per harness, with long lists wrapped to the terminal. `status` fits one screen: the overall state, the repo link, sources and lock check, a table with one row per harness, and a block only for a harness that needs attention; `--verbose` adds a block for every harness with the full lists. Both drop escape codes when output is not a terminal and color when `NO_COLOR` is set.
 
 `view` (browser web UI) is the primary surface, on a desktop, a phone or a narrow
 pane: a dashboard with per-agent sync state, outside sources with their pins, cooldowns
