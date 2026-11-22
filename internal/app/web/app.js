@@ -638,6 +638,7 @@ function renderOverview(root) {
   ].filter(Boolean).join(' ');
   mount(root,
     hero(fail.length ? FAIL : warn.length ? WARN : pending.length ? IDLE : OK, title, said),
+    harnessRail(),
     h('div', {class: fail.length || warn.length ? 'cols split' : 'cols'},
       fail.length || warn.length ? h('section', {},
         fail.length ? [groupHead('st-fail', 'Failing', fail.length), cards(FAIL, fail.map(([, node]) => node))] : null,
@@ -645,6 +646,91 @@ function renderOverview(root) {
       h('section', {},
         h('h2', {class: 'gh'}, 'Everything else'),
         h('ul', {class: 'rest'}, everythingElse(syncWaiting)))));
+  railFit();
+}
+// ---------- the harness rail ----------
+// The wall rail under the Overview headline: every enabled harness hangs its nameplate on two hooks. In sync
+// it hangs straight; needing a sync it has slipped off one hook and hangs crooked; failing it lies on the
+// floor line under its hooks; not installed, its hooks are empty. The state is the rows' own harnessState.
+// A plate moves when its state changes, when the inventory is read again, when it first shows and when the
+// pointer nudges it. Every move is one Web Animation that ends by itself: no timers, and none at all with
+// reduced motion. The list element outlives a render, so a move is not cut short by one.
+const RAIL_GLYPH = {ok: '✓', warn: '!', fail: '✗'};
+// Where a plate rests, as px down and degrees round its left ring; style.css draws the floor to match.
+const RAIL_POSE = {ok: [0, 0], warn: [0, 12], fail: [37, -5], off: [0, 0]};
+const RAIL_RING = '20px -5px'; // the left ring, which a crooked or fallen plate turns round; one in sync rocks round its top middle
+const RAIL_SLOT = 164; // the least width a plate takes on the rail
+const rail = {el: null, slots: new Map(), read: 0, still: matchMedia('(prefers-reduced-motion: reduce)')};
+function railPose([drop, tilt], extra = 0) { return `translateY(${drop}px) rotate(${tilt + extra}deg)`; }
+// A pendulum round the resting pose that dies out; a plate on the floor only rocks.
+function railSwing(slot, amp, delay = 0) {
+  if (rail.still.matches || slot.st === 'off') return;
+  const size = slot.st === 'fail' ? amp / 3 : amp;
+  const frames = [0, 1, -0.62, 0.36, -0.2, 0.1, 0].map((k) => ({transform: railPose(RAIL_POSE[slot.st], size * k), easing: 'ease-in-out'}));
+  slot.plate.animate(frames, {duration: 700 + 110 * Math.abs(amp), delay});
+}
+// From one state to the next: slipping off a hook, dropping to the floor, or being hung back.
+function railMove(slot, from) {
+  if (from === 'off') { railSwing(slot, 7); return; }
+  if (rail.still.matches || slot.st === 'off') return;
+  const path = {
+    ok: [[-5, -3], [0, 0], [0, -2], [0, 0], [0, -0.8]],
+    warn: [[0, 18], [0, 8], [0, 14.5], [0, 10.6]],
+    fail: [[0, 16], [3, 18], [37, -10], [30, -2], [37, -6.5]],
+  }[slot.st];
+  const poses = [RAIL_POSE[from], ...path, RAIL_POSE[slot.st]];
+  slot.plate.getAnimations().forEach((animation) => animation.cancel());
+  slot.plate.animate(poses.map((pose, index) => ({transform: railPose(pose), transformOrigin: RAIL_RING, easing: slot.st === 'fail' && index === 2 ? 'ease-in' : 'ease-in-out'})), {duration: slot.st === 'fail' ? 1100 : 1300});
+}
+// Rows of equal length: ten plates that need two rows hang five and five. More than two rows, or a phone,
+// and the rail is one row that scrolls sideways instead.
+const railNarrow = matchMedia('(max-width: 899px)');
+function railFit() {
+  const width = rail.el?.clientWidth;
+  if (!width || !rail.slots.size) return;
+  const rows = Math.ceil(rail.slots.size / Math.max(1, Math.floor(width / RAIL_SLOT)));
+  rail.el.classList.toggle('run', rows > 2 || railNarrow.matches);
+  rail.el.style.setProperty('--cols', String(Math.ceil(rail.slots.size / rows)));
+}
+function harnessRail() {
+  const agents = (store.inv?.agents || []).filter((agent) => agent.enabled);
+  if (!agents.length) return null;
+  if (!rail.el) {
+    rail.el = h('ul', {class: 'rail', 'aria-label': 'Harnesses'});
+    new ResizeObserver(railFit).observe(rail.el);
+  }
+  const reread = store.updatedAt !== rail.read; // the inventory was read again since the last render
+  rail.read = store.updatedAt;
+  for (const [name, slot] of rail.slots) {
+    if (!agents.some((agent) => agent.name === name)) { slot.li.remove(); rail.slots.delete(name); }
+  }
+  agents.forEach((agent, index) => {
+    const {st, word} = harnessState(agent);
+    let slot = rail.slots.get(agent.name);
+    const from = slot?.st;
+    if (!slot) {
+      slot = {li: h('li', {}), plate: null, st: '', word: ''};
+      rail.slots.set(agent.name, slot);
+    }
+    if (from !== st || slot.word !== word) {
+      const open = st === 'off' ? null : st === 'fail' ? () => { location.hash = agent.error ? '#config' : '#unmanaged'; } : openSync;
+      const plate = h(open ? 'button' : 'span', {class: 'plate', type: open ? 'button' : null, onclick: open, title: `${display(agent.name)}: ${word}`,
+        onpointerenter: (event) => { if (!plate.getAnimations().length) railSwing(slot, event.offsetX < plate.offsetWidth / 2 ? -6 : 6); }},
+      h('b', {text: display(agent.name)}),
+      h('span', {class: 'state'}, st === 'off' ? null : [h('span', {class: `st-${st}`, text: RAIL_GLYPH[st]}), ' '], word));
+      plate.style.transform = railPose(RAIL_POSE[st]);
+      if (st === 'warn' || st === 'fail') plate.style.transformOrigin = RAIL_RING;
+      Object.assign(slot, {plate, st, word});
+      slot.li.className = `hang-${st}`;
+      mount(slot.li, icon('rail-hook', 'hook'), icon('rail-hook', 'hook'), plate);
+    }
+    if (rail.el.children[index] !== slot.li) rail.el.insertBefore(slot.li, rail.el.children[index] || null);
+    // A plate that changed state moves at once; the rest swing in turn on first sight and ripple on a new read.
+    if (from === undefined) railSwing(slot, 7, index * 60);
+    else if (from !== st) railMove(slot, from);
+    else if (reread) railSwing(slot, 3.5, index * 45);
+  });
+  return rail.el;
 }
 // One line of Everything else: a mark, a title and the lines under it. It opens a view, opens Sync,
 // or folds open in place.
