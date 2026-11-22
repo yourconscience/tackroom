@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"slices"
 	"strings"
 	"sync"
@@ -22,7 +23,7 @@ import (
 // `tackroom dash` is a live screen for a terminal pane: whether everything is
 // in sync and which scheduled jobs fail, with run now, pause and resume for a
 // launchd job and a sync. The workspace commands (rex, tmux, zellij, tern)
-// open it above the shell. See docs/terminals.md.
+// open it next to a shell. See docs/terminals.md.
 
 const (
 	dashStatusEvery = 30 * time.Second
@@ -54,6 +55,7 @@ func runDashCommand(args []string) error {
 	if cw, ok := ui.Writer(screen).(*colorprofile.Writer); ok {
 		programOpts = append(programOpts, tea.WithColorProfile(cw.Profile))
 	}
+	dashKeepGitOffTerminal()
 	// The collectors and sync print config warnings and git output on stderr
 	// and a README line on stdout, which would land in the middle of the
 	// screen. While it is up both go to a pipe that keeps the tail; the tail is
@@ -69,6 +71,25 @@ func runDashCommand(args []string) error {
 		return fmt.Errorf("tackroom dash: %w", runErr)
 	}
 	return nil
+}
+
+// dashKeepGitOffTerminal keeps the git a sync runs from asking anything on
+// the terminal the dash draws on: a password (GIT_TERMINAL_PROMPT=0) or an
+// unknown host key over ssh (BatchMode). The clone or fetch fails instead and
+// sync's error shows in the message line. A setting of the user's own, in the
+// environment or in git's core.sshCommand, is kept.
+func dashKeepGitOffTerminal() {
+	if _, ok := os.LookupEnv("GIT_TERMINAL_PROMPT"); !ok {
+		_ = os.Setenv("GIT_TERMINAL_PROMPT", "0")
+	}
+	_, sshCommand := os.LookupEnv("GIT_SSH_COMMAND")
+	_, ssh := os.LookupEnv("GIT_SSH")
+	if sshCommand || ssh {
+		return
+	}
+	if out, _ := exec.Command("git", "config", "--get", "core.sshCommand").Output(); strings.TrimSpace(string(out)) == "" {
+		_ = os.Setenv("GIT_SSH_COMMAND", "ssh -o BatchMode=yes")
+	}
 }
 
 // dashCaptureOutput points os.Stdout and os.Stderr at a pipe and keeps the
@@ -136,13 +157,7 @@ func collectDashStatus(configPath string) (dashStatus, error) {
 	if err != nil {
 		return dashStatus{}, err
 	}
-	lockCfg := g.cfg
-	if g.cfg.configuredSources != nil {
-		lockCfg.ExternalSkills = g.cfg.configuredSources
-	}
-	lock := checkExternalSkillLock(g.repoRoot, lockCfg, g.home)
-	lock.detail, _, _ = strings.Cut(lock.detail, "; see tackroom status")
-	s := dashStatus{repo: repo, reports: reports, gated: len(gatedLines(g.gated)), lock: lock, sources: len(g.sources)}
+	s := dashStatus{repo: repo, reports: reports, gated: len(gatedLines(g.gated)), lock: statusLockCheck(g.repoRoot, g.cfg, g.home), sources: len(g.sources)}
 	cacheRoot := externalCacheDir(g.home)
 	for _, src := range g.sources {
 		if _, issue := sourcePinIssue(g.lock, src, cacheRoot); issue == "" {
@@ -181,34 +196,41 @@ type dashSyncMsg struct {
 
 type dashTickMsg struct{ crons bool }
 
-// dashPending is a question in the message line and what y starts.
+// dashPending is a question in the message line: the key that asked it, and
+// the verb y starts on job (run, pause or resume), or sync.
 type dashPending struct {
 	question string
-	busy     string
-	run      tea.Cmd
-	sync     bool
+	key      string
+	verb     string
+	job      cronJob
 }
 
 type dashModel struct {
 	configPath    string
 	width, height int
 
+	// A refresh error is kept apart from the last action's result: it clears
+	// when that refresh next succeeds and never takes the result's place.
 	status     *dashStatus
 	statusGen  int
 	statusBusy bool
+	statusErr  string
+	statusAt   time.Time        // the last status collect that succeeded
 	crons      *cronsScanResult // jobs in dash order
 	cronsGen   int
 	cronsBusy  bool
-	updated    time.Time // the last refresh that brought data
+	cronsErr   string
+	cronsAt    time.Time
 
 	cursor, top int
 	selected    string // the selected job's key, kept across refreshes
 
-	pending *dashPending
-	busy    string // the action that runs
-	syncing bool
-	message string
-	failed  bool // message is an error
+	pending  *dashPending
+	busy     string // the action that runs
+	syncing  bool
+	quitHeld bool   // q was pressed while busy
+	result   string // the outcome of the last action, sync or refusal
+	failed   bool   // result is an error
 }
 
 func newDashModel(configPath string) dashModel {
@@ -256,7 +278,7 @@ func (m *dashModel) refreshCrons() tea.Cmd {
 }
 
 func (m *dashModel) say(text string, failed bool) {
-	m.message, m.failed = text, failed
+	m.result, m.failed = text, failed
 }
 
 func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -270,10 +292,10 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.statusBusy = false
 		if msg.err != nil {
-			m.say("status: "+firstLine(msg.err.Error()), true)
+			m.statusErr = firstLine(msg.err.Error())
 			return m, nil
 		}
-		m.status, m.updated = &msg.status, time.Now()
+		m.status, m.statusErr, m.statusAt = &msg.status, "", time.Now()
 		m.fit()
 	case dashCronsMsg:
 		if msg.gen != m.cronsGen {
@@ -281,10 +303,10 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.cronsBusy = false
 		if msg.err != nil {
-			m.say("crons: "+firstLine(msg.err.Error()), true)
+			m.cronsErr = firstLine(msg.err.Error())
 			return m, nil
 		}
-		m.updated = time.Now()
+		m.cronsErr, m.cronsAt = "", time.Now()
 		m.setJobs(msg.result)
 	case dashTickMsg:
 		next := dashTick(msg.crons)
@@ -296,7 +318,7 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, next
 	case dashActionMsg:
-		m.busy = ""
+		m.busy, m.quitHeld = "", false
 		where := msg.job.ID + " on " + msg.job.Host
 		if msg.err != nil {
 			m.say(firstLine(msg.err.Error()), true)
@@ -320,11 +342,11 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Collect every host again when the job's host could not be read,
 		// and when a collect that began before the action is still running,
 		// so its older record of the job does not come back.
-		if msg.job.Source == "launchd" && (msg.fresh == nil || m.cronsBusy) {
+		if msg.fresh == nil || m.cronsBusy {
 			return m, m.refreshCrons()
 		}
 	case dashSyncMsg:
-		m.busy, m.syncing = "", false
+		m.busy, m.syncing, m.quitHeld = "", false, false
 		if msg.err != nil {
 			m.say("sync: "+firstLine(msg.err.Error()), true)
 		} else {
@@ -347,12 +369,16 @@ func (m dashModel) key(key string) (tea.Model, tea.Cmd) {
 			m.say("cancelled", false)
 			return m, nil
 		}
-		m.busy, m.syncing, m.message = p.busy, p.sync, ""
-		return m, p.run
+		return m.start(*p)
 	}
 	jobs := m.jobs()
 	switch key {
 	case "q":
+		// Quitting would cut a sync in this process mid-write.
+		if m.busy != "" {
+			m.quitHeld = true
+			return m, nil
+		}
 		return m, tea.Quit
 	case "up", "k":
 		m.move(-1)
@@ -376,50 +402,84 @@ func (m dashModel) key(key string) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		job := jobs[m.cursor]
-		verb := "run"
-		if key == "p" {
-			verb = "pause"
-			if cronPausedStates[job.State] {
-				verb = "resume"
-			}
+		verb, why := dashVerb(job, key)
+		if why != "" {
+			m.say(why, false)
+			return m, nil
 		}
 		where := job.ID + " on " + job.Host
 		question := verb + " " + where + "? y/n"
 		if verb == "run" {
 			question = "run " + where + " now? y/n"
 		}
-		configPath := m.configPath
-		m.pending = &dashPending{
-			question: question,
-			busy:     map[string]string{"run": "running ", "pause": "pausing ", "resume": "resuming "}[verb] + where + "…",
-			run: func() tea.Msg {
-				out, err := doCronAction(job, verb, "", configPath)
-				msg := dashActionMsg{job: job, verb: verb, out: out, err: err}
-				if job.Source == "launchd" {
-					msg.fresh = refreshedCronJob(configPath, job)
-				}
-				return msg
-			},
-		}
+		m.pending = &dashPending{question: question, key: key, verb: verb, job: job}
 	case "s":
 		if m.busy != "" {
 			return m, nil
 		}
-		configPath := m.configPath
-		m.pending = &dashPending{
-			question: "sync now? y/n",
-			busy:     "syncing…",
-			sync:     true,
-			run: func() tea.Msg {
-				// As `tackroom sync` runs it; the report is not printed, and
-				// result receives what the run changed.
-				var result setupSyncResult
-				err := runSync(runOptions{ConfigPath: configPath, Stdout: io.Discard, Stdin: strings.NewReader(""), setupResult: &result})
-				return dashSyncMsg{result: result, err: err}
-			},
-		}
+		m.pending = &dashPending{question: "sync now? y/n", key: key, verb: "sync"}
 	}
 	return m, nil
+}
+
+// dashVerb is what Enter or p does to job, decided as the web view's buttons
+// are (runButtons in web/app.js): only a launchd job with a unit has actions,
+// a paused one (disabled or not loaded) only Resume, any other one Run now and
+// Pause. why says why the key does nothing.
+func dashVerb(job cronJob, key string) (verb, why string) {
+	if job.Source != "launchd" || job.Unit == "" {
+		return "", "actions work on launchd jobs only"
+	}
+	paused := job.State == "disabled" || job.State == "not_loaded"
+	switch {
+	case key == "enter" && paused:
+		return "", job.ID + " is paused; p resumes it"
+	case key == "enter":
+		return "run", ""
+	case paused:
+		return "resume", ""
+	case job.State == "service":
+		// The scan leaves a disabled launchd service out (crons.go), so a
+		// paused one would vanish from the list with nothing to resume it.
+		return "", "pausing a service hides it from the scan, so it could not be resumed here"
+	}
+	return "pause", ""
+}
+
+// start runs what the question asked once it is answered y. A job action acts
+// only on a job the last scan lists, by its record there, as the web view does
+// (stale_crons in crons_actions.go).
+func (m dashModel) start(p dashPending) (tea.Model, tea.Cmd) {
+	configPath := m.configPath
+	if p.verb == "sync" {
+		m.busy, m.syncing, m.result = "syncing…", true, ""
+		return m, func() tea.Msg {
+			// As `tackroom sync` runs it; the report is not printed, and
+			// result receives what the run changed.
+			var result setupSyncResult
+			err := runSync(runOptions{ConfigPath: configPath, Stdout: io.Discard, Stdin: strings.NewReader(""), setupResult: &result})
+			return dashSyncMsg{result: result, err: err}
+		}
+	}
+	i := slices.IndexFunc(m.jobs(), func(j cronJob) bool { return sameCronJob(j, p.job) })
+	if i < 0 {
+		m.say("this job is not in the last scan; press r", false)
+		return m, nil
+	}
+	job := m.jobs()[i]
+	if verb, why := dashVerb(job, p.key); why != "" || verb != p.verb {
+		if why == "" {
+			why = job.ID + " changed since the question; ask again"
+		}
+		m.say(why, false)
+		return m, nil
+	}
+	m.busy = map[string]string{"run": "running ", "pause": "pausing ", "resume": "resuming "}[p.verb] + job.ID + " on " + job.Host + "…"
+	m.result = ""
+	return m, func() tea.Msg {
+		out, err := doCronAction(job, p.verb, "", configPath)
+		return dashActionMsg{job: job, verb: p.verb, out: out, err: err, fresh: refreshedCronJob(configPath, job)}
+	}
 }
 
 func (m dashModel) jobs() []cronJob {
@@ -431,22 +491,19 @@ func (m dashModel) jobs() []cronJob {
 
 func dashJobKey(j cronJob) string { return j.Host + "\x00" + j.Source + "\x00" + j.ID }
 
-func dashFailed(j cronJob) bool { return j.LastExit != nil && *j.LastExit != 0 }
-
-// setJobs takes a scan: jobs whose last run failed first, then jobs with
-// problems, then the rest in scan order. The selection stays on its job.
+// setJobs takes a scan in the web view's order: failing jobs first, then the
+// ones whose last run failed, by the shared Health (crons_words.go), then the
+// rest in scan order. The selection stays on its job.
 func (m *dashModel) setJobs(result cronsScanResult) {
-	rank := func(j cronJob) int {
-		switch {
-		case dashFailed(j):
-			return 0
-		case len(j.Problems) > 0:
-			return 1
+	rank := map[string]int{"fail": 0, "warn": 1}
+	order := func(j cronJob) int {
+		if r, ok := rank[j.Health]; ok {
+			return r
 		}
 		return 2
 	}
 	result.Jobs = slices.Clone(result.Jobs)
-	slices.SortStableFunc(result.Jobs, func(a, b cronJob) int { return rank(a) - rank(b) })
+	slices.SortStableFunc(result.Jobs, func(a, b cronJob) int { return order(a) - order(b) })
 	m.crons = &result
 	if i := slices.IndexFunc(result.Jobs, func(j cronJob) bool { return dashJobKey(j) == m.selected }); i >= 0 {
 		m.cursor = i
@@ -480,36 +537,64 @@ func (m *dashModel) fit() {
 }
 
 // dashVisibleRows is how many jobs fit in rows lines: all of them, or one
-// line fewer to say how many more there are.
+// line fewer to say how many more there are, and always the selected one.
 func dashVisibleRows(jobs, rows int) int {
-	if jobs <= rows {
+	switch {
+	case jobs <= rows:
 		return jobs
+	case rows <= 1:
+		return 1
 	}
-	return max(rows-1, 1)
+	return rows - 1
 }
 
-// dashLayout is what fits between the crons title and the footer.
+// dashLayout is what the pane shows, from the top.
 type dashLayout struct {
-	harness []string
-	detail  []string
-	rows    int // lines for the job list, its "more" line included
+	header, title bool
+	rows          int // lines for the job list, its "more" line included
+	detail        []string
+	harness       []string
+	footer        []string // the message line and the keys
 }
 
-// layout gives the job list at least three rows, then the harness block one
-// line, then the detail lines, then the list the rest of its jobs; the full
-// harness block takes the place of its one line only when that leaves room.
-// So as the pane gets shorter the harness block becomes one line first, then
-// the list scrolls, then the detail lines go.
+// layout gives the job list at least three rows, with the header, the crons
+// line, the message line and the keys. What is left goes to the harness block
+// as one line, then to the detail lines, then to the rest of the jobs; the
+// full harness block takes the place of its one line only when that leaves
+// room. So as the pane gets shorter the harness block becomes one line first,
+// then the list scrolls, then the detail lines go.
+//
+// A pane too short for that keeps the selected row and puts the message line,
+// when it has a question, a result or an error, in the place of the keys; then
+// the crons line goes, then the header.
 func (m dashModel) layout() dashLayout {
 	n := len(m.jobs())
 	minRows := max(min(n, 3), 1)
 	if n > 3 {
 		minRows = 4 // three jobs and the "more" line
 	}
-	left := m.height - 4 - minRows // header, crons title, message, keys
-	var l dashLayout
-	if left < 1 {
-		l.rows = minRows
+	message, keys := m.messageLine(), ui.Dim.Render(m.keysLine())
+	l := dashLayout{header: true, title: true, footer: []string{message, keys}}
+	left := m.height - 4 - minRows
+	if left < 0 {
+		l.footer = []string{keys}
+		if message != "" {
+			l.footer = []string{message}
+		}
+		l.rows = m.height - 3
+		if l.rows < 1 {
+			l.title, l.rows = false, l.rows+1
+		}
+		if l.rows < 1 {
+			l.header, l.rows = false, l.rows+1
+		}
+		if l.rows < 1 && m.pending == nil {
+			l.footer, l.rows = nil, 1
+		}
+		return l
+	}
+	l.rows = minRows
+	if left == 0 {
 		return l
 	}
 	l.harness = []string{m.harnessSummary()}
@@ -518,7 +603,7 @@ func (m dashModel) layout() dashLayout {
 	l.detail = detail[:min(len(detail), left)]
 	left -= len(l.detail)
 	more := min(max(n-minRows, 0), left) // up to every job, without the "more" line
-	l.rows = minRows + more
+	l.rows += more
 	left -= more
 	if full := m.harnessLines(); len(full)-1 <= left {
 		l.harness = full
@@ -537,19 +622,20 @@ func (m dashModel) render() string {
 		return ""
 	}
 	l := m.layout()
-	lines := []string{m.headerLine(), m.cronsTitle()}
+	var lines []string
+	if l.header {
+		lines = append(lines, m.headerLine())
+	}
+	if l.title {
+		lines = append(lines, m.cronsTitle())
+	}
 	lines = append(lines, m.listLines(l.rows)...)
 	lines = append(lines, l.detail...)
 	lines = append(lines, l.harness...)
-	footer := []string{m.messageLine(), ui.Dim.Render(m.keysLine())}
-	for len(lines)+len(footer) < m.height {
+	for len(lines)+len(l.footer) < m.height {
 		lines = append(lines, "")
 	}
-	lines = append(lines, footer...)
-	if len(lines) > m.height {
-		// Shorter than the minimum: keep the top and the keys.
-		lines = append(lines[:max(m.height-1, 0)], footer[1])[:m.height]
-	}
+	lines = append(lines[:min(len(lines), m.height-len(l.footer))], l.footer...)
 	// No line may wrap: a wrapped line would push the screen down.
 	for i, line := range lines {
 		lines[i] = ansi.Truncate(line, m.width, "…")
@@ -578,9 +664,17 @@ func (m dashModel) rightAlign(left string, rights ...string) string {
 	return left + strings.Repeat(" ", m.width-lipgloss.Width(left)-lipgloss.Width(right)) + right
 }
 
+// asOf is " (as of 15:04)" for data whose last refresh failed.
+func asOf(at time.Time) string {
+	return ui.Dim.Render(" (as of " + at.Format("15:04") + ")")
+}
+
 func (m dashModel) headerLine() string {
 	left := ui.Bold.Render("tackroom") + "  "
 	switch s := m.status; {
+	case m.statusErr != "":
+		// The state is not known, so the last one is not shown as current.
+		left += ui.Mark("warn") + " " + ui.Yellow.Render("status unknown") + ui.Dim.Render(": "+m.statusErr)
 	case s != nil:
 		harnesses := 0
 		for _, r := range s.reports {
@@ -596,17 +690,19 @@ func (m dashModel) headerLine() string {
 		default:
 			left += fmt.Sprintf(" · %d of %s pinned", s.pinned, plural(s.sources, "source"))
 		}
-	case m.statusBusy:
-		left += ui.Dim.Render("collecting…")
 	default:
-		left += ui.Dim.Render("no status")
+		left += ui.Dim.Render("collecting…")
 	}
 	// A narrow pane gets the short form, so the counts stay whole.
+	updated := m.statusAt
+	if m.cronsAt.After(updated) {
+		updated = m.cronsAt
+	}
 	switch {
 	case m.statusBusy || m.cronsBusy:
 		return m.rightAlign(left, ui.Dim.Render("refreshing…"), ui.Dim.Render("…"))
-	case !m.updated.IsZero():
-		at := m.updated.Format("15:04")
+	case !updated.IsZero():
+		at := updated.Format("15:04")
 		return m.rightAlign(left, ui.Dim.Render("updated "+at), ui.Dim.Render(at))
 	}
 	return left
@@ -615,18 +711,22 @@ func (m dashModel) headerLine() string {
 func (m dashModel) cronsTitle() string {
 	line := ui.Bold.Render("crons") + "  "
 	if m.crons == nil {
-		if m.cronsBusy {
+		switch {
+		case m.cronsErr != "":
+			return line + ui.Mark("warn") + " " + ui.Yellow.Render("unknown") + ui.Dim.Render(": "+m.cronsErr)
+		case m.cronsBusy:
 			return line + ui.Dim.Render("collecting…")
 		}
 		return line + ui.Dim.Render("not collected")
 	}
-	failed, problems := 0, 0
+	// Counted by the shared Health, in the web view's words.
+	failing, failed := 0, 0
 	for _, j := range m.crons.Jobs {
-		switch {
-		case dashFailed(j):
+		switch j.Health {
+		case "fail":
+			failing++
+		case "warn":
 			failed++
-		case len(j.Problems) > 0:
-			problems++
 		}
 	}
 	// A host whose probe failed has no jobs listed; say so, or its jobs
@@ -637,24 +737,27 @@ func (m dashModel) cronsTitle() string {
 			unreached = append(unreached, a.Host)
 		}
 	}
-	// A narrow pane gets "1 problem" for "1 with problems".
-	title := func(problemWords string) string {
+	// A narrow pane gets "1 failed" for "1 last run failed".
+	title := func(failedWords string) string {
 		parts := []string{fmt.Sprint(len(m.crons.Jobs))}
-		if failed > 0 {
-			parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failed", failed)))
+		if m.cronsErr != "" {
+			parts = append(parts, ui.Yellow.Render("stale, from "+m.cronsAt.Format("15:04")))
 		}
-		if problems > 0 {
-			parts = append(parts, ui.Yellow.Render(problemWords))
+		if failing > 0 {
+			parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failing", failing)))
+		}
+		if failed > 0 {
+			parts = append(parts, ui.Yellow.Render(fmt.Sprintf(failedWords, failed)))
 		}
 		if len(unreached) > 0 {
 			parts = append(parts, ui.Red.Render(strings.Join(unreached, ", ")+" not reached"))
 		}
 		return line + strings.Join(parts, " · ")
 	}
-	if full := title(fmt.Sprintf("%d with problems", problems)); lipgloss.Width(full) <= m.width {
+	if full := title("%d last run failed"); lipgloss.Width(full) <= m.width {
 		return full
 	}
-	return title(plural(problems, "problem"))
+	return title("%d failed")
 }
 
 // dashAge is a last run as an age: 2m ago, 3h ago, 8d ago; empty when unknown.
@@ -675,10 +778,10 @@ func dashAge(lastRun string, now time.Time) string {
 	}
 }
 
-// dashResult is the result cell: exit N, or problem for a job with problems
-// and no failed exit.
+// dashResult is the result cell: exit N or the last status, or problem for a
+// job with problems and no failed exit.
 func dashResult(j cronJob) string {
-	if !dashFailed(j) && len(j.Problems) > 0 {
+	if (j.LastExit == nil || *j.LastExit == 0) && len(j.Problems) > 0 {
 		return "problem"
 	}
 	result, _ := cronResultAndLastRun(j)
@@ -688,10 +791,14 @@ func dashResult(j cronJob) string {
 // listLines is the job list in rows lines at most, scrolled to the cursor.
 func (m dashModel) listLines(rows int) []string {
 	jobs := m.jobs()
-	if m.crons == nil {
+	switch {
+	case rows <= 0:
+		return nil
+	case m.crons == nil && m.cronsBusy:
 		return []string{"  " + ui.Dim.Render("collecting…")}
-	}
-	if len(jobs) == 0 {
+	case m.crons == nil:
+		return []string{"  " + ui.Dim.Render("no jobs: the collect failed")}
+	case len(jobs) == 0:
 		return []string{"  " + ui.Dim.Render("no scheduled jobs found")}
 	}
 	now := time.Now()
@@ -731,18 +838,15 @@ func (m dashModel) listLines(rows int) []string {
 		top = max(min(m.cursor, len(jobs)-visible), 0)
 	}
 	pad := func(s string, w int) string { return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0)) }
+	// The result is colored by the shared Health, as the web view colors it.
+	color := map[string]lipgloss.Style{"fail": ui.Red, "warn": ui.Yellow, "paused": ui.Dim}
 	var lines []string
 	for i := top; i < top+visible; i++ {
 		c, j := all[i], jobs[i]
 		result := c.result
 		selected := i == m.cursor
-		if !selected {
-			switch {
-			case dashFailed(j):
-				result = ui.Red.Render(result)
-			case c.result == "problem":
-				result = ui.Yellow.Render(result)
-			}
+		if style, ok := color[j.Health]; ok && !selected && result != "" {
+			result = style.Render(result)
 		}
 		line := pad(c.host, hostW) + "  " + pad(shortenMiddle(c.id, idW), idW) + "  "
 		if showState {
@@ -759,7 +863,7 @@ func (m dashModel) listLines(rows int) []string {
 		}
 		lines = append(lines, line)
 	}
-	if visible < len(jobs) {
+	if visible < len(jobs) && len(lines) < rows {
 		var more []string
 		if top > 0 {
 			more = append(more, fmt.Sprintf("↑ %d more", top))
@@ -803,7 +907,10 @@ func (m dashModel) harnessLines() []string {
 	label := ui.Bold.Render("harnesses") + "  "
 	indent := strings.Repeat(" ", len("harnesses  "))
 	s := m.status
-	if s == nil {
+	switch {
+	case s == nil && m.statusErr != "":
+		return []string{label + ui.Dim.Render("unknown")}
+	case s == nil:
 		return []string{label + ui.Dim.Render("collecting…")}
 	}
 	var wrong, synced, absent []string
@@ -844,6 +951,9 @@ func (m dashModel) harnessLines() []string {
 	if s.lock.status != checkStatusPass {
 		lines = append(lines, "lock "+ui.Mark(checkMarkKind(s.lock.status))+" "+s.lock.detail)
 	}
+	if m.statusErr != "" {
+		lines = append(lines, ui.Dim.Render("as of "+m.statusAt.Format("15:04")+"; the last status refresh failed"))
+	}
 	for i := range lines {
 		if i == 0 {
 			lines[i] = label + lines[i]
@@ -857,7 +967,10 @@ func (m dashModel) harnessLines() []string {
 // harnessSummary is the harness block in one line, for a short pane.
 func (m dashModel) harnessSummary() string {
 	s := m.status
-	if s == nil {
+	switch {
+	case s == nil && m.statusErr != "":
+		return ui.Bold.Render("harnesses") + "  " + ui.Dim.Render("unknown")
+	case s == nil:
 		return ui.Bold.Render("harnesses") + "  " + ui.Dim.Render("collecting…")
 	}
 	var synced int
@@ -883,19 +996,40 @@ func (m dashModel) harnessSummary() string {
 	if s.repo.State != stateSynced {
 		parts = append(parts, ui.Red.Render("~/.agents link "+s.repo.State))
 	}
-	return fmt.Sprintf("%s: %s", plural(synced+len(drifted)+len(failed), "harness"), strings.Join(parts, ", "))
+	stale := ""
+	if m.statusErr != "" {
+		stale = asOf(m.statusAt)
+	}
+	return fmt.Sprintf("%s%s: %s", plural(synced+len(drifted)+len(failed), "harness"), stale, strings.Join(parts, ", "))
 }
 
+// messageLine is a pending question, the action that runs, the last action's
+// result, or else a refresh error.
 func (m dashModel) messageLine() string {
 	switch {
 	case m.pending != nil:
-		return ui.Bold.Render(m.pending.question)
+		// A narrow pane shortens the job's id, then the middle, so the
+		// question keeps its "y/n".
+		question := m.pending.question
+		if over := lipgloss.Width(question) - m.width; over > 0 && m.pending.job.ID != "" {
+			id := m.pending.job.ID
+			question = strings.Replace(question, id, shortenMiddle(id, max(lipgloss.Width(id)-over, 1)), 1)
+		}
+		return ui.Bold.Render(shortenMiddle(question, max(m.width, 1)))
+	case m.busy != "" && m.quitHeld:
+		return ui.Bold.Render(m.busy + " q waits for it to end; ctrl+c quits anyway")
 	case m.busy != "":
 		return ui.Dim.Render(m.busy)
-	case m.failed:
-		return ui.Red.Render(m.message)
+	case m.result != "" && m.failed:
+		return ui.Red.Render(m.result)
+	case m.result != "":
+		return m.result
+	case m.statusErr != "":
+		return ui.Red.Render("status: " + m.statusErr)
+	case m.cronsErr != "":
+		return ui.Red.Render("crons: " + m.cronsErr)
 	}
-	return m.message
+	return ""
 }
 
 func (m dashModel) keysLine() string {
