@@ -6,6 +6,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -613,17 +614,22 @@ var removedAgentWarning sync.Once
 func dropRemovedAgents(cfg *config) {
 	dropped := false
 	without := func(names []string) ([]string, bool) {
-		kept := names[:0]
-		for _, name := range names {
-			if normalizeAgentName(name) == removedAgentGemini {
-				dropped = true
-				continue
-			}
-			kept = append(kept, name)
+		isGemini := func(name string) bool { return normalizeAgentName(name) == removedAgentGemini }
+		if !slices.ContainsFunc(names, isGemini) {
+			return names, false
 		}
-		return kept, len(names) > 0 && len(kept) == 0
+		dropped = true
+		// A new slice: another copy of the config may share this one's array.
+		kept := make([]string, 0, len(names))
+		for _, name := range names {
+			if !isGemini(name) {
+				kept = append(kept, name)
+			}
+		}
+		return kept, len(kept) == 0
 	}
-	agents := cfg.Agents[:0]
+	// A new slice: another copy of the config may share this one's array.
+	agents := make([]agentConfig, 0, len(cfg.Agents))
 	for _, agent := range cfg.Agents {
 		if normalizeAgentName(agent.Name) == removedAgentGemini {
 			dropped = true

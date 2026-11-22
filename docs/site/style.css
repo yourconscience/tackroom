@@ -128,7 +128,7 @@ main section.hero { border-top: 0; padding: 40px 0 48px; }
 .wall > li { display: flex; align-items: center; gap: var(--tr-space-3); min-width: 0; font: 600 var(--tr-fs-body)/1.25 var(--tr-font-display); }
 .wall span { min-width: 0; overflow-wrap: break-word; }
 /* Vendor marks are shown as supplied, each in the same 28px box on the same silver tile. */
-.wall img { flex: none; width: 40px; height: 40px; padding: 5px; background: var(--tr-mark-bg); border: 1px solid var(--tr-mark-line); border-radius: var(--tr-radius-card); object-fit: contain; }
+.wall img, .wall .mark-empty { flex: none; width: 40px; height: 40px; padding: 5px; background: var(--tr-mark-bg); border: 1px solid var(--tr-mark-line); border-radius: var(--tr-radius-card); object-fit: contain; }
 .wall-head { margin: var(--tr-space-6) 0 var(--tr-space-4); }
 .after { margin-top: 18px; color: var(--tr-muted); max-width: 62ch; }
 
