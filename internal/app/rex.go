@@ -60,13 +60,13 @@ func runRexCommand(args []string) error {
 		dash = append(dash, "--config", configPath)
 	}
 
-	// line is a rex command as a shell would take it; a word with a space or a
-	// quote, such as a path, is quoted, so the placeholders of --dry-run stay
-	// bare.
+	// line is a rex command as a shell would take it: a word with anything a
+	// shell reads is quoted. The placeholders of --dry-run (<session>,
+	// session_id=<session>) stay bare, so < > and = do not count.
 	line := func(args []string) string {
 		words := append([]string{rex}, args...)
 		for i, w := range words {
-			if strings.ContainsAny(w, " \t'\"$;") {
+			if w == "" || strings.Trim(w, plainShellWord+"<>=") != "" {
 				words[i] = shellQuote(w)
 			}
 		}
