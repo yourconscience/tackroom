@@ -267,9 +267,9 @@ type runOptions struct {
 	// Overlay names overlays/NAME.yaml in the config root, which setup copies
 	// to tackroom.local.yaml before the first sync.
 	Overlay string
-	// setupResult, set by setup, receives what the setup-driven sync did, so
-	// setup can print its short summary. The sync report itself is then
-	// printed only with Verbose.
+	// setupResult, set by setup and by the dash's sync, receives what the sync
+	// did, so the caller can print its short summary. The sync report itself
+	// is then printed only with Verbose.
 	setupResult *setupSyncResult
 	// ExitCode makes `status` map drift to exit 1 and errors to exit 2
 	// (instead of the default 1 for any failure).
@@ -324,6 +324,8 @@ func run(args []string) error {
 		return runMCP(args[1:])
 	case "hook":
 		return runHookCommand(args[1:])
+	case "dash":
+		return runDashCommand(args[1:])
 	case "tern":
 		return runTernCommand(args[1:])
 	case "rex":
@@ -384,7 +386,7 @@ func run(args []string) error {
 	default:
 		printUsage()
 		if args[0] == "tui" {
-			fmt.Fprintln(os.Stderr, "tackroom tui was removed in 3.0. Use tackroom view, or tackroom status in a terminal.")
+			fmt.Fprintln(os.Stderr, "tackroom tui was removed in 3.0. Use tackroom dash in a terminal, or tackroom view.")
 		}
 		return fmt.Errorf("unknown subcommand %q", args[0])
 	}
@@ -655,6 +657,7 @@ func printUsage() {
 	fmt.Println("  config   Validate or print the canonical YAML")
 	fmt.Println("  restore  List backups or put backed-up native files back")
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
+	fmt.Println("  dash     Live screen for a terminal pane: sync state and crons, with actions")
 	fmt.Println("  hosts    Show tackroom on every machine in crons.hosts; fix one or set one up")
 	fmt.Println()
 	fmt.Println("Command groups:")
@@ -691,6 +694,7 @@ var canonicalForms = []string{
 	"  tackroom restore [<backup> | latest] [--dry-run]",
 	"  tackroom hook list [--agents ...] [query]",
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
+	"  tackroom dash [--config PATH]                     # live screen for a terminal pane: sync state, crons; run, pause, resume, sync",
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
 	"  tackroom rex [--config PATH] [--dry-run]          # open a tackroom workspace in the Rex terminal",
 	"  tackroom tmux [--config PATH] [--dry-run]         # open a tackroom workspace in tmux",
