@@ -40,7 +40,7 @@ Rows are cut, never wrapped, and a resized pane is drawn again at once. In a nar
 | `p` | Pause the selected job, or resume it when it is disabled or not loaded |
 | `r` | Refresh everything now, and clear the last result from the message line |
 | `s` | Run `tackroom sync` in a process of its own, then show what it changed or why it failed; if the dash quits meanwhile, the sync still runs to the end |
-| `q` | Quit; while an action or a sync runs, quit when it ends |
+| `q` | Quit; while an action or a sync runs, quit when it ends and print its outcome |
 | Ctrl-C | Quit at once; a sync already started still runs to the end |
 
 Enter, `p` and `s` ask first in the message line, for example `run ai.knowledge-sync on m1 now? y/n`; any key other than `y` cancels. At `y` the job must still be in the last scan, or nothing runs and the message line says to press `r`. Run now, Pause and Resume work on launchd jobs, on this machine or on a host in `crons.hosts`, and run the same `launchctl` commands as the web view ([crons.md](crons.md#run-pause-and-resume-jobs)), which offers the same ones: Resume alone for a paused job. For any other job, Enter and `p` say they work on launchd jobs only, without asking. A launchd service, a job that runs on load or stays alive rather than on a schedule, is not paused here: the scan leaves a disabled service out, so nothing would be left to resume.

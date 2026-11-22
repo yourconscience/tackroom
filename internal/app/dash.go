@@ -66,11 +66,16 @@ func runDashCommand(args []string) error {
 	if err != nil {
 		return err
 	}
-	_, runErr := tea.NewProgram(newDashModel(*configPath), programOpts...).Run()
+	final, runErr := tea.NewProgram(newDashModel(*configPath), programOpts...).Run()
 	tail := stop()
 	if runErr != nil {
 		_, _ = os.Stderr.Write(tail)
 		return fmt.Errorf("tackroom dash: %w", runErr)
+	}
+	// A q that waited for an action or a sync left before its outcome could
+	// be read on the screen, so the outcome is printed after it.
+	if m, ok := final.(dashModel); ok && m.quitHeld && m.result != "" {
+		fmt.Fprintln(os.Stderr, m.result)
 	}
 	return nil
 }
@@ -303,9 +308,6 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, next
 	case dashActionMsg:
 		m.busy = ""
-		if m.quitHeld {
-			return m, tea.Quit
-		}
 		where := msg.job.ID + " on " + msg.job.Host
 		if msg.err != nil {
 			m.say(firstLine(msg.err.Error()), true)
@@ -315,6 +317,9 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				done += ": " + firstLine(msg.out)
 			}
 			m.say(done, false)
+		}
+		if m.quitHeld {
+			return m, tea.Quit
 		}
 		if msg.fresh != nil && m.crons != nil {
 			result := *m.crons
@@ -531,9 +536,10 @@ func dashChangesLine(report string) string {
 // dashExitStatus matches an error that says only that a command exited.
 var dashExitStatus = regexp.MustCompile(`exit status \d+$`)
 
-// dashSyncFailure is why a sync failed: the last line it printed, which is its
-// error, and when that says only that a command such as git exited, the first
-// line before it from ssh or git that says why.
+// dashSyncFailure is why a sync failed: the line that names conflicts left in
+// place, else the last line it printed, which is its error, and when that says
+// only that a command such as git exited, the first line before it from ssh or
+// git that says why.
 func dashSyncFailure(stderr string) string {
 	var lines []string
 	for _, line := range strings.Split(stderr, "\n") {
@@ -545,6 +551,13 @@ func dashSyncFailure(stderr string) string {
 		return ""
 	}
 	last := lines[len(lines)-1]
+	// A sync that left conflicts ends with advice; the line before it says
+	// what was left.
+	for _, line := range lines {
+		if strings.Contains(line, "conflict(s) in place") {
+			return line
+		}
+	}
 	if !dashExitStatus.MatchString(last) {
 		return last
 	}
