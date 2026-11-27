@@ -830,6 +830,10 @@ func (m dashModel) layout() dashLayout {
 		switch lv.detail {
 		case 2:
 			detail, reserve = m.detailCard(w), dashCardLines+2
+			// A pane too narrow for the card gets the two plain lines.
+			if len(detail) == 0 {
+				detail, reserve = m.detailPlain(w), 2
+			}
 		case 1:
 			detail, reserve = m.detailPlain(w), 2
 		}
