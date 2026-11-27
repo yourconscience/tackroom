@@ -43,7 +43,7 @@ tackroom mcp <list|add|import|remove> [options]
 tackroom restore [<backup> | latest] [--dry-run]
 tackroom dash [--config PATH]                   # live screen for a terminal pane: sync state, crons; run, pause or resume a launchd job, sync
 tackroom tern [--config PATH] [--dry-run]       # open a tackroom workspace in the Tern terminal
-tackroom rex [--config PATH] [--dry-run]        # open a tackroom workspace in the Rex terminal
+tackroom rex [--config PATH] [--dry-run]        # show or hide the tackroom panel in this Rex session
 tackroom tmux [--config PATH] [--dry-run]       # open a tackroom workspace in tmux
 tackroom zellij [--config PATH] [--dry-run]     # open a tackroom workspace in zellij
 tackroom pull [options]        # git pull --ff-only, then sync; what the periodic job runs

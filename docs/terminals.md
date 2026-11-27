@@ -4,6 +4,7 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 
 - A panel is tackroom's own interface inside the terminal.
 - A workspace command opens a session in the terminal with a shell and [`tackroom dash`](#dash).
+- In Rex, `tackroom rex` toggles a panel instead: `tackroom dash` floating at the right of the window you are in, with no session of its own.
 - A recipe is a snippet you add or run yourself.
 
 | Tool | Panel | Workspace command | Recipe |
@@ -12,26 +13,29 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 | <img src="site/marks/zellij.svg" alt="zellij logo" width="17" height="20"> [zellij](#zellij) | - | `tackroom zellij` | - |
 | <img src="site/marks/herdr.svg" alt="Herdr logo" width="20" height="20"> [Herdr](#herdr) | [tackroom panel](#herdr-panel) in the Herdr app; the Herdr TUI has none | - | - |
 | <img src="site/marks/tern.png" alt="Tern logo" width="20" height="20"> [Tern](#tern) | crons panel | `tackroom tern` | - |
-| <img src="site/marks/rex.png" alt="Rex logo" width="20" height="20"> [Rex](#rex) | - | `tackroom rex` | palette actions |
+| <img src="site/marks/rex.png" alt="Rex logo" width="20" height="20"> [Rex](#rex) | [`tackroom rex`](#rex), a floating `tackroom dash` you show and hide | - | palette actions |
 | [cmux](#cmux) | - | - | `cmux new-workspace`, not run here |
 
 ## Dash
 
-`tackroom dash` is a live screen for a terminal pane, and the four workspace commands open it next to a shell: above it in tmux, zellij and Rex, below it in Tern. It answers two questions at a glance: is everything in sync, and which scheduled jobs fail.
+`tackroom dash` is a live screen for a terminal pane. The three workspace commands open it next to a shell, above it in tmux and zellij and below it in Tern, and `tackroom rex` opens it as a panel in Rex. It answers two questions at a glance: is everything in sync, and which scheduled jobs fail.
 
 ```bash
 tackroom dash [--config PATH]
 ```
 
-From the top:
+It has the shape of the [Herdr panel](#herdr-panel)'s Overview, drawn in the terminal's own colors. From the top:
 
-- A header with the overall state as `tackroom status` decides it (`synced` or `needs attention`), the number of detected harnesses and of pinned skill sources, and the time of the last refresh, or `refreshing…` while one runs.
-- A crons line with the number of jobs, how many are failing and how many failed their last run, and any host in `crons.hosts` that could not be reached. These come from the job health the web view uses: a job with problems is failing, a job whose last exit or last status says it failed has a last run that failed, and a paused job is neither, whatever its last exit. Then one row per job: host, id, state, last run (`2m ago`, `3h ago`, `8d ago`) and result (`exit N` or the last status, or `problem` for a job with problems and no failed exit), red for a failing job, yellow for a last run that failed and dim for a paused job. Failing jobs come first, then the ones whose last run failed, then the rest in the order `cron collect` finds them. The list scrolls and says how many more jobs are above or below.
-- Under the list, the selected job's schedule, source and problems.
-- The harnesses: one that drifted or failed comes first, on a line of its own with what is wrong, then every other one with `✓`, and those not detected last. Then how many items are in cooldown or blocked, and the lock check when it did not pass.
+- A title bar with the time of the last refresh, or `refreshing…` while one runs.
+- The answer: a dot and how many things fail and how many need attention, such as `1 failing, 5 need attention`, or `All clear`, counted as the [Herdr panel](#herdr-panel)'s Overview counts them, so the two agree. Failing: a failing cron, a harness with a conflict or a config that could not be read, a failing machine, and a host the crons collect could not reach that is not already counted as a machine. Needs attention: a cron whose last run failed, a sync waiting (a harness that drifted, or the `~/.agents` link), each machine that needs attention, a source blocked by the audit or a gate, and status, crons or machines that could not be read at all. Under it, in dim: whether the harnesses are in sync or which need a sync, what the failures are when they are one kind, sources that are blocked, cron sources that could not be read, and what is still being checked.
+- The counts: skills, roles, MCP servers and hooks in the config, and the scheduled jobs, red when one fails and yellow when a last run failed, in a rounded box of five cells, or one line in a pane narrower than 43 columns.
+- The harnesses: how many are in sync, a line for each one that drifted or failed with what is wrong, then the rest as a grid with `✓`, those not detected last and dim. Then how many items are in cooldown or blocked, and the lock check when it did not pass.
+- The machines, when `crons.hosts` names more than this one: how they stand, then a line each, with what `tackroom hosts` says is wrong, or the tackroom version and config commit of one that is fine.
+- The jobs in three groups, each with its title and count: Failing, Last run failed, and Everything else (just Crons when nothing fails). The groups come from the job health the web view uses: a job with problems is failing, a job whose last exit or last status says it failed has a last run that failed, and a paused job is neither, whatever its last exit. A row has a dot (red, yellow, dim for the rest, hollow for a paused job or one that has not run), the job's name (a launchd label without its reverse-DNS prefix, any other job's id), the schedule in words in a wide pane, the host, the last run (`2m ago`, `3h ago`, `8d ago`) and the result (`exit N` or the last status, or `problem` for a job with problems and no failed exit). The selected row has a bar and, when the terminal says what its background is, a tint of it. The list scrolls and says how many more rows are above or below; with room to spare the groups get a blank line between them.
+- At the bottom, the selected job in a rounded card with its id in the border: its schedule, source, state and host, its last run, and its problems, wrapped. The card keeps its place whichever job is selected, so the list does not move with the cursor.
 - A message line with a question, the result of the last action or sync, or else the error of a refresh, and the keys.
 
-Rows are cut, never wrapped, and a resized pane is drawn again at once. In a narrow pane the jobs lose the state column, then the last run, and a long id is shortened in the middle. From 8 lines up (fewer with three jobs or less) the header, the crons line, three job rows, the message line and the keys always fit; a shorter pane first shows the harnesses as one line, such as `12 harnesses: 11 synced, 1 drifted (qwen-code)`, then scrolls the list, then drops the detail lines. Below 8 lines the harness block and the detail go, the message line takes the place of the keys whenever it has something to say, and the list shrinks down to the selected job; at 3 lines the crons line goes too, at 2 lines the header. From 2 lines up, a question waiting for y or n and the selected job are always on screen.
+Rows are cut, never wrapped, a pane wider than 104 columns keeps the content to 100, and a resized pane is drawn again at once. In a narrow pane the jobs lose the schedule, then the last run, then the host, and a long name is shortened in the middle. As the pane gets shorter the blank lines go first, then the counts become one line (`34 skills · 6 roles · 2 MCP · 2 hooks · 20 crons`), then the harnesses and the machines (`Harnesses  11 in sync · 1 need a sync`, `Machines  1 need attention`), then the card becomes two plain lines; then the counts, the harnesses, the detail and the title bar go, and the message line takes the place of the keys whenever it has something to say; last the answer goes and the list shrinks down to the selected job. From 2 lines up, a question waiting for y or n and the selected job are always on screen.
 
 | Key | Action |
 | --- | --- |
@@ -45,7 +49,7 @@ Rows are cut, never wrapped, and a resized pane is drawn again at once. In a nar
 
 Enter, `p` and `s` ask first in the message line, for example `run ai.knowledge-sync on m1 now? y/n`; any key other than `y` cancels. At `y` the job must still be in the last scan, or nothing runs and the message line says to press `r`. Run now, Pause and Resume work on launchd jobs, on this machine or on a host in `crons.hosts`, and run the same `launchctl` commands as the web view ([crons.md](crons.md#run-pause-and-resume-jobs)), which offers the same ones: Resume alone for a paused job. For any other job, Enter and `p` say they work on launchd jobs only, without asking. A launchd service, a job that runs on load or stays alive rather than on a schedule, is not paused here: the scan leaves a disabled service out, so nothing would be left to resume.
 
-The dash refreshes while it runs: the sync state every 30 seconds, which reads only this machine, and the crons every 5 minutes, after Run now, Pause or Resume (the job's host), and on `r`. A crons collect probes every host over SSH and can take a while; the screen stays usable meanwhile. A refresh that fails leaves the last data on screen, marked: the header says the status is unknown and the harnesses say when they are from, or the crons line says stale. Its error shows in the message line when no question or result is there (`r` clears the last result), and goes when that refresh next succeeds. Warnings the collectors print are kept off the screen; `tackroom status` prints them. A sync from the dash never asks anything on the terminal: it runs with no terminal at all, so when git, ssh or an ssh command of your own would ask for a password or about an unknown host key, the clone or fetch fails instead, and the message line shows the error with the line from git or ssh that says why. Its own output stays off the screen; `tackroom sync` in a shell prints it.
+The dash refreshes while it runs: the sync state every 30 seconds, which reads only this machine, and the crons and the machines every 5 minutes and on `r`, the crons also after Run now, Pause or Resume (the job's host). A crons collect and the machines check probe every host over SSH and can take a while; the screen stays usable meanwhile. A refresh that fails leaves the last data on screen, marked: the line under the answer says when the harnesses or the crons are from. Its error shows in the message line when no question or result is there (`r` clears the last result), and goes when that refresh next succeeds. Warnings the collectors print are kept off the screen; `tackroom status` prints them. A sync from the dash never asks anything on the terminal: it runs with no terminal at all, so when git, ssh or an ssh command of your own would ask for a password or about an unknown host key, the clone or fetch fails instead, and the message line shows the error with the line from git or ssh that says why. Its own output stays off the screen; `tackroom sync` in a shell prints it.
 
 It needs a terminal on stdout; otherwise it prints `tackroom dash needs a terminal; use tackroom status and tackroom cron collect --table` and exits 1. It follows `NO_COLOR`.
 
@@ -232,20 +236,21 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 ### Shipped
 
 - `tackroom doctor` checks Rex (`checkRex`): it runs `rex version`. With Rex absent it reports `skipped`, which counts as a pass. With Rex installed but not runnable it warns. Otherwise it prints the version line.
-- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a [`tackroom dash`](#dash) pane across the full width on top, with 70% of the height, and a shell pane below it, then asks the Rex app to show it. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
-  - The dash pane runs the same `tackroom` that opened it, by its absolute path. It is labelled `dash` and stays open when the dash ends, so an error stays readable.
-  - Showing the session needs the app open with Remote Control turned on in its settings; otherwise `tackroom rex` prints one line saying to open the session from Rex's sidebar.
-  - A second run shows the existing `tackroom` session instead of opening another.
-  - `--dry-run` prints the `rex` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `rex` is an error.
-- Palette actions: `rex/tackroom.lua`, which you `require` from Rex's `init.lua`, adds three actions under "tackroom" in the command palette. Install: [`rex/RECIPE.md`](../rex/RECIPE.md#palette-actions).
-  - Open tackroom Workspace (`tackroom rex`).
-  - Open tackroom Crons (`tackroom cron collect --table` in a new tab).
+- `tackroom rex` shows or hides the tackroom panel in the Rex session it runs in: [`tackroom dash`](#dash) in a floating pane at the right edge of the window, at full height. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
+  - The first run opens the panel and focuses it. The next run hides it and the one after shows it again; hidden, the dash keeps running, so it comes back at once. `q` in the dash closes the panel.
+  - A session has one panel. Run from another window of the session, `tackroom rex` closes the panel there and opens it in this window.
+  - The panel aims for 62 columns, within 30% to 60% of the window's width. It floats over the panes on the right instead of resizing them, so nothing reflows when it shows or hides.
+  - It creates no session or window and renames nothing. It finds its session and window by `REX_SESSION` and `REX_BLOCK`, which Rex sets in every pane; outside Rex it is an error, as is an absent `rex`.
+  - The dash runs the same `tackroom` that opened it, by its absolute path, in the config root. Its pane is labelled `tackroom`, which is how a later run finds the panel.
+  - `--dry-run` prints the `rex` command that would change the panel; `--config PATH` takes a config file, as every other command does.
+- Palette actions: `rex/tackroom.lua`, which you `require` from Rex's `init.lua`, adds two actions under "tackroom" in the command palette. Install: [`rex/RECIPE.md`](../rex/RECIPE.md#palette-actions).
+  - Toggle tackroom Panel (`tackroom rex` for the window the palette was opened in), which you can bind to a key.
   - Open tackroom View on Crons (`tackroom view` on its Crons tab in the default browser, started when none runs).
-- Crons with actions: Rex has no panel API, but its blocks are terminals, so the workspace's [dash](#dash) lists the jobs and has Run now, Pause and Resume for launchd jobs. The web view has them too; Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)). The Open tackroom Crons action shows the read-only `cron collect` table.
+- Crons with actions: the panel's [dash](#dash) lists the jobs and has Run now, Pause and Resume for launchd jobs. The web view has them too; Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)).
 
 ### Constraint
 
-Rex blocks are terminals, and Rex has no plugin or custom panel API. Integration goes through the `rex` CLI, Lua actions the person adds to their own `init.lua`, and `tackroom` CLI verbs. tackroom never reads or writes Rex's configuration.
+Rex blocks are terminals, and Rex has no plugin API for custom panes. The panel is a terminal pane in one of Rex's floating layers. Integration goes through the `rex` CLI, Lua actions the person adds to their own `init.lua`, and `tackroom` CLI verbs. tackroom never reads or writes Rex's configuration.
 
 ## cmux
 

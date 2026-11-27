@@ -696,7 +696,7 @@ var canonicalForms = []string{
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
 	"  tackroom dash [--config PATH]                     # live screen for a terminal pane: sync state, crons; run, pause, resume, sync",
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
-	"  tackroom rex [--config PATH] [--dry-run]          # open a tackroom workspace in the Rex terminal",
+	"  tackroom rex [--config PATH] [--dry-run]          # show or hide the tackroom panel in this Rex session",
 	"  tackroom tmux [--config PATH] [--dry-run]         # open a tackroom workspace in tmux",
 	"  tackroom zellij [--config PATH] [--dry-run]       # open a tackroom workspace in zellij",
 	"  tackroom hosts [HOST...] [--json] [--config PATH]   # tackroom on each machine in crons.hosts: version, sync state, config commit",

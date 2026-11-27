@@ -3,14 +3,10 @@
 -- Put this file beside Rex's init.lua and add `require("tackroom")` to
 -- init.lua; see RECIPE.md. tackroom never edits Rex config.
 --
---   tackroom_workspace  runs `tackroom rex`: a tackroom session with
---                       `tackroom dash` above a shell
---   tackroom_crons      opens `tackroom cron collect --table` in a new tab
---   tackroom_view       opens `tackroom view` on its Crons tab, starting it
---                       when none runs; Run now, Pause and Resume are there
---
--- Rex has no panel API, so acting on a job goes through the workspace's
--- `tackroom dash` or the web view.
+--   tackroom_panel  runs `tackroom rex`: shows or hides the tackroom panel, a
+--                   floating `tackroom dash` at the right of this window
+--   tackroom_view   opens `tackroom view` on its Crons tab, starting it
+--                   when none runs
 --
 -- Optional settings, after the require:
 --
@@ -19,8 +15,6 @@
 --   tackroom.config = "/path/to/tackroom.yaml" -- default: tackroom's own lookup
 
 local M = { bin = "tackroom", config = nil }
-
-local SHELL = "com.superlogical.terminal.shell"
 
 local function home()
 	return os.getenv("HOME") or ""
@@ -97,14 +91,22 @@ local function last_line(s)
 end
 
 rex.action({
-	name = "tackroom_workspace",
-	title = "Open tackroom Workspace",
-	description = "Runs tackroom rex: a tackroom session with tackroom dash, the sync state and the crons, above a shell.",
+	name = "tackroom_panel",
+	title = "Toggle tackroom Panel",
+	description = "Shows or hides the tackroom panel at the right of this window: tackroom dash, with the sync state and the crons. q in the panel closes it.",
 	category = "tackroom",
-	keywords = "tackroom workspace session dash status crons",
+	keywords = "tackroom panel dash status sync crons jobs",
 	run = function(ctx, args)
+		if not ctx.session_id then
+			error("Toggle tackroom Panel needs a Rex session", 0)
+		end
 		local b = bin()
-		local r, err = rex.exec(command(b, { "rex" }), { env = env(b), timeout = 25 })
+		-- `tackroom rex` finds its session and window by the variables Rex
+		-- sets in a pane; here they come from where the action was run.
+		local e = env(b)
+		e.REX_SESSION = ctx.session_id
+		e.REX_BLOCK = ctx.block_id or false
+		local r, err = rex.exec(command(b, { "rex" }), { env = e, timeout = 25 })
 		if r == nil then
 			error(err, 0)
 		end
@@ -115,44 +117,6 @@ rex.action({
 			end
 			error("tackroom rex: " .. reason, 0)
 		end
-		-- `tackroom rex` shows the session from outside the app, which needs
-		-- Remote Control. Run from the palette, this app can show it itself.
-		local list = rex.call("session.list")
-		if list and list.sessions then
-			for _, s in ipairs(list.sessions) do
-				if s.label == "tackroom" then
-					pcall(rex.client.queue, "session.select", { session_id = s.session_id })
-					break
-				end
-			end
-		end
-		if last_line(r.stdout) ~= "" then
-			return { output = last_line(r.stdout) }
-		end
-	end,
-})
-
-rex.action({
-	name = "tackroom_crons",
-	title = "Open tackroom Crons",
-	description = "tackroom cron collect --table in a new tab: every scheduled job on every host. Act on one from the workspace's dash or the web view.",
-	category = "tackroom",
-	keywords = "tackroom cron crons jobs launchd collect",
-	run = function(ctx, args)
-		local w, err = rex.session.new_window({
-			window_label = "crons",
-			layout = rex.layout.block({
-				flavor = SHELL,
-				options = {
-					command = command(bin(), { "cron", "collect", "--table" }),
-					exit = { on_completion = false },
-				},
-			}),
-		})
-		if err ~= nil then
-			error(err, 0)
-		end
-		return { window_id = w.window_id }
 	end,
 })
 
