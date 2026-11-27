@@ -12,7 +12,7 @@ The panel is `tackroom dash`, a terminal program with the sync state and your sc
 Run `tackroom rex` (or `tackroom rex --config PATH` with the path of a non-default `tackroom.yaml`) in a Rex pane:
 
 - The first run opens the panel in that pane's window and focuses it.
-- The next run hides it, and the one after shows it again. Hidden, the dash keeps running, so it comes back at once.
+- The next run hides it, and the one after shows it again. Hidden, the dash keeps running but skips its timed refreshes, so a hidden panel does not probe your hosts over SSH every 5 minutes. Showing it presses F5 in it, so it refreshes at once; unlike `r`, F5 leaves a question waiting in the dash alone.
 - `q` in the dash closes the panel.
 - Run from another window of the same session, it closes the panel there and opens it in this one, so a session has one panel.
 
@@ -26,10 +26,11 @@ rex block call -s <session> -b <pane> size {}
 rex api call -s <session> session.new_layer '{"window_id":"<window>","bounds":[<x>,0,<w>,1],"focus":true,"layout":{"block":{"flavor":"com.superlogical.terminal.shell","label":"tackroom","options":{"command":["<tackroom>","dash"],"cwd":"<root>"}}}}'
 rex api call -s <session> session.set_layer_state '{"layer_id":"<panel>","state":"minimized"}'
 rex api call -s <session> session.set_layer_state '{"layer_id":"<panel>","state":"normal","focus":true}'
+rex send-key -s <session> -b <panel pane> f5
 rex api call -s <session> session.close_layer '{"layer_id":"<panel>"}'
 ```
 
-The first two only read: the session's windows and panes, and the width in columns of a pane of the window, from which the panel's width follows. One of the others runs: `new_layer` opens the panel, `set_layer_state` hides or shows it, and `close_layer` takes it out of another window before `new_layer` opens it in this one. `--dry-run` runs the reads and prints the command that would change the panel.
+The first two only read: the session's windows and panes, and the width in columns of a pane of the window, from which the panel's width follows. One of the others runs: `new_layer` opens the panel, `set_layer_state` hides or shows it (showing it then sends F5 to the dash), and `close_layer` takes it out of another window before `new_layer` opens it in this one. `--dry-run` runs the reads and prints the command that would change the panel.
 
 ## Palette actions
 

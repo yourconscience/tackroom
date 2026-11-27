@@ -51,7 +51,8 @@ func (n *rexNode) leaf(block string) *rexNode {
 // runRexCommand toggles the tackroom panel in the Rex session it runs in: a
 // floating pane at the right edge of the window, at full height, running
 // `tackroom dash`. The first run opens it with the focus, the next hides it and
-// the one after shows it again; hidden, the dash keeps running. A panel in
+// the one after shows it again; hidden, the dash keeps running but skips its
+// timed refreshes, and showing it presses F5 to refresh it. A panel in
 // another window of the session moves to this one, so a session has one panel.
 // Sessions, windows and their labels stay as they are. It is the optional Rex
 // terminal integration; an absent Rex, or a run outside Rex, is an error.
@@ -167,7 +168,7 @@ func runRexCommand(args []string) error {
 	// window the session shows. An existing panel is a floating layer with a
 	// pane labelled tackroom, in any window.
 	window := view.ActiveWindowID
-	panel, panelState, panelWindow := "", "", ""
+	panel, panelBlock, panelState, panelWindow := "", "", "", ""
 	for _, w := range view.Windows {
 		for _, l := range w.Layers {
 			for _, b := range l.Blocks {
@@ -175,7 +176,7 @@ func runRexCommand(args []string) error {
 					window = w.WindowID
 				}
 				if l.Kind == "floating" && b.Label == rexPanelLabel && panel == "" {
-					panel, panelState, panelWindow = l.LayerID, l.State, w.WindowID
+					panel, panelBlock, panelState, panelWindow = l.LayerID, b.BlockID, l.State, w.WindowID
 				}
 			}
 		}
@@ -197,6 +198,13 @@ func runRexCommand(args []string) error {
 			if err := call(true, "session.set_layer_state", map[string]any{"layer_id": panel, "state": "normal", "focus": true}); err != nil {
 				return err
 			}
+			// A hidden dash skipped its timed refreshes; F5 refreshes it now,
+			// and unlike r leaves a question waiting in it alone. The panel
+			// shows either way, so a failure here is only said.
+			if _, err := run(true, "send-key", "-s", session, "-b", panelBlock, "f5"); err != nil {
+				fmt.Println("Showed the tackroom panel; press r in it to refresh it (" + firstLine(err.Error()) + ").")
+				return nil
+			}
 			if !*dryRun {
 				fmt.Println("Showed the tackroom panel.")
 			}
@@ -206,7 +214,7 @@ func runRexCommand(args []string) error {
 			return err
 		}
 		if !*dryRun {
-			fmt.Println("Hid the tackroom panel; the dash keeps running.")
+			fmt.Println("Hid the tackroom panel; it stops refreshing until you show it again.")
 		}
 		return nil
 	}

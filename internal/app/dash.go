@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -8,6 +10,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"slices"
 	"strings"
@@ -204,7 +207,9 @@ type dashSyncMsg struct {
 	failed bool
 }
 
-type dashTickMsg struct{ crons bool }
+// dashTickMsg is a timed refresh coming due; hidden says the dash's Rex pane
+// was minimized then, and the refresh is skipped.
+type dashTickMsg struct{ crons, hidden bool }
 
 // dashPending is a question in the message line: the key that asked it, and
 // the verb y starts on job (run, pause or resume), or sync.
@@ -288,7 +293,59 @@ func dashTick(crons bool) tea.Cmd {
 	if crons {
 		every = dashCronsEvery
 	}
-	return tea.Tick(every, func(time.Time) tea.Msg { return dashTickMsg{crons: crons} })
+	return tea.Tick(every, func(time.Time) tea.Msg { return dashTickMsg{crons: crons, hidden: dashHiddenInRex()} })
+}
+
+// dashHiddenInRex reports whether the dash runs in a Rex pane that is
+// minimized, as `tackroom rex` hides its panel. A hidden dash skips its timed
+// refreshes, so a panel left hidden does not probe the hosts every 5 minutes;
+// `tackroom rex` presses F5 in it when it shows it again. Rex sets REX_SESSION,
+// REX_BLOCK and REX_BIN_DIR, the folder of its CLI, in every pane. Outside
+// Rex, or when Rex cannot say within 5 seconds, it is false and the refreshes
+// run.
+func dashHiddenInRex() bool {
+	session, block := os.Getenv("REX_SESSION"), os.Getenv("REX_BLOCK")
+	if session == "" || block == "" {
+		return false
+	}
+	rex, err := exec.LookPath("rex")
+	if dir := os.Getenv("REX_BIN_DIR"); dir != "" {
+		if _, statErr := os.Stat(filepath.Join(dir, "rex")); statErr == nil {
+			rex, err = filepath.Join(dir, "rex"), nil
+		}
+	}
+	if err != nil {
+		return false
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, rex, "--autostart=false", "api", "call", "-s", session, "session.view").Output()
+	if err != nil {
+		return false
+	}
+	var view struct {
+		Windows []struct {
+			Layers []struct {
+				State  string `json:"state"`
+				Blocks []struct {
+					BlockID string `json:"block_id"`
+				} `json:"blocks"`
+			} `json:"layers"`
+		} `json:"windows"`
+	}
+	if json.Unmarshal(out, &view) != nil {
+		return false
+	}
+	for _, w := range view.Windows {
+		for _, l := range w.Layers {
+			for _, b := range l.Blocks {
+				if b.BlockID == block {
+					return l.State == "minimized"
+				}
+			}
+		}
+	}
+	return false
 }
 
 // refreshStatus starts a status collect; a collect already running is
@@ -303,6 +360,22 @@ func (m *dashModel) refreshCrons() tea.Cmd {
 	m.cronsGen++
 	m.cronsBusy = true
 	return dashCollectCrons(m.configPath, m.cronsGen)
+}
+
+// refreshAll refreshes whatever is not refreshing already: the sync state,
+// unless a sync runs, the crons and the machines.
+func (m *dashModel) refreshAll() tea.Cmd {
+	var cmds []tea.Cmd
+	if !m.statusBusy && !m.syncing {
+		cmds = append(cmds, m.refreshStatus())
+	}
+	if !m.cronsBusy {
+		cmds = append(cmds, m.refreshCrons())
+	}
+	if !m.hostsBusy {
+		cmds = append(cmds, m.refreshHosts())
+	}
+	return tea.Batch(cmds...)
 }
 
 // refreshHosts probes the machines again; it runs with the crons, every 5
@@ -365,6 +438,8 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dashTickMsg:
 		next := dashTick(msg.crons)
 		switch {
+		case msg.hidden:
+			return m, next
 		case msg.crons:
 			cmds := []tea.Cmd{next}
 			if !m.cronsBusy {
@@ -426,6 +501,11 @@ func (m dashModel) key(key string) (tea.Model, tea.Cmd) {
 	if key == "ctrl+c" {
 		return m, tea.Quit
 	}
+	// F5 refreshes as r does, but leaves a question and the last result in
+	// place: `tackroom rex` presses it when it shows a hidden panel.
+	if key == "f5" {
+		return m, m.refreshAll()
+	}
 	if p := m.pending; p != nil {
 		m.pending = nil
 		if key != "y" {
@@ -453,17 +533,7 @@ func (m dashModel) key(key string) (tea.Model, tea.Cmd) {
 		m.move(len(jobs))
 	case "r":
 		m.result, m.failed = "", false
-		var cmds []tea.Cmd
-		if !m.statusBusy && !m.syncing {
-			cmds = append(cmds, m.refreshStatus())
-		}
-		if !m.cronsBusy {
-			cmds = append(cmds, m.refreshCrons())
-		}
-		if !m.hostsBusy {
-			cmds = append(cmds, m.refreshHosts())
-		}
-		return m, tea.Batch(cmds...)
+		return m, m.refreshAll()
 	case "enter", "p":
 		if m.busy != "" || len(jobs) == 0 {
 			return m, nil
