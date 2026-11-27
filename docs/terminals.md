@@ -156,13 +156,15 @@ If you copied the `tackroom` layout that earlier releases shipped in `herdr/layo
 
 #### What the panel shows
 
-- **Header.** The time the open tab's data was loaded, a Refresh button that reloads it and a Web button that opens the same tab of `tackroom view`, starting the view when none runs. A dot after a tab's name marks a tab that needs attention.
-- **Overview.** It draws `tackroom sync --dry-run --json`, which writes and fetches nothing, and `tackroom hosts --json`. From the top:
-  - whether everything is synced or how many changes wait;
-  - a Machines section with one row per machine in `crons.hosts` (its health, a summary and the command that fixes it; only with more than one host);
-  - one row per harness (what is missing or drifted, then how many skills, roles, MCP servers and hooks it has, and its state) that opens into the exact names. An open harness row has Turn off; a harness turned off in the config is listed with Turn on;
-  - an "In cooldown or blocked" list of what sync skips, with the command that overrides it;
-  - a line for the Crons tab.
+- **Header.** The tackroom mark and name, a pill with the short hash of your config's commit (from 340 px of panel width; from 440 px the config root comes with it, "~/.agents · 9b13be6"), the tackroom version, a Refresh button that reloads the open tab and a Web button that opens the same tab of `tackroom view`, starting the view when none runs. A count after a tab's name marks a tab that needs attention, in the colour for failing or for needs attention.
+- **Overview.** It draws `tackroom sync --dry-run --json`, which writes and fetches nothing, `tackroom hosts --json`, `tackroom config inventory` and `tackroom cron collect`. From the top:
+  - the answer, one line such as "2 failing, 1 needs attention" or "All clear", with a filled Sync button at its right while a sync waits;
+  - a counts strip with skills, roles, MCP servers, hooks and crons, each opening its tab; a number takes the colour for needs attention or failing when something of that kind is wrong;
+  - a harness grid: one row per installed harness with Herdr's own icon for it, its name and one cell each for skills, roles, MCP servers and hooks. A cell is a dot, green when everything on that surface is in place, yellow when something is missing or drifted, red on a conflict or an unreadable config, or a dash where the harness does not take that surface. Failing harnesses come first, then those that need attention; past six rows the ones in sync fold into "+N more in sync". A row opens into its counts and Turn off;
+  - "Failing" and "Needs attention", each with its count and with the fix or the actions on every row: a cron, a harness with a conflict, the sync waiting and the harnesses that need it, a source the audit blocked, and one row for each machine in `crons.hosts` with its summary and the command that fixes it (only with more than one host). A cron row has Run now, Pause and Log, and Details opens the rest;
+  - "Outside skills" as chips: how many sources are pinned, one chip for each with audit findings, and how many are in cooldown or blocked. A chip opens the Skills tab;
+  - "Everything else": the healthy crons, the config commit and tackroom version the machines share, what is in cooldown with the command that overrides it, and the harnesses not installed or turned off, with Turn on.
+- **Buttons and footer.** Actions are quiet bordered buttons, and a row of them wraps on a narrow panel. Under every tab a footer stays in place: the state of the config root on this Mac ("~/.agents · 1 uncommitted" or "~/.agents · clean") and when the open tab's data was loaded.
 - **Sync.** When something waits, Overview has a Sync button. It opens the plan in a dialog: each change once, with the harnesses it touches under it, and in red what the sync removes or overwrites. The dialog's button reads Sync and remove when it removes something.
   - It runs `tackroom sync --plan-digest`, so when the plan or the config changed since the plan loaded, nothing is applied, the dialog says so and the panel loads the new plan. The dialog then leaves only Cancel, and Sync on Overview opens the new plan.
   - An edit inside a skill or role file that leaves the plan's lines the same is not noticed.
@@ -189,7 +191,7 @@ Turn on, Turn off, Add and Remove run `tackroom config set`, which changes `tack
 
 - The web view cannot be embedded: Herdr mods are native elements drawn from JavaScript, so Herdr has its own renderer over the same data.
 - The web view's Unmanaged and Config tabs are not in the panel.
-- The Skills tab lists skills of a source sync has not pinned because it is blocked or in cooldown as missing in every harness, as the web view does; Overview lists the source under "In cooldown or blocked".
+- The Skills tab lists skills of a source sync has not pinned because it is blocked or in cooldown as missing in every harness, as the web view does; Overview shows a blocked source under Needs attention and a source in cooldown as a chip and under Everything else.
 - The Web button runs `tackroom view --json`, which uses tackroom's default token file, so it does not find a view started with another `--token-file`; it starts one of its own instead.
 - A collect probes every host over SSH. On a loaded machine the local probe can hit tackroom's 2 minute timeout, and the host shows "unreachable" until the next collect.
 - After an Add, Edit, Delete or action, the Crons tab runs a full collect and the row updates when that finishes, not at once as in the web view.
