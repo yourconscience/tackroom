@@ -643,6 +643,10 @@ func parseCronFlags(args []string) (cronOptions, error) {
 	if err := fs.Parse(args); err != nil {
 		return cronOptions{}, err
 	}
+	// Bare `cron` installs the sync job, so a mistyped subcommand must not reach it.
+	if fs.NArg() > 0 {
+		return cronOptions{}, fmt.Errorf("unknown cron subcommand %q", fs.Arg(0))
+	}
 	return opts, nil
 }
 
