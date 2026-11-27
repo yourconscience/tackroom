@@ -2,6 +2,11 @@
 
 What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
+## To 3.2
+
+- Changed: `tackroom rex` toggles a tackroom panel in the Rex session it runs in, instead of opening a session labelled `tackroom`. The panel is `tackroom dash` floating at the right edge of the window, at full height; a second run hides it, a third shows it again, and `q` in the dash closes it. Run it in a Rex pane, or bind the new Toggle tackroom Panel action. A `tackroom` session from an earlier release stays until you close it. See [terminals.md](terminals.md#rex).
+- Changed: `rex/tackroom.lua` has Toggle tackroom Panel in place of Open tackroom Workspace and Open tackroom Crons, whose crons table the panel's dash already shows. Copy the file again.
+
 ## To 3.1
 
 Nothing to migrate by hand. A workspace session that is already open keeps its old panes until you close it; run the workspace command again to get the new layout.

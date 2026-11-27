@@ -4,6 +4,7 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 
 - A panel is tackroom's own interface inside the terminal.
 - A workspace command opens a session in the terminal with a shell and [`tackroom dash`](#dash).
+- In Rex, `tackroom rex` toggles a panel instead: `tackroom dash` floating at the right of the window you are in, with no session of its own.
 - A recipe is a snippet you add or run yourself.
 
 | Tool | Panel | Workspace command | Recipe |
@@ -12,12 +13,12 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 | <img src="site/marks/zellij.svg" alt="zellij logo" width="17" height="20"> [zellij](#zellij) | - | `tackroom zellij` | - |
 | <img src="site/marks/herdr.svg" alt="Herdr logo" width="20" height="20"> [Herdr](#herdr) | [tackroom panel](#herdr-panel) in the Herdr app; the Herdr TUI has none | - | - |
 | <img src="site/marks/tern.png" alt="Tern logo" width="20" height="20"> [Tern](#tern) | crons panel | `tackroom tern` | - |
-| <img src="site/marks/rex.png" alt="Rex logo" width="20" height="20"> [Rex](#rex) | - | `tackroom rex` | palette actions |
+| <img src="site/marks/rex.png" alt="Rex logo" width="20" height="20"> [Rex](#rex) | [`tackroom rex`](#rex), a floating `tackroom dash` you show and hide | - | palette actions |
 | [cmux](#cmux) | - | - | `cmux new-workspace`, not run here |
 
 ## Dash
 
-`tackroom dash` is a live screen for a terminal pane, and the four workspace commands open it next to a shell: above it in tmux, zellij and Rex, below it in Tern. It answers two questions at a glance: is everything in sync, and which scheduled jobs fail.
+`tackroom dash` is a live screen for a terminal pane. The three workspace commands open it next to a shell, above it in tmux and zellij and below it in Tern, and `tackroom rex` opens it as a panel in Rex. It answers two questions at a glance: is everything in sync, and which scheduled jobs fail.
 
 ```bash
 tackroom dash [--config PATH]
@@ -230,20 +231,21 @@ Tern panes are terminals. Integration goes through the `tern` CLI, the plugin AP
 ### Shipped
 
 - `tackroom doctor` checks Rex (`checkRex`): it runs `rex version`. With Rex absent it reports `skipped`, which counts as a pass. With Rex installed but not runnable it warns. Otherwise it prints the version line.
-- `tackroom rex` opens a tackroom workspace in Rex: a session labelled `tackroom` in the config root with a [`tackroom dash`](#dash) pane across the full width on top, with 70% of the height, and a shell pane below it, then asks the Rex app to show it. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
-  - The dash pane runs the same `tackroom` that opened it, by its absolute path. It is labelled `dash` and stays open when the dash ends, so an error stays readable.
-  - Showing the session needs the app open with Remote Control turned on in its settings; otherwise `tackroom rex` prints one line saying to open the session from Rex's sidebar.
-  - A second run shows the existing `tackroom` session instead of opening another.
-  - `--dry-run` prints the `rex` commands; `--config PATH` takes a config file, as every other command does, and opens the session in its folder. Without it the root follows `$TACKROOM_HOME`, else `~/.agents`. An absent `rex` is an error.
-- Palette actions: `rex/tackroom.lua`, which you `require` from Rex's `init.lua`, adds three actions under "tackroom" in the command palette. Install: [`rex/RECIPE.md`](../rex/RECIPE.md#palette-actions).
-  - Open tackroom Workspace (`tackroom rex`).
-  - Open tackroom Crons (`tackroom cron collect --table` in a new tab).
+- `tackroom rex` shows or hides the tackroom panel in the Rex session it runs in: [`tackroom dash`](#dash) in a floating pane at the right edge of the window, at full height. Recipe: [`rex/RECIPE.md`](../rex/RECIPE.md).
+  - The first run opens the panel and focuses it. The next run hides it and the one after shows it again; hidden, the dash keeps running, so it comes back at once. `q` in the dash closes the panel.
+  - A session has one panel. Run from another window of the session, `tackroom rex` closes the panel there and opens it in this window.
+  - The panel aims for 62 columns, within 30% to 60% of the window's width. It floats over the panes on the right instead of resizing them, so nothing reflows when it shows or hides.
+  - It creates no session or window and renames nothing. It finds its session and window by `REX_SESSION` and `REX_BLOCK`, which Rex sets in every pane; outside Rex it is an error, as is an absent `rex`.
+  - The dash runs the same `tackroom` that opened it, by its absolute path, in the config root. Its pane is labelled `tackroom`, which is how a later run finds the panel.
+  - `--dry-run` prints the `rex` command that would change the panel; `--config PATH` takes a config file, as every other command does.
+- Palette actions: `rex/tackroom.lua`, which you `require` from Rex's `init.lua`, adds two actions under "tackroom" in the command palette. Install: [`rex/RECIPE.md`](../rex/RECIPE.md#palette-actions).
+  - Toggle tackroom Panel (`tackroom rex` for the window the palette was opened in), which you can bind to a key.
   - Open tackroom View on Crons (`tackroom view` on its Crons tab in the default browser, started when none runs).
-- Crons with actions: Rex has no panel API, but its blocks are terminals, so the workspace's [dash](#dash) lists the jobs and has Run now, Pause and Resume for launchd jobs. The web view has them too; Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)). The Open tackroom Crons action shows the read-only `cron collect` table.
+- Crons with actions: the panel's [dash](#dash) lists the jobs and has Run now, Pause and Resume for launchd jobs. The web view has them too; Open tackroom View on Crons opens its Crons tab ([crons.md](crons.md)).
 
 ### Constraint
 
-Rex blocks are terminals, and Rex has no plugin or custom panel API. Integration goes through the `rex` CLI, Lua actions the person adds to their own `init.lua`, and `tackroom` CLI verbs. tackroom never reads or writes Rex's configuration.
+Rex blocks are terminals, and Rex has no plugin API for custom panes. The panel is a terminal pane in one of Rex's floating layers. Integration goes through the `rex` CLI, Lua actions the person adds to their own `init.lua`, and `tackroom` CLI verbs. tackroom never reads or writes Rex's configuration.
 
 ## cmux
 
