@@ -16,10 +16,10 @@ Open with **Open tackroom crons** in the palette, or `Ctrl+Alt+C`. To change it,
 
 ## What you see
 
-- **Header**: "Crons", the time of the last collect (or "collecting…"), then **Collect** and **Web** buttons.
-- **Hosts**, one line each: the host's name ("This Mac" for the local one), then a colored dot and count per health (failing, last run failed, no result, healthy, paused).
-- **Needs attention**: failing jobs, each row showing the host instead of the schedule.
-- **One section per host**: its jobs sorted failing, last run failed, no result, healthy, paused. A row is a health dot, the short name, the schedule in words, and how long ago it last ran ("paused" for a paused job). Launchd jobs get **Run now** and **Pause** (or **Resume** when off).
+- **Header**: "Crons" and the time of the last collect (or "collecting…"), with **Collect** and **Web** buttons on the right.
+- **Hosts**: one stat tile per host ("This Mac" for the local one) with the job count and a tinted breakdown by health (failing, last run failed, no result, healthy, paused); the count is red when any job is failing.
+- **Needs attention**: a section of failing jobs, each row showing the host instead of the schedule.
+- **One section per host**: a table of its jobs sorted failing, last run failed, no result, healthy, paused. A row is a status dot and the short name, the schedule in words, and how long ago it last ran ("paused" for a paused job). Launchd jobs get **Run now** and **Pause** (or **Resume** when off).
 
 ## How it behaves
 
