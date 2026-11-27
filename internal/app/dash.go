@@ -955,11 +955,6 @@ func padRight(s string, w int) string {
 	return s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
 }
 
-// asOf is " (as of 15:04)" for data whose last refresh failed.
-func asOf(at time.Time) string {
-	return ui.Dim.Render(" (as of " + at.Format("15:04") + ")")
-}
-
 // titleBar is the name and when the data was last refreshed.
 func (m dashModel) titleBar(w int) string {
 	left := ui.Bold.Render("tackroom")
@@ -1107,6 +1102,8 @@ func (m dashModel) answer() (level, title string, subs []string) {
 	}
 	warn += sick
 	switch {
+	case m.hosts != nil && m.hostsErr != "":
+		subs = append(subs, "Machines as of "+m.hostsAt.Format("15:04")+".")
 	case m.hosts == nil && m.hostsErr != "":
 		warn++
 		subs = append(subs, "Machines could not be checked.")
@@ -1772,6 +1769,8 @@ func (m dashModel) messageLine(w int) string {
 		return ui.Red.Render("status: " + m.statusErr)
 	case m.cronsErr != "":
 		return ui.Red.Render("crons: " + m.cronsErr)
+	case m.hostsErr != "":
+		return ui.Red.Render("machines: " + m.hostsErr)
 	}
 	return ""
 }
