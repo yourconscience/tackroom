@@ -1,6 +1,6 @@
-import { View, div, svg } from "gpui-kit";
+import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex } from "gpui-base";
-import { exec, props, theme, notify, openOverlay, nextCommand, run } from "herdr";
+import { exec, props, theme, notify, openOverlay, nextCommand, run, settings, home as homeDir, agents as liveAgents, knownAgents } from "herdr";
 import JobForm, { runTackroom, expand } from "./form.js";
 
 // tackroom inside Herdr, one tab for each tab of the web view. Every tab draws
@@ -87,6 +87,19 @@ function harnessLevel(a) {
   return a.synced ? "ok" : "warn";
 }
 const surfaces = (a) => [["Skills", a.skills], ["Roles", a.roles], ["MCP", a.mcp], ["Hooks", a.hooks]];
+// The columns of the Overview's harness grid, in the order of surfaces(a): the label over
+// each and the inventory flag that says whether the harness takes the surface.
+const GRID = [["SK", ""], ["RO", "supports_roles"], ["MCP", "supports_mcp"], ["HK", "supports_hooks"]];
+// The grid shows this many harnesses before the ones in sync fold into one line.
+const GRID_ROWS = 6;
+// The pill with the config root shows from this panel width on.
+const WIDE = 340;
+const norm = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+// A path under the home folder as ~/…
+function tilde(path) {
+  const h = homeDir();
+  return h && (path === h || path.startsWith(`${h}/`)) ? `~${path.slice(h.length)}` : path;
+}
 
 // A Claude Desktop task's short name is its whole prompt; its id reads better.
 const jobName = (j) => (j.source === "claude-desktop" ? j.id : j.short_name);
@@ -161,12 +174,19 @@ export default class Tackroom extends View {
     this.src = Object.fromEntries(Object.keys(SOURCES).map((name) => [name, { data: null, error: "", loading: false, again: false, at: 0 }]));
     this.busy = "";
     this.open = new Set();
+    // wide: the panel is at least WIDE px, so the header has room for the config root.
+    this.wide = false;
+    // Herdr's program table for the agents it can start: where a harness's icon comes from.
+    this.known = [];
     // A crons collect probes every host over SSH, so poll gently; Refresh reloads the open tab at once.
     cx.timer.every(Math.max(60, p.refresh ?? 300) * 1000, (cx) => Object.keys(SOURCES).forEach((name) => this.load(name, cx)));
     // The first loads start from a timer: an exec started in init never
     // returned (Herdr 0.1.15, a panel created hidden or covered), which kept
     // every source "loading" and the panel on "Loading…" for good.
-    cx.timer.after(300, (cx) => Object.keys(SOURCES).forEach((name) => this.load(name, cx)));
+    cx.timer.after(300, (cx) => {
+      Object.keys(SOURCES).forEach((name) => this.load(name, cx));
+      this.loadKnown(cx);
+    });
     // The dialog sends "reload" after it changes a job and "synced" after a sync.
     cx.spawn(async (cx) => {
       for (;;) {
@@ -242,6 +262,18 @@ export default class Tackroom extends View {
     const path = `${section}/${name}/enabled`;
     return this.link(`on:${path}`, this.busy === `cfg:${path}` ? "…" : enabled ? "Turn off" : "Turn on",
       (cx) => this.configSet(path, !enabled, `${name} turned ${enabled ? "off" : "on"}`, cx), this.busy !== "", t);
+  }
+
+  // The agents Herdr knows, with their icons. A harness the table lacks keeps its letter.
+  loadKnown(cx) {
+    cx.spawn(async (cx) => {
+      try {
+        this.known = await knownAgents();
+        cx.notify();
+      } catch {
+        this.known = [];
+      }
+    });
   }
 
   load(name, cx) {
@@ -341,9 +373,9 @@ export default class Tackroom extends View {
   // Failing: a failing cron, a harness with a conflict or an unreadable config,
   // a failing machine (unreachable, not set up, a major version behind), a host
   // the crons collect could not reach. Needs attention: a cron whose last run
-  // failed, a sync waiting, the machines that need attention (one row for them
-  // all, as in the web view), a source the audit blocked, and a source that did
-  // not load. pending: sources still loading for the first time.
+  // failed, a sync waiting, a machine that needs attention, a source the audit
+  // blocked, and a source that did not load. pending: sources still loading for
+  // the first time.
   overviewModel() {
     const d = this.src.plan.data;
     const c = this.src.crons.data;
@@ -359,7 +391,7 @@ export default class Tackroom extends View {
     const warn = [
       ...jobs.filter((j) => j.health === "warn").map((job) => ({ kind: "job", job })),
       ...(d && !d.synced ? [{ kind: "sync" }] : []),
-      ...(sick.length ? [{ kind: "machines", hosts: sick }] : []),
+      ...sick.map((m) => ({ kind: "machines", hosts: [m] })),
       ...(d ? skippedItems(d) : []).filter((h) => h.kind === "blocked").map((h) => ({ kind: "blocked", h })),
       ...["plan", "crons"].filter((name) => !this.src[name].data && this.src[name].error).map((name) => ({ kind: "error", name })),
     ];
@@ -443,11 +475,22 @@ export default class Tackroom extends View {
 
   // ---------- pieces every tab draws with ----------
 
-  // An action in the theme's accent, as the web view's text buttons.
+  // An action as a quiet button: a 1px border, no fill until the pointer is over it.
   link(id, label, onClick, disabled, t) {
-    return div().id(id).flex_none().text_size(12).font_medium().text_color(t.accent)
+    return h_flex().id(id).flex_none().items_center().px(8).py(3).rounded(6).border(1).border_color(t.border)
+      .text_size(12).text_color(t.foreground)
       .when(disabled, (el) => el.opacity(0.5))
-      .when(!disabled, (el) => el.cursor_pointer().hover((s) => s.opacity(0.75)))
+      .when(!disabled, (el) => el.cursor_pointer().hover((s) => s.bg(t.hover)))
+      .on_click((_e, cx) => { if (!disabled) onClick(cx); })
+      .child(label);
+  }
+
+  // The one filled button of the Overview: the theme's foreground as its fill.
+  primary(id, label, onClick, disabled, t) {
+    return h_flex().id(id).flex_none().items_center().px(10).py(4).rounded(6).bg(t.foreground)
+      .text_size(12).font_semibold().text_color(t.background)
+      .when(disabled, (el) => el.opacity(0.5))
+      .when(!disabled, (el) => el.cursor_pointer().hover((s) => s.opacity(0.88)))
       .on_click((_e, cx) => { if (!disabled) onClick(cx); })
       .child(label);
   }
@@ -509,14 +552,19 @@ export default class Tackroom extends View {
       .when(Boolean(right), (el) => el.child(h_flex().flex_none().pt(4).child(right)));
   }
 
-  // A group under a sentence-case title in its level's colour, with an optional
-  // dim note after the title and a column label over the right-hand numbers.
-  group(title, level, rows, t, { gap = 2, note = "", column = "" } = {}) {
+  // A section title: 10px, semibold, upper case, in the colour it is given.
+  heading(text, color) {
+    return div().flex_none().text_size(10).font_semibold().text_color(color).child(text.toUpperCase());
+  }
+
+  // A group under a title in its level's colour with its count ("NEEDS ATTENTION · 2"),
+  // an optional dim note after the title and a column label over the right-hand numbers.
+  group(title, level, rows, t, { gap = 2, note = "", column = "", count = null } = {}) {
     return v_flex().gap(gap)
-      .child(h_flex().gap(8).px(6).items_center().text_size(11)
-        .child(div().flex_none().font_semibold().text_color(level ? tone(t, level) : t.muted).child(title))
-        .child(div().flex_1().min_w(0).truncate().text_color(t.dim).child(note))
-        .when(Boolean(column), (el) => el.child(div().flex_none().w(48).text_right().text_color(t.dim).child(column))))
+      .child(h_flex().gap(8).px(6).items_center()
+        .child(this.heading(count == null ? title : `${title} · ${count}`, level ? tone(t, level) : t.muted))
+        .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(note))
+        .when(Boolean(column), (el) => el.child(div().flex_none().w(48).text_right().text_size(11).text_color(t.dim).child(column))))
       .children(rows);
   }
 
@@ -527,16 +575,16 @@ export default class Tackroom extends View {
     const acts = [...(c.acts ?? [])];
     if (c.detail) acts.push(this.link(`${k}:details`, open ? "Hide details" : "Details", (cx) => this.toggle(k, cx), false, t));
     return v_flex().gap(3).px(6)
-      .child(h_flex().gap(8).items_center()
-        .child(div().flex_1().min_w(0).truncate().text_size(13).font_semibold().child(c.name))
-        .when(Boolean(c.where), (el) => el.child(div().flex_none().max_w(170).truncate().text_size(11).text_color(t.muted).child(c.where))))
+      .child(h_flex().gap(8).items_start()
+        .child(div().flex_1().min_w(0).text_size(13).font_semibold().child(c.name))
+        .when(Boolean(c.where), (el) => el.child(div().flex_none().max_w(150).pt(2).text_size(11).text_color(t.muted).child(c.where))))
       .when(Boolean(c.why), (el) => el.child(div().text_size(12).text_color(t.muted).child(c.why)))
       .when(Boolean(c.path), (el) => el.child(div().min_w(0).overflow_hidden().whitespace_nowrap().text_ellipsis_start().text_size(11).text_color(t.dim).child(c.path)))
       .children((c.notes ?? []).filter(Boolean).map((n) => div().text_size(11).text_color(t.dim).child(n)))
-      .when(acts.length > 0 || Boolean(c.when), (el) => el.child(h_flex().gap(14).pt(3).items_center()
-        .children(acts)
-        .child(div().flex_1())
-        .when(Boolean(c.when), (row) => row.child(div().flex_none().text_size(11).text_color(t.dim).child(c.when)))))
+      // The buttons wrap when they do not fit; the time of the last run stays at the right.
+      .when(acts.length > 0 || Boolean(c.when), (el) => el.child(h_flex().gap(8).pt(3).items_start()
+        .child(h_flex().flex_1().min_w(0).flex_wrap().gap(6).children(acts))
+        .when(Boolean(c.when), (row) => row.child(div().flex_none().pt(4).text_size(11).text_color(t.dim).child(c.when)))))
       .when(open && Boolean(c.detail), (el) => el.child(c.detail().pt(4)));
   }
 
@@ -572,11 +620,21 @@ export default class Tackroom extends View {
     const srcs = tab.sources.map((name) => this.src[name]);
     const loading = srcs.some((s) => s.loading);
     const times = srcs.filter((s) => s.at).map((s) => s.at);
-    // Refresh reloads every source of the open tab that is not loading already.
+    // The config root of this Mac, with its short hash: the header's pill and the footer.
+    const hosts = this.src.hosts.data;
+    const local = hosts?.hosts.find((h) => h.host === "local");
+    const root = local?.config_root || this.src.plan.data?.config_root || "";
+    const commit = (hosts?.commit ?? "").slice(0, 7);
+    // Refresh reloads every source of the open tab that is not loading already. The pill
+    // takes what the mark, name, version and buttons leave, cut at its start: the hash stays.
     const header = h_flex().flex_none().h(40).pl(14).pr(8).gap(4).items_center()
-      .child(svg("mods/tackroom/tackroom.svg").size(14).text_color(t.muted))
-      .child(div().flex_1().pl(4).text_size(13).font_semibold().child("tackroom"))
-      .child(div().pr(4).text_size(11).text_color(t.dim).child(loading ? "loading…" : times.length ? clock(Math.min(...times)) : ""))
+      .child(svg("mods/tackroom/tackroom.svg").size(14).flex_none().text_color(t.muted))
+      .child(div().flex_none().text_size(13).font_semibold().child("tackroom"))
+      .when(this.wide && Boolean(root), (el) => el.child(h_flex().min_w(0).overflow_hidden().px(6).py(2).rounded(999).bg(t.raised).text_size(11).text_color(t.muted)
+        .child(div().min_w(0).overflow_hidden().whitespace_nowrap().text_ellipsis_start().child(tilde(root)))
+        .when(Boolean(commit), (pill) => pill.child(div().flex_none().whitespace_nowrap().child(` · ${commit}`)))))
+      .child(div().flex_1())
+      .when(Boolean(hosts?.version), (el) => el.child(div().min_w(0).truncate().pr(2).text_size(11).text_color(t.muted).child(hosts.version)))
       .child(this.button("refresh", "Refresh", (cx) => tab.sources.filter((name) => !this.src[name].loading).forEach((name) => this.load(name, cx)),
         srcs.every((s) => s.loading), t))
       .child(this.button("web", "Web", (cx) => this.openWeb(tab, cx), false, t));
@@ -591,10 +649,22 @@ export default class Tackroom extends View {
     if (s.error && (s.data || tab.id !== "overview")) items.push(div().px(6).text_size(11).text_color(t.ansi1).child(s.data ? `Last load failed: ${s.error}` : s.error));
     if (!ready && !s.error) items.push(this.note("Loading…", t));
     if (ready) items.push(...this[tab.id](t));
-    // One scroll position for each tab.
-    return v_flex().size_full().bg(t.surface).text_color(t.foreground)
+    // On the left, the state of the config root on this Mac; on the right, when the open tab's oldest data loaded.
+    const dirty = local?.commit ? local.dirty : null;
+    const footer = h_flex().flex_none().h(36).px(14).gap(10).items_center().border_t(1).border_color(t.border).text_size(11)
+      .child(h_flex().flex_1().min_w(0).overflow_hidden().text_color(dirty > 0 ? t.ansi3 : t.muted)
+        .when(Boolean(root), (el) => el.child(div().min_w(0).overflow_hidden().whitespace_nowrap().text_ellipsis_start().child(tilde(root)))
+          .when(dirty != null, (row) => row.child(div().flex_none().whitespace_nowrap().child(` · ${dirty > 0 ? `${dirty} uncommitted` : "clean"}`)))))
+      .child(div().flex_none().whitespace_nowrap().text_color(t.dim).child(loading ? "loading…" : times.length ? `loaded ${clock(Math.min(...times))}` : ""));
+    // One scroll position for each tab; the header, tab strip and footer stay in place.
+    return v_flex().id("tackroom-root").size_full().bg(t.surface).text_color(t.foreground)
+      .on_size_change((size, cx) => {
+        const wide = size.width / (Number(settings()?.zoom) || 1) >= WIDE;
+        if (wide !== this.wide) { this.wide = wide; cx.notify(); }
+      })
       .child(header).child(strip)
-      .child(v_flex().id(`tackroom-${tab.id}`).flex_1().min_h(0).overflow_y_scrollbar().px(8).pt(16).pb(16).gap(22).children(items));
+      .child(v_flex().id(`tackroom-${tab.id}`).flex_1().min_h(0).overflow_y_scrollbar().px(8).pt(16).pb(16).gap(22).children(items))
+      .child(footer);
   }
 
   // ---------- Overview ----------
@@ -619,9 +689,17 @@ export default class Tackroom extends View {
     }
     if (o.pending.length) subs.push(`Still checking ${andList(o.pending.map((name) => ({ plan: "harnesses", crons: "crons", hosts: "machines" })[name]))}.`);
 
-    const out = [this.answer(level, title, subs.join(" "), t)];
-    if (o.fail.length) out.push(this.group("Failing", "fail", o.fail.map((i) => this.item(i, t)), t, { gap: 14 }));
-    if (o.warn.length) out.push(this.group("Needs attention", "warn", o.warn.map((i) => this.item(i, t)), t, { gap: 14 }));
+    // The one filled button: Sync, only while a sync waits and this tackroom can apply it.
+    const sync = o.warn.some((i) => i.kind === "sync") && this.canEdit()
+      ? this.primary("sync-primary", "Sync", () => this.openSync(), this.busy !== "" || this.src.plan.loading, t) : null;
+    const strip = this.countsStrip(t);
+    const out = [v_flex().gap(14).child(this.answer(level, title, subs.join(" "), t, sync)).when(Boolean(strip), (el) => el.child(strip))];
+    const grid = this.harnessGrid(t);
+    if (grid) out.push(grid);
+    if (o.fail.length) out.push(this.group("Failing", "fail", o.fail.map((i) => this.item(i, t)), t, { gap: 14, count: o.fail.length }));
+    if (o.warn.length) out.push(this.group("Needs attention", "warn", o.warn.map((i) => this.item(i, t)), t, { gap: 14, count: o.warn.length }));
+    const outside = this.outsideSkills(t);
+    if (outside) out.push(outside);
     const rest = this.restLines(t);
     if (rest.length) out.push(this.group("Everything else", "", rest, t, { gap: 6 }).pt(18).border_t(1).border_color(t.border));
     return out;
@@ -656,22 +734,7 @@ export default class Tackroom extends View {
         detail: out.length ? () => v_flex().gap(2).children(out.map((a) => this.harnessRow(a, t))) : null,
       }, t);
     }
-    if (i.kind === "machines") {
-      // One machine reads as its name and summary; several with the same summary
-      // share it as the title, as in the web view. Each line under it is a fix:
-      // `tackroom hosts`'s, or a look at the uncommitted changes it counts.
-      const many = i.hosts.length > 1;
-      const same = many && new Set(i.hosts.map((m) => m.summary)).size === 1;
-      const home = this.src.inventory.data?.home;
-      const fix = (m) => m.fix || (m.dirty > 0 && m.config_root
-        ? `${m.host === "local" ? "" : `ssh ${m.host} `}git -C ${m.host === "local" && home ? m.config_root.replace(home, "~") : m.config_root} status` : "");
-      return this.card(`machines:${i.hosts.map((m) => m.host).join(",")}`, {
-        name: !many ? hostName(i.hosts[0].host) : same ? i.hosts[0].summary.replace(/^1 /, "One ") : "Machines need attention",
-        where: !many ? MACHINE[i.hosts[0].health] ?? i.hosts[0].health : andList(i.hosts.map((m) => hostName(m.host))),
-        why: same ? "" : i.hosts.map((m) => `${many ? `${hostName(m.host)}: ` : ""}${sentence(m.summary)}`).join(" "),
-        notes: i.hosts.filter(fix).map((m) => `${many ? `${hostName(m.host)}: ` : "Fix: "}${fix(m)}`),
-      }, t);
-    }
+    if (i.kind === "machines") return this.machineItem(i.hosts[0], t);
     if (i.kind === "blocked") {
       return this.card(`blocked:${i.h.item}`, { name: i.h.item, where: "blocked", why: sentence(cap(i.h.reason)), notes: [`${byAudit(i.h) ? "Override" : "Fix"}: ${i.h.command}`] }, t);
     }
@@ -686,20 +749,139 @@ export default class Tackroom extends View {
     }, t);
   }
 
-  // Everything that is healthy or off, folded to one line per kind.
+  // One machine of `tackroom hosts` that fails or needs attention: a dot, its name, why in
+  // one wrapping line, and the command that fixes it, or a look at its uncommitted changes.
+  machineItem(m, t) {
+    const home = this.src.inventory.data?.home;
+    const fix = m.fix || (m.dirty > 0 && m.config_root
+      ? `${m.host === "local" ? "" : `ssh ${m.host} `}git -C ${m.host === "local" && home ? m.config_root.replace(home, "~") : m.config_root} status` : "");
+    return h_flex().id(`machines:${m.host}`).gap(8).px(6).items_start()
+      .child(this.dot(tone(t, m.health === "fail" ? "fail" : "warn")).mt(5))
+      .child(v_flex().flex_1().min_w(0).gap(3)
+        .child(div().text_size(13).font_semibold().child(hostName(m.host)))
+        .when(Boolean(m.summary), (el) => el.child(div().text_size(12).text_color(t.muted).child(sentence(m.summary))))
+        .when(Boolean(fix), (el) => el.child(div().text_size(11).text_color(t.dim).child(`Fix: ${fix}`))));
+  }
+
+  // The strip under the answer: how many skills, roles, MCP servers, hooks and crons there
+  // are, in the colour of the worst of each. A kind with none is left out; "…" while it loads.
+  // A cell opens its tab.
+  countsStrip(t) {
+    const inv = this.src.inventory.data;
+    const c = this.src.crons.data;
+    const wired = inv ? this.inventoryRows("wiring") : [];
+    const cells = [
+      ["Skills", "skills", "inventory", inv?.skills.length, inv ? [...this.inventoryRows("skills").map((r) => r.level), ...this.orphanBlocked().map(() => "warn")] : []],
+      ["Roles", "roles", "inventory", inv?.roles.length, inv ? this.inventoryRows("roles").map((r) => r.level) : []],
+      ["MCP", "wiring", "inventory", inv?.mcp.length, wired.filter((r) => r.kind === "mcp").map((r) => r.level)],
+      ["Hooks", "wiring", "inventory", inv?.hooks.length, wired.filter((r) => r.kind === "hook").map((r) => r.level)],
+      ["Crons", "crons", "crons", c?.jobs.length, c ? [...c.jobs.map(jobLevel), ...downHosts(c).map(() => "fail")] : []],
+    ].filter(([, , , n]) => n !== 0);
+    if (!cells.length) return null;
+    return h_flex().rounded(8).border(1).border_color(t.border).overflow_hidden()
+      .children(cells.map(([label, go, source, n, levels], i) => {
+        const level = worst(levels.filter(bad));
+        const text = n != null ? String(n) : this.src[source].error ? "–" : "…";
+        return v_flex().id(`count:${label}`).flex_1().min_w(0).items_center().py(6)
+          .when(i > 0, (el) => el.border_l(1).border_color(t.border))
+          .cursor_pointer().hover((st) => st.bg(t.hover))
+          .on_click((_e, cx) => { this.tab = go; cx.notify(); })
+          .child(div().text_size(15).font_semibold().text_color(n == null ? t.muted : bad(level) ? tone(t, level) : t.foreground).child(text))
+          .child(div().text_size(11).text_color(t.muted).child(label));
+      }));
+  }
+
+  // The icon of a harness: Herdr's own for the program of that name, found among the agents
+  // running now and those it can start, else a rounded square with the first letter.
+  harnessIcon(name, programs, t) {
+    const want = [name, this.display(name)].map(norm);
+    const p = programs.find((x) => x?.icon && [x.key, x.name].some((k) => want.includes(norm(k))));
+    if (p) return p.tint ? svg(p.icon).size(16).flex_none().text_color(t.foreground) : image(p.icon).w(16).h(16).flex_none();
+    return h_flex().w(16).h(16).flex_none().items_center().justify_center().rounded(4).bg(t.raised)
+      .text_size(10).font_semibold().text_color(t.muted).child((this.display(name)[0] ?? "?").toUpperCase());
+  }
+
+  // One harness of the grid: icon, name and a cell for each surface. A cell is a dot in the
+  // colour of the surface's state in this harness, or a dim dash where it does not take it.
+  // The states are the plan's (error; missing; drifted, or stale, which the next sync
+  // removes), and the inventory's conflict, which the plan reports for the harness as a whole.
+  harnessGridRow(a, programs, t) {
+    const inv = this.src.inventory.data;
+    const meta = inv?.agents.find((x) => x.name === a.name);
+    const lists = inv ? [inv.skills, inv.roles, inv.mcp, inv.hooks] : [];
+    const level = harnessLevel(a);
+    const cells = surfaces(a).map(([, s], i) => {
+      const takes = !GRID[i][1] || meta?.[GRID[i][1]] !== false;
+      const state = a.error ? "error" : (lists[i] ?? []).some((r) => r.states[a.name] === "conflict") ? "conflict"
+        : s.missing.length ? "missing" : s.drifted.length || s.stale?.length ? "drift" : "ok";
+      return h_flex().w(22).flex_none().items_center().justify_center()
+        .child(takes ? this.dot(tone(t, cellLevel(state))) : div().text_size(11).text_color(t.dim).child("–"));
+    });
+    // A harness that is not in sync reads so by its name too, whichever cell shows it.
+    return this.fold(`g:${a.name}`,
+      [this.harnessIcon(a.name, programs, t),
+        div().flex_1().min_w(0).text_size(12).text_color(bad(level) ? tone(t, level) : t.foreground).child(this.display(a.name)),
+        h_flex().flex_none().children(cells)],
+      () => v_flex().gap(4)
+        .child(div().text_size(11).text_color(t.dim).child(this.harnessCounts(a)))
+        .child(this.harnessDetail(a, t)), t, { indent: 30 });
+  }
+
+  // The installed harnesses, one row each under the column labels: failing first, then those
+  // that need attention, then the rest in the plan's order. Past GRID_ROWS rows the ones in
+  // sync fold into one line that opens them.
+  harnessGrid(t) {
+    const d = this.src.plan.data;
+    const live = (d?.agents ?? []).filter((a) => a.detected).map((a, i) => ({ a, i }))
+      .sort((x, y) => RANK[harnessLevel(y.a)] - RANK[harnessLevel(x.a)] || x.i - y.i).map((x) => x.a);
+    if (!live.length) return null;
+    const programs = [...liveAgents().map((x) => x.program), ...this.known];
+    const shown = live.filter((a, i) => i < GRID_ROWS || harnessLevel(a) !== "ok");
+    const folded = live.filter((a) => !shown.includes(a));
+    const open = this.open.has("grid:more");
+    return v_flex().gap(2)
+      .child(h_flex().gap(8).px(6).items_center()
+        .child(div().w(16).flex_none())
+        .child(div().flex_1().min_w(0))
+        .child(h_flex().flex_none().children(GRID.map(([label]) => div().w(22).flex_none().text_center().whitespace_nowrap().text_size(10).text_color(t.dim).child(label)))))
+      .children(shown.map((a) => this.harnessGridRow(a, programs, t)))
+      .when(folded.length > 0, (el) => el.child(h_flex().id("grid:more").px(6).py(4).rounded(5).items_center().cursor_pointer()
+        .hover((s) => s.bg(t.hover))
+        .on_click((_e, cx) => this.toggle("grid:more", cx))
+        .child(div().text_size(12).text_color(t.muted).child(open ? "Show fewer" : `+${folded.length} more in sync`))))
+      .when(folded.length > 0 && open, (el) => el.children(folded.map((a) => this.harnessGridRow(a, programs, t))))
+      .when(Boolean(d.synced && d.not_fetched.length), (el) => el.child(this.note(`A sync would first fetch ${d.not_fetched.join(", ")}.`, t)));
+  }
+
+  // Outside skills as chips: how many sources are pinned, each with audit findings, how many
+  // wait in cooldown and how many the audit blocked. A chip opens the Skills tab.
+  outsideSkills(t) {
+    const pinned = (this.src.inventory.data?.lock ?? []).filter((l) => l.state === "pinned");
+    const skipped = this.src.plan.data ? skippedItems(this.src.plan.data) : [];
+    const cool = skipped.filter((h) => h.kind !== "blocked").length;
+    const blocked = skipped.filter((h) => h.kind === "blocked").length;
+    const chips = [
+      ...(pinned.length ? [[`${pinned.length} pinned`, t.muted]] : []),
+      ...pinned.filter((l) => l.findings).map((l) => [`${l.name} · ${plural(l.findings, "finding")}`, t.ansi3]),
+      ...(cool ? [[`${cool} in cooldown`, t.muted]] : []),
+      ...(blocked ? [[`${blocked} blocked`, t.ansi1]] : []),
+    ];
+    if (!chips.length) return null;
+    return v_flex().gap(8).px(6)
+      .child(this.heading("Outside skills", t.dim))
+      .child(h_flex().flex_wrap().gap(6).children(chips.map(([text, color], i) => h_flex().id(`outside:${i}`).max_w_full().px(8).py(2).rounded(999)
+        .border(1).border_color(t.border).text_size(12).text_color(color).cursor_pointer().hover((s) => s.bg(t.hover))
+        .on_click((_e, cx) => { this.tab = "skills"; cx.notify(); })
+        .child(text))));
+  }
+
+  // Everything else that is healthy or off, folded to one line per kind. The harnesses
+  // in sync are the grid's and the pinned outside sources are the chips'.
   restLines(t) {
     const d = this.src.plan.data;
     const c = this.src.crons.data;
     const inv = this.src.inventory.data;
     const lines = [];
-    const ok = (d?.agents ?? []).filter((a) => harnessLevel(a) === "ok");
-    if (ok.length) {
-      lines.push(this.line("rest:harnesses", "ok", `${plural(ok.length, "harness", "harnesses")} in sync${d.synced ? ", nothing to sync" : ""}`, [
-        inv ? [plural(inv.skills.length, "skill"), plural(inv.roles.length, "role"), plural(inv.mcp.length, "MCP server"), plural(inv.hooks.length, "hook")].join(", ") : "",
-        ok.map((a) => this.display(a.name)).join(", "),
-        d.synced && d.not_fetched.length ? `A sync would first fetch ${d.not_fetched.join(", ")}.` : "",
-      ], t, { detail: () => v_flex().gap(2).children(ok.map((a) => this.harnessRow(a, t))) }));
-    }
     if (c && c.jobs.length) {
       const healthy = c.jobs.filter((j) => j.health === "ok").length;
       const quiet = c.jobs.filter((j) => j.health === "paused" || j.health === "idle").length;
@@ -716,13 +898,6 @@ export default class Tackroom extends View {
         same ? `${hosts.length === 2 ? "Both" : `All ${hosts.length}`} machines on config ${hosts[0].commit.slice(0, 7)}` : plural(hosts.length, "machine"),
         [[...versions].map(([v, names]) => `tackroom ${v} on ${andList(names)}`).join("; ")],
         t, { detail: () => v_flex().gap(6).children(hosts.map((m) => this.machineRow(m, t))) }));
-    }
-    const pinned = (inv?.lock ?? []).filter((l) => l.state === "pinned");
-    if (pinned.length) {
-      const findings = pinned.filter((l) => l.findings).map((l) => `${l.name} has ${plural(l.findings, "audit finding")}, ${l.critical ? `${l.critical} critical` : "none critical"}`);
-      const unaudited = pinned.filter((l) => !l.audited).length;
-      lines.push(this.line("rest:sources", "ok", `${plural(pinned.length, "outside source")} pinned`,
-        [[...findings, unaudited ? `${unaudited} not audited yet` : ""].filter(Boolean).join("; ") || "No audit findings"], t, { go: "skills" }));
     }
     const cool = d ? skippedItems(d).filter((h) => h.kind !== "blocked") : [];
     if (cool.length) {
@@ -742,12 +917,21 @@ export default class Tackroom extends View {
       lines.push(this.line("rest:idle", "off", [absent.length ? `${absent.length} not installed` : "", off.length ? `${off.length} turned off` : ""].filter(Boolean).join(", "),
         [idle.map((a) => this.display(a.name)).join(", ")], t, {
           detail: () => v_flex().gap(4).text_size(12).children(idle.map((a) => h_flex().gap(8).items_center()
-            .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(this.display(a.name)))
+            .child(div().flex_1().min_w(0).text_color(t.muted).child(this.display(a.name)))
             .child(div().flex_none().text_size(11).text_color(t.dim).child(a.enabled ? "not installed" : "turned off"))
-            .when(this.canEdit(), (el) => el.child(h_flex().w(56).flex_none().justify_end().child(this.switchButton("agents", a.name, a.enabled, t)))))),
+            .when(this.canEdit(), (el) => el.child(h_flex().w(72).flex_none().justify_end().child(this.switchButton("agents", a.name, a.enabled, t)))))),
         }));
     }
     return lines;
+  }
+
+  // What a harness holds, what needs attention first: the line wraps instead of cutting it off.
+  harnessCounts(a) {
+    const count = (kind) => surfaces(a).reduce((n, [, s]) => n + s[kind].length, 0);
+    return a.detected
+      ? [...(count("missing") ? [`${count("missing")} missing`] : []), ...(count("drifted") ? [`${count("drifted")} drifted`] : []),
+        plural(a.skills.managed.length, "skill"), plural(a.roles.managed.length, "role"), `${a.mcp.managed.length} MCP`, plural(a.hooks.managed.length, "hook")].join(" · ")
+      : "";
   }
 
   // One harness of the plan: what it holds, and its state. It opens into its details.
@@ -755,17 +939,11 @@ export default class Tackroom extends View {
     const level = harnessLevel(a);
     const word = level === "off" ? "not installed" : a.error ? "config unreadable"
       : a.conflicts.length ? plural(a.conflicts.length, "conflict") : level === "warn" ? "needs sync" : "synced";
-    const count = (kind) => surfaces(a).reduce((n, [, s]) => n + s[kind].length, 0);
-    // What needs attention first: the line wraps instead of cutting it off.
-    const summary = a.detected
-      ? [...(count("missing") ? [`${count("missing")} missing`] : []), ...(count("drifted") ? [`${count("drifted")} drifted`] : []),
-        plural(a.skills.managed.length, "skill"), plural(a.roles.managed.length, "role"), `${a.mcp.managed.length} MCP`, plural(a.hooks.managed.length, "hook")].join(" · ")
-      : "";
     return this.fold(`h:${a.name}`,
       [this.mark(level, t),
         v_flex().flex_1().min_w(0)
           .child(div().truncate().text_size(12).child(this.display(a.name)))
-          .child(div().text_size(11).text_color(t.dim).child(summary)),
+          .child(div().text_size(11).text_color(t.dim).child(this.harnessCounts(a))),
         div().flex_none().text_size(11).text_color(bad(level) ? tone(t, level) : t.dim).child(word)],
       () => this.harnessDetail(a, t), t);
   }
@@ -818,9 +996,9 @@ export default class Tackroom extends View {
         const targeted = !["off", "unsupported", "absent", "error"].includes(r.states[a]);
         const locked = ["unsupported", "absent", "error"].includes(r.states[a]);
         return h_flex().gap(8).items_center()
-          .child(div().flex_1().min_w(0).truncate().text_color(t.muted).child(this.display(a)))
+          .child(div().flex_1().min_w(0).text_color(t.muted).child(this.display(a)))
           .child(div().flex_none().text_color(bad(level) ? tone(t, level) : level === "ok" ? t.muted : t.dim).child(word))
-          .when(Boolean(r.entry) && this.canEdit(), (el) => el.child(h_flex().w(52).flex_none().justify_end()
+          .when(Boolean(r.entry) && this.canEdit(), (el) => el.child(h_flex().w(68).flex_none().justify_end()
             .when(!locked, (box) => box.child(this.link(`t:${r.kind}:${r.name}:${a}`, targeted ? "Remove" : "Add",
               (cx) => this.toggleTarget(r, a, targeted, cx), this.busy !== "", t)))));
       }))
@@ -844,11 +1022,11 @@ export default class Tackroom extends View {
           name: sourceRepo(l) || l.name, where: "blocked", why: sentence(cap(l.reason || "blocked by the audit")), notes: [l.command ? `${byAudit(l) ? "Override" : "Fix"}: ${l.command}` : ""],
         }, t)))] : []),
         ...worse.map((r) => this.invRow(r, t)),
-      ], t, { column: worse.length ? "in place" : "" }));
+      ], t, { column: worse.length ? "in place" : "", count: asks }));
     }
     for (const [title, rows] of groups) {
       const rest = rows.filter((r) => !bad(r.level)).sort((a, b) => a.name.localeCompare(b.name));
-      if (rest.length) out.push(this.group(title, "", rest.map((r) => this.invRow(r, t)), t, { note: String(rest.length), column: "in place" }));
+      if (rest.length) out.push(this.group(title, "", rest.map((r) => this.invRow(r, t)), t, { count: rest.length, column: "in place" }));
     }
     return out;
   }
@@ -919,8 +1097,8 @@ export default class Tackroom extends View {
       ...down.map((h) => this.card(`down:${h}`, { name: `${hostName(h)} unreachable`, why: sentence(cap(downDetail(d, h))) }, t)),
       ...fails.map((j) => this.jobCard(j, t)),
     ];
-    if (failing.length) items.push(this.group("Failing", "fail", failing, t, { gap: 14 }));
-    if (warns.length) items.push(this.group("Needs attention", "warn", warns.map((j) => this.jobCard(j, t)), t, { gap: 14 }));
+    if (failing.length) items.push(this.group("Failing", "fail", failing, t, { gap: 14, count: failing.length }));
+    if (warns.length) items.push(this.group("Needs attention", "warn", warns.map((j) => this.jobCard(j, t)), t, { gap: 14, count: warns.length }));
     // Everything else, folded per machine: healthy jobs first, then paused and not run yet, by name.
     const rest = hosts.map((h) => {
       const list = jobs.filter((j) => j.host === h && !bad(jobLevel(j)))
@@ -979,7 +1157,7 @@ export default class Tackroom extends View {
     return v_flex().gap(3).text_size(11)
       .children((j.problems ?? []).slice(all ? 0 : 1).map((p) => div().text_color(t.ansi1).child(p)))
       .children(fields.map(([label, value]) => this.field(label, value, t)))
-      .when(acts.length > 0, (el) => el.child(h_flex().gap(14).pt(4).items_center().children(acts)))
+      .when(acts.length > 0, (el) => el.child(h_flex().flex_wrap().gap(6).pt(4).items_center().children(acts)))
       .when(!j.editable && Boolean(j.edit_note), (el) => el.child(div().pt(2).text_color(t.dim).child(`No edit or delete. ${j.edit_note}`)));
   }
 }
