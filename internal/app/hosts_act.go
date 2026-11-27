@@ -231,7 +231,7 @@ func runOnHost(host string, steps [][]string) error {
 	for i, argv := range steps {
 		lines[i] = shellJoin(argv)
 	}
-	cmd := exec.Command("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", host, strings.Join(lines, " && "))
+	cmd := exec.Command("ssh", append(sshOptions(host), host, strings.Join(lines, " && "))...)
 	cmd.Stdout, cmd.Stderr = os.Stdout, os.Stderr
 	return cmd.Run()
 }

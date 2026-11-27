@@ -149,8 +149,13 @@ func doCronAction(job cronJob, action, schedule, configPath string) (string, err
 	cronActionMu.Lock()
 	defer cronActionMu.Unlock()
 	switch action {
-	case "run", "pause", "resume":
-		return runLaunchdAction(job, action)
+	// Each verb reaches the command line as a constant, never as request text.
+	case "run":
+		return runLaunchdAction(job, "run")
+	case "pause":
+		return runLaunchdAction(job, "pause")
+	case "resume":
+		return runLaunchdAction(job, "resume")
 	case "schedule":
 		switch {
 		case !job.Owned || job.Host != "local":
@@ -175,7 +180,7 @@ func runLaunchdAction(job cronJob, action string) (string, error) {
 		for i, arg := range args {
 			quoted[i] = "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
 		}
-		cmd = exec.CommandContext(ctx, "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", job.Host, "sh -s -- "+strings.Join(quoted, " "))
+		cmd = exec.CommandContext(ctx, "ssh", append(sshOptions(job.Host), job.Host, "sh -s -- "+strings.Join(quoted, " "))...)
 	}
 	cmd.Stdin = strings.NewReader(launchdActionScript)
 	// The timeout kills the whole process group, so no launchctl started here
