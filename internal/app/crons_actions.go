@@ -149,8 +149,13 @@ func doCronAction(job cronJob, action, schedule, configPath string) (string, err
 	cronActionMu.Lock()
 	defer cronActionMu.Unlock()
 	switch action {
-	case "run", "pause", "resume":
-		return runLaunchdAction(job, action)
+	// Each verb reaches the command line as a constant, never as request text.
+	case "run":
+		return runLaunchdAction(job, "run")
+	case "pause":
+		return runLaunchdAction(job, "pause")
+	case "resume":
+		return runLaunchdAction(job, "resume")
 	case "schedule":
 		switch {
 		case !job.Owned || job.Host != "local":
