@@ -173,6 +173,7 @@ func defaultAgentConfigs() []agentConfig {
 		{Name: agentDSH, Enabled: true, SkillRoot: "~/.dsh/skills", Detect: "dsh"},
 		{Name: agentAgy, Enabled: true, SkillRoot: "~/.gemini/antigravity-cli/skills", Detect: "agy"},
 		{Name: agentKimi, Enabled: true, SkillRoot: "~/.kimi-code/skills", AgentRoot: "~/.kimi-code/agents", Detect: "kimi"},
+		{Name: agentOuroboros, Enabled: true, SkillRoot: tackroomSkillsPathValue},
 	}
 }
 

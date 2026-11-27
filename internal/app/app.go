@@ -222,6 +222,10 @@ type replaceableConflict struct {
 
 func isDetected(agent agentConfig) bool {
 	if agent.Detect == "" {
+		if h := harnessFor(agent.Name); h != nil && h.DetectHome != nil {
+			home, err := os.UserHomeDir()
+			return err == nil && h.DetectHome(home)
+		}
 		return true
 	}
 	executable, err := exec.LookPath(agent.Detect)
@@ -249,6 +253,9 @@ type runOptions struct {
 	// ConfirmRemovals makes sync preview per-harness removals and role
 	// overwrites and ask before applying them. Set by setup-driven syncs.
 	ConfirmRemovals bool
+	// OuroborosRules makes sync only preview, and with AssumeYes write, the
+	// Ouroboros owner rules and My folder trust (sync --ouroboros-rules).
+	OuroborosRules bool
 	// ReplaceConflicts moves native files that differ from the canonical copy
 	// into a timestamped backup and links them. Setup always sets it.
 	ReplaceConflicts bool
@@ -595,12 +602,17 @@ func parseSyncFlags(args []string) (runOptions, error) {
 	fs.BoolVar(&opts.ReplaceConflicts, "replace-conflicts", false, "Move native files that differ from the shared copy into a backup, then link the shared skill or instructions file, or rewrite the role, in their place")
 	fs.BoolVar(&opts.JSONOutput, "json", false, "Print the resulting status as JSON instead of the text report")
 	fs.StringVar(&opts.PlanDigest, "plan-digest", "", "Sync only if the plan still has this plan_digest from sync --dry-run --json")
+	fs.BoolVar(&opts.OuroborosRules, "ouroboros-rules", false, "Only preview Ouroboros owner rules (from AGENTS.md) and My folder trust; with --yes, write them")
+	fs.BoolVar(&opts.AssumeYes, "yes", false, "With --ouroboros-rules, write the previewed changes")
 	addAllowFreshFlags(fs, &opts)
 	if err := fs.Parse(args); err != nil {
 		return runOptions{}, err
 	}
 	if fs.NArg() != 0 {
 		return runOptions{}, errors.New("sync does not accept positional arguments")
+	}
+	if opts.AssumeYes && !opts.OuroborosRules {
+		return runOptions{}, errors.New("sync --yes only confirms --ouroboros-rules")
 	}
 	// An empty digest must not fall through to a sync that checks nothing.
 	emptyDigest := false
@@ -675,6 +687,7 @@ var canonicalForms = []string{
 	"  tackroom status [--verbose] [--exit-code] [--agents ...]",
 	"  tackroom sync [--pull] [--dry-run] [--replace-conflicts] [--agents ...] [--allow-fresh[=item,...]] [--reason ...]",
 	"  tackroom sync --plan-digest DIGEST        # sync only if the plan is still the one sync --dry-run --json showed",
+	"  tackroom sync --ouroboros-rules [--yes]   # preview Ouroboros owner rules and My folder trust; --yes writes them",
 	"  tackroom doctor [--e2e] [--agents ...]",
 	"  tackroom doctor audit [--json]            # findings per item; exit 1 on an unaccepted CRITICAL in external content",
 	"  tackroom doctor audit accept <item> <rule> --reason \"...\"   # item is kind:name, e.g. skill:foo",

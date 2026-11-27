@@ -64,6 +64,8 @@ func (role *Role) UnmarshalYAML(value *yaml.Node) error {
 			err = node.Decode(&decoded.Grok)
 		case "gemini":
 			err = node.Decode(&decoded.Gemini)
+		case "ouroboros":
+			err = node.Decode(&decoded.Ouroboros)
 		}
 		if err != nil {
 			return err

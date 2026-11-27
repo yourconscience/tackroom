@@ -26,21 +26,22 @@ type Role struct {
 	Effort      string `yaml:"effort"`
 	// Tools is nil when the role sets none (the harness default, usually
 	// every tool) and empty when it sets `tools: []` (no tools at all).
-	Tools        []string        `yaml:"tools"`
-	Color        string          `yaml:"color"`
-	Instructions string          `yaml:"-"`
-	Source       string          `yaml:"-"`
-	Claude       ClaudeOptions   `yaml:"claude"`
-	Codex        CodexOptions    `yaml:"codex"`
-	OMP          OMPOptions      `yaml:"omp"`
-	Pi           PiOptions       `yaml:"pi"`
-	Droid        DroidOptions    `yaml:"droid"`
-	Opencode     OpenCodeOptions `yaml:"opencode"`
-	Qwen         QwenOptions     `yaml:"qwen"`
-	Cursor       CursorOptions   `yaml:"cursor"`
-	Copilot      CopilotOptions  `yaml:"copilot"`
-	Grok         GrokOptions     `yaml:"grok"`
-	Gemini       GeminiOptions   `yaml:"gemini"`
+	Tools        []string         `yaml:"tools"`
+	Color        string           `yaml:"color"`
+	Instructions string           `yaml:"-"`
+	Source       string           `yaml:"-"`
+	Claude       ClaudeOptions    `yaml:"claude"`
+	Codex        CodexOptions     `yaml:"codex"`
+	OMP          OMPOptions       `yaml:"omp"`
+	Pi           PiOptions        `yaml:"pi"`
+	Droid        DroidOptions     `yaml:"droid"`
+	Opencode     OpenCodeOptions  `yaml:"opencode"`
+	Qwen         QwenOptions      `yaml:"qwen"`
+	Cursor       CursorOptions    `yaml:"cursor"`
+	Copilot      CopilotOptions   `yaml:"copilot"`
+	Grok         GrokOptions      `yaml:"grok"`
+	Gemini       GeminiOptions    `yaml:"gemini"`
+	Ouroboros    OuroborosOptions `yaml:"ouroboros"`
 }
 
 type ClaudeOptions struct {
@@ -96,6 +97,12 @@ type GrokOptions struct {
 type GeminiOptions struct {
 	Model string   `yaml:"model"`
 	Tools []string `yaml:"tools"`
+}
+
+// OuroborosOptions names the Ouroboros session route (harness[=model]) a
+// role runs on, for a model the role's own model field cannot name.
+type OuroborosOptions struct {
+	Route string `yaml:"route"`
 }
 
 // Renderer is a harness projection of a canonical role.

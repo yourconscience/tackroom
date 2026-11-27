@@ -208,6 +208,9 @@ func ExitCode(err error) int {
 }
 
 func runSync(opts runOptions) error {
+	if opts.OuroborosRules {
+		return runOuroborosRules(opts)
+	}
 	if opts.DryRun {
 		return runSyncDryRun(opts)
 	}
@@ -341,7 +344,7 @@ func runSync(opts runOptions) error {
 	if err := applyAgentSync(reports, cfg, repoRoot, home); err != nil {
 		return err
 	}
-	if err := applyAgentRoleSync(reports, selected, repoRoot); err != nil {
+	if err := applyAgentRoleSync(reports, selected, repoRoot, home); err != nil {
 		return err
 	}
 	if err := applyAgentMCPSync(reports, cfg, home); err != nil {

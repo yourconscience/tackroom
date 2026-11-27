@@ -89,6 +89,13 @@ type harness struct {
 	// RootInstructions describes a root instructions symlink. nil = none.
 	RootInstructions *rootInstructionsCapability
 
+	// DetectHome detects a harness that has no executable on PATH; it is
+	// consulted when the agent config names no Detect executable.
+	DetectHome func(home string) bool
+	// ApplyRoles writes roles for a harness that keeps them as rows of a
+	// settings document rather than files. nil = file roles via roles.
+	ApplyRoles func(report agentReport, repoRoot, home string, agent agentConfig) error
+
 	// IntegrationNote is printed in status/sync reports for this agent.
 	// Empty string = no note.
 	IntegrationNote string
@@ -529,6 +536,28 @@ func initHarnesses() {
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 			},
 			IntegrationNote: "skills read natively from ~/.agents/skills; MCP goes to tackroom-mcp-* rows in ~/.dsh/cordis.patch.yml (every profile)",
+		},
+
+		agentOuroboros: {
+			DisplayName:   "Ouroboros",
+			DetectHome:    detectOuroboros,
+			Skills:        skillsConfigDriven,
+			InspectSkills: inspectOuroborosAgent,
+			Setup:         patchOuroborosSkillsFolder,
+			MCP: mcpTargetPtr(mcpTarget{
+				agentName:  agentOuroboros,
+				configPath: ouroborosSettingsPath,
+				inspect:    inspectOuroborosMCPServer,
+				patch:      patchOuroborosMCPServer,
+				remove:     removeOuroborosMCPServer,
+				read:       readOuroborosMCPServer,
+				literalEnv: true,
+			}),
+			ApplyRoles: applyOuroborosRoles,
+			doctorChecks: []doctorCheck{
+				{Name: "ouroboros settings", Run: checkOuroborosSettings},
+			},
+			IntegrationNote: "everything goes to ~/Ouroboros/data/settings.json under its lock: skills via My folder (set only when empty), stdio MCP servers to MCP_SERVERS (${VAR} env is skipped), roles to tackroom.* rows of OUROBOROS_SUBAGENTS (one agent_session row per engine; role instructions are not carried). Owner rules and My folder trust are written only by `tackroom sync --ouroboros-rules --yes`",
 		},
 	}
 }

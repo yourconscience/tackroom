@@ -42,6 +42,7 @@ You review code changes. Report findings; do not edit files.
 | Grok Build | Markdown | `~/.grok/agents/<name>.md` |
 | Gemini CLI | Markdown, `kind: local` | `~/.gemini/agents/<name>.md` |
 | Kimi Code | Markdown | `~/.kimi-code/agents/<name>.md` |
+| Ouroboros | a `tackroom.*` row per engine | `OUROBOROS_SUBAGENTS` in `~/Ouroboros/data/settings.json` |
 
 Paths follow each harness's `agent_root` in `tackroom.yaml`.
 
@@ -62,6 +63,7 @@ Paths follow each harness's `agent_root` in `tackroom.yaml`.
 | Pi, OpenCode, GitHub Copilot CLI, Grok Build, Gemini CLI | omitted, so the harness inherits | `pi.model`, `opencode.model`, `copilot.model`, `grok.model`, `gemini.model` |
 | Cursor, Qwen Code | `inherit` | `cursor.model`, `qwen.model` |
 | Kimi Code | no model is written | none |
+| Ouroboros | `claude=<tier>`; no model gives `claude` | `ouroboros.route` (`harness=model`) |
 
 An exact id in `model` is passed through to every harness except Kimi Code. To pin one model for all roles that declare none, set `role_model` on the agent entry in `tackroom.yaml`; a role's own `model` or per-harness override always wins.
 

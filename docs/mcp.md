@@ -65,7 +65,7 @@ Secrets do not come along. Each env value that is not already a `${VAR}` referen
 | Gemini CLI | `httpUrl` and `headers` |
 | Grok Build | `url` and `headers` |
 
-Factory Droid, OMP, OpenCode, Qwen Code, GitHub Copilot CLI, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp get stdio servers only. A remote server is skipped for them, and `mcp add` says which harnesses it will not reach.
+Factory Droid, OMP, OpenCode, Qwen Code, GitHub Copilot CLI, DeepSeek Harness, Antigravity CLI, Kimi Code, Ouroboros and Amp get stdio servers only. A remote server is skipped for them, and `mcp add` says which harnesses it will not reach.
 
 Codex keeps secrets out of `config.toml`. `Authorization: Bearer ${NAME}` becomes `bearer_token_env_var = "NAME"`, a header whose whole value is `${NAME}` goes to `env_http_headers`, and a literal header goes to `http_headers`.
 

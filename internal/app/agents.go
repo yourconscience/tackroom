@@ -254,7 +254,7 @@ func isManagedAgentFile(path string, data []byte, repoRoot string) bool {
 	return targetAbs == repoAgentsRoot || strings.HasPrefix(targetAbs, repoAgentsRoot+string(os.PathSeparator))
 }
 
-func applyAgentRoleSync(reports []agentReport, selected []agentConfig, repoRoot string) error {
+func applyAgentRoleSync(reports []agentReport, selected []agentConfig, repoRoot, home string) error {
 	agentIndex := make(map[string]agentConfig, len(selected))
 	for _, agent := range selected {
 		agentIndex[agent.Name] = agent
@@ -264,6 +264,12 @@ func applyAgentRoleSync(reports []agentReport, selected []agentConfig, repoRoot 
 			continue
 		}
 		agent, ok := agentIndex[report.Name]
+		if h := harnessFor(report.Name); ok && h != nil && h.ApplyRoles != nil {
+			if err := h.ApplyRoles(report, repoRoot, home, agent); err != nil {
+				return fmt.Errorf("%s roles: %w", report.Name, err)
+			}
+			continue
+		}
 		if !ok || agent.AgentRoot == "" {
 			continue
 		}

@@ -26,6 +26,7 @@ tackroom sync --agents codex,gemini   # limit a run to some harnesses, by key
 | DeepSeek Harness | ✓ | - | ~ | - | - | ✓ | - |
 | Antigravity CLI | ✓ | - | ~ | ✓ | - | ✓ | - |
 | Kimi Code | ✓ | ✓ | ~ | ✓ | - | - | - |
+| Ouroboros | ✓ | ~ | ~ | - | - | - | - |
 | Amp | ✓ | - | ~ | - | - | ✓ | - |
 
 `✓` full, `~` partial, `-` none. A cell claims only what the adapter writes today; tackroom does not invent files a harness cannot read.
@@ -64,9 +65,10 @@ The key is what you write in `tackroom.yaml`, in `--agents`, and in the `agents:
 | DeepSeek Harness | `dsh` | `dsh` | `~/.dsh/skills` |
 | Antigravity CLI | `agy` | `agy` | `~/.gemini/antigravity-cli/skills` |
 | Kimi Code | `kimi` | `kimi` | `~/.kimi-code/skills` |
+| Ouroboros | `ouroboros` | its `settings.json` | My folder in its settings |
 | Amp | `amp` | `amp` | `~/.agents/skills` |
 
-- `setup` detects every harness above except Amp; add that with `--agents amp`.
+- `setup` detects every harness above except Amp; add that with `--agents amp`. Ouroboros has no CLI, so it counts as detected when its `settings.json` exists.
 - Pi and OMP are separate harnesses: `pi` is not counted as detected when its `--version` output starts with `omp/`.
 - Claude Code is `claude`. The former key `claude-code` is still accepted and read as `claude`. A tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config ([release notes](upgrading.md#the-claude-key)).
 - Qwen Code is `qwen-code`. `qwen`, the name of its executable, is accepted too and read as `qwen-code`, in the config, in `--agents` and in an `agents:` list ([release notes](upgrading.md#to-301)).
@@ -92,9 +94,10 @@ Roles follow each harness's `agent_root`; the paths are in [roles.md](roles.md#w
 | DeepSeek Harness | `~/.dsh/cordis.patch.yml` | none | `~/.dsh/AGENTS.md` | none |
 | Antigravity CLI | `~/.gemini/config/mcp_config.json` | `~/.gemini/config/hooks.json` | `~/.gemini/GEMINI.md` | none |
 | Kimi Code | `~/.kimi-code/mcp.json` | `~/.kimi-code/config.toml` | none | none |
+| Ouroboros | `MCP_SERVERS` in `~/Ouroboros/data/settings.json` | none | none | none |
 | Amp | `~/.config/amp/settings.json` | none | `~/.config/amp/AGENTS.md` | none |
 
-Some folders move with an environment variable: `$COPILOT_HOME`, `$GROK_HOME`, `$DSH_HOME` and `$KIMI_CODE_HOME` replace the folder of their harness, and `$XDG_CONFIG_HOME/opencode` replaces `~/.config/opencode`.
+Some folders move with an environment variable: `$COPILOT_HOME`, `$GROK_HOME`, `$DSH_HOME` and `$KIMI_CODE_HOME` replace the folder of their harness, `$OUROBOROS_SETTINGS_PATH`, `$OUROBOROS_DATA_DIR` or `$OUROBOROS_APP_ROOT` move Ouroboros's settings file, and `$XDG_CONFIG_HOME/opencode` replaces `~/.config/opencode`.
 
 The root files are links to `~/.agents/AGENTS.md`, or generated files when you list extra `instructions:` ([setup.md](setup.md#share-your-root-instructions)). Where the table says none, nothing is written for that surface.
 
@@ -171,6 +174,15 @@ That also stops Devin loading Claude Code's hooks, so Devin then runs none of yo
 ### Kimi Code
 
 Kimi Code reads `~/.agents/skills` and `~/.agents/AGENTS.md` itself, so no root file is written for it and files listed under `instructions:` do not reach it. MCP servers go to `~/.kimi-code/mcp.json` and hooks to `[[hooks]]` tables in `~/.kimi-code/config.toml`.
+
+### Ouroboros
+
+Ouroboros keeps everything in one file, `~/Ouroboros/data/settings.json`, which the running app also writes. tackroom edits it only under Ouroboros's own `settings.json.lock`, replaces it atomically, and rewrites only the keys it changes. It refuses to write when the file is missing or is not valid JSON.
+
+- Skills: Ouroboros reads them from My folder (`OUROBOROS_SKILLS_REPO_PATH`). tackroom sets it to your config root only when it is empty; a folder you chose is reported, never replaced. New skills there still wait for your review in Ouroboros.
+- MCP: stdio servers become enabled rows of `MCP_SERVERS`. Servers with `${VAR}` env values are skipped, because Ouroboros takes literal values only, and a row bound to an Ouroboros skill is never taken over.
+- Roles: each engine your roles need becomes one `agent_session` row of `OUROBOROS_SUBAGENTS` with an id starting `tackroom.`; roles that share an engine share the row, and a role whose engine one of your own rows already runs adds nothing. Its `access` follows the role's tools (no tool list is `full`, a shell or file edits are `workspace_write`, the rest `readonly`). Ouroboros rows carry no instructions, so only each role's description reaches it. Rows tackroom did not write are never changed, and your switch and review mark on a `tackroom.` row are kept. A role model of `haiku`, `sonnet` or `opus` runs on `claude`; name any other route with `ouroboros.route: harness=model`.
+- Owner rules and skill trust feed every Safety check and skill install, so sync never writes them. `tackroom sync --ouroboros-rules` shows the change to `OUROBOROS_SAFETY_OWNER_RULES` (from your config root's `AGENTS.md`) and to trusting My folder when it is the config root, and writes them only with `--yes`.
 
 ### Amp
 

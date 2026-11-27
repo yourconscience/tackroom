@@ -39,6 +39,9 @@ type mcpTarget struct {
 	parentKey string
 	defaults  map[string]interface{}
 	remote    *remoteMCP
+	// literalEnv marks a harness that takes literal env values only; servers
+	// with ${VAR} env are not synced to it.
+	literalEnv bool
 }
 
 const yamlMapTag = "!!map"
@@ -51,6 +54,9 @@ func desiredMCPServersForAgent(cfg config, agentName string) []mcpServerConfig {
 			continue
 		}
 		if server.URL != "" && !hasRemoteMCPSupport(agentName) {
+			continue
+		}
+		if target, err := mcpTargetForHarness(agentName); err == nil && target.literalEnv && envHasReference(server.Env) {
 			continue
 		}
 		if agentName == agentCodex && cfg.codexPluginMCP[server.Name] {

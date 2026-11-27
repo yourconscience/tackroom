@@ -1,6 +1,6 @@
 ---
 name: tackroom
-description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Devin, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Grok Build, DeepSeek Harness (dsh), Factory Droid, OpenCode, Qwen Code, Pi, OMP, and Amp. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, or config-root workflows.
+description: Set up, inspect, and sync a private user-owned agent configuration across Claude Code, Codex, Cursor, Devin, Gemini CLI, Antigravity CLI, GitHub Copilot CLI, Kimi Code, Ouroboros, Grok Build, DeepSeek Harness (dsh), Factory Droid, OpenCode, Qwen Code, Pi, OMP, and Amp. Use for tackroom setup, status, sync, doctor, skill, MCP, hook, role, or config-root workflows.
 ---
 
 # tackroom
@@ -245,6 +245,7 @@ tackroom view --ssh-host me@box                      # remote: print an ssh -L t
 | Cursor | yes | yes | yes, `~/.cursor/mcp.json` | yes, `~/.cursor/hooks.json` |
 | GitHub Copilot CLI | yes | yes | yes, `~/.copilot/mcp-config.json` | yes, `~/.copilot/hooks/tackroom.json` |
 | Kimi Code | yes | yes | yes, `~/.kimi-code/mcp.json` | yes, `~/.kimi-code/config.toml` |
+| Ouroboros | yes, via My folder | yes, `tackroom.*` rows of `OUROBOROS_SUBAGENTS` | yes, stdio rows of `MCP_SERVERS` | no |
 | Grok Build | yes | yes | yes, `~/.grok/config.toml` | yes, `~/.grok/hooks/tackroom.json` |
 | Devin | yes | no | yes, `~/.config/devin/mcp_config.json` | no; Devin loads Claude Code's hooks itself |
 | Gemini CLI | yes | yes | yes, `~/.gemini/settings.json` | yes, `~/.gemini/settings.json` |
