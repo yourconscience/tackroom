@@ -175,7 +175,7 @@ func runLaunchdAction(job cronJob, action string) (string, error) {
 		for i, arg := range args {
 			quoted[i] = "'" + strings.ReplaceAll(arg, "'", `'\''`) + "'"
 		}
-		cmd = exec.CommandContext(ctx, "ssh", append(sshOptions(), job.Host, "sh -s -- "+strings.Join(quoted, " "))...)
+		cmd = exec.CommandContext(ctx, "ssh", append(sshOptions(job.Host), job.Host, "sh -s -- "+strings.Join(quoted, " "))...)
 	}
 	cmd.Stdin = strings.NewReader(launchdActionScript)
 	// The timeout kills the whole process group, so no launchctl started here

@@ -411,7 +411,7 @@ func runHostProbe(host, script string, args ...string) ([]probeSection, error) {
 	if host == "local" {
 		cmd = exec.CommandContext(ctx, "sh", append([]string{"-s", "--"}, argv...)...)
 	} else {
-		cmd = exec.CommandContext(ctx, "ssh", append(sshOptions(), host, "sh -s -- "+shellJoin(argv))...)
+		cmd = exec.CommandContext(ctx, "ssh", append(sshOptions(host), host, "sh -s -- "+shellJoin(argv))...)
 	}
 	cmd.Stdin = strings.NewReader(script)
 	var stderr strings.Builder
