@@ -92,8 +92,14 @@ const surfaces = (a) => [["Skills", a.skills], ["Roles", a.roles], ["MCP", a.mcp
 const GRID = [["SK", ""], ["RO", "supports_roles"], ["MCP", "supports_mcp"], ["HK", "supports_hooks"]];
 // The grid shows this many harnesses before the ones in sync fold into one line.
 const GRID_ROWS = 6;
-// The pill with the config root shows from this panel width on.
-const WIDE = 340;
+// The header's pill: from HASH_AT px of panel width it holds the short hash, from PATH_AT px
+// "path · hash"; the path is cut at its start only while it keeps MIN_PATH characters.
+const HASH_AT = 340;
+const PATH_AT = 440;
+const MIN_PATH = 8;
+// A monospace UI font is about 0.6em a character. The header and footer are sized by it so
+// nothing in them is cut; a proportional font only leaves more room.
+const textW = (text, size) => text.length * size * 0.6;
 const norm = (s) => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
 // A path under the home folder as ~/…
 function tilde(path) {
@@ -174,8 +180,8 @@ export default class Tackroom extends View {
     this.src = Object.fromEntries(Object.keys(SOURCES).map((name) => [name, { data: null, error: "", loading: false, again: false, at: 0 }]));
     this.busy = "";
     this.open = new Set();
-    // wide: the panel is at least WIDE px, so the header has room for the config root.
-    this.wide = false;
+    // The panel's width in px, from its first layout on: the header and footer fit their text to it.
+    this.width = 0;
     // Herdr's program table for the agents it can start: where a harness's icon comes from.
     this.known = [];
     // A crons collect probes every host over SSH, so poll gently; Refresh reloads the open tab at once.
@@ -477,7 +483,7 @@ export default class Tackroom extends View {
 
   // An action as a quiet button: a 1px border, no fill until the pointer is over it.
   link(id, label, onClick, disabled, t) {
-    return h_flex().id(id).flex_none().items_center().px(8).py(3).rounded(6).border(1).border_color(t.border)
+    return h_flex().id(id).flex_none().items_center().px(7).py(3).rounded(6).border(1).border_color(t.border)
       .text_size(12).text_color(t.foreground)
       .when(disabled, (el) => el.opacity(0.5))
       .when(!disabled, (el) => el.cursor_pointer().hover((s) => s.bg(t.hover)))
@@ -573,18 +579,19 @@ export default class Tackroom extends View {
   card(k, c, t) {
     const open = this.open.has(k);
     const acts = [...(c.acts ?? [])];
-    if (c.detail) acts.push(this.link(`${k}:details`, open ? "Hide details" : "Details", (cx) => this.toggle(k, cx), false, t));
+    if (c.detail) acts.push(this.link(`${k}:details`, open ? "Hide" : "Details", (cx) => this.toggle(k, cx), false, t));
     return v_flex().gap(3).px(6)
       .child(h_flex().gap(8).items_start()
         .child(div().flex_1().min_w(0).text_size(13).font_semibold().child(c.name))
         .when(Boolean(c.where), (el) => el.child(div().flex_none().max_w(150).pt(2).text_size(11).text_color(t.muted).child(c.where))))
-      .when(Boolean(c.why), (el) => el.child(div().text_size(12).text_color(t.muted).child(c.why)))
+      // Why, with the time of the last run at its right, so the buttons below get the whole width.
+      .when(Boolean(c.why) || Boolean(c.when), (el) => el.child(h_flex().gap(8).items_start()
+        .child(div().flex_1().min_w(0).text_size(12).text_color(t.muted).child(c.why ?? ""))
+        .when(Boolean(c.when), (row) => row.child(div().flex_none().pt(1).text_size(11).text_color(t.dim).child(c.when)))))
       .when(Boolean(c.path), (el) => el.child(div().min_w(0).overflow_hidden().whitespace_nowrap().text_ellipsis_start().text_size(11).text_color(t.dim).child(c.path)))
       .children((c.notes ?? []).filter(Boolean).map((n) => div().text_size(11).text_color(t.dim).child(n)))
-      // The buttons wrap when they do not fit; the time of the last run stays at the right.
-      .when(acts.length > 0 || Boolean(c.when), (el) => el.child(h_flex().gap(8).pt(3).items_start()
-        .child(h_flex().flex_1().min_w(0).flex_wrap().gap(6).children(acts))
-        .when(Boolean(c.when), (row) => row.child(div().flex_none().pt(4).text_size(11).text_color(t.dim).child(c.when)))))
+      // The buttons wrap only when they do not fit: four fit on one line at 280px.
+      .when(acts.length > 0, (el) => el.child(h_flex().flex_wrap().gap(6).pt(3).children(acts)))
       .when(open && Boolean(c.detail), (el) => el.child(c.detail().pt(4)));
   }
 
@@ -604,10 +611,11 @@ export default class Tackroom extends View {
   tabButton(tab, t) {
     const on = this.tab === tab.id;
     const b = this.badge(tab);
-    return h_flex().id(`tab-${tab.id}`).pt(4).gap(5).flex_none().items_center().text_size(12)
+    // The underline sits 4px under its label, and a wrapped second line follows it by the strip's 2px gap.
+    return h_flex().id(`tab-${tab.id}`).gap(5).flex_none().items_center().text_size(12)
       .text_color(on ? t.foreground : t.muted)
-      .when(on, (el) => el.pb(6).border_b(2).border_color(t.accent))
-      .when(!on, (el) => el.pb(8).cursor_pointer().hover((s) => s.text_color(t.foreground)))
+      .when(on, (el) => el.pb(4).border_b(2).border_color(t.accent))
+      .when(!on, (el) => el.pb(6).cursor_pointer().hover((s) => s.text_color(t.foreground)))
       .on_click((_e, cx) => { this.tab = tab.id; cx.notify(); })
       .child(tab.label)
       .when(Boolean(b), (el) => el.child(div().text_size(11).font_semibold().text_color(tone(t, b?.level)).child(String(b?.count))));
@@ -625,20 +633,35 @@ export default class Tackroom extends View {
     const local = hosts?.hosts.find((h) => h.host === "local");
     const root = local?.config_root || this.src.plan.data?.config_root || "";
     const commit = (hosts?.commit ?? "").slice(0, 7);
-    // Refresh reloads every source of the open tab that is not loading already. The pill
-    // takes what the mark, name, version and buttons leave, cut at its start: the hash stays.
+    const width = this.width || 368;
+    // The header's room: what is left of the line after the mark, name, buttons, the 4px
+    // gaps between them and a little margin. The version takes its share first and never
+    // gives way; the pill gets the rest.
+    let free = width - 22 - 14 - textW("tackroom", 13) - textW("Refresh", 12) - textW("Web", 12) - 32 - 16 - 6;
+    const version = hosts?.version ?? "";
+    const showVersion = Boolean(version) && textW(version, 11) + 6 <= free;
+    if (showVersion) free -= textW(version, 11) + 6;
+    // Up to PATH_AT px the pill holds the hash; from there "path · hash", the path cut at its start.
+    let pill = width >= HASH_AT && commit && free >= 4 + 12 + textW(commit, 11) ? commit : "";
+    if (width >= PATH_AT && root) {
+      const tail = commit ? ` · ${commit}` : "";
+      const room = Math.floor((free - 4 - 12 - textW(tail, 11)) / (11 * 0.6));
+      const path = tilde(root);
+      if (path.length <= room) pill = `${path}${tail}`;
+      else if (room > MIN_PATH) pill = `…${path.slice(path.length - (room - 1))}${tail}`;
+    }
+    // Refresh reloads every source of the open tab that is not loading already.
     const header = h_flex().flex_none().h(40).pl(14).pr(8).gap(4).items_center()
       .child(svg("mods/tackroom/tackroom.svg").size(14).flex_none().text_color(t.muted))
       .child(div().flex_none().text_size(13).font_semibold().child("tackroom"))
-      .when(this.wide && Boolean(root), (el) => el.child(h_flex().min_w(0).overflow_hidden().px(6).py(2).rounded(999).bg(t.raised).text_size(11).text_color(t.muted)
-        .child(div().min_w(0).overflow_hidden().whitespace_nowrap().text_ellipsis_start().child(tilde(root)))
-        .when(Boolean(commit), (pill) => pill.child(div().flex_none().whitespace_nowrap().child(` · ${commit}`)))))
+      .when(Boolean(pill), (el) => el.child(h_flex().flex_none().px(6).py(2).rounded(999).bg(t.raised).text_size(11).text_color(t.muted)
+        .child(div().whitespace_nowrap().child(pill))))
       .child(div().flex_1())
-      .when(Boolean(hosts?.version), (el) => el.child(div().min_w(0).truncate().pr(2).text_size(11).text_color(t.muted).child(hosts.version)))
+      .when(showVersion, (el) => el.child(div().flex_none().whitespace_nowrap().pr(2).text_size(11).text_color(t.muted).child(version)))
       .child(this.button("refresh", "Refresh", (cx) => tab.sources.filter((name) => !this.src[name].loading).forEach((name) => this.load(name, cx)),
         srcs.every((s) => s.loading), t))
       .child(this.button("web", "Web", (cx) => this.openWeb(tab, cx), false, t));
-    const strip = h_flex().flex_none().flex_wrap().gap_x(14).px(14).border_b(1).border_color(t.border)
+    const strip = h_flex().flex_none().flex_wrap().gap_x(14).gap_y(2).px(14).pt(6).border_b(1).border_color(t.border)
       .children(TABS.map((x) => this.tabButton(x, t)));
 
     // The Overview draws whatever has loaded, and says what has not; the other
@@ -649,18 +672,29 @@ export default class Tackroom extends View {
     if (s.error && (s.data || tab.id !== "overview")) items.push(div().px(6).text_size(11).text_color(t.ansi1).child(s.data ? `Last load failed: ${s.error}` : s.error));
     if (!ready && !s.error) items.push(this.note("Loading…", t));
     if (ready) items.push(...this[tab.id](t));
-    // On the left, the state of the config root on this Mac; on the right, when the open tab's oldest data loaded.
+    // On the left, the state of the config root on this Mac; on the right, when the open tab's
+    // oldest data loaded. A path of 16 characters or fewer is never cut. When the row is tight
+    // the word "loaded" goes first, then the time moves to a second line.
     const dirty = local?.commit ? local.dirty : null;
-    const footer = h_flex().flex_none().h(36).px(14).gap(10).items_center().border_t(1).border_color(t.border).text_size(11)
-      .child(h_flex().flex_1().min_w(0).overflow_hidden().text_color(dirty > 0 ? t.ansi3 : t.muted)
-        .when(Boolean(root), (el) => el.child(div().min_w(0).overflow_hidden().whitespace_nowrap().text_ellipsis_start().child(tilde(root)))
-          .when(dirty != null, (row) => row.child(div().flex_none().whitespace_nowrap().child(` · ${dirty > 0 ? `${dirty} uncommitted` : "clean"}`)))))
-      .child(div().flex_none().whitespace_nowrap().text_color(t.dim).child(loading ? "loading…" : times.length ? `loaded ${clock(Math.min(...times))}` : ""));
+    const left = root ? tilde(root) : "";
+    const tail = dirty == null || !root ? "" : ` · ${dirty > 0 ? `${dirty} uncommitted` : "clean"}`;
+    const time = loading ? "loading…" : times.length ? clock(Math.min(...times)) : "";
+    const loaded = loading || !time ? time : `loaded ${time}`;
+    const fits = (text) => textW(left + tail, 11) + 10 + textW(text, 11) <= width - 28;
+    const right = fits(loaded) ? loaded : fits(time) ? time : null;
+    const leftEl = (box) => box.min_w(0).overflow_hidden().text_color(dirty > 0 ? t.ansi3 : t.muted)
+      .when(Boolean(left), (el) => el.child(div().whitespace_nowrap().when(left.length > 16, (d) => d.min_w(0).overflow_hidden().text_ellipsis_start()).when(left.length <= 16, (d) => d.flex_none()).child(left))
+        .when(Boolean(tail), (row) => row.child(div().flex_none().whitespace_nowrap().child(tail))));
+    const timeEl = (text) => div().flex_none().whitespace_nowrap().text_color(t.dim).child(text);
+    const footer = (right == null
+      ? v_flex().flex_none().min_h(36).px(14).py(6).gap(2).justify_center().child(leftEl(h_flex())).child(h_flex().justify_end().child(timeEl(loaded)))
+      : h_flex().flex_none().h(36).px(14).gap(10).items_center().child(leftEl(h_flex().flex_1())).child(timeEl(right)))
+      .border_t(1).border_color(t.border).text_size(11);
     // One scroll position for each tab; the header, tab strip and footer stay in place.
     return v_flex().id("tackroom-root").size_full().bg(t.surface).text_color(t.foreground)
       .on_size_change((size, cx) => {
-        const wide = size.width / (Number(settings()?.zoom) || 1) >= WIDE;
-        if (wide !== this.wide) { this.wide = wide; cx.notify(); }
+        const w = Math.round(size.width / (Number(settings()?.zoom) || 1));
+        if (w !== this.width) { this.width = w; cx.notify(); }
       })
       .child(header).child(strip)
       .child(v_flex().id(`tackroom-${tab.id}`).flex_1().min_h(0).overflow_y_scrollbar().px(8).pt(16).pb(16).gap(22).children(items))
@@ -792,13 +826,15 @@ export default class Tackroom extends View {
   }
 
   // The icon of a harness: Herdr's own for the program of that name, found among the agents
-  // running now and those it can start, else a rounded square with the first letter.
+  // running now and those it can start, else a rounded square with its initials.
   harnessIcon(name, programs, t) {
     const want = [name, this.display(name)].map(norm);
     const p = programs.find((x) => x?.icon && [x.key, x.name].some((k) => want.includes(norm(k))));
     if (p) return p.tint ? svg(p.icon).size(16).flex_none().text_color(t.foreground) : image(p.icon).w(16).h(16).flex_none();
+    // The first letters of up to two words, so "Qwen Code" and "Antigravity CLI" read QC and AC.
+    const letters = this.display(name).split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
     return h_flex().w(16).h(16).flex_none().items_center().justify_center().rounded(4).bg(t.raised)
-      .text_size(10).font_semibold().text_color(t.muted).child((this.display(name)[0] ?? "?").toUpperCase());
+      .text_size(9).font_semibold().text_color(t.muted).child(letters);
   }
 
   // One harness of the grid: icon, name and a cell for each surface. A cell is a dot in the
