@@ -489,7 +489,7 @@ export default class Tackroom extends View {
 
   // An action as a quiet button: a 1px border, no fill until the pointer is over it.
   link(id, label, onClick, disabled, t) {
-    return h_flex().id(id).flex_none().items_center().px(7).py(3).rounded(6).border(1).border_color(t.border)
+    return h_flex().id(id).flex_none().items_center().px(9).py(3).rounded(8).border(1).border_color(t.border)
       .text_size(12).text_color(t.foreground)
       .when(disabled, (el) => el.opacity(0.5))
       .when(!disabled, (el) => el.cursor_pointer().hover((s) => s.bg(t.hover)))
@@ -497,10 +497,10 @@ export default class Tackroom extends View {
       .child(label);
   }
 
-  // The one filled button of the Overview: the theme's foreground as its fill.
+  // The one filled button of the Overview: the theme's accent as its fill.
   primary(id, label, onClick, disabled, t) {
-    return h_flex().id(id).flex_none().items_center().px(10).py(4).rounded(6).bg(t.foreground)
-      .text_size(12).font_semibold().text_color(t.background)
+    return h_flex().id(id).flex_none().items_center().px(12).py(4).rounded(8).bg(t.accent)
+      .text_size(12).font_semibold().text_color(t.accent_foreground)
       .when(disabled, (el) => el.opacity(0.5))
       .when(!disabled, (el) => el.cursor_pointer().hover((s) => s.opacity(0.88)))
       .on_click((_e, cx) => { if (!disabled) onClick(cx); })
@@ -544,7 +544,7 @@ export default class Tackroom extends View {
   // A line that opens into its details when clicked; detail() builds them only while open.
   fold(k, head, detail, t, { start = false, indent = 22 } = {}) {
     const open = this.open.has(k);
-    const row = h_flex().id(k).gap(8).px(6).py(4).rounded(5)
+    const row = h_flex().id(k).gap(8).px(6).py(4).border_b(1).border_color(t.border)
       .when(start, (el) => el.items_start())
       .when(!start, (el) => el.items_center())
       .when(open, (el) => el.bg(t.raised))
@@ -556,17 +556,17 @@ export default class Tackroom extends View {
 
   // The answer at the top of a tab: a status dot, one line that says it, and a line under it.
   answer(level, title, sub, t, right) {
-    return h_flex().gap(10).px(6).items_start()
-      .child(this.dot(tone(t, level), 12).mt(6))
-      .child(v_flex().flex_1().min_w(0).gap(3)
-        .child(div().text_size(18).font_semibold().child(title))
-        .when(Boolean(sub), (el) => el.child(div().text_size(12).text_color(t.muted).child(sub))))
-      .when(Boolean(right), (el) => el.child(h_flex().flex_none().pt(4).child(right)));
+    return h_flex().gap(10).px(14).items_start()
+      .child(this.dot(tone(t, level), 12).mt(7))
+      .child(v_flex().flex_1().min_w(0).gap(4)
+        .child(div().text_size(20).font_semibold().child(title))
+        .when(Boolean(sub), (el) => el.child(div().text_size(13).text_color(t.muted).child(sub))))
+      .when(Boolean(right), (el) => el.child(h_flex().flex_none().pt(2).child(right)));
   }
 
-  // A section title: 10px, semibold, upper case, in the colour it is given.
+  // A section title: 13px, semibold, sentence case, in the colour it is given.
   heading(text, color) {
-    return div().flex_none().text_size(10).font_semibold().text_color(color).child(text.toUpperCase());
+    return div().flex_none().text_size(13).font_semibold().text_color(color).child(text);
   }
 
   // A group under a title in its level's colour with its count ("NEEDS ATTENTION · 2"),
@@ -586,7 +586,7 @@ export default class Tackroom extends View {
     const open = this.open.has(k);
     const acts = [...(c.acts ?? [])];
     if (c.detail) acts.push(this.link(`${k}:details`, open ? "Hide" : "Details", (cx) => this.toggle(k, cx), false, t));
-    return v_flex().gap(3).px(6)
+    return v_flex().gap(6).px(14).py(12).rounded(12).border(1).border_color(t.border).bg(t.surface)
       .child(h_flex().gap(8).items_start()
         .child(div().flex_1().min_w(0).text_size(13).font_semibold().child(c.name))
         .when(Boolean(c.where), (el) => el.child(div().flex_none().max_w(150).pt(2).text_size(11).text_color(t.muted).child(c.where))))
@@ -609,7 +609,7 @@ export default class Tackroom extends View {
         .child(div().text_size(13).font_medium().text_color(level === "off" ? t.muted : t.foreground).child(title))
         .children(subs.filter(Boolean).map((s) => div().text_size(12).text_color(t.muted).child(s)))];
     if (detail) return this.fold(k, head, detail, t, { start: true });
-    return h_flex().id(k).gap(8).px(6).py(4).items_start().rounded(5)
+    return h_flex().id(k).gap(8).px(6).py(4).items_start().border_b(1).border_color(t.border)
       .when(Boolean(go), (el) => el.cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => { this.tab = go; cx.notify(); }))
       .children(head);
   }
@@ -697,7 +697,7 @@ export default class Tackroom extends View {
       : h_flex().flex_none().h(36).px(14).gap(10).items_center().child(leftEl(h_flex().flex_1())).child(timeEl(right)))
       .border_t(1).border_color(t.border).text_size(11);
     // One scroll position for each tab; the header, tab strip and footer stay in place.
-    return v_flex().id("tackroom-root").size_full().bg(t.surface).text_color(t.foreground)
+    return v_flex().id("tackroom-root").size_full().bg(t.canvas).text_color(t.foreground)
       .on_size_change((size, cx) => {
         const w = Math.round(size.width / (Number(settings()?.zoom) || 1));
         if (w !== this.width) { this.width = w; cx.notify(); }
@@ -741,7 +741,9 @@ export default class Tackroom extends View {
     const outside = this.outsideSkills(t);
     if (outside) out.push(outside);
     const rest = this.restLines(t);
-    if (rest.length) out.push(this.group("Everything else", "", rest, t, { gap: 6 }).pt(18).border_t(1).border_color(t.border));
+    if (rest.length) out.push(v_flex().gap(8).pt(18)
+      .child(this.heading("Everything else", t.muted))
+      .child(v_flex().rounded(12).border(1).border_color(t.border).bg(t.surface).px(4).py(4).children(rest)));
     return out;
   }
 
@@ -795,8 +797,8 @@ export default class Tackroom extends View {
     const home = this.src.inventory.data?.home;
     const fix = m.fix || (m.dirty > 0 && m.config_root
       ? `${m.host === "local" ? "" : `ssh ${m.host} `}git -C ${m.host === "local" && home ? m.config_root.replace(home, "~") : m.config_root} status` : "");
-    return h_flex().id(`machines:${m.host}`).gap(8).px(6).items_start()
-      .child(this.dot(tone(t, m.health === "fail" ? "fail" : "warn")).mt(5))
+    return h_flex().id(`machines:${m.host}`).gap(10).px(14).py(12).rounded(12).border(1).border_color(t.border).bg(t.surface).items_start()
+      .child(this.dot(tone(t, m.health === "fail" ? "fail" : "warn"), 10).mt(6))
       .child(v_flex().flex_1().min_w(0).gap(3)
         .child(div().text_size(13).font_semibold().child(hostName(m.host)))
         .when(Boolean(m.summary), (el) => el.child(div().text_size(12).text_color(t.muted).child(sentence(m.summary))))
@@ -818,7 +820,7 @@ export default class Tackroom extends View {
       ["Crons", "crons", "crons", c?.jobs.length, c ? [...c.jobs.map(jobLevel), ...downHosts(c).map(() => "fail")] : []],
     ].filter(([, , , n]) => n !== 0);
     if (!cells.length) return null;
-    return h_flex().rounded(8).border(1).border_color(t.border).overflow_hidden()
+    return h_flex().rounded(12).border(1).border_color(t.border).bg(t.surface).overflow_hidden()
       .children(cells.map(([label, go, source, n, levels], i) => {
         const level = worst(levels.filter(bad));
         const text = n != null ? String(n) : this.src[source].error ? "–" : "…";
@@ -886,7 +888,7 @@ export default class Tackroom extends View {
     const shown = live.filter((a, i) => i < GRID_ROWS || harnessLevel(a) !== "ok");
     const folded = live.filter((a) => !shown.includes(a));
     const open = this.open.has("grid:more");
-    return v_flex().gap(2)
+    return v_flex().gap(2).px(10).py(10).rounded(12).border(1).border_color(t.border).bg(t.surface)
       .child(h_flex().gap(8).px(6).items_center()
         .child(div().w(16).flex_none())
         .child(div().flex_1().min_w(0))
