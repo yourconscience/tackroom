@@ -20,6 +20,7 @@ tackroom cron [--interval 15m] [--deps] [--remove]        # tackroom's own sync 
 For each host, `collect` runs one POSIX `sh` probe, locally or through `ssh -o BatchMode=yes HOST sh -s`, and parses the printed scheduler state locally. Nothing is installed on, copied to or written on the scanned host.
 
 - Hosts come from `--hosts`, else `crons.hosts` in `tackroom.local.yaml`, else `crons.hosts` in `tackroom.yaml`, else `local`. SSH aliases resolve through your own `~/.ssh/config`.
+- The first call to a host leaves its SSH connection open for ten minutes, behind a socket in `$XDG_STATE_HOME/tackroom/ssh` (`~/.local/state/tackroom/ssh`), so the next `collect`, `tackroom hosts` or job action on that host skips the handshake. Keepalives close a connection whose network has gone silent, and the next call reconnects. Where that directory's path is too long to hold a socket, every call connects on its own.
 - The same list names the machines `tackroom hosts` reports on: tackroom's own version, sync state and config commit on each ([commands.md](commands.md#check-health)).
 - Scope is the user tackroom runs as (or the SSH user): their LaunchAgents, crontab and user timers. System daemons, other users' crontabs and system timers are out of scope.
 
