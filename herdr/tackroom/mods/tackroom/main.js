@@ -856,7 +856,10 @@ export default class Tackroom extends View {
       // Only the inventory says whether a harness takes roles, MCP servers or hooks (every one takes
       // skills). Until it has loaded, or when it failed, that is unknown: a middle dot, not a dot.
       const takes = !GRID[i][1] ? true : meta ? meta[GRID[i][1]] !== false : null;
-      const state = a.error ? "error" : (lists[i] ?? []).some((r) => r.states[a.name] === "conflict") ? "conflict"
+      // The plan alone says whether a harness has a conflict, as it alone says missing and drifted;
+      // the inventory only says where the conflict is. So a cell is never red or yellow for a
+      // harness the headline counts as in sync, whichever of the two loaded last.
+      const state = a.error ? "error" : a.conflicts.length && (lists[i] ?? []).some((r) => r.states[a.name] === "conflict") ? "conflict"
         : s.missing.length ? "missing" : s.drifted.length || s.stale?.length ? "drift" : "ok";
       return h_flex().w(22).flex_none().items_center().justify_center()
         .child(takes ? this.dot(tone(t, cellLevel(state))) : div().text_size(11).text_color(t.dim).child(takes == null ? "·" : "–"));
