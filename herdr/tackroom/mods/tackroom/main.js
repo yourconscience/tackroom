@@ -49,6 +49,12 @@ const jobLevel = (j) => (JOB[j.health] ?? ["warn"])[0];
 const DONE = { run: "Started", pause: "Paused", resume: "Resumed" };
 const VERB = { run: "Run now", pause: "Pause", resume: "Resume" };
 const MACHINE = { ok: "healthy", warn: "needs attention", fail: "failing" };
+// The sources the Overview draws from. One that has not loaded once keeps the answer from
+// reading "All clear"; one that failed with nothing to show is a row with Retry.
+const OVERVIEW = ["plan", "inventory", "crons", "hosts"];
+const NOT_LOADED = { plan: "The sync plan did not load", inventory: "The inventory did not load", crons: "Crons did not load", hosts: "Machines did not load" };
+// What the answer says it is still checking, by source.
+const CHECKING = { plan: "harnesses", inventory: "the inventory", crons: "crons", hosts: "machines" };
 // What a matrix cell of the inventory says, in the web view's words, and its level.
 const CELL = {
   ok: ["in place", "ok"], drift: ["drifted", "warn"], missing: ["missing", "warn"], conflict: ["conflict", "fail"],
@@ -399,9 +405,9 @@ export default class Tackroom extends View {
       ...(d && !d.synced ? [{ kind: "sync" }] : []),
       ...sick.map((m) => ({ kind: "machines", hosts: [m] })),
       ...(d ? skippedItems(d) : []).filter((h) => h.kind === "blocked").map((h) => ({ kind: "blocked", h })),
-      ...["plan", "crons"].filter((name) => !this.src[name].data && this.src[name].error).map((name) => ({ kind: "error", name })),
+      ...OVERVIEW.filter((name) => !this.src[name].data && this.src[name].error).map((name) => ({ kind: "error", name })),
     ];
-    const pending = ["plan", "crons", "hosts"].filter((name) => !this.src[name].data && !this.src[name].error);
+    const pending = OVERVIEW.filter((name) => !this.src[name].data && !this.src[name].error);
     return { fail, warn, pending };
   }
 
@@ -721,7 +727,7 @@ export default class Tackroom extends View {
       const [one, many] = kinds[failKinds[0]];
       subs.push(o.fail.length === 1 ? `The failure is ${one}.` : `${o.fail.length === 2 ? "Both failures" : "The failures"} are ${many}.`);
     }
-    if (o.pending.length) subs.push(`Still checking ${andList(o.pending.map((name) => ({ plan: "harnesses", crons: "crons", hosts: "machines" })[name]))}.`);
+    if (o.pending.length) subs.push(`Still checking ${andList(o.pending.map((name) => CHECKING[name]))}.`);
 
     // The one filled button: Sync, only while a sync waits and this tackroom can apply it.
     const sync = o.warn.some((i) => i.kind === "sync") && this.canEdit()
@@ -778,7 +784,7 @@ export default class Tackroom extends View {
     }
     // A source that did not load.
     return this.card(`error:${i.name}`, {
-      name: i.name === "plan" ? "The sync plan did not load" : "Crons did not load", why: this.src[i.name].error,
+      name: NOT_LOADED[i.name], why: this.src[i.name].error,
       acts: [this.link(`retry:${i.name}`, "Retry", (cx) => this.load(i.name, cx), this.src[i.name].loading, t)],
     }, t);
   }
@@ -847,11 +853,13 @@ export default class Tackroom extends View {
     const lists = inv ? [inv.skills, inv.roles, inv.mcp, inv.hooks] : [];
     const level = harnessLevel(a);
     const cells = surfaces(a).map(([, s], i) => {
-      const takes = !GRID[i][1] || meta?.[GRID[i][1]] !== false;
+      // Only the inventory says whether a harness takes roles, MCP servers or hooks (every one takes
+      // skills). Until it has loaded, or when it failed, that is unknown: a middle dot, not a dot.
+      const takes = !GRID[i][1] ? true : meta ? meta[GRID[i][1]] !== false : null;
       const state = a.error ? "error" : (lists[i] ?? []).some((r) => r.states[a.name] === "conflict") ? "conflict"
         : s.missing.length ? "missing" : s.drifted.length || s.stale?.length ? "drift" : "ok";
       return h_flex().w(22).flex_none().items_center().justify_center()
-        .child(takes ? this.dot(tone(t, cellLevel(state))) : div().text_size(11).text_color(t.dim).child("–"));
+        .child(takes ? this.dot(tone(t, cellLevel(state))) : div().text_size(11).text_color(t.dim).child(takes == null ? "·" : "–"));
     });
     // A harness that is not in sync reads so by its name too, whichever cell shows it.
     return this.fold(`g:${a.name}`,
