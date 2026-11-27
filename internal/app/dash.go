@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -204,7 +205,9 @@ type dashSyncMsg struct {
 	failed bool
 }
 
-type dashTickMsg struct{ crons bool }
+// dashTickMsg is a timed refresh coming due; hidden says the dash's Rex pane
+// was minimized then, and the refresh is skipped.
+type dashTickMsg struct{ crons, hidden bool }
 
 // dashPending is a question in the message line: the key that asked it, and
 // the verb y starts on job (run, pause or resume), or sync.
@@ -288,7 +291,51 @@ func dashTick(crons bool) tea.Cmd {
 	if crons {
 		every = dashCronsEvery
 	}
-	return tea.Tick(every, func(time.Time) tea.Msg { return dashTickMsg{crons: crons} })
+	return tea.Tick(every, func(time.Time) tea.Msg { return dashTickMsg{crons: crons, hidden: dashHiddenInRex()} })
+}
+
+// dashHiddenInRex reports whether the dash runs in a Rex pane that is
+// minimized, as `tackroom rex` hides its panel. A hidden dash skips its timed
+// refreshes, so a panel left hidden does not probe the hosts every 5 minutes;
+// `tackroom rex` presses r in it when it shows it again. Rex sets REX_SESSION
+// and REX_BLOCK in every pane. Outside Rex, or when Rex cannot say, it is
+// false and the refreshes run.
+func dashHiddenInRex() bool {
+	session, block := os.Getenv("REX_SESSION"), os.Getenv("REX_BLOCK")
+	if session == "" || block == "" {
+		return false
+	}
+	rex, err := exec.LookPath("rex")
+	if err != nil {
+		return false
+	}
+	out, err := exec.Command(rex, "api", "call", "-s", session, "session.view").Output()
+	if err != nil {
+		return false
+	}
+	var view struct {
+		Windows []struct {
+			Layers []struct {
+				State  string `json:"state"`
+				Blocks []struct {
+					BlockID string `json:"block_id"`
+				} `json:"blocks"`
+			} `json:"layers"`
+		} `json:"windows"`
+	}
+	if json.Unmarshal(out, &view) != nil {
+		return false
+	}
+	for _, w := range view.Windows {
+		for _, l := range w.Layers {
+			for _, b := range l.Blocks {
+				if b.BlockID == block {
+					return l.State == "minimized"
+				}
+			}
+		}
+	}
+	return false
 }
 
 // refreshStatus starts a status collect; a collect already running is
@@ -365,6 +412,8 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case dashTickMsg:
 		next := dashTick(msg.crons)
 		switch {
+		case msg.hidden:
+			return m, next
 		case msg.crons:
 			cmds := []tea.Cmd{next}
 			if !m.cronsBusy {

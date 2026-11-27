@@ -2,6 +2,12 @@
 
 What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
+## To 3.2.1
+
+Nothing to migrate by hand.
+
+- Changed: a hidden Rex panel stops refreshing. `tackroom dash` in a minimized Rex pane skips its timed refreshes, so panels left hidden in several sessions no longer probe your hosts over SSH every 5 minutes, and `tackroom rex` presses `r` in the panel when it shows it again, so it refreshes at once. See [terminals.md](terminals.md#rex).
+
 ## To 3.2
 
 Nothing to migrate by hand.
