@@ -91,7 +91,7 @@ Each view has its own fragment: `#overview`, `#skills`, `#roles`, `#wiring` (MCP
 | Unmanaged | Items in harness folders that tackroom did not put there, with the command that promotes one, and conflicts. tackroom never deletes them. Stale links into its own store are listed too; sync removes those. |
 | Config | Either config file as YAML ([What it can change](#what-it-can-change)). |
 
-Overview groups its rows as the Herdr panel's Overview does:
+Overview groups its rows into the same three groups as the Herdr panel's Overview. The panel adds a counts strip and a harness grid above them and gives each machine its own row:
 
 - **Failing**: a failing cron; a harness with a conflict or an unreadable config; a failing machine; a host the crons collect could not reach.
 - **Needs attention**: a cron whose last run failed; one row for the sync waiting ("3 changes waiting to sync"), with the harnesses that need it, how many items are missing or drifted and the config root link when it is not synced; one row for the machines that need attention; an outside source the audit blocked, with the command that accepts the finding; a scheduler the crons collect could not read; a source that did not load or refresh (the inventory, the crons or the machines), with Retry.

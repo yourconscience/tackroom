@@ -2,6 +2,12 @@
 
 What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
+## To 3.2
+
+Nothing to migrate by hand.
+
+- Changed: the Overview of the Herdr panel has a new layout: a header with the short hash of your config, a counts strip, a grid with an icon and one cell per surface for each harness, Failing and Needs attention with counts and one row per machine, outside skills as chips, actions as bordered buttons and a footer that stays in place. Copy the two mods from `herdr/tackroom/mods/` again, as the [recipe](https://github.com/yourconscience/tackroom/blob/main/herdr/tackroom/RECIPE.md) says; nothing else changes.
+
 ## To 3.1
 
 Nothing to migrate by hand. A workspace session that is already open keeps its old panes until you close it; run the workspace command again to get the new layout.
