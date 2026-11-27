@@ -13,7 +13,7 @@ local VIEW_MS = 30 * 1000
 
 local HEALTH = { fail = "Failing", warn = "Last run failed", idle = "No result", ok = "Healthy", paused = "Paused" }
 local ORDER = { "fail", "warn", "idle", "ok", "paused" }
-local TONE = { fail = "error", warn = "warning", idle = "dim", ok = "success", paused = "muted" }
+local TONE = { fail = "error", warn = "warning", idle = "muted", ok = "success", paused = "muted" }
 local DONE = { run = "Started", pause = "Paused", resume = "Resumed" }
 local OFF = { disabled = true, not_loaded = true }
 
@@ -266,78 +266,133 @@ local function clock(iso)
 	return hh .. ":" .. mm
 end
 
-local function badge(label, act, tone)
-	local node = ui.badge(label, tone)
-	local p = node.p or {}
-	p.actions = { click = act }
-	node.p = p
-	return node
-end
-
-local function section_title(text, count)
-	return ui.text({ ui.span(text, "strong"), ui.span("  " .. count, "dim") })
-end
-
-local function host_line(h, data)
+-- Count jobs of one host by health (ORDER keys only; an unknown health is dropped).
+local function health_counts(data, h)
 	local counts = {}
-	for _, k in ORDER do
-		local n = 0
-		for _, j in data.jobs do
-			if j.host == h and j.health == k then
-				n = n + 1
+	for _, k in ipairs(ORDER) do
+		counts[k] = 0
+	end
+	for _, j in data.jobs do
+		if j.host == h then
+			local k = j.health or "ok"
+			if counts[k] ~= nil then
+				counts[k] = counts[k] + 1
 			end
 		end
-		if n > 0 then
-			table.insert(counts, { k, n })
-		end
 	end
-	local spans = { ui.span(host_name(h), "strong") }
-	for _, c in counts do
-		table.insert(spans, ui.span("  ", "dim"))
-		table.insert(spans, ui.span("● ", TONE[c[1]]))
-		table.insert(spans, ui.span(c[2] .. " " .. string.lower(HEALTH[c[1]]), "muted"))
-	end
-	return ui.text(spans)
+	return counts
 end
 
-local function job_row(state, j, show_host)
-	local h = j.health or "ok"
-	local kids = {
-		ui.text({
-			ui.span("● ", TONE[h]),
-			ui.span(j.short_name or j.name or j.id, h == "paused" and "muted" or nil),
-			ui.span("  ", "dim"),
-			ui.span(show_host and host_name(j.host) or (j.schedule_text or j.schedule or ""), "dim"),
-			ui.span("  ", "dim"),
-			ui.span(h == "paused" and "paused" or (j.last_run and ago(j.last_run) or "-"), "dim"),
-		}),
-	}
-	if j.source == "launchd" and j.unit then
-		local busy = state.busy == key(j)
-		if OFF[j.state] then
-			table.insert(kids, badge(busy and "…" or "Resume", "resume:" .. key(j), busy and "muted" or "accent"))
-		else
-			table.insert(kids, badge(busy and "…" or "Run now", "run:" .. key(j), busy and "muted" or "accent"))
-			table.insert(kids, badge(busy and "…" or "Pause", "pause:" .. key(j), busy and "muted" or "neutral"))
+-- A span list tinting each non-zero health ("2 failing · 3 healthy").
+local function health_sub(data, h)
+	local counts = health_counts(data, h)
+	local out = {}
+	local first = true
+	for _, k in ipairs(ORDER) do
+		local n = counts[k]
+		if n > 0 then
+			if not first then
+				table.insert(out, ui.span(" · ", "muted"))
+			end
+			table.insert(out, ui.span(n .. " " .. string.lower(HEALTH[k]), TONE[k]))
+			first = false
 		end
 	end
-	return ui.row(kids)
+	return out
+end
+
+-- The hosts summary: one stat tile per host, tinted by its worst health.
+local function host_stats(d, hosts)
+	local items = {}
+	for _, h in ipairs(hosts) do
+		local counts = health_counts(d, h)
+		local total = 0
+		for _, k in ipairs(ORDER) do
+			total = total + counts[k]
+		end
+		table.insert(items, {
+			label = ui.span(host_name(h), "strong"),
+			value = tostring(total),
+			sub = health_sub(d, h),
+			tone = counts.fail > 0 and "error" or (counts.warn > 0 and "warning" or nil),
+			title = host_name(h),
+		})
+	end
+	return ui.stats(items)
+end
+
+local function job_cols(show_host)
+	return {
+		{ id = "job", head = "Job", grow = 1 },
+		{ id = "when", head = show_host and "Host" or "Schedule", truncate = "end" },
+		{ id = "last", head = "Last run", align = "end" },
+		{ id = "run", head = "", align = "end" },
+		{ id = "pause", head = "", align = "end" },
+	}
+end
+
+-- One job as a table row: a status dot and name, the schedule (or host), how
+-- long ago it last ran, and Run now / Pause (Resume when off) for launchd jobs.
+local function job_row(state, j, show_host)
+	local h = j.health or "ok"
+	local name = j.short_name or j.name or j.id
+	local when = show_host and host_name(j.host) or (j.schedule_text or j.schedule or "")
+	local last = h == "paused" and "paused" or (j.last_run and ago(j.last_run) or "-")
+	local busy = state.busy == key(j)
+
+	local cells = {
+		{ text = ui.span(name, h == "paused" and "muted" or nil), dot = TONE[h] },
+		ui.span(when, "muted"),
+		ui.span(last, "muted"),
+		"",
+		"",
+	}
+	if j.source == "launchd" and j.unit then
+		if OFF[j.state] then
+			cells[4] = { button = { text = busy and "…" or "Resume", act = "resume", variant = "default", disabled = busy } }
+		else
+			cells[4] = { button = { text = busy and "…" or "Run now", act = "run", variant = "default", disabled = busy } }
+			cells[5] = { button = { text = busy and "…" or "Pause", act = "pause", variant = "default", disabled = busy } }
+		end
+	end
+	return { id = key(j), cells = cells, title = j.name or j.id }
+end
+
+local function jobs_table(state, jobs, show_host)
+	local rows = {}
+	for _, j in ipairs(jobs) do
+		table.insert(rows, job_row(state, j, show_host))
+	end
+	return ui.table(job_cols(show_host), rows, { empty = ui.span("No jobs", "muted") })
+end
+
+local function section_head(text, count)
+	return { ui.span(text, "strong"), ui.span("  " .. count, "muted") }
+end
+
+local function job_by_key(state, id)
+	if state.data then
+		for _, j in state.data.jobs do
+			if key(j) == id then
+				return j
+			end
+		end
+	end
+	return nil
 end
 
 local function main_view(state)
 	local d = state.data
 	local kids = {}
 
-	local header = {
+	table.insert(kids, ui.row({
 		ui.text({
 			ui.span("Crons", "strong"),
-			ui.span("  " .. (state.loading and "collecting…" or (d and clock(d.scanned_at) or "")), "dim"),
-			ui.span("   ", "dim"),
+			ui.span("  " .. (state.loading and "collecting…" or (d and clock(d.scanned_at) or "")), "muted"),
 		}),
-		badge(state.loading and "…" or "Collect", "collect", state.loading and "muted" or "accent"),
-		badge("Web", "web", "neutral"),
-	}
-	table.insert(kids, ui.row(header))
+		ui.button("Collect", { key = "collect", variant = "primary", size = "sm", busy = state.loading, actions = { click = "collect" } }),
+		ui.button("Web", { key = "web", variant = "default", size = "sm", actions = { click = "web" } }),
+	}))
 
 	if state.error then
 		table.insert(kids, ui.text({ ui.span(state.error, "error") }))
@@ -364,8 +419,10 @@ local function main_view(state)
 		end
 	end
 
-	for _, h in hosts do
-		table.insert(kids, host_line(h, d))
+	if #hosts > 0 then
+		table.insert(kids, host_stats(d, hosts))
+	else
+		table.insert(kids, ui.text({ ui.span("No crons collected.", "muted") }))
 	end
 
 	local att = {}
@@ -375,13 +432,10 @@ local function main_view(state)
 		end
 	end
 	if #att > 0 then
-		table.insert(kids, section_title("NEEDS ATTENTION", #att))
-		for _, j in att do
-			table.insert(kids, job_row(state, j, true))
-		end
+		table.insert(kids, ui.section(section_head("Needs attention", #att), { jobs_table(state, att, true) }))
 	end
 
-	for _, h in hosts do
+	for _, h in ipairs(hosts) do
 		local list = {}
 		for _, j in jobs do
 			if j.host == h then
@@ -397,10 +451,7 @@ local function main_view(state)
 			return ia < ib
 		end)
 		if #list > 0 then
-			table.insert(kids, section_title(string.upper(host_name(h)), #list))
-			for _, j in list do
-				table.insert(kids, job_row(state, j, false))
-			end
+			table.insert(kids, ui.section(section_head(host_name(h), #list), { jobs_table(state, list, false) }))
 		end
 	end
 
@@ -412,7 +463,7 @@ local function dock_view(state)
 	if state.note and state.note ~= "" then
 		table.insert(lines, ui.text({ ui.span(state.note, "muted") }))
 	end
-	table.insert(lines, ui.text({ ui.span("Collect refreshes now · actions on launchd jobs", "dim") }))
+	table.insert(lines, ui.text({ ui.span("Collect refreshes now · actions on launchd jobs", "muted") }))
 	return ui.col({ ui.lines(lines) })
 end
 
@@ -466,20 +517,15 @@ tern.block.define("crons", {
 		if ev.ev ~= "action" then
 			return
 		end
-		local act = ev.act or ""
-		if act == "collect" then
+		local name = ev.act or ""
+		if name == "collect" then
 			collect(state)
-		elseif act == "web" then
+		elseif name == "web" then
 			open_web(state)
-		else
-			local verb, rest = string.match(act, "^(run|pause|resume):(.*)$")
-			if verb and state.data then
-				for _, j in state.data.jobs do
-					if key(j) == rest then
-						act(state, j, verb)
-						break
-					end
-				end
+		elseif name == "run" or name == "pause" or name == "resume" then
+			local job = job_by_key(state, ev.item)
+			if job then
+				act(state, job, name)
 			end
 		end
 	end,
