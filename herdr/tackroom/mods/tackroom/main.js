@@ -576,7 +576,7 @@ export default class Tackroom extends View {
       .child(h_flex().gap(8).px(6).items_center()
         .child(this.heading(count == null ? title : `${title} · ${count}`, level ? tone(t, level) : t.muted))
         .child(div().flex_1().min_w(0).truncate().text_size(11).text_color(t.dim).child(note))
-        .when(Boolean(column), (el) => el.child(div().flex_none().w(48).text_right().text_size(11).text_color(t.dim).child(column))))
+        .when(Boolean(column), (el) => el.child(div().flex_none().min_w(48).text_right().text_size(11).text_color(t.dim).child(column))))
       .children(rows);
   }
 
@@ -857,7 +857,9 @@ export default class Tackroom extends View {
     const cells = surfaces(a).map(([, s], i) => {
       // Only the inventory says whether a harness takes roles, MCP servers or hooks (every one takes
       // skills). Until it has loaded, or when it failed, that is unknown: a middle dot, not a dot.
-      const takes = !GRID[i][1] ? true : meta ? meta[GRID[i][1]] !== false : null;
+      // A harness that takes a surface may still take none of what is configured (Pi and a Stop hook).
+      const none = Boolean(lists[i]?.length) && lists[i].every((r) => r.states[a.name] === "unsupported");
+      const takes = !GRID[i][1] ? true : meta ? meta[GRID[i][1]] !== false && !none : null;
       // The plan alone says whether a harness has a conflict, as it alone says missing and drifted;
       // the inventory only says where the conflict is. So a cell is never red or yellow for a
       // harness the headline counts as in sync, whichever of the two loaded last.
