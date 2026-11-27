@@ -4,6 +4,7 @@ What changed in each release since 2.0, newest first, with what to do on every m
 
 ## To 3.2
 
+- Changed: `tackroom dash` is laid out as the Herdr panel's Overview: an answer such as `1 failing, 3 need attention` with a line under it, the counts in a box, the harnesses as a grid, the jobs in Failing, Last run failed and Everything else groups listed by their short names, and the selected job in a card at the bottom. The keys and what they do are unchanged. See [terminals.md](terminals.md#dash).
 - Changed: `tackroom rex` toggles a tackroom panel in the Rex session it runs in, instead of opening a session labelled `tackroom`. The panel is `tackroom dash` floating at the right edge of the window, at full height; a second run hides it, a third shows it again, and `q` in the dash closes it. Run it in a Rex pane, or bind the new Toggle tackroom Panel action. A `tackroom` session from an earlier release stays until you close it. See [terminals.md](terminals.md#rex).
 - Changed: `rex/tackroom.lua` has Toggle tackroom Panel in place of Open tackroom Workspace and Open tackroom Crons, whose crons table the panel's dash already shows. Copy the file again.
 

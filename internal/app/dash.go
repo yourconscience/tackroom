@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"image/color"
 	"io"
 	"os"
 	"os/exec"
@@ -19,13 +20,14 @@ import (
 	"github.com/charmbracelet/colorprofile"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/term"
+	"github.com/yourconscience/tackroom/internal/agentrole"
 	"github.com/yourconscience/tackroom/internal/ui"
 )
 
 // `tackroom dash` is a live screen for a terminal pane: whether everything is
 // in sync and which scheduled jobs fail, with run now, pause and resume for a
-// launchd job and a sync. The workspace commands (rex, tmux, zellij, tern)
-// open it next to a shell. See docs/terminals.md.
+// launchd job and a sync. The workspace commands (tmux, zellij, tern) open it
+// next to a shell, and `tackroom rex` as a panel. See docs/terminals.md.
 
 const (
 	dashStatusEvery = 30 * time.Second
@@ -34,8 +36,6 @@ const (
 	// shown when the screen fails.
 	dashKeepOutput = 16 << 10
 )
-
-var dashSelectedStyle = lipgloss.NewStyle().Reverse(true)
 
 func runDashCommand(args []string) error {
 	fs := flag.NewFlagSet("dash", flag.ContinueOnError)
@@ -132,6 +132,8 @@ type dashStatus struct {
 	lock    checkResult // the external skill lock check
 	sources int
 	pinned  int
+	// What the config manages, for the counts strip.
+	skills, roles, mcp, hooks int
 }
 
 // collectDashStatus is statusReport's data: no registry lookup, no lock write,
@@ -145,7 +147,14 @@ func collectDashStatus(configPath string) (dashStatus, error) {
 	if err != nil {
 		return dashStatus{}, err
 	}
-	s := dashStatus{repo: repo, reports: reports, gated: len(gatedLines(g.gated)), lock: statusLockCheck(g.repoRoot, g.cfg, g.home), sources: len(g.sources)}
+	s := dashStatus{repo: repo, reports: reports, gated: len(gatedLines(g.gated)), lock: statusLockCheck(g.repoRoot, g.cfg, g.home), sources: len(g.sources),
+		mcp: len(g.cfg.MCPServers), hooks: len(g.cfg.Hooks)}
+	if expected, err := expectedSkills(g.repoRoot, g.home, g.cfg); err == nil {
+		s.skills = len(expected)
+	}
+	if roles, err := agentrole.Load(g.repoRoot); err == nil {
+		s.roles = len(roles)
+	}
 	cacheRoot := externalCacheDir(g.home)
 	for _, src := range g.sources {
 		if _, issue := sourcePinIssue(g.lock, src, cacheRoot); issue == "" {
@@ -220,6 +229,11 @@ type dashModel struct {
 	quitHeld bool   // q was pressed while busy
 	result   string // the outcome of the last action, sync or refusal
 	failed   bool   // result is an error
+
+	// Tints of the terminal's own background, once it says what that is: the
+	// selected row's, and the key caps'. Without them the selected row is bold
+	// with a bar, and a key is bold.
+	tint, keyBg color.Color
 }
 
 func newDashModel(configPath string) dashModel {
@@ -227,7 +241,7 @@ func newDashModel(configPath string) dashModel {
 }
 
 func (m dashModel) Init() tea.Cmd {
-	return tea.Batch(dashCollectStatus(m.configPath, m.statusGen), dashCollectCrons(m.configPath, m.cronsGen), dashTick(false), dashTick(true))
+	return tea.Batch(dashCollectStatus(m.configPath, m.statusGen), dashCollectCrons(m.configPath, m.cronsGen), dashTick(false), dashTick(true), tea.RequestBackgroundColor)
 }
 
 func dashCollectStatus(configPath string, gen int) tea.Cmd {
@@ -275,6 +289,13 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
 		m.fit()
+	case tea.BackgroundColorMsg:
+		if msg.Color != nil {
+			m.tint, m.keyBg = lipgloss.Lighten(msg.Color, 0.06), lipgloss.Lighten(msg.Color, 0.14)
+			if !msg.IsDark() {
+				m.tint, m.keyBg = lipgloss.Darken(msg.Color, 0.05), lipgloss.Darken(msg.Color, 0.1)
+			}
+		}
 	case dashStatusMsg:
 		if msg.gen != m.statusGen {
 			return m, nil
@@ -604,7 +625,8 @@ func (m *dashModel) move(delta int) {
 	m.fit()
 }
 
-// fit keeps the cursor on a job and the list window on the cursor.
+// fit keeps the cursor on a job and the list window on the cursor, with the
+// title of the cursor's group in view when the window has room for it.
 func (m *dashModel) fit() {
 	jobs := m.jobs()
 	m.cursor = max(min(m.cursor, len(jobs)-1), 0)
@@ -614,89 +636,186 @@ func (m *dashModel) fit() {
 	if m.width <= 0 || m.height <= 0 {
 		return
 	}
-	visible := dashVisibleRows(len(jobs), m.layout().rows)
-	if m.cursor < m.top {
-		m.top = m.cursor
+	rows := m.listRows()
+	visible := dashVisibleRows(len(rows), m.layout().rows)
+	at := dashRowOf(rows, m.cursor)
+	want := at
+	if at > 0 && rows[at-1].job < 0 && visible > 1 {
+		want = at - 1
 	}
-	if m.cursor >= m.top+visible {
-		m.top = m.cursor - visible + 1
+	if want < m.top {
+		m.top = want
 	}
-	m.top = max(min(m.top, len(jobs)-visible), 0)
+	if at >= m.top+visible {
+		m.top = at - visible + 1
+	}
+	m.top = max(min(m.top, len(rows)-visible), 0)
 }
 
-// dashVisibleRows is how many jobs fit in rows lines: all of them, or one
+// dashVisibleRows is how many list rows fit in rows lines: all of them, or one
 // line fewer to say how many more there are, and always the selected one.
-func dashVisibleRows(jobs, rows int) int {
+func dashVisibleRows(total, rows int) int {
 	switch {
-	case jobs <= rows:
-		return jobs
+	case total <= rows:
+		return total
 	case rows <= 1:
 		return 1
 	}
 	return rows - 1
 }
 
-// dashLayout is what the pane shows, from the top.
-type dashLayout struct {
-	header, title bool
-	rows          int // lines for the job list, its "more" line included
-	detail        []string
-	harness       []string
-	footer        []string // the message line and the keys
+// dashRow is a line of the job list: the title of a group, or a job.
+type dashRow struct {
+	group string // fail, warn, or empty for every other job
+	job   int    // the job's index in jobs(), or -1 for a group's title
 }
 
-// layout gives the job list at least three rows, with the header, the crons
-// line, the message line and the keys. What is left goes to the harness block
-// as one line, then to the detail lines, then to the rest of the jobs; the
-// full harness block takes the place of its one line only when that leaves
-// room. So as the pane gets shorter the harness block becomes one line first,
-// then the list scrolls, then the detail lines go.
-//
-// A pane too short for that keeps the selected row and puts the message line,
-// when it has a question, a result or an error, in the place of the keys; then
-// the crons line goes, then the header.
+// dashGroup is the group a job is listed in, by the shared Health: failing,
+// last run failed, or everything else.
+func dashGroup(j cronJob) string {
+	if j.Health == "fail" || j.Health == "warn" {
+		return j.Health
+	}
+	return ""
+}
+
+// listRows is the job list: each group's title, then its jobs. setJobs keeps
+// a group's jobs together.
+func (m dashModel) listRows() []dashRow {
+	jobs := m.jobs()
+	var rows []dashRow
+	for i, j := range jobs {
+		if i == 0 || dashGroup(j) != dashGroup(jobs[i-1]) {
+			rows = append(rows, dashRow{group: dashGroup(j), job: -1})
+		}
+		rows = append(rows, dashRow{group: dashGroup(j), job: i})
+	}
+	return rows
+}
+
+// groupGaps is how many blank lines the list's groups take apart: one above
+// every group's title but the first.
+func (m dashModel) groupGaps() int {
+	gaps := -1
+	for _, r := range m.listRows() {
+		if r.job < 0 {
+			gaps++
+		}
+	}
+	return max(gaps, 0)
+}
+
+func dashRowOf(rows []dashRow, job int) int {
+	for i, r := range rows {
+		if r.job == job {
+			return i
+		}
+	}
+	return 0
+}
+
+// dashLevel is how much the pane shows around the job list. The levels go
+// from the full screen to the job list alone; layout takes the first that
+// leaves the list minRows lines.
+type dashLevel struct {
+	spaced         bool // a blank line between the blocks
+	title, answer  bool
+	sub            bool // the line under the answer
+	counts         int  // 2 the boxed strip, 1 one line, 0 none
+	harness        int  // 2 the full block, 1 one line, 0 none
+	detail         int  // 2 the card, 1 two plain lines, 0 none
+	minRows        int
+	footerOneLine  bool // the message line takes the place of the keys
+	footerOptional bool // a pane of one line keeps the selected job instead
+}
+
+var dashLevels = []dashLevel{
+	{spaced: true, title: true, answer: true, sub: true, counts: 2, harness: 2, detail: 2, minRows: 8},
+	{title: true, answer: true, sub: true, counts: 2, harness: 2, detail: 2, minRows: 8},
+	{title: true, answer: true, sub: true, counts: 1, harness: 2, detail: 2, minRows: 6},
+	{title: true, answer: true, sub: true, counts: 1, harness: 1, detail: 2, minRows: 6},
+	{title: true, answer: true, counts: 1, harness: 1, detail: 1, minRows: 5},
+	{title: true, answer: true, harness: 1, minRows: 4},
+	{answer: true, minRows: 3, footerOneLine: true},
+	{minRows: 1, footerOneLine: true, footerOptional: true},
+}
+
+// dashLayout is what the pane shows, from the top.
+type dashLayout struct {
+	top    []string // the title bar, the answer, the counts and the harnesses
+	rows   int      // lines for the job list
+	detail []string // the selected job
+	footer []string // the message line and the keys
+}
+
+// layout gives the job list what is left once the richest level that leaves it
+// its minimum is drawn. As the pane gets shorter the spacing goes first, then
+// the counts become one line, then the harnesses, then the detail card becomes
+// two lines; then the counts, the harnesses, the detail and the title bar go,
+// and last the answer.
 func (m dashModel) layout() dashLayout {
-	n := len(m.jobs())
-	minRows := max(min(n, 3), 1)
-	if n > 3 {
-		minRows = 4 // three jobs and the "more" line
-	}
-	message, keys := m.messageLine(), ui.Dim.Render(m.keysLine())
-	l := dashLayout{header: true, title: true, footer: []string{message, keys}}
-	left := m.height - 4 - minRows
-	if left < 0 {
-		l.footer = []string{keys}
+	w, _ := m.inner()
+	total := max(len(m.listRows()), 1)
+	message, keys := m.messageLine(w), m.keysLine(w)
+	for i, lv := range dashLevels {
+		footer := []string{keys}
 		if message != "" {
-			l.footer = []string{message}
+			footer = []string{message, keys}
 		}
-		l.rows = m.height - 3
-		if l.rows < 1 {
-			l.title, l.rows = false, l.rows+1
+		if lv.footerOneLine && message != "" {
+			footer = []string{message}
+		} else if lv.footerOneLine {
+			footer = []string{keys}
 		}
-		if l.rows < 1 {
-			l.header, l.rows = false, l.rows+1
+		top := m.topLines(w, lv)
+		// The detail takes the most it can take whichever job is selected, so
+		// the list does not move as the cursor does; render puts it at the
+		// bottom.
+		var detail []string
+		reserve := 0
+		switch lv.detail {
+		case 2:
+			detail, reserve = m.detailCard(w), dashCardLines+2
+		case 1:
+			detail, reserve = m.detailPlain(w), 2
 		}
-		if l.rows < 1 && m.pending == nil {
-			l.footer, l.rows = nil, 1
+		if len(detail) == 0 {
+			reserve = 0
+		} else if lv.spaced {
+			reserve++
 		}
-		return l
+		fixed := len(top) + reserve + len(footer)
+		if fixed+min(lv.minRows, total) <= m.height {
+			// A spaced level gives each group after the first a blank line
+			// above its title when the whole list fits with them.
+			most := total
+			if lv.spaced {
+				most += m.groupGaps()
+			}
+			return dashLayout{top: top, rows: min(m.height-fixed, most), detail: detail, footer: footer}
+		}
+		if i == len(dashLevels)-1 {
+			l := dashLayout{rows: m.height - len(footer), footer: footer}
+			if l.rows < 1 && m.pending == nil {
+				l.footer, l.rows = nil, 1
+			}
+			return l
+		}
 	}
-	l.rows = minRows
-	if left == 0 {
-		return l
+	return dashLayout{}
+}
+
+// inner is the width of the content and its left margin: 2 columns of margin
+// from a 50-column pane, 1 from 30, and at most 100 columns of content, so a
+// wide pane keeps a job's name near its result.
+func (m dashModel) inner() (w, margin int) {
+	switch {
+	case m.width >= 50:
+		margin = 2
+	case m.width >= 30:
+		margin = 1
 	}
-	l.harness = []string{m.harnessSummary()}
-	left--
-	detail := m.detailLines()
-	l.detail = detail[:min(len(detail), left)]
-	left -= len(l.detail)
-	more := min(max(n-minRows, 0), left) // up to every job, without the "more" line
-	l.rows += more
-	left -= more
-	if full := m.harnessLines(); len(full)-1 <= left {
-		l.harness = full
-	}
-	return l
+	return max(min(m.width-2*margin, 100), 1), margin
 }
 
 func (m dashModel) View() tea.View {
@@ -710,46 +829,72 @@ func (m dashModel) render() string {
 		return ""
 	}
 	l := m.layout()
-	var lines []string
-	if l.header {
-		lines = append(lines, m.headerLine())
-	}
-	if l.title {
-		lines = append(lines, m.cronsTitle())
-	}
-	lines = append(lines, m.listLines(l.rows)...)
-	lines = append(lines, l.detail...)
-	lines = append(lines, l.harness...)
-	for len(lines)+len(l.footer) < m.height {
+	w, margin := m.inner()
+	lines := slices.Clone(l.top)
+	lines = append(lines, m.listLines(w, l.rows)...)
+	for len(lines)+len(l.detail)+len(l.footer) < m.height {
 		lines = append(lines, "")
 	}
+	lines = append(lines, l.detail...)
 	lines = append(lines[:min(len(lines), m.height-len(l.footer))], l.footer...)
 	// No line may wrap: a wrapped line would push the screen down.
+	pad := strings.Repeat(" ", margin)
 	for i, line := range lines {
+		if line != "" {
+			line = pad + line
+		}
 		lines[i] = ansi.Truncate(line, m.width, "…")
 	}
 	return strings.Join(lines, "\n")
 }
 
-// rightAlign puts the first of rights that leaves left whole at the end of a
-// line of the pane's width; when none does, the last, with left cut to make
-// room.
-func (m dashModel) rightAlign(left string, rights ...string) string {
-	right := ""
-	for _, right = range rights {
-		if lipgloss.Width(left)+2+lipgloss.Width(right) <= m.width {
-			break
+// topLines are the blocks above the job list that lv shows, with a blank line
+// after each when lv is spaced.
+func (m dashModel) topLines(w int, lv dashLevel) []string {
+	var out []string
+	add := func(lines ...string) {
+		if len(lines) == 0 {
+			return
+		}
+		out = append(out, lines...)
+		if lv.spaced {
+			out = append(out, "")
 		}
 	}
-	if right == "" {
+	if lv.title {
+		add(m.titleBar(w))
+	}
+	if lv.answer {
+		add(m.answerLines(w, lv.sub)...)
+	}
+	switch {
+	case lv.counts == 2 && w >= dashCountsBoxMin:
+		add(m.countsBox(w)...)
+	case lv.counts > 0:
+		add(m.countsLine(w))
+	}
+	switch lv.harness {
+	case 2:
+		add(m.harnessBlock(w)...)
+	case 1:
+		add(m.harnessLine(w))
+	}
+	return out
+}
+
+// spread puts right at the end of a line of width w after left, or leaves it
+// out when both do not fit with two spaces between them.
+func spread(left, right string, w int) string {
+	gap := w - lipgloss.Width(left) - lipgloss.Width(right)
+	if right == "" || gap < 2 {
 		return left
 	}
-	room := m.width - lipgloss.Width(right) - 2
-	if room < 10 {
-		return left
-	}
-	left = ansi.Truncate(left, room, "…")
-	return left + strings.Repeat(" ", m.width-lipgloss.Width(left)-lipgloss.Width(right)) + right
+	return left + strings.Repeat(" ", gap) + right
+}
+
+// padRight pads s with spaces to width w.
+func padRight(s string, w int) string {
+	return s + strings.Repeat(" ", max(w-lipgloss.Width(s), 0))
 }
 
 // asOf is " (as of 15:04)" for data whose last refresh failed.
@@ -757,71 +902,30 @@ func asOf(at time.Time) string {
 	return ui.Dim.Render(" (as of " + at.Format("15:04") + ")")
 }
 
-func (m dashModel) headerLine() string {
-	left := ui.Bold.Render("tackroom") + "  "
-	switch s := m.status; {
-	case m.statusErr != "":
-		// The state is not known, so the last one is not shown as current.
-		left += ui.Mark("warn") + " " + ui.Yellow.Render("status unknown") + ui.Dim.Render(": "+m.statusErr)
-	case s != nil:
-		harnesses := 0
-		for _, r := range s.reports {
-			if r.Detected || r.Error != "" {
-				harnesses++
-			}
-		}
-		left += reportState(reportProblems(s.repo, s.reports)) + " · " + plural(harnesses, "harness")
-		switch {
-		case s.sources == 0:
-		case s.pinned == s.sources:
-			left += " · " + plural(s.sources, "source") + " pinned"
-		default:
-			left += fmt.Sprintf(" · %d of %s pinned", s.pinned, plural(s.sources, "source"))
-		}
-	default:
-		left += ui.Dim.Render("collecting…")
-	}
-	// A narrow pane gets the short form, so the counts stay whole.
+// titleBar is the name and when the data was last refreshed.
+func (m dashModel) titleBar(w int) string {
+	left := ui.Bold.Render("tackroom")
 	updated := m.statusAt
 	if m.cronsAt.After(updated) {
 		updated = m.cronsAt
 	}
 	switch {
 	case m.statusBusy || m.cronsBusy:
-		return m.rightAlign(left, ui.Dim.Render("refreshing…"), ui.Dim.Render("…"))
+		return spread(left, ui.Dim.Render("refreshing…"), w)
 	case !updated.IsZero():
-		at := updated.Format("15:04")
-		return m.rightAlign(left, ui.Dim.Render("updated "+at), ui.Dim.Render(at))
+		return spread(left, ui.Dim.Render("updated "+updated.Format("15:04")), w)
 	}
 	return left
 }
 
-func (m dashModel) cronsTitle() string {
-	line := ui.Bold.Render("crons") + "  "
+// cronAccess is the hosts the crons collect could not reach and how many cron
+// sources it could not read: a host whose probe failed lists no jobs, and an
+// unreadable source none of its own, so they are said, or the jobs would just
+// be missing.
+func (m dashModel) cronAccess() (unreached []string, unreadable int) {
 	if m.crons == nil {
-		switch {
-		case m.cronsErr != "":
-			return line + ui.Mark("warn") + " " + ui.Yellow.Render("unknown") + ui.Dim.Render(": "+m.cronsErr)
-		case m.cronsBusy:
-			return line + ui.Dim.Render("collecting…")
-		}
-		return line + ui.Dim.Render("not collected")
+		return nil, 0
 	}
-	// Counted by the shared Health, in the web view's words.
-	failing, failed := 0, 0
-	for _, j := range m.crons.Jobs {
-		switch j.Health {
-		case "fail":
-			failing++
-		case "warn":
-			failed++
-		}
-	}
-	// A host whose probe failed has no jobs listed, and a source that could
-	// not be read lists none of its own; say so, or the jobs would just be
-	// missing.
-	var unreached []string
-	unreadable := 0
 	for _, a := range m.crons.Access {
 		switch {
 		case strings.HasPrefix(a.Detail, "probe failed"):
@@ -832,34 +936,368 @@ func (m dashModel) cronsTitle() string {
 			unreadable++
 		}
 	}
-	// A narrow pane gets "1 failed" for "1 last run failed".
-	title := func(failedWords string) string {
-		parts := []string{fmt.Sprint(len(m.crons.Jobs))}
-		if m.cronsErr != "" {
-			parts = append(parts, ui.Yellow.Render("stale, from "+m.cronsAt.Format("15:04")))
-		}
-		if failing > 0 {
-			parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failing", failing)))
-		}
-		if failed > 0 {
-			parts = append(parts, ui.Yellow.Render(fmt.Sprintf(failedWords, failed)))
-		}
-		if len(unreached) > 0 {
-			parts = append(parts, ui.Red.Render(strings.Join(unreached, ", ")+" not reached"))
-		}
-		if unreadable > 0 {
-			word := "sources"
-			if unreadable == 1 {
-				word = "source"
+	return unreached, unreadable
+}
+
+// answer is the headline and the sentences under it, counted as the Herdr
+// panel's Overview counts. Failing: a failing cron, a harness whose config
+// could not be read, a broken ~/.agents link, a host the crons collect could
+// not reach. Needs attention: a cron whose last run failed, a sync waiting,
+// a lock check that did not pass, an unreadable cron source, and a source
+// that could not be read at all. level is fail, warn, ok, or off while the
+// first collects run.
+func (m dashModel) answer() (level, title string, subs []string) {
+	fail, warn := 0, 0
+	failKinds := map[string]bool{}
+	var pending []string
+	if s := m.status; s != nil {
+		live, broken := 0, 0
+		var drifted []string
+		for _, r := range s.reports {
+			switch {
+			case r.Error != "":
+				broken++
+			case !r.Detected:
+			case !r.Synced:
+				live++
+				drifted = append(drifted, r.Name)
+			default:
+				live++
 			}
-			parts = append(parts, ui.Red.Render(fmt.Sprintf("%d %s unreadable", unreadable, word)))
 		}
-		return line + strings.Join(parts, " · ")
+		fail += broken
+		if broken > 0 {
+			failKinds["harness"] = true
+		}
+		if s.repo.State != stateSynced {
+			fail++
+			failKinds["link"] = true
+			subs = append(subs, "The ~/.agents link is "+s.repo.State+".")
+		}
+		switch {
+		case len(drifted) > 0:
+			warn++
+			if len(drifted) <= 2 {
+				verb := " needs a sync."
+				if len(drifted) == 2 {
+					verb = " need a sync."
+				}
+				subs = append(subs, strings.Join(drifted, " and ")+verb)
+			} else {
+				subs = append(subs, fmt.Sprintf("%d harnesses need a sync.", len(drifted)))
+			}
+		case broken == 0 && live == 1:
+			subs = append(subs, "The harness is in sync.")
+		case broken == 0 && live > 1:
+			subs = append(subs, fmt.Sprintf("All %d harnesses are in sync.", live))
+		}
+		if s.lock.status != checkStatusPass {
+			warn++
+		}
+		if m.statusErr != "" {
+			subs = append(subs, "Harnesses as of "+m.statusAt.Format("15:04")+".")
+		}
+	} else if m.statusErr != "" {
+		warn++
+		subs = append(subs, "Harness status could not be read.")
+	} else {
+		pending = append(pending, "harnesses")
 	}
-	if full := title("%d last run failed"); lipgloss.Width(full) <= m.width {
-		return full
+	if c := m.crons; c != nil {
+		for _, j := range c.Jobs {
+			switch j.Health {
+			case "fail":
+				fail++
+				failKinds["cron"] = true
+			case "warn":
+				warn++
+			}
+		}
+		unreached, unreadable := m.cronAccess()
+		fail += len(unreached)
+		if len(unreached) > 0 {
+			failKinds["host"] = true
+			subs = append(subs, strings.Join(unreached, " and ")+" could not be reached.")
+		}
+		warn += unreadable
+		if unreadable > 0 {
+			subs = append(subs, plural(unreadable, "cron source")+" could not be read.")
+		}
+		if m.cronsErr != "" {
+			subs = append(subs, "Crons as of "+m.cronsAt.Format("15:04")+".")
+		}
+	} else if m.cronsErr != "" {
+		warn++
+		subs = append(subs, "Crons could not be collected.")
+	} else {
+		pending = append(pending, "crons")
 	}
-	return title("%d failed")
+	// What the failures are, when they are all one kind the sentences above do
+	// not already name.
+	if len(failKinds) == 1 && (failKinds["cron"] || failKinds["harness"]) {
+		one, many := "a cron", "crons"
+		if failKinds["harness"] {
+			one, many = "a harness", "harnesses"
+		}
+		switch fail {
+		case 1:
+			subs = append(subs, "The failure is "+one+".")
+		case 2:
+			subs = append(subs, "Both failures are "+many+".")
+		default:
+			subs = append(subs, "The failures are "+many+".")
+		}
+	}
+	if len(pending) > 0 {
+		subs = append(subs, "Still checking "+strings.Join(pending, " and ")+".")
+	}
+	var parts []string
+	if fail > 0 {
+		parts = append(parts, fmt.Sprintf("%d failing", fail))
+	}
+	if warn == 1 {
+		parts = append(parts, "1 needs attention")
+	} else if warn > 1 {
+		parts = append(parts, fmt.Sprintf("%d need attention", warn))
+	}
+	switch {
+	case fail > 0:
+		level = "fail"
+	case warn > 0:
+		level = "warn"
+	case len(pending) > 0:
+		return "off", "Checking…", subs
+	default:
+		return "ok", "All clear", subs
+	}
+	return level, strings.Join(parts, ", "), subs
+}
+
+// dashDot is a level's dot: red for failing, yellow for needs attention, green
+// for clear, and hollow while unknown.
+func dashDot(level string) string {
+	switch level {
+	case "fail":
+		return ui.Red.Render("●")
+	case "warn":
+		return ui.Yellow.Render("●")
+	case "ok":
+		return ui.Green.Render("●")
+	}
+	return ui.Dim.Render("○")
+}
+
+// answerLines is the headline with its dot, and with sub the sentences under
+// it in two lines at most.
+func (m dashModel) answerLines(w int, sub bool) []string {
+	level, title, subs := m.answer()
+	lines := []string{dashDot(level) + " " + ui.Bold.Render(title)}
+	if !sub || len(subs) == 0 || w < 12 {
+		return lines
+	}
+	wrapped := packItems(strings.Fields(strings.Join(subs, " ")), "", w-2)
+	if len(wrapped) > 2 {
+		wrapped = wrapped[:2]
+		wrapped[1] = ansi.Truncate(wrapped[1], w-3, "") + "…"
+	}
+	for _, line := range wrapped {
+		lines = append(lines, "  "+ui.Dim.Render(line))
+	}
+	return lines
+}
+
+// dashCountsBoxMin is the narrowest content the boxed counts fit in: five
+// cells of at least seven columns and their six borders.
+const dashCountsBoxMin = 41
+
+// counts are the numbers of the counts strip with their labels: what the config
+// manages, and the jobs, red when one fails and yellow when a last run failed.
+func (m dashModel) counts() (values, labels []string) {
+	labels = []string{"Skills", "Roles", "MCP", "Hooks", "Crons"}
+	unknown := ui.Dim.Render("–")
+	values = []string{unknown, unknown, unknown, unknown, unknown}
+	if s := m.status; s != nil {
+		for i, n := range []int{s.skills, s.roles, s.mcp, s.hooks} {
+			values[i] = ui.Bold.Render(fmt.Sprint(n))
+		}
+	}
+	if c := m.crons; c != nil {
+		style := ui.Bold
+		for _, j := range c.Jobs {
+			if j.Health == "fail" {
+				style = ui.Red.Bold(true)
+				break
+			}
+			if j.Health == "warn" {
+				style = ui.Yellow.Bold(true)
+			}
+		}
+		values[4] = style.Render(fmt.Sprint(len(c.Jobs)))
+	}
+	return values, labels
+}
+
+// countsBox is the counts strip as a rounded box of five cells across w.
+func (m dashModel) countsBox(w int) []string {
+	values, labels := m.counts()
+	n := len(values)
+	cells := make([]int, n)
+	for i := range cells {
+		cells[i] = (w - n - 1) / n
+		if i < (w-n-1)%n {
+			cells[i]++
+		}
+	}
+	center := func(s string, cw int) string {
+		gap := max(cw-lipgloss.Width(s), 0)
+		return strings.Repeat(" ", gap/2) + s + strings.Repeat(" ", gap-gap/2)
+	}
+	rule := func(left, mid, right string) string {
+		segs := make([]string, n)
+		for i, cw := range cells {
+			segs[i] = strings.Repeat("─", cw)
+		}
+		return ui.Dim.Render(left + strings.Join(segs, mid) + right)
+	}
+	row := func(texts []string) string {
+		bar := ui.Dim.Render("│")
+		segs := make([]string, n)
+		for i, cw := range cells {
+			segs[i] = center(texts[i], cw)
+		}
+		return bar + strings.Join(segs, bar) + bar
+	}
+	dimLabels := make([]string, n)
+	for i, l := range labels {
+		dimLabels[i] = ui.Dim.Render(l)
+	}
+	return []string{rule("╭", "┬", "╮"), row(values), row(dimLabels), rule("╰", "┴", "╯")}
+}
+
+// countsLine is the counts strip in one line, for a narrow or short pane.
+func (m dashModel) countsLine(w int) string {
+	values, labels := m.counts()
+	parts := make([]string, len(values))
+	for i := range values {
+		label := strings.ToLower(labels[i])
+		if labels[i] == "MCP" {
+			label = "MCP"
+		}
+		parts[i] = values[i] + " " + ui.Dim.Render(label)
+	}
+	return ansi.Truncate(strings.Join(parts, ui.Dim.Render(" · ")), w, "…")
+}
+
+// harnessTally is how the harnesses stand: the ones in sync and not detected
+// by name, and a line each for what is wrong.
+func (m dashModel) harnessTally() (synced, absent, wrong []string, drifted, broken int) {
+	s := m.status
+	if s.repo.State != stateSynced {
+		wrong = append(wrong, ui.Mark("fail")+" "+ui.Bold.Render("~/.agents link")+"  "+ui.Red.Render(s.repo.State))
+	}
+	for _, r := range s.reports {
+		switch {
+		case r.Error != "":
+			broken++
+			wrong = append(wrong, ui.Mark("fail")+" "+ui.Bold.Render(r.Name)+"  "+ui.Red.Render("config unreadable: "+firstLine(r.Error)))
+		case !r.Detected:
+			absent = append(absent, r.Name)
+		case !r.Synced:
+			drifted++
+			var what []string
+			for _, b := range driftBuckets(r) {
+				if len(b.items) > 0 {
+					what = append(what, fmt.Sprintf("%s %d", b.label, len(b.items)))
+				}
+			}
+			if r.RootState != "" && r.RootState != stateSynced {
+				what = append(what, "root doc "+r.RootState)
+			}
+			wrong = append(wrong, ui.Mark("warn")+" "+ui.Bold.Render(r.Name)+"  "+ui.Yellow.Render(strings.Join(what, ", ")))
+		default:
+			synced = append(synced, r.Name)
+		}
+	}
+	return synced, absent, wrong, drifted, broken
+}
+
+// harnessBlock is the harnesses: a title with how many are in sync, a line for
+// each one that is wrong, the rest as a grid, the ones not detected last and
+// dim, then the items in cooldown or blocked and a lock check that did not pass.
+func (m dashModel) harnessBlock(w int) []string {
+	title := ui.Bold.Render("Harnesses")
+	if m.status == nil {
+		if m.statusErr != "" {
+			return []string{spread(title, ui.Dim.Render("unknown"), w)}
+		}
+		return []string{spread(title, ui.Dim.Render("collecting…"), w)}
+	}
+	s := m.status
+	synced, absent, wrong, drifted, broken := m.harnessTally()
+	var right string
+	switch {
+	case broken > 0:
+		right = ui.Red.Render(fmt.Sprintf("%d failing", broken))
+	case drifted > 0:
+		right = ui.Yellow.Render(fmt.Sprintf("%d need a sync", drifted))
+	default:
+		right = ui.Dim.Render(fmt.Sprintf("%d in sync", len(synced)))
+	}
+	lines := []string{spread(title, right, w)}
+	lines = append(lines, wrong...)
+	// The grid: a column per chip, as wide as the widest, two spaces apart.
+	chips := make([]string, 0, len(synced)+len(absent))
+	width := 0
+	for _, name := range synced {
+		chips = append(chips, ui.Green.Render("✓")+" "+name)
+		width = max(width, 2+lipgloss.Width(name))
+	}
+	for _, name := range absent {
+		chips = append(chips, ui.Dim.Render("– "+name))
+		width = max(width, 2+lipgloss.Width(name))
+	}
+	if cols := max((w+3)/(width+3), 1); len(chips) > 0 {
+		for i := 0; i < len(chips); i += cols {
+			row := chips[i:min(i+cols, len(chips))]
+			for j := range row[:len(row)-1] {
+				row[j] = padRight(row[j], width+3)
+			}
+			lines = append(lines, strings.Join(row, ""))
+		}
+	}
+	if s.gated > 0 {
+		lines = append(lines, ui.Yellow.Render(fmt.Sprintf("%d in cooldown or blocked, skipped by sync", s.gated)))
+	}
+	if s.lock.status != checkStatusPass {
+		lines = append(lines, ui.Mark(checkMarkKind(s.lock.status))+" lock  "+s.lock.detail)
+	}
+	return lines
+}
+
+// harnessLine is the harnesses in one line, for a short pane.
+func (m dashModel) harnessLine(w int) string {
+	title := ui.Bold.Render("Harnesses") + "  "
+	if m.status == nil {
+		if m.statusErr != "" {
+			return title + ui.Dim.Render("unknown")
+		}
+		return title + ui.Dim.Render("collecting…")
+	}
+	synced, absent, _, drifted, broken := m.harnessTally()
+	parts := []string{fmt.Sprintf("%d in sync", len(synced))}
+	if drifted > 0 {
+		parts = append(parts, ui.Yellow.Render(fmt.Sprintf("%d need a sync", drifted)))
+	}
+	if broken > 0 {
+		parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failing", broken)))
+	}
+	if m.status.repo.State != stateSynced {
+		parts = append(parts, ui.Red.Render("~/.agents link "+m.status.repo.State))
+	}
+	if len(absent) > 0 {
+		parts = append(parts, ui.Dim.Render(fmt.Sprintf("%d not installed", len(absent))))
+	}
+	return ansi.Truncate(title+strings.Join(parts, ui.Dim.Render(" · ")), w, "…")
 }
 
 // dashAge is a last run as an age: 2m ago, 3h ago, 8d ago; empty when unknown.
@@ -890,236 +1328,258 @@ func dashResult(j cronJob) string {
 	return result
 }
 
-// listLines is the job list in rows lines at most, scrolled to the cursor.
-func (m dashModel) listLines(rows int) []string {
+// dashJobName is the name a job is listed by: a launchd label without its
+// reverse-DNS prefix, and any other job's id, since its name may carry a
+// description.
+func dashJobName(j cronJob) string {
+	if j.Source == "launchd" && j.ShortName != "" {
+		return j.ShortName
+	}
+	return j.ID
+}
+
+// dashGroupTitles are the titles of the list's groups.
+var dashGroupTitles = map[string]string{"fail": "Failing", "warn": "Last run failed", "": "Everything else"}
+
+// listLines is the job list in rows lines at most, scrolled to the cursor: a
+// group's title, then a row per job with a dot by its health, its name, host,
+// schedule when the pane is wide, last run and result.
+func (m dashModel) listLines(w, rows int) []string {
 	jobs := m.jobs()
 	switch {
 	case rows <= 0:
 		return nil
 	case m.crons == nil && m.cronsBusy:
-		return []string{"  " + ui.Dim.Render("collecting…")}
+		return []string{ui.Bold.Render("Crons") + "  " + ui.Dim.Render("collecting…")}
 	case m.crons == nil:
-		return []string{"  " + ui.Dim.Render("no jobs: the collect failed")}
+		return []string{ui.Bold.Render("Crons") + "  " + ui.Dim.Render("not collected: the collect failed")}
 	case len(jobs) == 0:
-		return []string{"  " + ui.Dim.Render("no scheduled jobs found")}
+		return []string{ui.Bold.Render("Crons") + "  " + ui.Dim.Render("no scheduled jobs found")}
+	}
+	all := m.listRows()
+	groups := map[string]int{}
+	for _, j := range jobs {
+		groups[dashGroup(j)]++
 	}
 	now := time.Now()
-	type cells struct{ host, id, state, age, result string }
-	all := make([]cells, len(jobs))
-	var hostW, idW, stateW, ageW, resultW int
+	type cells struct{ name, host, schedule, age, result string }
+	cs := make([]cells, len(jobs))
+	var nameW, hostW, schedW, ageW, resultW int
 	for i, j := range jobs {
-		c := cells{host: truncate(j.Host, 12), id: j.ID, state: j.State, age: dashAge(j.LastRun, now), result: dashResult(j)}
-		all[i] = c
-		hostW, idW, stateW = max(hostW, ansi.StringWidth(c.host)), max(idW, ansi.StringWidth(c.id)), max(stateW, ansi.StringWidth(c.state))
-		ageW, resultW = max(ageW, ansi.StringWidth(c.age)), max(resultW, ansi.StringWidth(c.result))
+		c := cells{name: dashJobName(j), host: truncate(j.Host, 12), schedule: truncate(j.ScheduleText, 18), age: dashAge(j.LastRun, now), result: dashResult(j)}
+		cs[i] = c
+		nameW, hostW = max(nameW, ansi.StringWidth(c.name)), max(hostW, ansi.StringWidth(c.host))
+		schedW, ageW, resultW = max(schedW, ansi.StringWidth(c.schedule)), max(ageW, ansi.StringWidth(c.age)), max(resultW, ansi.StringWidth(c.result))
 	}
-	// The id shrinks to idMin before a column goes: state first, then the last run.
-	showState, showAge := stateW > 0, ageW > 0
+	// The name shrinks to nameMin before a column goes: the schedule first,
+	// then the last run, then the host.
+	showSched, showAge, showHost := schedW > 0 && w >= 84, ageW > 0, hostW > 0
 	fixed := func() int {
-		n := 2 + hostW + 2 + 2 + resultW
-		if showState {
-			n += stateW + 2
-		}
-		if showAge {
-			n += ageW + 2
+		n := 4 + 2 + resultW // the bar, the dot, their spaces
+		for _, c := range []struct {
+			on bool
+			w  int
+		}{{showSched, schedW}, {showAge, ageW}, {showHost, hostW}} {
+			if c.on {
+				n += c.w + 2
+			}
 		}
 		return n
 	}
-	idMin := min(idW, 20)
-	if fixed()+idMin > m.width {
-		showState = false
-	}
-	if fixed()+idMin > m.width {
-		showAge = false
-	}
-	idW = max(min(idW, m.width-fixed()), 1)
-
-	visible := dashVisibleRows(len(jobs), rows)
-	top := max(min(m.top, len(jobs)-visible), 0)
-	if m.cursor < top || m.cursor >= top+visible {
-		top = max(min(m.cursor, len(jobs)-visible), 0)
-	}
-	pad := func(s string, w int) string { return s + strings.Repeat(" ", max(w-ansi.StringWidth(s), 0)) }
-	// The result is colored by the shared Health, as the web view colors it.
-	color := map[string]lipgloss.Style{"fail": ui.Red, "warn": ui.Yellow, "paused": ui.Dim}
-	var lines []string
-	for i := top; i < top+visible; i++ {
-		c, j := all[i], jobs[i]
-		result := c.result
-		selected := i == m.cursor
-		if style, ok := color[j.Health]; ok && !selected && result != "" {
-			result = style.Render(result)
+	nameMin := min(nameW, 14)
+	for _, drop := range []*bool{&showSched, &showAge, &showHost} {
+		if fixed()+nameMin > w {
+			*drop = false
 		}
-		line := pad(c.host, hostW) + "  " + pad(shortenMiddle(c.id, idW), idW) + "  "
-		if showState {
-			line += pad(c.state, stateW) + "  "
+	}
+	nameW = max(min(nameW, w-fixed()), 1)
+
+	visible := dashVisibleRows(len(all), rows)
+	top := max(min(m.top, len(all)-visible), 0)
+	if at := dashRowOf(all, m.cursor); at < top || at >= top+visible {
+		top = max(min(at, len(all)-visible), 0)
+	}
+	color := map[string]lipgloss.Style{"fail": ui.Red, "warn": ui.Yellow}
+	gaps := visible == len(all) && rows >= len(all)+m.groupGaps()
+	var lines []string
+	for i, r := range all[top : top+visible] {
+		if r.job < 0 {
+			if gaps && i > 0 {
+				lines = append(lines, "")
+			}
+			title := dashGroupTitles[r.group]
+			if len(groups) == 1 && r.group == "" {
+				title = "Crons"
+			}
+			style := ui.Bold
+			if c, ok := color[r.group]; ok {
+				style = c.Bold(true)
+			}
+			lines = append(lines, style.Render(title)+ui.Dim.Render(fmt.Sprintf(" · %d", groups[r.group])))
+			continue
+		}
+		c, j, selected := cs[r.job], jobs[r.job], r.job == m.cursor
+		// The selected row is tinted across the content's width, each part
+		// with the tint, so the styles inside it do not end it.
+		tint := func(s lipgloss.Style) lipgloss.Style {
+			if selected && m.tint != nil {
+				return s.Background(m.tint)
+			}
+			return s
+		}
+		plain := tint(lipgloss.NewStyle())
+		gap := plain.Render("  ")
+		bar, name := plain.Render(" "), tint(lipgloss.NewStyle())
+		if selected {
+			bar, name = tint(ui.Bold).Render("▌"), tint(ui.Bold)
+		}
+		dot := tint(ui.Dim).Render("●")
+		switch j.Health {
+		case "fail", "warn":
+			dot = tint(color[j.Health]).Render("●")
+		case "paused", "idle":
+			dot = tint(ui.Dim).Render("○")
+		}
+		result := tint(ui.Dim)
+		if s, ok := color[j.Health]; ok {
+			result = tint(s)
+		}
+		line := bar + plain.Render(" ") + dot + plain.Render(" ") + name.Render(padRight(shortenMiddle(c.name, nameW), nameW))
+		if showSched {
+			line += gap + tint(ui.Dim).Render(padRight(c.schedule, schedW))
+		}
+		if showHost {
+			line += gap + tint(ui.Dim).Render(padRight(c.host, hostW))
 		}
 		if showAge {
-			line += pad(c.age, ageW) + "  "
+			line += gap + tint(ui.Dim).Render(strings.Repeat(" ", ageW-ansi.StringWidth(c.age))+c.age)
 		}
-		line += result
+		line += gap + result.Render(padRight(c.result, resultW))
 		if selected {
-			line = dashSelectedStyle.Render(pad("▸ "+line, m.width))
-		} else {
-			line = "  " + line
+			line += plain.Render(strings.Repeat(" ", max(w-lipgloss.Width(line), 0)))
 		}
 		lines = append(lines, line)
 	}
-	if visible < len(jobs) && len(lines) < rows {
+	if visible < len(all) && len(lines) < rows {
 		var more []string
 		if top > 0 {
 			more = append(more, fmt.Sprintf("↑ %d more", top))
 		}
-		if below := len(jobs) - top - visible; below > 0 {
+		if below := len(all) - top - visible; below > 0 {
 			more = append(more, fmt.Sprintf("↓ %d more", below))
 		}
-		lines = append(lines, "  "+ui.Dim.Render(strings.Join(more, " · ")))
+		lines = append(lines, "    "+ui.Dim.Render(strings.Join(more, " · ")))
 	}
 	return lines
 }
 
-// detailLines are up to three lines on the selected job: its schedule,
-// source and problems, wrapped between words.
-func (m dashModel) detailLines() []string {
+// selectedJob is the job under the cursor, if any.
+func (m dashModel) selectedJob() (cronJob, bool) {
 	jobs := m.jobs()
-	if len(jobs) == 0 || m.width <= 0 {
-		return nil
+	if len(jobs) == 0 {
+		return cronJob{}, false
 	}
-	j := jobs[max(min(m.cursor, len(jobs)-1), 0)]
-	schedule := j.Schedule
+	return jobs[max(min(m.cursor, len(jobs)-1), 0)], true
+}
+
+// detailFacts are the selected job's schedule, source, state and host, its
+// last run and result, and its problems.
+func (m dashModel) detailFacts(j cronJob) (meta, last string, problems []string) {
+	schedule := j.ScheduleText
+	if schedule == "" {
+		schedule = j.Schedule
+	}
 	if schedule == "" {
 		schedule = "no schedule"
 	}
-	text := strings.Join(append([]string{schedule, j.Source}, j.Problems...), " · ")
-	lines := packItems(strings.Fields(text), "", max(m.width-2, 10))
-	if len(lines) > 3 {
-		lines = lines[:3]
-		lines[2] = ansi.Truncate(lines[2], max(m.width-3, 1), "") + "…"
+	var parts []string
+	for _, p := range []string{schedule, j.Source, j.State, j.Host} {
+		if p != "" {
+			parts = append(parts, p)
+		}
 	}
-	for i := range lines {
-		lines[i] = "  " + lines[i]
+	meta = strings.Join(parts, " · ")
+	if age := dashAge(j.LastRun, time.Now()); age != "" {
+		last = "Last run " + age
+		if result := dashResult(j); result != "" {
+			last += " · " + result
+		}
 	}
-	return lines
+	return meta, last, j.Problems
 }
 
-// harnessLines is the full harness block: what is wrong first, a line each,
-// then every harness in order, the ones not detected last and dim, then the
-// items in cooldown or blocked and a lock check that did not pass.
-func (m dashModel) harnessLines() []string {
-	label := ui.Bold.Render("harnesses") + "  "
-	indent := strings.Repeat(" ", len("harnesses  "))
-	s := m.status
-	switch {
-	case s == nil && m.statusErr != "":
-		return []string{label + ui.Dim.Render("unknown")}
-	case s == nil:
-		return []string{label + ui.Dim.Render("collecting…")}
+// dashCardLines is the most lines the detail card's body takes.
+const dashCardLines = 6
+
+// detailCard is the selected job in a rounded box with its id in the top
+// border: schedule, source, state and host, its last run, and its problems,
+// wrapped, in dashCardLines lines at most.
+func (m dashModel) detailCard(w int) []string {
+	j, ok := m.selectedJob()
+	if !ok || w < 24 {
+		return nil
 	}
-	var wrong, synced, absent []string
-	if s.repo.State != stateSynced {
-		wrong = append(wrong, ui.Bold.Render("~/.agents link")+" "+ui.Mark("fail")+" "+s.repo.State)
-	}
-	for _, r := range s.reports {
-		name := ui.Bold.Render(r.Name)
-		switch {
-		case r.Error != "":
-			wrong = append(wrong, name+" "+ui.Mark("fail")+" "+ui.Red.Render("config unreadable: "+firstLine(r.Error)))
-		case !r.Detected:
-			absent = append(absent, ui.Dim.Render(r.Name+" –"))
-		case !r.Synced:
-			var what []string
-			for _, b := range driftBuckets(r) {
-				if len(b.items) > 0 {
-					what = append(what, fmt.Sprintf("%s %d", b.label, len(b.items)))
-				}
-			}
-			if r.RootState != "" && r.RootState != stateSynced {
-				what = append(what, "root doc "+r.RootState)
-			}
-			wrong = append(wrong, name+" "+ui.Mark("warn")+" "+ui.Yellow.Render(strings.Join(what, ", ")))
-		default:
-			synced = append(synced, r.Name+" "+ui.Mark("ok"))
+	meta, last, problems := m.detailFacts(j)
+	cw := w - 4
+	body := []string{ui.Dim.Render(ansi.Truncate(meta, cw, "…"))}
+	if last != "" {
+		style := lipgloss.NewStyle()
+		switch j.Health {
+		case "fail":
+			style = ui.Red
+		case "warn":
+			style = ui.Yellow
 		}
+		body = append(body, style.Render(ansi.Truncate(last, cw, "…")))
 	}
-	lines := wrong
-	if strip := append(synced, absent...); len(strip) > 0 {
-		for _, line := range packItems(strip, " ", max(m.width-len(indent), 10)) {
-			lines = append(lines, strings.TrimRight(line, " "))
-		}
+	for _, p := range problems {
+		body = append(body, strings.Split(ansi.Wrap(p, cw, " /"), "\n")...)
 	}
-	if s.gated > 0 {
-		lines = append(lines, ui.Yellow.Render(fmt.Sprintf("%d in cooldown or blocked, skipped by sync", s.gated)))
+	if len(body) > dashCardLines {
+		body = body[:dashCardLines]
+		body[dashCardLines-1] = ansi.Truncate(body[dashCardLines-1], cw-1, "") + "…"
 	}
-	if s.lock.status != checkStatusPass {
-		lines = append(lines, "lock "+ui.Mark(checkMarkKind(s.lock.status))+" "+s.lock.detail)
+	title := ui.Bold.Render(shortenMiddle(j.ID, max(w-6, 1)))
+	lines := []string{ui.Dim.Render("╭─ ") + title + ui.Dim.Render(" "+strings.Repeat("─", max(w-5-lipgloss.Width(title), 0))+"╮")}
+	for _, line := range body {
+		lines = append(lines, ui.Dim.Render("│ ")+padRight(line, cw)+ui.Dim.Render(" │"))
 	}
-	if m.statusErr != "" {
-		lines = append(lines, ui.Dim.Render("as of "+m.statusAt.Format("15:04")+"; the last status refresh failed"))
-	}
-	for i := range lines {
-		if i == 0 {
-			lines[i] = label + lines[i]
-		} else {
-			lines[i] = indent + lines[i]
-		}
-	}
-	return lines
+	return append(lines, ui.Dim.Render("╰"+strings.Repeat("─", w-2)+"╯"))
 }
 
-// harnessSummary is the harness block in one line, for a short pane.
-func (m dashModel) harnessSummary() string {
-	s := m.status
-	switch {
-	case s == nil && m.statusErr != "":
-		return ui.Bold.Render("harnesses") + "  " + ui.Dim.Render("unknown")
-	case s == nil:
-		return ui.Bold.Render("harnesses") + "  " + ui.Dim.Render("collecting…")
+// detailPlain is the selected job in two plain lines, for a short pane.
+func (m dashModel) detailPlain(w int) []string {
+	j, ok := m.selectedJob()
+	if !ok {
+		return nil
 	}
-	var synced int
-	var drifted, failed []string
-	for _, r := range s.reports {
-		switch {
-		case r.Error != "":
-			failed = append(failed, r.Name)
-		case !r.Detected:
-		case r.Synced:
-			synced++
-		default:
-			drifted = append(drifted, r.Name)
-		}
+	meta, last, problems := m.detailFacts(j)
+	second := last
+	if len(problems) > 0 {
+		second = strings.Join(problems, " · ")
 	}
-	parts := []string{fmt.Sprintf("%d synced", synced)}
-	if len(drifted) > 0 {
-		parts = append(parts, ui.Yellow.Render(fmt.Sprintf("%d drifted (%s)", len(drifted), strings.Join(drifted, ", "))))
+	lines := []string{"  " + ui.Dim.Render(ansi.Truncate(meta, max(w-2, 1), "…"))}
+	if second != "" {
+		lines = append(lines, "  "+ansi.Truncate(second, max(w-2, 1), "…"))
 	}
-	if len(failed) > 0 {
-		parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failed (%s)", len(failed), strings.Join(failed, ", "))))
-	}
-	if s.repo.State != stateSynced {
-		parts = append(parts, ui.Red.Render("~/.agents link "+s.repo.State))
-	}
-	stale := ""
-	if m.statusErr != "" {
-		stale = asOf(m.statusAt)
-	}
-	return fmt.Sprintf("%s%s: %s", plural(synced+len(drifted)+len(failed), "harness"), stale, strings.Join(parts, ", "))
+	return lines
 }
 
 // messageLine is a pending question, the action that runs, the last action's
 // result, or else a refresh error.
-func (m dashModel) messageLine() string {
+func (m dashModel) messageLine(w int) string {
 	switch {
 	case m.pending != nil:
 		// A narrow pane drops " on <host>", then shortens the job's id, then
 		// the middle, so the question keeps the job's name and its "y/n".
 		question, job := m.pending.question, m.pending.job
-		if lipgloss.Width(question) > m.width && job.ID != "" {
+		if lipgloss.Width(question) > w && job.ID != "" {
 			question = strings.Replace(question, " on "+job.Host, "", 1)
 		}
-		if over := lipgloss.Width(question) - m.width; over > 0 && job.ID != "" {
+		if over := lipgloss.Width(question) - w; over > 0 && job.ID != "" {
 			question = strings.Replace(question, job.ID, shortenMiddle(job.ID, max(lipgloss.Width(job.ID)-over, 1)), 1)
 		}
-		return ui.Bold.Render(shortenMiddle(question, max(m.width, 1)))
+		return ui.Bold.Render(shortenMiddle(question, max(w, 1)))
 	case m.busy != "" && m.quitHeld:
 		return ui.Bold.Render(m.busy + " quitting when it ends; ctrl+c quits now")
 	case m.busy != "":
@@ -1136,9 +1596,32 @@ func (m dashModel) messageLine() string {
 	return ""
 }
 
-func (m dashModel) keysLine() string {
-	if full := "↑↓ select · enter run now · p pause/resume · r refresh · s sync · q quit"; ansi.StringWidth(full) <= m.width {
-		return full
+// keysLine is the keys, each as a key cap with what it does, as many words as
+// fit: every label, then the short ones, then the keys alone.
+func (m dashModel) keysLine(w int) string {
+	keyCap := func(k string) string {
+		if m.keyBg != nil {
+			return lipgloss.NewStyle().Background(m.keyBg).Padding(0, 1).Render(k)
+		}
+		return ui.Bold.Render(k)
 	}
-	return "↑↓ · enter run · p pause · r refresh · s sync · q"
+	join := func(keys [][2]string) string {
+		parts := make([]string, len(keys))
+		for i, k := range keys {
+			parts[i] = keyCap(k[0])
+			if k[1] != "" {
+				parts[i] += " " + ui.Dim.Render(k[1])
+			}
+		}
+		return strings.Join(parts, "  ")
+	}
+	for _, keys := range [][][2]string{
+		{{"↑↓", "select"}, {"enter", "run now"}, {"p", "pause"}, {"s", "sync"}, {"r", "refresh"}, {"q", "quit"}},
+		{{"↑↓", ""}, {"enter", "run"}, {"p", "pause"}, {"s", "sync"}, {"r", "refresh"}, {"q", "quit"}},
+	} {
+		if line := join(keys); lipgloss.Width(line) <= w {
+			return line
+		}
+	}
+	return ansi.Truncate(ui.Dim.Render("↑↓ enter p s r q"), w, "")
 }
