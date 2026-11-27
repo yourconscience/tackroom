@@ -134,6 +134,7 @@ type dashStatus struct {
 	pinned  int
 	// What the config manages, for the counts strip.
 	skills, roles, mcp, hooks int
+	blocked                   int // sources the audit or a gate blocked
 }
 
 // collectDashStatus is statusReport's data: no registry lookup, no lock write,
@@ -155,6 +156,11 @@ func collectDashStatus(configPath string) (dashStatus, error) {
 	if roles, err := agentrole.Load(g.repoRoot); err == nil {
 		s.roles = len(roles)
 	}
+	for _, item := range g.gated {
+		if item.Kind == "blocked" {
+			s.blocked++
+		}
+	}
 	cacheRoot := externalCacheDir(g.home)
 	for _, src := range g.sources {
 		if _, issue := sourcePinIssue(g.lock, src, cacheRoot); issue == "" {
@@ -173,6 +179,12 @@ type dashStatusMsg struct {
 type dashCronsMsg struct {
 	gen    int
 	result cronsScanResult
+	err    error
+}
+
+type dashHostsMsg struct {
+	gen    int
+	result hostsJSON
 	err    error
 }
 
@@ -219,6 +231,11 @@ type dashModel struct {
 	cronsBusy  bool
 	cronsErr   string
 	cronsAt    time.Time
+	hosts      *hostsJSON // tackroom on each machine in crons.hosts
+	hostsGen   int
+	hostsBusy  bool
+	hostsErr   string
+	hostsAt    time.Time
 
 	cursor, top int
 	selected    string // the selected job's key, kept across refreshes
@@ -237,11 +254,12 @@ type dashModel struct {
 }
 
 func newDashModel(configPath string) dashModel {
-	return dashModel{configPath: configPath, statusGen: 1, statusBusy: true, cronsGen: 1, cronsBusy: true}
+	return dashModel{configPath: configPath, statusGen: 1, statusBusy: true, cronsGen: 1, cronsBusy: true, hostsGen: 1, hostsBusy: true}
 }
 
 func (m dashModel) Init() tea.Cmd {
-	return tea.Batch(dashCollectStatus(m.configPath, m.statusGen), dashCollectCrons(m.configPath, m.cronsGen), dashTick(false), dashTick(true), tea.RequestBackgroundColor)
+	return tea.Batch(dashCollectStatus(m.configPath, m.statusGen), dashCollectCrons(m.configPath, m.cronsGen), dashCollectHosts(m.configPath, m.hostsGen),
+		dashTick(false), dashTick(true), tea.RequestBackgroundColor)
 }
 
 func dashCollectStatus(configPath string, gen int) tea.Cmd {
@@ -255,6 +273,13 @@ func dashCollectCrons(configPath string, gen int) tea.Cmd {
 	return func() tea.Msg {
 		result, err := collectCrons(configPath, nil)
 		return dashCronsMsg{gen: gen, result: result, err: err}
+	}
+}
+
+func dashCollectHosts(configPath string, gen int) tea.Cmd {
+	return func() tea.Msg {
+		result, err := collectHosts(configPath, nil)
+		return dashHostsMsg{gen: gen, result: result, err: err}
 	}
 }
 
@@ -278,6 +303,14 @@ func (m *dashModel) refreshCrons() tea.Cmd {
 	m.cronsGen++
 	m.cronsBusy = true
 	return dashCollectCrons(m.configPath, m.cronsGen)
+}
+
+// refreshHosts probes the machines again; it runs with the crons, every 5
+// minutes and on r.
+func (m *dashModel) refreshHosts() tea.Cmd {
+	m.hostsGen++
+	m.hostsBusy = true
+	return dashCollectHosts(m.configPath, m.hostsGen)
 }
 
 func (m *dashModel) say(text string, failed bool) {
@@ -318,11 +351,29 @@ func (m dashModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.cronsErr, m.cronsAt = "", time.Now()
 		m.setJobs(msg.result)
+	case dashHostsMsg:
+		if msg.gen != m.hostsGen {
+			return m, nil
+		}
+		m.hostsBusy = false
+		if msg.err != nil {
+			m.hostsErr = firstLine(msg.err.Error())
+			return m, nil
+		}
+		m.hosts, m.hostsErr, m.hostsAt = &msg.result, "", time.Now()
+		m.fit()
 	case dashTickMsg:
 		next := dashTick(msg.crons)
 		switch {
-		case msg.crons && !m.cronsBusy:
-			return m, tea.Batch(m.refreshCrons(), next)
+		case msg.crons:
+			cmds := []tea.Cmd{next}
+			if !m.cronsBusy {
+				cmds = append(cmds, m.refreshCrons())
+			}
+			if !m.hostsBusy {
+				cmds = append(cmds, m.refreshHosts())
+			}
+			return m, tea.Batch(cmds...)
 		case !msg.crons && !m.statusBusy && !m.syncing:
 			return m, tea.Batch(m.refreshStatus(), next)
 		}
@@ -408,6 +459,9 @@ func (m dashModel) key(key string) (tea.Model, tea.Cmd) {
 		}
 		if !m.cronsBusy {
 			cmds = append(cmds, m.refreshCrons())
+		}
+		if !m.hostsBusy {
+			cmds = append(cmds, m.refreshHosts())
 		}
 		return m, tea.Batch(cmds...)
 	case "enter", "p":
@@ -876,8 +930,12 @@ func (m dashModel) topLines(w int, lv dashLevel) []string {
 	switch lv.harness {
 	case 2:
 		add(m.harnessBlock(w)...)
+		add(m.machineBlock(w)...)
 	case 1:
 		add(m.harnessLine(w))
+		if line := m.machineLine(w); line != "" {
+			add(line)
+		}
 	}
 	return out
 }
@@ -906,11 +964,13 @@ func asOf(at time.Time) string {
 func (m dashModel) titleBar(w int) string {
 	left := ui.Bold.Render("tackroom")
 	updated := m.statusAt
-	if m.cronsAt.After(updated) {
-		updated = m.cronsAt
+	for _, at := range []time.Time{m.cronsAt, m.hostsAt} {
+		if at.After(updated) {
+			updated = at
+		}
 	}
 	switch {
-	case m.statusBusy || m.cronsBusy:
+	case m.statusBusy || m.cronsBusy || m.hostsBusy:
 		return spread(left, ui.Dim.Render("refreshing…"), w)
 	case !updated.IsZero():
 		return spread(left, ui.Dim.Render("updated "+updated.Format("15:04")), w)
@@ -918,33 +978,63 @@ func (m dashModel) titleBar(w int) string {
 	return left
 }
 
-// cronAccess is the hosts the crons collect could not reach and how many cron
-// sources it could not read: a host whose probe failed lists no jobs, and an
-// unreadable source none of its own, so they are said, or the jobs would just
-// be missing.
-func (m dashModel) cronAccess() (unreached []string, unreadable int) {
-	if m.crons == nil {
-		return nil, 0
+// machines is the machines in crons.hosts as `tackroom hosts` reports them,
+// when there is more than this one, as the Herdr panel shows them.
+func (m dashModel) machines() []hostJSON {
+	if m.hosts == nil || len(m.hosts.Hosts) < 2 {
+		return nil
 	}
+	return m.hosts.Hosts
+}
+
+// downHosts are the hosts the crons collect could not reach: every source on
+// them unscanned, one with a failed probe. They list no jobs, so they are said,
+// or their jobs would just be missing.
+func (m dashModel) downHosts() []string {
+	if m.crons == nil {
+		return nil
+	}
+	var down []string
 	for _, a := range m.crons.Access {
-		switch {
-		case strings.HasPrefix(a.Detail, "probe failed"):
-			if !slices.Contains(unreached, a.Host) {
-				unreached = append(unreached, a.Host)
+		if slices.Contains(down, a.Host) {
+			continue
+		}
+		all, probe := true, false
+		for _, b := range m.crons.Access {
+			if b.Host != a.Host {
+				continue
 			}
-		case a.State == "unreadable":
-			unreadable++
+			all = all && b.State == "not_scanned"
+			probe = probe || strings.HasPrefix(b.Detail, "probe failed")
+		}
+		if all && probe {
+			down = append(down, a.Host)
 		}
 	}
-	return unreached, unreadable
+	return down
+}
+
+// unreadableSources is how many cron sources the collect could not read.
+func (m dashModel) unreadableSources() int {
+	n := 0
+	if m.crons != nil {
+		for _, a := range m.crons.Access {
+			if a.State == "unreadable" {
+				n++
+			}
+		}
+	}
+	return n
 }
 
 // answer is the headline and the sentences under it, counted as the Herdr
-// panel's Overview counts. Failing: a failing cron, a harness whose config
-// could not be read, a broken ~/.agents link, a host the crons collect could
-// not reach. Needs attention: a cron whose last run failed, a sync waiting,
-// a lock check that did not pass, an unreadable cron source, and a source
-// that could not be read at all. level is fail, warn, ok, or off while the
+// panel's Overview counts (overviewModel in herdr/tackroom/mods/tackroom), so
+// the two agree. Failing: a failing cron, a harness with a conflict or an
+// unreadable config, a failing machine, a host the crons collect could not
+// reach that is not a machine already counted. Needs attention: a cron whose
+// last run failed, a sync waiting, each machine that needs attention, a source
+// blocked by the audit or a gate, and status, crons or machines that could not
+// be read at all. level is fail, warn, ok, or off while the
 // first collects run.
 func (m dashModel) answer() (level, title string, subs []string) {
 	fail, warn := 0, 0
@@ -955,7 +1045,7 @@ func (m dashModel) answer() (level, title string, subs []string) {
 		var drifted []string
 		for _, r := range s.reports {
 			switch {
-			case r.Error != "":
+			case r.Error != "" || len(r.Conflicts) > 0:
 				broken++
 			case !r.Detected:
 			case !r.Synced:
@@ -969,30 +1059,27 @@ func (m dashModel) answer() (level, title string, subs []string) {
 		if broken > 0 {
 			failKinds["harness"] = true
 		}
+		if len(drifted) > 0 || s.repo.State != stateSynced {
+			warn++
+		}
 		if s.repo.State != stateSynced {
-			fail++
-			failKinds["link"] = true
 			subs = append(subs, "The ~/.agents link is "+s.repo.State+".")
 		}
 		switch {
-		case len(drifted) > 0:
-			warn++
-			if len(drifted) <= 2 {
-				verb := " needs a sync."
-				if len(drifted) == 2 {
-					verb = " need a sync."
-				}
-				subs = append(subs, strings.Join(drifted, " and ")+verb)
-			} else {
-				subs = append(subs, fmt.Sprintf("%d harnesses need a sync.", len(drifted)))
-			}
-		case broken == 0 && live == 1:
+		case len(drifted) == 1:
+			subs = append(subs, drifted[0]+" needs a sync.")
+		case len(drifted) == 2:
+			subs = append(subs, drifted[0]+" and "+drifted[1]+" need a sync.")
+		case len(drifted) > 2:
+			subs = append(subs, fmt.Sprintf("%d harnesses need a sync.", len(drifted)))
+		case broken == 0 && s.repo.State == stateSynced && live == 1:
 			subs = append(subs, "The harness is in sync.")
-		case broken == 0 && live > 1:
+		case broken == 0 && s.repo.State == stateSynced && live > 1:
 			subs = append(subs, fmt.Sprintf("All %d harnesses are in sync.", live))
 		}
-		if s.lock.status != checkStatusPass {
-			warn++
+		warn += s.blocked
+		if s.blocked > 0 {
+			subs = append(subs, plural(s.blocked, "source")+" blocked.")
 		}
 		if m.statusErr != "" {
 			subs = append(subs, "Harnesses as of "+m.statusAt.Format("15:04")+".")
@@ -1002,6 +1089,29 @@ func (m dashModel) answer() (level, title string, subs []string) {
 		subs = append(subs, "Harness status could not be read.")
 	} else {
 		pending = append(pending, "harnesses")
+	}
+	machines := m.machines()
+	counted := map[string]bool{}
+	sick := 0
+	for _, h := range machines {
+		switch h.Health {
+		case "ok":
+		case "fail":
+			fail++
+			failKinds["machine"] = true
+			counted[h.Host] = true
+		default:
+			sick++
+			counted[h.Host] = true
+		}
+	}
+	warn += sick
+	switch {
+	case m.hosts == nil && m.hostsErr != "":
+		warn++
+		subs = append(subs, "Machines could not be checked.")
+	case m.hosts == nil:
+		pending = append(pending, "machines")
 	}
 	if c := m.crons; c != nil {
 		for _, j := range c.Jobs {
@@ -1013,15 +1123,19 @@ func (m dashModel) answer() (level, title string, subs []string) {
 				warn++
 			}
 		}
-		unreached, unreadable := m.cronAccess()
-		fail += len(unreached)
-		if len(unreached) > 0 {
-			failKinds["host"] = true
-			subs = append(subs, strings.Join(unreached, " and ")+" could not be reached.")
+		var down []string
+		for _, h := range m.downHosts() {
+			if !counted[h] {
+				down = append(down, h)
+			}
 		}
-		warn += unreadable
-		if unreadable > 0 {
-			subs = append(subs, plural(unreadable, "cron source")+" could not be read.")
+		fail += len(down)
+		if len(down) > 0 {
+			failKinds["machine"] = true
+			subs = append(subs, strings.Join(down, " and ")+" could not be reached.")
+		}
+		if n := m.unreadableSources(); n > 0 {
+			subs = append(subs, plural(n, "cron source")+" could not be read.")
 		}
 		if m.cronsErr != "" {
 			subs = append(subs, "Crons as of "+m.cronsAt.Format("15:04")+".")
@@ -1032,20 +1146,19 @@ func (m dashModel) answer() (level, title string, subs []string) {
 	} else {
 		pending = append(pending, "crons")
 	}
-	// What the failures are, when they are all one kind the sentences above do
-	// not already name.
-	if len(failKinds) == 1 && (failKinds["cron"] || failKinds["harness"]) {
-		one, many := "a cron", "crons"
-		if failKinds["harness"] {
-			one, many = "a harness", "harnesses"
-		}
-		switch fail {
-		case 1:
-			subs = append(subs, "The failure is "+one+".")
-		case 2:
-			subs = append(subs, "Both failures are "+many+".")
-		default:
-			subs = append(subs, "The failures are "+many+".")
+	// What the failures are, when they are all one kind.
+	if len(failKinds) == 1 {
+		kinds := map[string][2]string{"cron": {"a cron", "crons"}, "harness": {"a harness", "harnesses"}, "machine": {"a machine", "machines"}}
+		for kind := range failKinds {
+			one, many := kinds[kind][0], kinds[kind][1]
+			switch fail {
+			case 1:
+				subs = append(subs, "The failure is "+one+".")
+			case 2:
+				subs = append(subs, "Both failures are "+many+".")
+			default:
+				subs = append(subs, "The failures are "+many+".")
+			}
 		}
 	}
 	if len(pending) > 0 {
@@ -1071,6 +1184,70 @@ func (m dashModel) answer() (level, title string, subs []string) {
 		return "ok", "All clear", subs
 	}
 	return level, strings.Join(parts, ", "), subs
+}
+
+// machineBlock is the machines when there is more than this one: a title with
+// how they stand, then a line each with its health and summary, or for one
+// that is fine its tackroom version and config commit.
+func (m dashModel) machineBlock(w int) []string {
+	machines := m.machines()
+	if len(machines) == 0 {
+		return nil
+	}
+	out := []string{spread(ui.Bold.Render("Machines"), m.machineTally(), w)}
+	for _, h := range machines {
+		name := ui.Bold.Render(h.Host)
+		switch h.Health {
+		case "ok":
+			what := "tackroom " + h.Version
+			if len(h.Commit) >= 7 {
+				what += " · config " + h.Commit[:7]
+			}
+			out = append(out, ui.Mark("ok")+" "+name+"  "+ui.Dim.Render(what))
+		case "fail":
+			out = append(out, ui.Mark("fail")+" "+name+"  "+ui.Red.Render(h.Summary))
+		default:
+			out = append(out, ui.Mark("warn")+" "+name+"  "+ui.Yellow.Render(h.Summary))
+		}
+	}
+	for i := range out {
+		out[i] = ansi.Truncate(out[i], w, "…")
+	}
+	return out
+}
+
+// machineTally is how the machines stand in a few words, for the title of
+// their block and for their line.
+func (m dashModel) machineTally() string {
+	var parts []string
+	failing, sick := 0, 0
+	for _, h := range m.machines() {
+		switch h.Health {
+		case "ok":
+		case "fail":
+			failing++
+		default:
+			sick++
+		}
+	}
+	if failing > 0 {
+		parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failing", failing)))
+	}
+	if sick > 0 {
+		parts = append(parts, ui.Yellow.Render(fmt.Sprintf("%d need attention", sick)))
+	}
+	if len(parts) == 0 {
+		parts = append(parts, ui.Dim.Render(fmt.Sprintf("%d in order", len(m.machines()))))
+	}
+	return strings.Join(parts, ui.Dim.Render(" · "))
+}
+
+// machineLine is the machines in one line, for a short pane.
+func (m dashModel) machineLine(w int) string {
+	if len(m.machines()) == 0 {
+		return ""
+	}
+	return ansi.Truncate(ui.Bold.Render("Machines")+"  "+m.machineTally(), w, "…")
 }
 
 // dashDot is a level's dot: red for failing, yellow for needs attention, green
@@ -1193,13 +1370,16 @@ func (m dashModel) countsLine(w int) string {
 func (m dashModel) harnessTally() (synced, absent, wrong []string, drifted, broken int) {
 	s := m.status
 	if s.repo.State != stateSynced {
-		wrong = append(wrong, ui.Mark("fail")+" "+ui.Bold.Render("~/.agents link")+"  "+ui.Red.Render(s.repo.State))
+		wrong = append(wrong, ui.Mark("warn")+" "+ui.Bold.Render("~/.agents link")+"  "+ui.Yellow.Render(s.repo.State))
 	}
 	for _, r := range s.reports {
 		switch {
 		case r.Error != "":
 			broken++
 			wrong = append(wrong, ui.Mark("fail")+" "+ui.Bold.Render(r.Name)+"  "+ui.Red.Render("config unreadable: "+firstLine(r.Error)))
+		case len(r.Conflicts) > 0:
+			broken++
+			wrong = append(wrong, ui.Mark("fail")+" "+ui.Bold.Render(r.Name)+"  "+ui.Red.Render(plural(len(r.Conflicts), "conflict")))
 		case !r.Detected:
 			absent = append(absent, r.Name)
 		case !r.Synced:
@@ -1292,7 +1472,7 @@ func (m dashModel) harnessLine(w int) string {
 		parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failing", broken)))
 	}
 	if m.status.repo.State != stateSynced {
-		parts = append(parts, ui.Red.Render("~/.agents link "+m.status.repo.State))
+		parts = append(parts, ui.Yellow.Render("~/.agents link "+m.status.repo.State))
 	}
 	if len(absent) > 0 {
 		parts = append(parts, ui.Dim.Render(fmt.Sprintf("%d not installed", len(absent))))
