@@ -97,7 +97,8 @@ elif command -v shasum >/dev/null 2>&1; then
     exit 1
   fi
 else
-  echo "warning: no sha256sum or shasum found; skipping checksum verification" >&2
+  echo "error: sha256sum or shasum is required to verify the download" >&2
+  exit 1
 fi
 
 # Extract binary
@@ -112,17 +113,26 @@ chmod +x "${INSTALL_DIR}/${BINARY}"
 echo ""
 echo "${BINARY} ${VERSION} installed to ${INSTALL_DIR}/${BINARY}"
 
-# PATH hint if needed; the next command uses the full path until it is on PATH
-NEXT="${BINARY}"
-case ":$PATH:" in
-  *":${INSTALL_DIR}:"*) ;;
-  *)
+# The next command is the bare name only when that name runs this install.
+NEXT="\"${INSTALL_DIR}/${BINARY}\""
+FOUND="$(command -v "${BINARY}" 2>/dev/null || true)"
+if [ "$FOUND" = "${INSTALL_DIR}/${BINARY}" ]; then
+  NEXT="${BINARY}"
+else
+  case ":$PATH:" in
+    *":${INSTALL_DIR}:"*) ;;
+    *)
+      echo ""
+      echo "Add ${INSTALL_DIR} to your PATH:"
+      echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+      ;;
+  esac
+  if [ -n "$FOUND" ]; then
     echo ""
-    echo "Add ${INSTALL_DIR} to your PATH:"
-    echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
-    NEXT="${INSTALL_DIR}/${BINARY}"
-    ;;
-esac
+    echo "Another ${BINARY} comes first on your PATH: ${FOUND}"
+    echo "Until ${INSTALL_DIR} comes before it, the periodic sync job runs that one."
+  fi
+fi
 
 echo ""
 echo "Next, run:"

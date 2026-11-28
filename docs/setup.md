@@ -11,7 +11,7 @@ tackroom setup --dry-run              # what the run would import, whose copy it
 
 ## Set up your first machine
 
-Install tackroom with the install script, npm or Homebrew, then run `tackroom setup`:
+Install tackroom with the install script, npm or Homebrew, then run `tackroom setup` (after the script, the command it prints last):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh   # the install script
@@ -19,7 +19,7 @@ npm install -g tackroom                    # or npm
 brew install yourconscience/tap/tackroom   # or Homebrew
 ```
 
-The script downloads the release binary for macOS or Linux (arm64 or x86-64) into `~/.local/bin` (`$TACKROOM_INSTALL_DIR` changes that), checks its sha256 against the release's `checksums.txt`, and ends with the command to run next, with the full path when that folder is not on your `PATH`. To read it before it runs, save it with `curl -fsSL -o install.sh https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh`, read `install.sh`, then run `sh install.sh`. npm and Homebrew install the same release binary. To try setup without installing, `npx tackroom setup --dry-run` shows what it would import and changes nothing.
+The script downloads the release binary for macOS or Linux (arm64 or x86-64) into `~/.local/bin` (`$TACKROOM_INSTALL_DIR` changes that), checks its sha256 against the release's `checksums.txt`, and ends with the command to run next, with the full path when that folder is not on your `PATH` or another `tackroom` comes before it there. It stops without installing when the machine has neither `sha256sum` nor `shasum` to check the download. To read it before it runs, save it with `curl -fsSL -o install.sh https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh`, read `install.sh`, then run `sh install.sh`. npm and Homebrew install the same release binary. To try setup without installing, `npx tackroom setup --dry-run` shows what it would import and changes nothing.
 
 `setup` ends with a short summary: the agents it found, what it imported, which copy it kept where copies differed, where the backups are, and either `Everything is synced.` or what needs you, each with the command that fixes it.
 

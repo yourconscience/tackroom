@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -299,7 +300,9 @@ func setupPeriodicSync(opts runOptions, configPath, repoRoot, home string, summa
 	// Setup is the one place besides `tackroom cron` that installs the job.
 	// A scheduler that cannot take it must not fail the setup. An installed
 	// job is left alone, so a chosen --interval survives.
-	if job, _ := readPeriodicSync(); job != nil {
+	// A job an earlier npx, pnpm dlx or bunx run left behind runs a copy
+	// that its cache can drop, so it does not count as installed.
+	if job, _ := readPeriodicSync(); job != nil && !packageRunnerCopy(job.Command) {
 		return "Periodic sync (tackroom pull) was already installed", false
 	}
 	if err := installPeriodicSync(cronOptions{runOptions: opts}); err != nil {
@@ -510,11 +513,15 @@ const (
 // schedule and would leave the job pointing at a missing file.
 var errTemporaryCopy = errors.New("this tackroom runs from a temporary copy (npx, pnpm dlx or bunx), which the job cannot rely on. After a real install, run: tackroom cron")
 
-// packageRunnerCopy reports whether path is inside the cache of a package
-// runner: npm's _npx, pnpm's dlx, or bunx's /tmp/bunx-<uid>-<package> folder.
+// packageRunnerCache matches a path inside the cache of a package runner:
+// npm's _npx/<hash>, pnpm's dlx/<hash>/<id>, or bunx's bunx-<uid>-<package>
+// folder, each followed by node_modules.
+var packageRunnerCache = regexp.MustCompile(`/(_npx/[^/]+|pnpm/dlx/[^/]+(/[^/]+)?|bunx-[^/]+)/node_modules/`)
+
+// packageRunnerCopy reports whether path, or a command line that starts with
+// it, runs from a package runner's cache.
 func packageRunnerCopy(path string) bool {
-	path = filepath.ToSlash(path)
-	return strings.Contains(path, "/_npx/") || strings.Contains(path, "/pnpm/dlx/") || strings.Contains(path, "/bunx-")
+	return packageRunnerCache.MatchString(filepath.ToSlash(path))
 }
 
 // cronBinaryPath is the tackroom a scheduled job runs: the one on PATH, else
