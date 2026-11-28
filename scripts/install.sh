@@ -138,4 +138,4 @@ fi
 
 echo ""
 echo "Next, run:"
-echo "  ${NEXT} setup"
+printf '  %s setup\n' "$NEXT"
