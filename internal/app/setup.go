@@ -514,9 +514,9 @@ const (
 var errTemporaryCopy = errors.New("this tackroom runs from a temporary copy (npx, pnpm dlx or bunx), which the job cannot rely on. After a real install, run: tackroom cron")
 
 // packageRunnerCache matches a path inside the cache of a package runner:
-// npm's _npx/<hash>, pnpm's dlx/<hash>/<id>, or bunx's bunx-<uid>-<package>
-// folder, each followed by node_modules.
-var packageRunnerCache = regexp.MustCompile(`/(_npx/[^/]+|pnpm/dlx/[^/]+(/[^/]+)?|bunx-[^/]+)/node_modules/`)
+// npm's _npx/<hash>, pnpm's dlx/<hash>/<id> under whatever cache-dir is set,
+// or bunx's bunx-<uid>-<package> folder, each followed by node_modules.
+var packageRunnerCache = regexp.MustCompile(`/(_npx/[^/]+|dlx/[^/]+(/[^/]+)?|bunx-[^/]+)/node_modules/`)
 
 // packageRunnerCopy reports whether path, or a command line that starts with
 // it, runs from a package runner's cache.

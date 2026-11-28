@@ -4,7 +4,7 @@ What changed in each release since 2.0, newest first, with what to do on every m
 
 ## To 3.2.2
 
-Nothing to migrate by hand. If you ran `npx tackroom setup`, `pnpm dlx tackroom setup` or `bunx tackroom setup` on a machine before, run `tackroom cron` from a real install once, as described below.
+Nothing to migrate by hand. If you ran `npx tackroom setup`, `pnpm dlx tackroom setup` or `bunx tackroom setup` on a machine before, run `tackroom cron` from a real install once, as described below. After the install script, use the full path it printed (`~/.local/bin/tackroom cron`) if that folder is not on your `PATH`.
 
 - Changed: the install script is the first install path again. `curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh` downloads the release binary for macOS or Linux into `~/.local/bin` (`$TACKROOM_INSTALL_DIR` changes that), checks its sha256 against the release's `checksums.txt`, and now ends with the command to run next, with the full path when that folder is not on your `PATH`. The README, [setup.md](setup.md#set-up-your-first-machine) and the site list it first, then npm, then Homebrew; 2.1 had stopped offering it. Upgrading a script install is running it again ([setup.md](setup.md#upgrade)).
 - Fixed: `bunx tackroom` failed with "The tackroom binary was not downloaded during install", because bun does not run the package's postinstall. The npm launcher now downloads the binary on its first run, with the same sha256 check, when the postinstall did not run. That also covers `npm install --ignore-scripts`. If the download fails, it prints the error and the other install paths.
