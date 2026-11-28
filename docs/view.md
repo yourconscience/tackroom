@@ -155,7 +155,7 @@ The manifest and icons are served without the token; they carry no config data. 
 
 ## Restart on upgrade
 
-A running view checks every 15 seconds whether the `tackroom` binary it started from has been replaced, by `brew upgrade`, `npm install -g` or `go install`. Once the new file has stayed unchanged for one more check, the view restarts itself in place with `--foreground` and `--no-open`, each added once, and prints `tackroom binary at <path> changed; restarting view`.
+A running view checks every 15 seconds whether the `tackroom` binary it started from has been replaced, by the install script, `npm install -g`, `brew upgrade` or `go install`. Once the new file has stayed unchanged for one more check, the view restarts itself in place with `--foreground` and `--no-open`, each added once, and prints `tackroom binary at <path> changed; restarting view`.
 
 The token file keeps the URL and open sessions valid. A background view keeps its idle timeout across the restart. If the restart fails, the view keeps serving the old version and says so.
 

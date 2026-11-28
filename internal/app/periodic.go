@@ -29,6 +29,10 @@ func setupPlannedActions(opts runOptions) []string {
 	if opts.NoCron {
 		return nil
 	}
+	// A dry run from npx, pnpm dlx or bunx says what the real run does there.
+	if path, err := cronBinaryPath(); err == nil && packageRunnerCopy(path) {
+		return []string{"skip the periodic sync job " + periodicSyncID + ": " + errTemporaryCopy.Error()}
+	}
 	return []string{"install the periodic sync job " + periodicSyncID + " (tackroom pull every " + cronIntervalDefault + "); skip with --no-cron"}
 }
 

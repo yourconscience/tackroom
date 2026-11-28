@@ -517,18 +517,29 @@ func packageRunnerCopy(path string) bool {
 	return strings.Contains(path, "/_npx/") || strings.Contains(path, "/pnpm/dlx/") || strings.Contains(path, "/bunx-")
 }
 
+// cronBinaryPath is the tackroom a scheduled job runs: the one on PATH, else
+// this executable.
+func cronBinaryPath() (string, error) {
+	path, err := exec.LookPath("tackroom")
+	if err == nil {
+		return path, nil
+	}
+	path, err = os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate tackroom executable: %w", err)
+	}
+	return path, nil
+}
+
 func runCron(opts cronOptions) error {
 	_, home, _, _, err := loadContext(opts.runOptions)
 	if err != nil {
 		return err
 	}
 
-	binaryPath, err := exec.LookPath("tackroom")
+	binaryPath, err := cronBinaryPath()
 	if err != nil {
-		binaryPath, err = os.Executable()
-		if err != nil {
-			return fmt.Errorf("locate tackroom executable: %w", err)
-		}
+		return err
 	}
 	// Removing a job never writes the path, so it works from any copy.
 	if !opts.Remove && packageRunnerCopy(binaryPath) {
