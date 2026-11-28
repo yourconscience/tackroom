@@ -4,7 +4,8 @@ name: Release
 # against main and a green ci.yml run. The goreleaser job runs in the `release`
 # environment, which has no required reviewers, so a verified tag publishes
 # without an approval step. Add reviewers to that environment in repository
-# settings to make publishing wait for one.
+# settings to make publishing wait for one. HOMEBREW_TAP_TOKEN is a repository
+# secret; move it into that environment too if only approved runs should read it.
 
 on:
   push:
