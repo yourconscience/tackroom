@@ -21,7 +21,7 @@ async function ensureBinary() {
   } catch (error) {
     console.error(`The tackroom binary could not be downloaded: ${error.message}`);
     console.error("Other ways to install tackroom:");
-    console.error("  curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh");
+    console.error("  curl -fsSL https://github.com/yourconscience/tackroom/releases/latest/download/install.sh | sh");
     console.error("  brew install yourconscience/tap/tackroom");
     process.exit(1);
   }

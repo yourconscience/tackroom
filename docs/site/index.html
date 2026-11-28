@@ -68,7 +68,7 @@
         <h1 id="hero-title">Set up your coding agents once.</h1>
         <p class="lead">One repo for everything your coding agents read, including the parts that never port: MCP servers, hooks and subagents. 16 harnesses, each in its own format.</p>
         <div class="cmd">
-          <code id="install-cmd">curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh</code>
+          <code id="install-cmd">curl -fsSL https://github.com/yourconscience/tackroom/releases/latest/download/install.sh | sh</code>
           <button class="copy" type="button" data-copy="install-cmd" aria-label="Copy install command" hidden><svg class="ico cp-i" aria-hidden="true"><use href="#i-copy"/></svg><svg class="ico ok-i" aria-hidden="true"><use href="#i-ok"/></svg><span class="lbl nl">Copy</span></button>
         </div>
         <a class="second" href="#start">Other ways to install</a>
@@ -260,7 +260,7 @@ cooldowns:
         <li>
           <div class="say">
             <h3>Install</h3>
-            <p>The install script (above), npm or Homebrew. All three fetch the same release from GitHub and check its checksum. The script puts the binary in <code>~/.local/bin</code> and ends with the command to run next. To read it before it runs, save it with <code>curl -fsSL -o install.sh https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh</code>, read <code>install.sh</code>, then run <code>sh install.sh</code>.</p>
+            <p>The install script (above), npm or Homebrew. All three fetch the same release from GitHub and check its checksum. The script puts the binary in <code>~/.local/bin</code> and ends with the command to run next. To read it before it runs, save it with <code>curl -fsSL -o install.sh https://github.com/yourconscience/tackroom/releases/latest/download/install.sh</code>, read <code>install.sh</code>, then run <code>sh install.sh</code>.</p>
           </div>
           <dl class="installs">
             <div><dt>npm</dt><dd><code>npm install -g tackroom</code></dd></div>

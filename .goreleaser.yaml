@@ -26,6 +26,13 @@ archives:
 checksum:
   name_template: checksums.txt
 
+# The install script is a file of each release, so the documented command
+# (releases/latest/download/install.sh) runs the script that was released, not
+# whatever the main branch holds.
+release:
+  extra_files:
+    - glob: ./scripts/install.sh
+
 brews:
   - repository:
       owner: yourconscience

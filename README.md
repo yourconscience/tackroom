@@ -14,10 +14,10 @@ One repo for everything your coding agents read, including the parts that never 
 ## Install and set up
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
+curl -fsSL https://github.com/yourconscience/tackroom/releases/latest/download/install.sh | sh
 ```
 
-Then run the command the script prints last, `tackroom setup`. The script downloads the release binary for macOS or Linux (arm64 or x86-64) into `~/.local/bin` (`$TACKROOM_INSTALL_DIR` changes that) and checks its sha256 against the release's `checksums.txt`. If that folder is not on your `PATH`, or another `tackroom` comes before it there, the printed command uses the full path. To read the script before it runs, save it with `curl -fsSL -o install.sh https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh`, read `install.sh`, then run `sh install.sh`.
+Then run the command the script prints last, `tackroom setup`. The script is a file of the latest release, so a change on the main branch reaches it only with a release. It downloads the release binary for macOS or Linux (arm64 or x86-64) into `~/.local/bin` (`$TACKROOM_INSTALL_DIR` changes that) and checks its sha256 against the release's `checksums.txt`. If that folder is not on your `PATH`, or another `tackroom` comes before it there, the printed command uses the full path. To read the script before it runs, save it with `curl -fsSL -o install.sh https://github.com/yourconscience/tackroom/releases/latest/download/install.sh`, read `install.sh`, then run `sh install.sh`.
 
 With npm: `npm install -g tackroom && tackroom setup`. With Homebrew: `brew install yourconscience/tap/tackroom && tackroom setup`. All three install the same release binary. To try it without installing, `npx tackroom setup --dry-run` shows what setup would import and changes nothing.
 

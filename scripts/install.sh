@@ -1,6 +1,6 @@
 #!/bin/sh
 # Install tackroom binary from GitHub Releases.
-# Usage: curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
+# Usage: curl -fsSL https://github.com/yourconscience/tackroom/releases/latest/download/install.sh | sh
 
 set -e
 
