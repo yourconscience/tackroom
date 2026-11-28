@@ -25,7 +25,7 @@
   <text x="24" y="355">│ omp     │ <tspan class="o">✓ synced</tspan> │ 3      │ 6      │ -   │ -     │ -       │ -        │</text>
   <text x="24" y="372">│ pi      │ <tspan class="o">✓ synced</tspan> │ 3      │ 6      │ 1   │ -     │ -       │ -        │</text>
   <text x="24" y="389">│ cursor  │ <tspan class="o">✓ synced</tspan> │ 3      │ 6      │ -   │ -     │ -       │ -        │</text>
-  <text x="24" y="406">│ gemini  │ <tspan class="o">✓ synced</tspan> │ 3      │ 6      │ -   │ -     │ -       │ -        │</text>
+  <text x="24" y="406">│ kiro    │ <tspan class="o">✓ synced</tspan> │ 3      │ -      │ -   │ -     │ -       │ -        │</text>
   <text x="24" y="423">│ grok    │ <tspan class="o">✓ synced</tspan> │ 3      │ 6      │ -   │ -     │ -       │ -        │</text>
   <text x="24" y="440">╰─────────┴──────────┴────────┴────────┴─────┴───────┴─────────┴──────────╯</text>
   <text x="24" y="457"><tspan class="d">...</tspan></text>

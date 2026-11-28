@@ -28,7 +28,7 @@ const (
 	agentQwenCode           = "qwen-code"
 	agentCursor             = "cursor"
 	agentDevin              = "devin"
-	agentGemini             = "gemini"
+	agentKiro               = "kiro"
 	agentCopilot            = "copilot"
 	agentGrok               = "grok"
 	agentDSH                = "dsh"

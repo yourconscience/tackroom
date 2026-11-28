@@ -6,7 +6,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 )
 
 func loadContext(opts runOptions) (string, string, config, []agentConfig, error) {
@@ -129,6 +131,7 @@ func validateConfig(cfg *config, home string, expand bool) error {
 	if cfg.Version == 0 {
 		cfg.Version = 1
 	}
+	dropRemovedAgents(cfg)
 
 	seen := make(map[string]struct{})
 	for i := range cfg.Agents {
@@ -262,8 +265,9 @@ func validateConfig(cfg *config, home string, expand bool) error {
 		if err := validateMCPTransport(cfg.MCPServers[i]); err != nil {
 			return err
 		}
-		// Fail before sync writes anything, not halfway through the agents.
-		if server := cfg.MCPServers[i]; server.URL != "" && mcpServerTargetsAgent(*cfg, server, agentCodex) {
+		// Fail before sync writes anything, not halfway through the agents. A
+		// server that is off is written nowhere, so its headers are not checked.
+		if server := cfg.MCPServers[i]; server.Enabled && server.URL != "" && mcpServerTargetsAgent(*cfg, server, agentCodex) {
 			if _, err := splitCodexHeaders(server.Headers); err != nil {
 				return fmt.Errorf("config MCP server %s: %w, or leave codex out of its agents list", server.Name, err)
 			}
@@ -596,6 +600,70 @@ func expandPath(path string, home string) string {
 var legacyAgentNames = map[string]string{
 	"claude-code": agentClaudeCode,
 	"qwen":        agentQwenCode,
+}
+
+// removedAgentGemini is the key of Gemini CLI, whose support was removed. It
+// is not an alias for agy: Antigravity CLI reads other files.
+const removedAgentGemini = "gemini"
+
+var removedAgentWarning sync.Once
+
+// dropRemovedAgents lets a config that still names gemini load: the agent
+// entry and every agents list item naming it are ignored, with one warning.
+// A server, hook or source MCP whose list named only gemini is turned off, so
+// the emptied list does not widen it to every harness.
+func dropRemovedAgents(cfg *config) {
+	dropped := false
+	without := func(names []string) ([]string, bool) {
+		isGemini := func(name string) bool { return normalizeAgentName(name) == removedAgentGemini }
+		if !slices.ContainsFunc(names, isGemini) {
+			return names, false
+		}
+		dropped = true
+		// A new slice: another copy of the config may share this one's array.
+		kept := make([]string, 0, len(names))
+		for _, name := range names {
+			if !isGemini(name) {
+				kept = append(kept, name)
+			}
+		}
+		return kept, len(kept) == 0
+	}
+	// A new slice: another copy of the config may share this one's array.
+	agents := make([]agentConfig, 0, len(cfg.Agents))
+	for _, agent := range cfg.Agents {
+		if normalizeAgentName(agent.Name) == removedAgentGemini {
+			dropped = true
+			continue
+		}
+		agents = append(agents, agent)
+	}
+	cfg.Agents = agents
+	for i := range cfg.MCPServers {
+		var emptied bool
+		if cfg.MCPServers[i].Agents, emptied = without(cfg.MCPServers[i].Agents); emptied {
+			cfg.MCPServers[i].Enabled = false
+		}
+	}
+	for i := range cfg.Hooks {
+		var emptied bool
+		if cfg.Hooks[i].Agents, emptied = without(cfg.Hooks[i].Agents); emptied {
+			cfg.Hooks[i].Enabled = false
+		}
+	}
+	for i := range cfg.ExternalSkills {
+		src := &cfg.ExternalSkills[i]
+		src.ExcludeAgents, _ = without(src.ExcludeAgents)
+		var emptied bool
+		if src.MCPAgents, emptied = without(src.MCPAgents); emptied {
+			src.MCP = false
+		}
+	}
+	if dropped {
+		removedAgentWarning.Do(func() {
+			fmt.Fprintln(os.Stderr, `warning: tackroom no longer supports Gemini CLI; the "gemini" agent and every agents list item naming it are ignored. Use "agy" (Antigravity CLI) instead.`)
+		})
+	}
 }
 
 // mcpServerTargetsAgent reports whether a server is meant for an agent: named

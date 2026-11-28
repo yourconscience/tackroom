@@ -4,7 +4,7 @@ tackroom writes your setup into 16 coding agents, called harnesses, each in its 
 
 ```bash
 tackroom status                       # per harness: synced, drifted, or not detected
-tackroom sync --agents codex,gemini   # limit a run to some harnesses, by key
+tackroom sync --agents codex,kiro     # limit a run to some harnesses, by key
 ```
 
 ## Capability matrix
@@ -20,7 +20,7 @@ tackroom sync --agents codex,gemini   # limit a run to some harnesses, by key
 | Qwen Code | ✓ | ✓ | ~ | ✓ | - | ✓ | - |
 | Cursor | ✓ | ✓ | ✓ | ✓ | - | - | - |
 | Devin | ✓ | - | ✓ | - | - | ✓ | - |
-| Gemini CLI | ✓ | ✓ | ✓ | ✓ | - | ✓ | - |
+| Kiro | ✓ | - | ✓ | - | - | ✓ | - |
 | GitHub Copilot CLI | ✓ | ✓ | ~ | ✓ | - | ✓ | - |
 | Grok Build | ✓ | ✓ | ✓ | ✓ | - | ✓ | - |
 | DeepSeek Harness | ✓ | - | ~ | - | - | ✓ | - |
@@ -33,7 +33,7 @@ tackroom sync --agents codex,gemini   # limit a run to some harnesses, by key
 What each `~` means:
 
 - **Roles, Pi.** The files are written to `~/.pi/agent/agents/`, but Pi uses them only with the `pi-subagents` package. Declare it under `packages:` (see [Pi](#pi)).
-- **MCP.** Stdio servers only. Remote servers (`mcp add --url`) reach the seven harnesses marked `✓`: Claude Code, Codex, Pi, Cursor, Devin, Gemini CLI and Grok Build. See [mcp.md](mcp.md).
+- **MCP.** Stdio servers only. Remote servers (`mcp add --url`) reach the seven harnesses marked `✓`: Claude Code, Codex, Pi, Cursor, Devin, Kiro and Grok Build. See [mcp.md](mcp.md).
 - **Hooks, OMP and Pi.** Only `SessionStart` and `SessionEnd` map. Other events are reported as unsupported. See [hooks.md](hooks.md#which-harnesses-run-hooks).
 - **Plugins, Codex.** Only agent-plugins-spec sources with `mcp: true`, installed through `codex plugin add` ([plugins.md](plugins.md#codex-plugins)). Codex has no plugin layout for your own plugins in the config root.
 
@@ -58,7 +58,7 @@ The key is what you write in `tackroom.yaml`, in `--agents`, and in the `agents:
 | Qwen Code | `qwen-code` | `qwen` | `~/.qwen/skills` |
 | Cursor | `cursor` | `cursor-agent` | `~/.cursor/skills` |
 | Devin | `devin` | `devin` | `~/.config/devin/skills` |
-| Gemini CLI | `gemini` | `gemini` | `~/.gemini/skills` |
+| Kiro | `kiro` | `kiro-cli` | `~/.kiro/skills` |
 | GitHub Copilot CLI | `copilot` | `copilot` | `~/.copilot/skills` |
 | Grok Build | `grok` | `grok` | `~/.grok/skills` |
 | DeepSeek Harness | `dsh` | `dsh` | `~/.dsh/skills` |
@@ -70,6 +70,7 @@ The key is what you write in `tackroom.yaml`, in `--agents`, and in the `agents:
 - Pi and OMP are separate harnesses: `pi` is not counted as detected when its `--version` output starts with `omp/`.
 - Claude Code is `claude`. The former key `claude-code` is still accepted and read as `claude`. A tackroom older than 1.2.0 does not know `claude`, so upgrade every machine that shares the config ([release notes](upgrading.md#the-claude-key)).
 - Qwen Code is `qwen-code`. `qwen`, the name of its executable, is accepted too and read as `qwen-code`, in the config, in `--agents` and in an `agents:` list ([release notes](upgrading.md#to-301)).
+- Gemini CLI (`gemini`) is no longer supported. A config that still names it loads and syncs: the `gemini` agent entry and every `agents:` list item naming it are ignored, with one warning. If `gemini` was the only enabled agent, nothing is left to sync to and `status` and `sync` stop with `config has no enabled agents`; run `tackroom setup` again to add the harnesses installed on the machine ([release notes](upgrading.md#to-31)).
 
 ## Where each surface lands
 
@@ -86,7 +87,7 @@ Roles follow each harness's `agent_root`; the paths are in [roles.md](roles.md#w
 | Qwen Code | `~/.qwen/settings.json` | `~/.qwen/settings.json` | `~/.qwen/QWEN.md` | none |
 | Cursor | `~/.cursor/mcp.json` | `~/.cursor/hooks.json` | none | none |
 | Devin | `~/.config/devin/mcp_config.json` | none | `~/.config/devin/AGENTS.md` | none |
-| Gemini CLI | `~/.gemini/settings.json` | `~/.gemini/settings.json` | `~/.gemini/GEMINI.md` | none |
+| Kiro | `~/.kiro/settings/mcp.json` | none | `~/.kiro/steering/AGENTS.md` | none |
 | GitHub Copilot CLI | `~/.copilot/mcp-config.json` | `~/.copilot/hooks/tackroom.json` | `~/.copilot/copilot-instructions.md` | none |
 | Grok Build | `~/.grok/config.toml` | `~/.grok/hooks/tackroom.json` | `~/.grok/AGENTS.md` | none |
 | DeepSeek Harness | `~/.dsh/cordis.patch.yml` | none | `~/.dsh/AGENTS.md` | none |
@@ -102,7 +103,7 @@ The root files are links to `~/.agents/AGENTS.md`, or generated files when you l
 
 ### Skills
 
-OpenCode, Cursor, Devin, Gemini CLI, GitHub Copilot CLI, Grok Build, Kimi Code and DeepSeek Harness read `~/.agents/skills` themselves. tackroom mirrors skills into their own skill root only when your config root is not `~/.agents`.
+OpenCode, Cursor, Devin, GitHub Copilot CLI, Grok Build, Kimi Code and DeepSeek Harness read `~/.agents/skills` themselves. tackroom mirrors skills into their own skill root only when your config root is not `~/.agents`.
 
 Qwen Code and Amp are config-driven: `setup` adds the skills folder to `skills.directories` in `~/.qwen/settings.json` and to `amp.skills.path` in Amp's settings, so no mirror is needed. More in [skills.md](skills.md#write-your-own).
 
@@ -133,7 +134,9 @@ MCP servers are written as `tackroom-mcp-<name>` rows in `~/.dsh/cordis.patch.ym
 
 ### Antigravity CLI
 
-Skills go to `~/.gemini/antigravity-cli/skills` (this CLI only, not Gemini CLI's `~/.gemini/skills`). MCP servers and hooks go to `~/.gemini/config/`, which Gemini CLI does not read. Only stdio MCP servers are written, roles are not rendered yet, and hooks cover `SessionStart`, `Stop`, `PreToolUse` and `PostToolUse`. It shares `~/.gemini/GEMINI.md` with Gemini CLI.
+Skills go to `~/.gemini/antigravity-cli/skills`. MCP servers and hooks go to `~/.gemini/config/`. Only stdio MCP servers are written, roles are not rendered yet, and hooks cover `SessionStart`, `Stop`, `PreToolUse` and `PostToolUse`. Its root file is `~/.gemini/GEMINI.md`.
+
+Antigravity CLI also reads `~/.gemini/skills`, where releases that supported Gemini CLI could mirror your skills. tackroom no longer writes there and does not clean it up; `tackroom doctor` warns when a skill is in both folders.
 
 ### Devin
 
@@ -167,6 +170,16 @@ To turn the import off, set this in `~/.config/devin/config.json`:
 ```
 
 That also stops Devin loading Claude Code's hooks, so Devin then runs none of your tackroom hooks. On a machine with Codex, Devin also reads `~/.codex/skills`, where tackroom links your skills for Codex. A skill that reaches Devin from both folders is listed once.
+
+### Kiro
+
+Kiro means Kiro CLI and the Kiro IDE, which share one configuration in `~/.kiro`. It is detected by `kiro-cli` on `PATH`, so the Kiro IDE without the CLI installed is not detected. The adapter is written from Kiro's documentation and has not been run against a real Kiro install, so whether Kiro follows the links tackroom makes for skills and the root file is not verified.
+
+- **Skills.** Kiro reads global skills from `~/.kiro/skills`, not from `~/.agents/skills`, so tackroom links every skill there.
+- **MCP.** Stdio and remote servers go to `mcpServers` in `~/.kiro/settings/mcp.json`, which Kiro CLI and the Kiro IDE both read. A stdio server gets `command`, `args`, `env` and `"disabled": false`, so one you turned off in Kiro's file is turned on again by the next sync; a remote server gets `url` and `headers`. Kiro's docs show `${NAME}` in both `env` and headers, so it is written as given. Your own servers and other keys in the file stay as they are.
+- **Root file.** `~/.kiro/steering/AGENTS.md`. Kiro loads an `AGENTS.md` in its global steering folder in every workspace and always includes it.
+- **Roles.** Not rendered. Kiro reads custom agents from `~/.kiro/agents/` as Markdown with front matter, but its `tools` field takes category tags such as `read`, `write`, `shell` and `web`, and the docs read for this adapter do not list which built-in tools each tag covers. Where `Grep`, `Glob` or `Edit` would land is a guess, so no role is written.
+- **Hooks.** Not written yet. Kiro CLI V3 loads hook files from `~/.kiro/hooks/`, but how tackroom's events map to Kiro's triggers has not been checked.
 
 ### Kimi Code
 

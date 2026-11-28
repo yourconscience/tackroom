@@ -28,7 +28,7 @@ mcp_servers:
     args: [-y, "@acme/docs-mcp"]
     env:
       DOCS_TOKEN: ${DOCS_TOKEN}
-    agents: [claude, codex, gemini]
+    agents: [claude, codex, kiro]
   - name: tracker
     enabled: true
     url: https://mcp.acme.example/tracker
@@ -62,7 +62,7 @@ Secrets do not come along. Each env value that is not already a `${VAR}` referen
 | Pi | `url` and `headers` |
 | Cursor | `url` and `headers`, with `${NAME}` rewritten as `${env:NAME}` |
 | Devin | `url` and `headers` |
-| Gemini CLI | `httpUrl` and `headers` |
+| Kiro | `url` and `headers` |
 | Grok Build | `url` and `headers` |
 
 Factory Droid, OMP, OpenCode, Qwen Code, GitHub Copilot CLI, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp get stdio servers only. A remote server is skipped for them, and `mcp add` says which harnesses it will not reach.
@@ -99,7 +99,7 @@ Before `sync` removes a server it copies that harness config to `backups/<time>/
 
 Where each harness keeps its servers is in [harnesses.md](harnesses.md#where-each-surface-lands). A few harnesses need extra fields, which tackroom adds:
 
-- Claude Code gets `"type": "stdio"` on stdio entries, Factory Droid `"type": "stdio"` and `"disabled": false`, and GitHub Copilot CLI `"type": "local"` and `"tools": ["*"]` when the entry has no `tools`.
+- Claude Code gets `"type": "stdio"` on stdio entries, Factory Droid `"type": "stdio"` and `"disabled": false`, Kiro `"disabled": false`, and GitHub Copilot CLI `"type": "local"` and `"tools": ["*"]` when the entry has no `tools`.
 - OpenCode gets a `mcp` block with `type: local`, a single `command` array, `environment` and `enabled: true`.
 - DeepSeek Harness gets one `tackroom-mcp-<name>` row per server in `~/.dsh/cordis.patch.yml`, for every profile.
 - Codex and Grok Build get `[mcp_servers.<name>]` tables in TOML. Keys tackroom does not manage in a Codex table, such as `startup_timeout_sec`, are kept.

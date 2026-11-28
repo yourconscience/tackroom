@@ -356,31 +356,32 @@ func initHarnesses() {
 			IntegrationNote: "skills read natively from ~/.agents/skills; MCP to ~/.config/devin/mcp_config.json; roles are not rendered (Devin loads the role files in ~/.agents/agents itself when that is the config root, with their tool names as written); no hooks are written because Devin loads Claude Code's hooks by default (read_config_from.claude), as it does ~/.claude/CLAUDE.md and Claude Code's MCP servers",
 		},
 
-		agentGemini: {
-			DisplayName:      "Gemini CLI",
-			Skills:           skillsSymlink,
-			SkillsNativeRoot: readsAgentsSkillsRoot,
+		// Kiro CLI and the Kiro IDE share ~/.kiro: global skills in
+		// ~/.kiro/skills (https://kiro.dev/docs/skills.md), MCP servers in
+		// ~/.kiro/settings/mcp.json (https://kiro.dev/docs/mcp/configuration.md)
+		// and AGENTS.md in ~/.kiro/steering (https://kiro.dev/docs/steering.md).
+		// No roles: custom agents select tools by category tags (read, write,
+		// shell, web) whose members the docs read so far do not list. No hooks
+		// yet: which canonical events map to Kiro's triggers is not settled.
+		agentKiro: {
+			DisplayName: "Kiro",
+			Skills:      skillsSymlink,
 			MCP: mcpTargetPtr(mcpTarget{
-				agentName:  agentGemini,
-				configPath: geminiSettingsPath,
+				agentName:  agentKiro,
+				configPath: func(home string) string { return filepath.Join(home, ".kiro", "settings", "mcp.json") },
 				inspect:    inspectJSONMCPServer,
 				patch:      patchJSONMCPServer,
 				remove:     removeJSONMCPServer,
 				read:       readJSONMCPServer,
 				rootKey:    "mcpServers",
-				remote:     &remoteMCP{urlKey: "httpUrl"},
+				defaults:   map[string]interface{}{"disabled": false},
+				remote:     &remoteMCP{urlKey: "url"},
 			}),
-			roles: roleRenderer(agentGemini),
-			Hooks: &hookTarget{
-				agentName: agentGemini,
-				inspect:   inspectGeminiHook,
-				patch:     patchGeminiHook,
-			},
 			RootInstructions: &rootInstructionsCapability{
-				Path:     func(home string) string { return filepath.Join(home, ".gemini", "GEMINI.md") },
+				Path:     func(home string) string { return filepath.Join(home, ".kiro", "steering", "AGENTS.md") },
 				Expected: func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 			},
-			IntegrationNote: "skills read natively from ~/.agents/skills; MCP servers and hooks go to ~/.gemini/settings.json",
+			IntegrationNote: "skills go to ~/.kiro/skills; MCP to ~/.kiro/settings/mcp.json; root file ~/.kiro/steering/AGENTS.md; roles are not rendered (Kiro's tool category members are unverified) and hooks are not written yet",
 		},
 
 		agentCursor: {
@@ -476,15 +477,14 @@ func initHarnesses() {
 				inspect:   inspectAgyHook,
 				patch:     patchAgyHook,
 			},
-			// ~/.gemini/GEMINI.md is Gemini CLI's file too; both adapters write
-			// the same link. ~/.gemini/AGENTS.md is not used: agy loads it next
-			// to GEMINI.md, so both would inject the same text.
+			// ~/.gemini/AGENTS.md is not used: agy loads it next to GEMINI.md,
+			// so both would inject the same text.
 			RootInstructions: &rootInstructionsCapability{
 				Path:          func(home string) string { return filepath.Join(home, ".gemini", "GEMINI.md") },
 				Expected:      func(repoRoot string) string { return filepath.Join(repoRoot, "AGENTS.md") },
 				NoSetupImport: true,
 			},
-			IntegrationNote: "skills go to ~/.gemini/antigravity-cli/skills (CLI only, not Gemini CLI's ~/.gemini/skills); MCP to ~/.gemini/config/mcp_config.json and hooks to ~/.gemini/config/hooks.json (Gemini CLI reads neither); roles are not rendered yet (agy supports custom agents in ~/.gemini/config/agents, but its tool-name mapping is unverified and `tools` defaults to empty); root file ~/.gemini/GEMINI.md is shared with Gemini CLI",
+			IntegrationNote: "skills go to ~/.gemini/antigravity-cli/skills; MCP to ~/.gemini/config/mcp_config.json and hooks to ~/.gemini/config/hooks.json; roles are not rendered yet (agy supports custom agents in ~/.gemini/config/agents, but its tool-name mapping is unverified and `tools` defaults to empty); root file ~/.gemini/GEMINI.md",
 			doctorChecks: []doctorCheck{
 				{Name: "agy duplicate skills", Run: checkAgyDuplicateSkills},
 			},
