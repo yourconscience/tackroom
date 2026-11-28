@@ -114,7 +114,9 @@ echo ""
 echo "${BINARY} ${VERSION} installed to ${INSTALL_DIR}/${BINARY}"
 
 # The next command is the bare name only when that name runs this install.
-NEXT="\"${INSTALL_DIR}/${BINARY}\""
+# The full path is printed in single quotes, with any single quote inside it
+# escaped, so the line can be pasted whatever the folder is called.
+NEXT="'$(printf '%s' "${INSTALL_DIR}/${BINARY}" | sed "s/'/'\\\\''/g")'"
 FOUND="$(command -v "${BINARY}" 2>/dev/null || true)"
 if [ "$FOUND" = "${INSTALL_DIR}/${BINARY}" ]; then
   NEXT="${BINARY}"
