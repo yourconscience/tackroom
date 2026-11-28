@@ -1,9 +1,11 @@
 name: Release
 
 # Publishing happens from a v* tag, but only after the tag has been verified
-# against main and a green ci.yml run, and after the protected `release`
-# environment approves. Configure that environment in repository settings with
-# required reviewers, and keep HOMEBREW_TAP_TOKEN scoped to it.
+# against main and a green ci.yml run. The goreleaser job runs in the `release`
+# environment, which has no required reviewers, so a verified tag publishes
+# without an approval step. Add reviewers to that environment in repository
+# settings to make publishing wait for one. HOMEBREW_TAP_TOKEN is a repository
+# secret; move it into that environment too if only approved runs should read it.
 
 on:
   push:
