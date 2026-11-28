@@ -661,7 +661,7 @@ func printUsage() {
 	fmt.Println("  config   Validate or print the canonical YAML")
 	fmt.Println("  restore  List backups or put backed-up native files back")
 	fmt.Println("  view     Author the canonical YAML in a loopback web UI (browser)")
-	fmt.Println("  dash     Live screen for a terminal pane: sync state and crons, with actions")
+	fmt.Println("  dash     Live screen for a terminal pane: sync state and crons, with actions; --json prints it once")
 	fmt.Println("  hosts    Show tackroom on every machine in crons.hosts; fix one or set one up")
 	fmt.Println()
 	fmt.Println("Command groups:")
@@ -698,7 +698,7 @@ var canonicalForms = []string{
 	"  tackroom restore [<backup> | latest] [--dry-run]",
 	"  tackroom hook list [--agents ...] [query]",
 	"  tackroom hook remove [--dry-run] [--agents ...] <query>",
-	"  tackroom dash [--config PATH]                     # live screen for a terminal pane: sync state, crons; run, pause, resume, sync",
+	"  tackroom dash [--json] [--config PATH]            # live screen for a terminal pane: sync state, crons; run, pause, resume, sync; --json prints the answer once",
 	"  tackroom tern [--config PATH] [--dry-run]         # open a tackroom workspace in the Tern terminal",
 	"  tackroom rex [--config PATH] [--dry-run]          # show or hide the tackroom panel in this Rex session",
 	"  tackroom tmux [--config PATH] [--dry-run]         # open a tackroom workspace in tmux",

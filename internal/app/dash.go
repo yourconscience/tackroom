@@ -44,14 +44,18 @@ func runDashCommand(args []string) error {
 	fs := flag.NewFlagSet("dash", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 	configPath := fs.String("config", "", "Path to tackroom YAML config")
+	asJSON := fs.Bool("json", false, "Print the answer once as JSON and exit; needs no terminal")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if fs.NArg() != 0 {
-		return errors.New("usage: tackroom dash [--config PATH]")
+		return errors.New("usage: tackroom dash [--json] [--config PATH]")
+	}
+	if *asJSON {
+		return runDashJSON(*configPath)
 	}
 	if !term.IsTerminal(os.Stdout.Fd()) {
-		return errors.New("tackroom dash needs a terminal; use tackroom status and tackroom cron collect --table")
+		return errors.New("tackroom dash needs a terminal; use tackroom dash --json, tackroom status or tackroom cron collect --table")
 	}
 
 	screen := os.Stdout
@@ -135,7 +139,8 @@ type dashStatus struct {
 	lock    checkResult // the external skill lock check
 	sources int
 	pinned  int
-	// What the config manages, for the counts strip.
+	// What the config manages, for the counts strip. skills and roles are -1
+	// when they could not be read.
 	skills, roles, mcp, hooks int
 	blocked                   int // sources the audit or a gate blocked
 }
@@ -152,7 +157,7 @@ func collectDashStatus(configPath string) (dashStatus, error) {
 		return dashStatus{}, err
 	}
 	s := dashStatus{repo: repo, reports: reports, gated: len(gatedLines(g.gated)), lock: statusLockCheck(g.repoRoot, g.cfg, g.home), sources: len(g.sources),
-		mcp: len(g.cfg.MCPServers), hooks: len(g.cfg.Hooks)}
+		skills: -1, roles: -1, mcp: len(g.cfg.MCPServers), hooks: len(g.cfg.Hooks)}
 	if expected, err := expectedSkills(g.repoRoot, g.home, g.cfg); err == nil {
 		s.skills = len(expected)
 	}
@@ -1104,9 +1109,8 @@ func (m dashModel) unreadableSources() int {
 // last run failed, a sync waiting, each machine that needs attention, a source
 // blocked by the audit or a gate, and status, crons or machines that could not
 // be read at all. level is fail, warn, ok, or off while the
-// first collects run.
-func (m dashModel) answer() (level, title string, subs []string) {
-	fail, warn := 0, 0
+// first collects run; fail and warn are the two numbers in the title.
+func (m dashModel) answer() (level, title string, fail, warn int, subs []string) {
 	failKinds := map[string]bool{}
 	var pending []string
 	if s := m.status; s != nil {
@@ -1250,11 +1254,24 @@ func (m dashModel) answer() (level, title string, subs []string) {
 	case warn > 0:
 		level = "warn"
 	case len(pending) > 0:
-		return "off", "Checking…", subs
+		return "off", "Checking…", fail, warn, subs
 	default:
-		return "ok", "All clear", subs
+		return "ok", "All clear", fail, warn, subs
 	}
-	return level, strings.Join(parts, ", "), subs
+	return level, strings.Join(parts, ", "), fail, warn, subs
+}
+
+// machineSummary is what a machine's line says: its summary, or for one that is
+// fine its tackroom version and config commit.
+func machineSummary(h hostJSON) string {
+	if h.Health != "ok" {
+		return h.Summary
+	}
+	what := "tackroom " + h.Version
+	if len(h.Commit) >= 7 {
+		what += " · config " + h.Commit[:7]
+	}
+	return what
 }
 
 // machineBlock is the machines when there is more than this one: a title with
@@ -1270,11 +1287,7 @@ func (m dashModel) machineBlock(w int) []string {
 		name := ui.Bold.Render(h.Host)
 		switch h.Health {
 		case "ok":
-			what := "tackroom " + h.Version
-			if len(h.Commit) >= 7 {
-				what += " · config " + h.Commit[:7]
-			}
-			out = append(out, ui.Mark("ok")+" "+name+"  "+ui.Dim.Render(what))
+			out = append(out, ui.Mark("ok")+" "+name+"  "+ui.Dim.Render(machineSummary(h)))
 		case "fail":
 			out = append(out, ui.Mark("fail")+" "+name+"  "+ui.Red.Render(h.Summary))
 		default:
@@ -1338,7 +1351,7 @@ func dashDot(level string) string {
 // answerLines is the headline with its dot, and with sub the sentences under
 // it in two lines at most.
 func (m dashModel) answerLines(w int, sub bool) []string {
-	level, title, subs := m.answer()
+	level, title, _, _, subs := m.answer()
 	lines := []string{dashDot(level) + " " + ui.Bold.Render(title)}
 	if !sub || len(subs) == 0 || w < 12 {
 		return lines
@@ -1358,15 +1371,33 @@ func (m dashModel) answerLines(w int, sub bool) []string {
 // cells of at least seven columns and their six borders.
 const dashCountsBoxMin = 41
 
+// countNumbers are the numbers of the counts strip, in the order of its
+// labels: what the config manages, and the jobs. nil is a number that could
+// not be read.
+func (m dashModel) countNumbers() (numbers [5]*int) {
+	if s := m.status; s != nil {
+		for i, n := range []int{s.skills, s.roles, s.mcp, s.hooks} {
+			if n >= 0 {
+				numbers[i] = &n
+			}
+		}
+	}
+	if c := m.crons; c != nil {
+		n := len(c.Jobs)
+		numbers[4] = &n
+	}
+	return numbers
+}
+
 // counts are the numbers of the counts strip with their labels: what the config
 // manages, and the jobs, red when one fails and yellow when a last run failed.
 func (m dashModel) counts() (values, labels []string) {
 	labels = []string{"Skills", "Roles", "MCP", "Hooks", "Crons"}
 	unknown := ui.Dim.Render("–")
 	values = []string{unknown, unknown, unknown, unknown, unknown}
-	if s := m.status; s != nil {
-		for i, n := range []int{s.skills, s.roles, s.mcp, s.hooks} {
-			values[i] = ui.Bold.Render(fmt.Sprint(n))
+	for i, n := range m.countNumbers() {
+		if n != nil {
+			values[i] = ui.Bold.Render(fmt.Sprint(*n))
 		}
 	}
 	if c := m.crons; c != nil {
@@ -1436,9 +1467,9 @@ func (m dashModel) countsLine(w int) string {
 	return ansi.Truncate(strings.Join(parts, ui.Dim.Render(" · ")), w, "…")
 }
 
-// harnessTally is how the harnesses stand: the ones in sync and not detected
-// by name, and a line each for what is wrong.
-func (m dashModel) harnessTally() (synced, absent, wrong []string, drifted, broken int) {
+// harnessTally is how the harnesses stand: the ones in sync, not detected, in
+// need of a sync and broken by name, and a line each for what is wrong.
+func (m dashModel) harnessTally() (synced, absent, wrong, drifted, broken []string) {
 	s := m.status
 	if s.repo.State != stateSynced {
 		wrong = append(wrong, ui.Mark("warn")+" "+ui.Bold.Render("~/.agents link")+"  "+ui.Yellow.Render(s.repo.State))
@@ -1446,15 +1477,15 @@ func (m dashModel) harnessTally() (synced, absent, wrong []string, drifted, brok
 	for _, r := range s.reports {
 		switch {
 		case r.Error != "":
-			broken++
+			broken = append(broken, r.Name)
 			wrong = append(wrong, ui.Mark("fail")+" "+ui.Bold.Render(r.Name)+"  "+ui.Red.Render("config unreadable: "+firstLine(r.Error)))
 		case len(r.Conflicts) > 0:
-			broken++
+			broken = append(broken, r.Name)
 			wrong = append(wrong, ui.Mark("fail")+" "+ui.Bold.Render(r.Name)+"  "+ui.Red.Render(plural(len(r.Conflicts), "conflict")))
 		case !r.Detected:
 			absent = append(absent, r.Name)
 		case !r.Synced:
-			drifted++
+			drifted = append(drifted, r.Name)
 			var what []string
 			for _, b := range driftBuckets(r) {
 				if len(b.items) > 0 {
@@ -1487,10 +1518,10 @@ func (m dashModel) harnessBlock(w int) []string {
 	synced, absent, wrong, drifted, broken := m.harnessTally()
 	var right string
 	switch {
-	case broken > 0:
-		right = ui.Red.Render(fmt.Sprintf("%d failing", broken))
-	case drifted > 0:
-		right = ui.Yellow.Render(fmt.Sprintf("%d need a sync", drifted))
+	case len(broken) > 0:
+		right = ui.Red.Render(fmt.Sprintf("%d failing", len(broken)))
+	case len(drifted) > 0:
+		right = ui.Yellow.Render(fmt.Sprintf("%d need a sync", len(drifted)))
 	default:
 		right = ui.Dim.Render(fmt.Sprintf("%d in sync", len(synced)))
 	}
@@ -1536,11 +1567,11 @@ func (m dashModel) harnessLine(w int) string {
 	}
 	synced, absent, _, drifted, broken := m.harnessTally()
 	parts := []string{fmt.Sprintf("%d in sync", len(synced))}
-	if drifted > 0 {
-		parts = append(parts, ui.Yellow.Render(fmt.Sprintf("%d need a sync", drifted)))
+	if len(drifted) > 0 {
+		parts = append(parts, ui.Yellow.Render(fmt.Sprintf("%d need a sync", len(drifted))))
 	}
-	if broken > 0 {
-		parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failing", broken)))
+	if len(broken) > 0 {
+		parts = append(parts, ui.Red.Render(fmt.Sprintf("%d failing", len(broken))))
 	}
 	if m.status.repo.State != stateSynced {
 		parts = append(parts, ui.Yellow.Render("~/.agents link "+m.status.repo.State))

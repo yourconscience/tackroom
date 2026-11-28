@@ -2,6 +2,12 @@
 
 What changed in each release since 2.0, newest first, with what to do on every machine that shares your config root, and how to move from dotagents. How to install a new release is in [Upgrade](setup.md#upgrade).
 
+## To 3.3
+
+Nothing to migrate by hand.
+
+- New: `tackroom dash --json` prints the answer the dash shows once, as JSON on stdout, and exits. It needs no terminal, so a script or a menu bar item can run it. The document has the dash's level and headline, the two numbers behind it, the sentences under it, the counts, the harnesses that need a sync or are broken, the jobs that fail or whose last run failed, and the machines in `crons.hosts`. `tackroom dash` is unchanged, and its error without a terminal now names `tackroom dash --json`. See [terminals.md](terminals.md#as-json).
+
 ## To 3.2.2
 
 Nothing to migrate by hand. If you ran `npx tackroom setup`, `pnpm dlx tackroom setup` or `bunx tackroom setup` on a machine before, run `tackroom cron` from a real install once, as described below. After the install script, use the full path it printed (`~/.local/bin/tackroom cron`) if that folder is not on your `PATH`.

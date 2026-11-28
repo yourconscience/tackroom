@@ -41,7 +41,7 @@ tackroom skill update [name ...] [--allow-fresh[=item,...]]
 tackroom publish [--target NAME] [--skills a,b] [--dry-run] [--json] [--yes]
 tackroom mcp <list|add|import|remove> [options]
 tackroom restore [<backup> | latest] [--dry-run]
-tackroom dash [--config PATH]                   # live screen for a terminal pane: sync state, crons; run, pause or resume a launchd job, sync
+tackroom dash [--json] [--config PATH]          # live screen for a terminal pane: sync state, crons; run, pause or resume a launchd job, sync; --json prints the answer once
 tackroom tern [--config PATH] [--dry-run]       # open a tackroom workspace in the Tern terminal
 tackroom rex [--config PATH] [--dry-run]        # show or hide the tackroom panel in this Rex session
 tackroom tmux [--config PATH] [--dry-run]       # open a tackroom workspace in tmux
