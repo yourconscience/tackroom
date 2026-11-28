@@ -139,7 +139,8 @@ type dashStatus struct {
 	lock    checkResult // the external skill lock check
 	sources int
 	pinned  int
-	// What the config manages, for the counts strip.
+	// What the config manages, for the counts strip. skills and roles are -1
+	// when they could not be read.
 	skills, roles, mcp, hooks int
 	blocked                   int // sources the audit or a gate blocked
 }
@@ -156,7 +157,7 @@ func collectDashStatus(configPath string) (dashStatus, error) {
 		return dashStatus{}, err
 	}
 	s := dashStatus{repo: repo, reports: reports, gated: len(gatedLines(g.gated)), lock: statusLockCheck(g.repoRoot, g.cfg, g.home), sources: len(g.sources),
-		mcp: len(g.cfg.MCPServers), hooks: len(g.cfg.Hooks)}
+		skills: -1, roles: -1, mcp: len(g.cfg.MCPServers), hooks: len(g.cfg.Hooks)}
 	if expected, err := expectedSkills(g.repoRoot, g.home, g.cfg); err == nil {
 		s.skills = len(expected)
 	}
@@ -1376,7 +1377,9 @@ const dashCountsBoxMin = 41
 func (m dashModel) countNumbers() (numbers [5]*int) {
 	if s := m.status; s != nil {
 		for i, n := range []int{s.skills, s.roles, s.mcp, s.hooks} {
-			numbers[i] = &n
+			if n >= 0 {
+				numbers[i] = &n
+			}
 		}
 	}
 	if c := m.crons; c != nil {
