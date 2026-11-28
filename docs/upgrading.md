@@ -13,6 +13,7 @@ Nothing to migrate by hand. If you ran `npx tackroom setup`, `pnpm dlx tackroom 
 - Changed: the install script stops with an error when the machine has neither `sha256sum` nor `shasum`; it used to warn and install the unchecked download. When another `tackroom` comes first on `PATH`, it says so and prints the full-path command.
 - Fixed: `setup` treated a periodic job left by an earlier `npx`, `pnpm dlx` or `bunx` run as already installed. From a real install it now replaces that job.
 - Changed: `tackroom hosts setup HOST` lists the install script, npm and Homebrew when the host has no tackroom. `--install` is unchanged: Homebrew, else npm.
+- Fixed: `tackroom cron` followed by a word it does not know, such as `tackroom cron list`, installed the periodic sync job. It now fails with `unknown cron subcommand "list"` and changes nothing.
 
 ## To 3.2.1
 
