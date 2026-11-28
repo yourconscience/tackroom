@@ -31,7 +31,7 @@ When `tackroom` cannot be found or `dash --json` fails, the dropdown is one line
 1. Install SwiftBar, with Homebrew or from its [releases](https://github.com/swiftbar/SwiftBar/releases):
 
    ```sh
-   brew install swiftbar
+   brew install --cask swiftbar
    ```
 
    On its first launch SwiftBar asks for a Plugin Folder. Every file in it becomes a plugin.
@@ -76,6 +76,7 @@ Actions run in the background, with no Terminal window and no output shown, and 
 ```sh
 TACKROOM_BIN=/path/to/tackroom      # tackroom, when it is in none of the places below
 TACKROOM_SWIFTBAR_PLAIN=1           # text marks instead of SF Symbols
+TACKROOM_HOME=/path/to/config-root  # the config root, when it is not ~/.agents
 ```
 
 SwiftBar does not pass your shell's variables. Set them on a line near the top of your copy of the script, or with a `<swiftbar.environment>[TACKROOM_BIN=/path/to/tackroom]</swiftbar.environment>` comment, which SwiftBar's README describes under "Other Parameters" and which has not been run here.
@@ -83,9 +84,9 @@ SwiftBar does not pass your shell's variables. Set them on a line near the top o
 ## Watch out
 
 - SwiftBar starts plugins with a minimal environment, without your shell's `PATH`. The script looks for `tackroom` in `$TACKROOM_BIN`, `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` and then `PATH`, and takes the first one it finds. With more than one installed, for example an old copy in `~/.local/bin` and a newer one from Homebrew, that may be the old one. Set `TACKROOM_BIN` to the one you want.
-- The script passes no `--config`, so it reads the config tackroom finds without one, `~/.agents/tackroom.yaml`. SwiftBar does not pass your `TACKROOM_HOME`.
+- SwiftBar does not pass your shell's `TACKROOM_HOME`, so without a setting the script reads `~/.agents/tackroom.yaml`. With `TACKROOM_HOME` set as above, it passes `--config $TACKROOM_HOME/tackroom.yaml` to `tackroom dash --json` and to every action. When that path has a space or another unusual character, the menu still reads that config and shows no actions.
 - Text from your jobs and notes goes into menu lines, where `|` starts a parameter. The script changes `|` to `¦`, `"` to `″` and a leading `-` to `‐`, and turns control characters into spaces. An action takes the job's id and host as separate parameters, and only when they are letters, digits, `.`, `_`, `@` and `-` and do not start with `-`; otherwise the job has no Run now. When the path to `tackroom` has a space or another unusual character, the script shows no actions and says so.
-- A tackroom older than 3.3 does not know `--json`, so the menu shows `tackroom dash --json failed` and the first line of its error, which for an unknown flag is Go's `flag provided but not defined: -json` (read from the 3.2.2 code, not run). Then the script found an older copy first.
+- A tackroom older than 3.3 does not know `--json`, so the menu shows `This tackroom has no dash --json. It needs tackroom 3.3 or later.` (checked with tackroom 3.2.2). Then the script found an older copy first.
 - The script uses `plutil -extract KEY raw`, which reads nested keys and the length of an array. It was checked on macOS 27.2.1 only.
 - Checked: the script's output for an all-clear answer, failing and warning jobs on this machine and on another host, job names with `|`, quotes and spaces, a missing `tackroom` and a failing one, against a stub `tackroom` that prints a fixed document, with `sh -n` and ShellCheck. Not checked: SwiftBar drawing the menu and running the actions.
 

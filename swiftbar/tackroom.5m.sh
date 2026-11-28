@@ -10,7 +10,8 @@
 #
 # The mark is an SF Symbol (sfimage). Set TACKROOM_SWIFTBAR_PLAIN to anything
 # for a plain-text mark instead. TACKROOM_BIN is the path to tackroom, when it
-# is in none of the places searched below.
+# is in none of the places searched below. TACKROOM_HOME is the config root,
+# when it is not ~/.agents.
 
 # clean TEXT prints TEXT as the text of one menu line: no control characters,
 # no "|" (it would start the parameters), no double quote (it quotes a
@@ -104,9 +105,15 @@ done
 [ -n "$bin" ] || bin=$(command -v tackroom 2>/dev/null)
 [ -n "$bin" ] || problem 'tackroom not found. Install it, or set TACKROOM_BIN to its path.'
 
+# SwiftBar does not pass the shell's TACKROOM_HOME, and a variable set on a
+# line of this script reaches neither tackroom nor an action. So when it is
+# set here, every tackroom call takes the config as --config.
+config=
+[ -z "${TACKROOM_HOME:-}" ] || config=$TACKROOM_HOME/tackroom.yaml
+
 err=$(mktemp -t tackroom-swiftbar) || problem 'Could not create a temporary file.'
 trap 'rm -f "$err"' EXIT
-json=$("$bin" dash --json 2>"$err")
+json=$("$bin" dash --json ${config:+--config} ${config:+"$config"} 2>"$err")
 rc=$?
 if [ "$rc" -ne 0 ]; then
 	reason=$(head -n 1 "$err")
@@ -140,6 +147,20 @@ done
 # only when the path and the values are plain enough to be one parameter each.
 actions=
 safe_path "$bin" && actions=1
+[ -z "$config" ] || safe_path "$config" || actions=
+
+# action TEXT PARAMS ARG... prints a menu line that runs tackroom with ARG...
+# in the background and then runs this script again.
+action() {
+	line="$1 | ${2:+$2 }bash=$bin"
+	shift 2
+	n=0
+	for arg in "$@"; do
+		n=$((n + 1))
+		line="$line param$n=$arg"
+	done
+	printf '%s terminal=false refresh=true\n' "$line"
+}
 
 njobs=$(num "$(get jobs)")
 [ "$njobs" -gt 0 ] && printf '%s\n' ---
@@ -165,9 +186,9 @@ while [ "$i" -lt "$njobs" ]; do
 	row "$label" "sfimage=$sym"
 	if [ "$src" = launchd ] && [ -n "$actions" ] && safe "$id" && safe "${host:-local}"; then
 		if [ -n "$remote" ]; then
-			printf 'Run now | sfimage=play.fill bash=%s param1=cron param2=run param3=--host param4=%s param5=%s terminal=false refresh=true\n' "$bin" "$host" "$id"
+			action 'Run now' sfimage=play.fill cron run ${config:+--config} ${config:+"$config"} --host "$host" "$id"
 		else
-			printf 'Run now | sfimage=play.fill bash=%s param1=cron param2=run param3=%s terminal=false refresh=true\n' "$bin" "$id"
+			action 'Run now' sfimage=play.fill cron run ${config:+--config} ${config:+"$config"} "$id"
 		fi
 	fi
 	i=$((i + 1))
@@ -175,10 +196,10 @@ done
 
 printf '%s\n' ---
 if [ -n "$actions" ]; then
-	printf 'Sync now | bash=%s param1=sync terminal=false refresh=true\n' "$bin"
-	printf 'Open view | bash=%s param1=view terminal=false\n' "$bin"
+	action 'Sync now' '' sync ${config:+--config} ${config:+"$config"}
+	action 'Open view' '' view ${config:+--config} ${config:+"$config"}
 else
-	row 'Actions are off: the path to tackroom has a space or an unusual character.' 'color=#888888'
+	row 'Actions are off: the path to tackroom or to its config has a space or an unusual character.' 'color=#888888'
 fi
 printf '%s\n' 'Refresh | refresh=true'
 
