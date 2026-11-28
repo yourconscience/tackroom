@@ -21,7 +21,7 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 `tackroom dash` is a live screen for a terminal pane. The three workspace commands open it next to a shell, above it in tmux and zellij and below it in Tern, and `tackroom rex` opens it as a panel in Rex. It answers two questions at a glance: is everything in sync, and which scheduled jobs fail.
 
 ```bash
-tackroom dash [--config PATH]
+tackroom dash [--json] [--config PATH]
 ```
 
 It has the shape of the [Herdr panel](#herdr-panel)'s Overview, drawn in the terminal's own colors. From the top:
@@ -52,7 +52,34 @@ Enter, `p` and `s` ask first in the message line, for example `run ai.knowledge-
 
 The dash refreshes while it runs: the sync state every 30 seconds, which reads only this machine, and the crons and the machines every 5 minutes and on `r`, the crons also after Run now, Pause or Resume (the job's host). In a Rex pane that is minimized, such as a hidden [Rex panel](#rex), the timed refreshes are skipped; the dash asks Rex at each one, through the `REX_SESSION`, `REX_BLOCK` and `REX_BIN_DIR` it sets in every pane, and refreshes as usual when Rex does not answer within 5 seconds. A crons collect and the machines check probe every host over SSH and can take a while; the screen stays usable meanwhile. A refresh that fails leaves the last data on screen, marked: the line under the answer says when the harnesses or the crons are from. Its error shows in the message line when no question or result is there (`r` clears the last result), and goes when that refresh next succeeds. Warnings the collectors print are kept off the screen; `tackroom status` prints them. A sync from the dash never asks anything on the terminal: it runs with no terminal at all, so when git, ssh or an ssh command of your own would ask for a password or about an unknown host key, the clone or fetch fails instead, and the message line shows the error with the line from git or ssh that says why. Its own output stays off the screen; `tackroom sync` in a shell prints it.
 
-It needs a terminal on stdout; otherwise it prints `tackroom dash needs a terminal; use tackroom status and tackroom cron collect --table` and exits 1. It follows `NO_COLOR`.
+It needs a terminal on stdout; otherwise it prints `tackroom dash needs a terminal; use tackroom dash --json, tackroom status or tackroom cron collect --table` and exits 1. It follows `NO_COLOR`.
+
+### As JSON
+
+`tackroom dash --json` prints the answer the dash shows once, as JSON on stdout, and exits. It needs no terminal, so a script or a menu bar item that refreshes every few minutes can run it. It collects the sync state, the crons and the machines as the dash does, which can take a while when `crons.hosts` names other machines, and counts them with the dash's own code. It exits 0 whenever it could print the document, whatever the level. A config that cannot be loaded is an error on stderr with a non-zero exit. Warnings the collectors print go to stderr, so stdout holds only the document, with no color codes.
+
+```json
+{
+  "schema": 1,
+  "level": "ok",
+  "title": "All clear",
+  "failing": 0,
+  "attention": 0,
+  "notes": ["All 9 harnesses are in sync."],
+  "counts": {"skills": 34, "roles": 6, "mcp": 2, "hooks": 2, "crons": 19},
+  "harnesses": {"synced": 9, "needs_sync": [], "broken": []},
+  "jobs": [],
+  "machines": [],
+  "checked_at": "2026-11-28T10:20:00Z"
+}
+```
+
+- `level` is `ok`, `warn` or `fail`, and `title` is the headline the dash draws, such as `All clear` or `1 failing, 5 need attention`. `failing` and `attention` are the two numbers in it. A part that could not be collected counts as the dash counts it: as needing attention, with a note that says which. `notes` are the sentences under the headline, as plain text.
+- `counts` are the numbers in the counts strip. One that could not be read is `null`.
+- `harnesses` is how many harnesses are in sync, and the names of those that need a sync and of those that are broken (a conflict or a config that could not be read). A harness that is not installed is left out.
+- `jobs` lists only the jobs that fail or whose last run failed (`health` is `fail` or `warn`), in the order of the dash's list. Each has `host`, `source`, `id`, `name`, `health`, `last_run` and `result`. `name` and `result` are what the list shows. `last_run` is the time the scan reports, or an empty string when it is unknown.
+- `machines` has one entry for each machine, with `host`, `health` and `summary` as the dash's machine block shows them, when `crons.hosts` names more than this one. Otherwise it is empty.
+- `checked_at` is the time of the collection, in UTC.
 
 ## tmux
 
