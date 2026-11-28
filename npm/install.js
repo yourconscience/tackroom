@@ -125,7 +125,7 @@ if (require.main === module) {
     })
     .catch((error) => {
       console.error(`tackroom postinstall failed: ${error.message}`);
-      console.error("Install with brew install yourconscience/tap/tackroom instead; see the README.");
+      console.error("Install with the curl script or brew install yourconscience/tap/tackroom instead; see the README.");
       process.exit(1);
     });
 }
