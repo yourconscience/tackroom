@@ -112,12 +112,18 @@ chmod +x "${INSTALL_DIR}/${BINARY}"
 echo ""
 echo "${BINARY} ${VERSION} installed to ${INSTALL_DIR}/${BINARY}"
 
-# PATH hint if needed
+# PATH hint if needed; the next command uses the full path until it is on PATH
+NEXT="${BINARY}"
 case ":$PATH:" in
   *":${INSTALL_DIR}:"*) ;;
   *)
     echo ""
     echo "Add ${INSTALL_DIR} to your PATH:"
     echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+    NEXT="${INSTALL_DIR}/${BINARY}"
     ;;
 esac
+
+echo ""
+echo "Next, run:"
+echo "  ${NEXT} setup"

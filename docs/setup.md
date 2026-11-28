@@ -11,7 +11,17 @@ tackroom setup --dry-run              # what the run would import, whose copy it
 
 ## Set up your first machine
 
-Install tackroom, then run `tackroom setup`. It ends with a short summary: the agents it found, what it imported, which copy it kept where copies differed, where the backups are, and either `Everything is synced.` or what needs you, each with the command that fixes it.
+Install tackroom with the install script, npm or Homebrew, then run `tackroom setup`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
+npm install -g tackroom
+brew install yourconscience/tap/tackroom
+```
+
+The script downloads the release binary for macOS or Linux (arm64 or x86-64) into `~/.local/bin` (`$TACKROOM_INSTALL_DIR` changes that), checks its sha256 against the release's `checksums.txt`, and ends with the command to run next, with the full path when that folder is not on your `PATH`. To read it before it runs, save it with `curl -fsSL -o install.sh https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh`, read `install.sh`, then run `sh install.sh`. npm and Homebrew install the same release binary. To try setup without installing, `npx tackroom setup --dry-run` shows what it would import and changes nothing.
+
+`setup` ends with a short summary: the agents it found, what it imported, which copy it kept where copies differed, where the backups are, and either `Everything is synced.` or what needs you, each with the command that fixes it.
 
 Every native file it replaces is backed up first, so `tackroom restore latest` puts them all back. Each step is described in [What setup does](#what-setup-does).
 
@@ -187,6 +197,8 @@ tackroom cron --remove
 
 Without the job, edited root instruction files reach Codex, Pi and OMP only on a manual `tackroom sync`.
 
+A tackroom run through `npx`, `pnpm dlx` or `bunx` is a temporary copy in the package runner's cache, which the runner can clear and leave the job pointing at nothing. From such a copy `setup` skips the job and says so in its summary, and `tackroom cron` fails with the same explanation. Run `tackroom cron` after a real install.
+
 While the job is missing, paused, broken or its last run failed, `status` prints a warning and `doctor` has a `periodic sync` check. `setup --no-cron` records `periodic_sync: false` in `tackroom.local.yaml`, which silences that warning; installing the job again clears it. [crons.md](crons.md#built-in-jobs) describes the job.
 
 ## Upgrade
@@ -194,10 +206,13 @@ While the job is missing, paused, broken or its last run failed, `status` prints
 Install the new release with the tool you installed tackroom with, then check the version:
 
 ```bash
-brew upgrade yourconscience/tap/tackroom   # installed with Homebrew
+curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh   # installed with the script
 npm install -g tackroom                    # installed with npm
+brew upgrade yourconscience/tap/tackroom   # installed with Homebrew
 tackroom version
 ```
+
+The script installs the latest release over the binary in `~/.local/bin`, or in `$TACKROOM_INSTALL_DIR` when you set it, so set it again if you did the first time.
 
 Do this on every machine that shares your config root. `tackroom hosts` shows the tackroom version of each machine in `crons.hosts` and warns about one that runs an older tackroom than this machine ([Check health](commands.md#check-health)).
 
