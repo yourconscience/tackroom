@@ -303,6 +303,9 @@ func setupPeriodicSync(opts runOptions, configPath, repoRoot, home string, summa
 		return "Periodic sync (tackroom pull) was already installed", false
 	}
 	if err := installPeriodicSync(cronOptions{runOptions: opts}); err != nil {
+		if errors.Is(err, errTemporaryCopy) {
+			return "Periodic sync was skipped: " + err.Error(), false
+		}
 		summary.problem("periodic sync was not installed: %v. Fix: tackroom cron", err)
 		return "", false
 	}
@@ -502,6 +505,18 @@ const (
 	cronIntervalWeekly  = "weekly"
 )
 
+// errTemporaryCopy means the tackroom that would run the job lives in a
+// package runner's cache (npx, pnpm dlx, bunx), which is cleaned on its own
+// schedule and would leave the job pointing at a missing file.
+var errTemporaryCopy = errors.New("this tackroom runs from a temporary copy (npx, pnpm dlx or bunx), which the job cannot rely on. After a real install, run: tackroom cron")
+
+// packageRunnerCopy reports whether path is inside the cache of a package
+// runner: npm's _npx, pnpm's dlx, or bunx's /tmp/bunx-<uid>-<package> folder.
+func packageRunnerCopy(path string) bool {
+	path = filepath.ToSlash(path)
+	return strings.Contains(path, "/_npx/") || strings.Contains(path, "/pnpm/dlx/") || strings.Contains(path, "/bunx-")
+}
+
 func runCron(opts cronOptions) error {
 	_, home, _, _, err := loadContext(opts.runOptions)
 	if err != nil {
@@ -514,6 +529,10 @@ func runCron(opts cronOptions) error {
 		if err != nil {
 			return fmt.Errorf("locate tackroom executable: %w", err)
 		}
+	}
+	// Removing a job never writes the path, so it works from any copy.
+	if !opts.Remove && packageRunnerCopy(binaryPath) {
+		return errTemporaryCopy
 	}
 
 	// The self-update and dependency jobs are built-in owned jobs: installed
