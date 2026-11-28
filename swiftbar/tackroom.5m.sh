@@ -110,6 +110,10 @@ json=$("$bin" dash --json 2>"$err")
 rc=$?
 if [ "$rc" -ne 0 ]; then
 	reason=$(head -n 1 "$err")
+	# An older tackroom does not know the flag.
+	case "$reason" in
+	*'not defined: -json'*) problem 'This tackroom has no dash --json. It needs tackroom 3.3 or later.' ;;
+	esac
 	problem "tackroom dash --json failed (exit $rc)${reason:+: $reason}"
 fi
 
