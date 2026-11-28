@@ -58,7 +58,7 @@ Root instructions come along too: `~/.agents/AGENTS.md` becomes `CLAUDE.md`, `GE
 
 Claude Code, Codex, Factory Droid, OMP, OpenCode, Pi, Qwen Code, Cursor, Devin, Gemini CLI, GitHub Copilot CLI, Grok Build, DeepSeek Harness, Antigravity CLI, Kimi Code and Amp. What each one gets is in the [capability matrix](https://yourconscience.github.io/tackroom/docs/harnesses/).
 
-Terminals: [`tackroom dash`](https://yourconscience.github.io/tackroom/docs/terminals/#dash), a live screen for a terminal pane with the sync state and the scheduled jobs, which the workspaces and the Rex panel below open; a `tackroom tmux` workspace for [tmux](https://yourconscience.github.io/tackroom/docs/terminals/#tmux), a `tackroom zellij` workspace for [zellij](https://yourconscience.github.io/tackroom/docs/terminals/#zellij), a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/terminals/#herdr-panel) (one line to your agent from Herdr's mod gallery), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/terminals/#tern), and a `tackroom rex` panel with a palette action for [Rex](https://yourconscience.github.io/tackroom/docs/terminals/#rex). A recipe for [cmux](https://yourconscience.github.io/tackroom/docs/terminals/#cmux) is on the same page.
+Terminals: [`tackroom dash`](https://yourconscience.github.io/tackroom/docs/terminals/#dash), a live screen for a terminal pane with the sync state and the scheduled jobs, which the workspaces and the Rex panel below open; a `tackroom tmux` workspace for [tmux](https://yourconscience.github.io/tackroom/docs/terminals/#tmux), a `tackroom zellij` workspace for [zellij](https://yourconscience.github.io/tackroom/docs/terminals/#zellij), a panel for [Herdr](https://yourconscience.github.io/tackroom/docs/terminals/#herdr-panel) (one line to your agent from Herdr's mod gallery), a crons panel and a `tackroom tern` workspace for [Tern](https://yourconscience.github.io/tackroom/docs/terminals/#tern), and a `tackroom rex` panel with a palette action for [Rex](https://yourconscience.github.io/tackroom/docs/terminals/#rex). A recipe for [cmux](https://yourconscience.github.io/tackroom/docs/terminals/#cmux) and a menu bar item for [SwiftBar](https://yourconscience.github.io/tackroom/docs/terminals/#menu-bar) that reads `tackroom dash --json` are on the same page.
 
 ## Docs
 
@@ -73,7 +73,7 @@ Terminals: [`tackroom dash`](https://yourconscience.github.io/tackroom/docs/term
 - [Memory](https://yourconscience.github.io/tackroom/docs/memory/): a memory file in every harness, and native memory settings
 - [Crons](https://yourconscience.github.io/tackroom/docs/crons/): every scheduled job, here and over SSH
 - [Web view](https://yourconscience.github.io/tackroom/docs/view/): the dashboard, on a desktop or a phone
-- [Terminals](https://yourconscience.github.io/tackroom/docs/terminals/): tmux, zellij, Herdr, Tern, Rex and cmux
+- [Terminals](https://yourconscience.github.io/tackroom/docs/terminals/): tmux, zellij, Herdr, Tern, Rex, cmux and a SwiftBar menu bar item
 - [Comparison](https://yourconscience.github.io/tackroom/docs/comparison/), with [moving from skillshare](https://yourconscience.github.io/tackroom/docs/comparison/#moving-from-skillshare)
 - [Troubleshooting](https://yourconscience.github.io/tackroom/docs/troubleshooting/) and the [release notes](https://yourconscience.github.io/tackroom/docs/upgrading/)
 

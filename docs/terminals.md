@@ -1,6 +1,6 @@
 # Terminals
 
-tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe for cmux. Each integration is optional and calls the same `tackroom` commands you can run in any shell. There are three kinds of integration:
+tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, a recipe for cmux and a menu bar item for SwiftBar. Each integration is optional and calls the same `tackroom` commands you can run in any shell. There are three kinds of integration:
 
 - A panel is tackroom's own interface inside the terminal.
 - A workspace command opens a session in the terminal with a shell and [`tackroom dash`](#dash).
@@ -15,6 +15,7 @@ tackroom has integrations for tmux, zellij, Herdr, Tern and Rex, and a recipe fo
 | <img src="site/marks/tern.png" alt="Tern logo" width="20" height="20"> [Tern](#tern) | crons panel | `tackroom tern` | - |
 | <img src="site/marks/rex.png" alt="Rex logo" width="20" height="20"> [Rex](#rex) | [`tackroom rex`](#rex), a floating `tackroom dash` you show and hide | - | palette actions |
 | [cmux](#cmux) | - | - | `cmux new-workspace`, not run here |
+| [SwiftBar](#menu-bar) | - | - | a [menu bar item](#menu-bar) that reads `tackroom dash --json` |
 
 ## Dash
 
@@ -296,6 +297,25 @@ cmux new-workspace --name tackroom --cwd "$ROOT" --focus true --layout '{"direct
 In cmux's layout, `horizontal` puts the children side by side and `vertical` stacks them. Whether a pane stays open after its command ends, and whether `--cwd` applies to every pane, is not known.
 
 By default cmux accepts commands only from processes started inside cmux, so run this from a cmux terminal. From any other terminal it answers `Access denied - only processes started inside cmux can connect`. That default is the `cmuxOnly` socket mode, and cmux's settings list other modes.
+
+## Menu bar
+
+[SwiftBar](https://github.com/swiftbar/SwiftBar) runs a script every few minutes and shows its output as an item in the macOS menu bar. tackroom has no command for it and does not check for SwiftBar. `swiftbar/tackroom.5m.sh` is a SwiftBar plugin that you copy into SwiftBar's Plugin Folder, and it reads [`tackroom dash --json`](#as-json).
+
+### Shipped
+
+- `swiftbar/tackroom.5m.sh`, a menu bar item that needs tackroom 3.3 or later. Recipe: [`swiftbar/RECIPE.md`](../swiftbar/RECIPE.md).
+  - The item is a mark for the dash's level, a check mark when all is clear, and a warning mark with the number of things that fail or need attention otherwise.
+  - The dropdown has the headline and the sentences under it, one row for each job that fails or whose last run failed, with its host when it is not this machine and its result, then Sync now (`tackroom sync`), Open view (`tackroom view`) and Refresh, and the time of the check.
+  - Under a launchd job, Run now runs `tackroom cron run [--host HOST] ID`, as the dash's Enter does.
+  - SwiftBar starts plugins with a minimal environment, so the script finds `tackroom` in `$TACKROOM_BIN`, `~/.local/bin`, `/opt/homebrew/bin`, `/usr/local/bin` and then `PATH`. It needs only what macOS ships, `plutil` among it, and no `jq`.
+  - When `tackroom` is missing or `dash --json` fails, the dropdown is one line that says so.
+  - The refresh interval is in the file name: rename `tackroom.5m.sh` to change it.
+- Checked against a stub `tackroom` on macOS 27.2.1, with ShellCheck. SwiftBar itself was not run, so the menu has not been seen drawn.
+
+### Constraint
+
+SwiftBar plugins are scripts that print a menu. Integration goes through `tackroom dash --json` and `tackroom` CLI verbs, and tackroom never edits SwiftBar's settings.
 
 ## Other terminals
 
