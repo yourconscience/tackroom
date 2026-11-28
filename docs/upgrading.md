@@ -7,6 +7,7 @@ What changed in each release since 2.0, newest first, with what to do on every m
 Nothing to migrate by hand.
 
 - New: `tackroom dash --json` prints the answer the dash shows once, as JSON on stdout, and exits. It needs no terminal, so a script or a menu bar item can run it. The document has the dash's level and headline, the two numbers behind it, the sentences under it, the counts, the harnesses that need a sync or are broken, the jobs that fail or whose last run failed, and the machines in `crons.hosts`. `tackroom dash` is unchanged, and its error without a terminal now names `tackroom dash --json`. See [terminals.md](terminals.md#as-json).
+- New: a menu bar item for macOS, a [SwiftBar](https://github.com/swiftbar/SwiftBar) plugin in `swiftbar/`. Copy `swiftbar/tackroom.5m.sh` into SwiftBar's Plugin Folder and make it executable. The item shows a mark for the dash's level, with the number of things that fail or need attention, and a dropdown with the headline, the notes, the jobs that fail, Run now for launchd jobs, Sync now, Open view and Refresh. It needs tackroom 3.3 or later for `tackroom dash --json`. See [terminals.md](terminals.md#menu-bar).
 
 ## To 3.2.2
 

@@ -85,7 +85,7 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 
 | Command | What it does |
 |---|---|
-| `tackroom dash` | A live screen for a terminal pane: sync state and crons, with Run now, Pause, Resume and Sync. `--json` prints the answer once and needs no terminal. See [terminals.md](terminals.md#dash). |
+| `tackroom dash` | A live screen for a terminal pane: sync state and crons, with Run now, Pause, Resume and Sync. `--json` prints the answer once and needs no terminal; the SwiftBar [menu bar item](terminals.md#menu-bar) reads it. See [terminals.md](terminals.md#dash). |
 | `tackroom tmux` | Opens a tackroom workspace in tmux. See [terminals.md](terminals.md#tmux). |
 | `tackroom zellij` | Opens a tackroom workspace in zellij. See [terminals.md](terminals.md#zellij). |
 | `tackroom tern` | Opens a tackroom workspace in the Tern terminal. See [terminals.md](terminals.md#tern). |
