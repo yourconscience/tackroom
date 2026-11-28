@@ -1,6 +1,6 @@
 #!/bin/sh
 # Install tackroom binary from GitHub Releases.
-# Usage: curl -fsSL https://raw.githubusercontent.com/yourconscience/tackroom/main/scripts/install.sh | sh
+# Usage: curl -fsSL https://github.com/yourconscience/tackroom/releases/latest/download/install.sh | sh
 
 set -e
 
@@ -97,7 +97,8 @@ elif command -v shasum >/dev/null 2>&1; then
     exit 1
   fi
 else
-  echo "warning: no sha256sum or shasum found; skipping checksum verification" >&2
+  echo "error: sha256sum or shasum is required to verify the download" >&2
+  exit 1
 fi
 
 # Extract binary
@@ -112,12 +113,29 @@ chmod +x "${INSTALL_DIR}/${BINARY}"
 echo ""
 echo "${BINARY} ${VERSION} installed to ${INSTALL_DIR}/${BINARY}"
 
-# PATH hint if needed
-case ":$PATH:" in
-  *":${INSTALL_DIR}:"*) ;;
-  *)
+# The next command is the bare name only when that name runs this install.
+# The full path is printed in single quotes, with any single quote inside it
+# escaped, so the line can be pasted whatever the folder is called.
+NEXT="'$(printf '%s' "${INSTALL_DIR}/${BINARY}" | sed "s/'/'\\\\''/g")'"
+FOUND="$(command -v "${BINARY}" 2>/dev/null || true)"
+if [ "$FOUND" = "${INSTALL_DIR}/${BINARY}" ]; then
+  NEXT="${BINARY}"
+else
+  case ":$PATH:" in
+    *":${INSTALL_DIR}:"*) ;;
+    *)
+      echo ""
+      echo "Add ${INSTALL_DIR} to your PATH:"
+      echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
+      ;;
+  esac
+  if [ -n "$FOUND" ]; then
     echo ""
-    echo "Add ${INSTALL_DIR} to your PATH:"
-    echo "  export PATH=\"${INSTALL_DIR}:\$PATH\""
-    ;;
-esac
+    echo "Another ${BINARY} comes first on your PATH: ${FOUND}"
+    echo "Until ${INSTALL_DIR} comes before it, the periodic sync job runs that one."
+  fi
+fi
+
+echo ""
+echo "Next, run:"
+printf '  %s setup\n' "$NEXT"

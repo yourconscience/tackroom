@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -299,10 +300,15 @@ func setupPeriodicSync(opts runOptions, configPath, repoRoot, home string, summa
 	// Setup is the one place besides `tackroom cron` that installs the job.
 	// A scheduler that cannot take it must not fail the setup. An installed
 	// job is left alone, so a chosen --interval survives.
-	if job, _ := readPeriodicSync(); job != nil {
+	// A job an earlier npx, pnpm dlx or bunx run left behind runs a copy
+	// that its cache can drop, so it does not count as installed.
+	if job, _ := readPeriodicSync(); job != nil && !packageRunnerCopy(job.Command) {
 		return "Periodic sync (tackroom pull) was already installed", false
 	}
 	if err := installPeriodicSync(cronOptions{runOptions: opts}); err != nil {
+		if errors.Is(err, errTemporaryCopy) {
+			return "Periodic sync was skipped: " + err.Error(), false
+		}
 		summary.problem("periodic sync was not installed: %v. Fix: tackroom cron", err)
 		return "", false
 	}
@@ -502,18 +508,49 @@ const (
 	cronIntervalWeekly  = "weekly"
 )
 
+// errTemporaryCopy means the tackroom that would run the job lives in a
+// package runner's cache (npx, pnpm dlx, bunx), which is cleaned on its own
+// schedule and would leave the job pointing at a missing file.
+var errTemporaryCopy = errors.New("this tackroom runs from a temporary copy (npx, pnpm dlx or bunx), which the job cannot rely on. After a real install, run: tackroom cron")
+
+// packageRunnerCache matches a path inside the cache of a package runner:
+// npm's _npx/<hash>, pnpm's dlx/<hash>/<id> under whatever cache-dir is set,
+// or bunx's bunx-<uid>-<package> folder, each followed by node_modules.
+var packageRunnerCache = regexp.MustCompile(`/(_npx/[^/]+|dlx/[^/]+(/[^/]+)?|bunx-[^/]+)/node_modules/`)
+
+// packageRunnerCopy reports whether path, or a command line that starts with
+// it, runs from a package runner's cache.
+func packageRunnerCopy(path string) bool {
+	return packageRunnerCache.MatchString(filepath.ToSlash(path))
+}
+
+// cronBinaryPath is the tackroom a scheduled job runs: the one on PATH, else
+// this executable.
+func cronBinaryPath() (string, error) {
+	path, err := exec.LookPath("tackroom")
+	if err == nil {
+		return path, nil
+	}
+	path, err = os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("locate tackroom executable: %w", err)
+	}
+	return path, nil
+}
+
 func runCron(opts cronOptions) error {
 	_, home, _, _, err := loadContext(opts.runOptions)
 	if err != nil {
 		return err
 	}
 
-	binaryPath, err := exec.LookPath("tackroom")
+	binaryPath, err := cronBinaryPath()
 	if err != nil {
-		binaryPath, err = os.Executable()
-		if err != nil {
-			return fmt.Errorf("locate tackroom executable: %w", err)
-		}
+		return err
+	}
+	// Removing a job never writes the path, so it works from any copy.
+	if !opts.Remove && packageRunnerCopy(binaryPath) {
+		return errTemporaryCopy
 	}
 
 	// The self-update and dependency jobs are built-in owned jobs: installed

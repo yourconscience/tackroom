@@ -97,22 +97,25 @@ async function install(options = {}) {
 
   const binDir = path.join(__dirname, "bin");
   fs.mkdirSync(binDir, { recursive: true });
-  const tmpArchive = path.join(os.tmpdir(), `${name}.${process.pid}`);
+  const binary = path.join(binDir, "tackroom");
+  // Extract beside the destination and rename into place, so a failed
+  // extraction or a second launcher never leaves or runs a partial binary.
+  const tmpDir = fs.mkdtempSync(path.join(binDir, ".download-"));
+  const tmpArchive = path.join(tmpDir, name);
   try {
     fs.writeFileSync(tmpArchive, archive);
-    const extract = spawnSync("tar", ["-xzf", tmpArchive, "-C", binDir], { stdio: "pipe", encoding: "utf8" });
+    const extract = spawnSync("tar", ["-xzf", tmpArchive, "-C", tmpDir, "tackroom"], { stdio: "pipe", encoding: "utf8" });
     if (extract.error) {
       throw extract.error;
     }
     if (extract.status !== 0) {
       throw new Error(`tar exited ${extract.status}: ${extract.stderr}`);
     }
+    fs.chmodSync(path.join(tmpDir, "tackroom"), 0o755);
+    fs.renameSync(path.join(tmpDir, "tackroom"), binary);
   } finally {
-    fs.rmSync(tmpArchive, { force: true });
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   }
-
-  const binary = path.join(binDir, "tackroom");
-  fs.chmodSync(binary, 0o755);
   return binary;
 }
 
@@ -125,7 +128,7 @@ if (require.main === module) {
     })
     .catch((error) => {
       console.error(`tackroom postinstall failed: ${error.message}`);
-      console.error("Install with brew install yourconscience/tap/tackroom instead; see the README.");
+      console.error("Install with the curl script or brew install yourconscience/tap/tackroom instead; see the README.");
       process.exit(1);
     });
 }

@@ -135,7 +135,7 @@ func runHostsSetup(args []string) error {
 	}
 	if h.bin == "" {
 		if !*install {
-			return fmt.Errorf("tackroom is not installed on %s. Install it there with one of\n  brew install yourconscience/tap/tackroom\n  npm install -g tackroom\nor run this again with --install", host)
+			return fmt.Errorf("tackroom is not installed on %s. Install it there with one of\n  curl -fsSL https://github.com/yourconscience/tackroom/releases/latest/download/install.sh | sh\n  npm install -g tackroom\n  brew install yourconscience/tap/tackroom\nor run this again with --install", host)
 		}
 		var with string
 		var argv []string

@@ -165,8 +165,8 @@ All seven are in [crons.md](crons.md). The hosts in `crons.hosts` are also the m
 `tackroom hosts setup HOST [--from GIT_URL] [--overlay NAME] [--no-cron] [--install] [--dry-run]` sets up a machine that has no tackroom config yet: it runs `tackroom setup --from GIT_URL` there over SSH, with `--overlay` and `--no-cron` passed through.
 
 - `--from` defaults to the `origin` remote of this machine's config root.
-- It finds tackroom on the host as `hosts` does (PATH, then `~/.local/bin`, `~/go/bin`, `/opt/homebrew/bin` and `/usr/local/bin`). Without one it stops with the two install commands.
-- With `--install` it runs `brew install yourconscience/tap/tackroom`, or `npm install -g tackroom` when the host has npm and no brew.
+- It finds tackroom on the host as `hosts` does (PATH, then `~/.local/bin`, `~/go/bin`, `/opt/homebrew/bin` and `/usr/local/bin`). Without one it stops with the three install commands: the install script, npm and Homebrew.
+- With `--install` it runs `brew install yourconscience/tap/tackroom`, or `npm install -g tackroom` when the host has npm and no brew. It does not use the install script: a host with neither needs it run there by hand.
 - A host that already has a `tackroom.yaml` is left alone: use `hosts fix`.
 - Afterwards it prints the host's row and, when the host is not in `crons.hosts`, the lines to add to `tackroom.local.yaml`.
 - `--dry-run` runs only the read-only probe on the host and prints the commands.

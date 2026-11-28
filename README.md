@@ -14,10 +14,12 @@ One repo for everything your coding agents read, including the parts that never 
 ## Install and set up
 
 ```bash
-brew install yourconscience/tap/tackroom && tackroom setup
+curl -fsSL https://github.com/yourconscience/tackroom/releases/latest/download/install.sh | sh
 ```
 
-With npm: `npm install -g tackroom && tackroom setup`. Both install the same checksum-verified binary for macOS or Linux, arm64 or x86-64.
+Then run the command the script prints last, `tackroom setup`. The script is a file of the latest release, so a change on the main branch reaches it only with a release. It downloads the release binary for macOS or Linux (arm64 or x86-64) into `~/.local/bin` (`$TACKROOM_INSTALL_DIR` changes that) and checks its sha256 against the release's `checksums.txt`. If that folder is not on your `PATH`, or another `tackroom` comes before it there, the printed command uses the full path. To read the script before it runs, save it with `curl -fsSL -o install.sh https://github.com/yourconscience/tackroom/releases/latest/download/install.sh`, read `install.sh`, then run `sh install.sh`.
+
+With npm: `npm install -g tackroom && tackroom setup`. With Homebrew: `brew install yourconscience/tap/tackroom && tackroom setup`. All three install the same release binary. To try it without installing, `npx tackroom setup --dry-run` shows what setup would import and changes nothing.
 
 `setup` asks nothing. It creates `~/.agents`, finds the agents you have, copies in their skills, MCP servers and roles, runs the first sync and prints a short summary. A native file that differs from the shared copy is backed up before it is replaced. `tackroom setup --review` asks before each step instead. On another machine, run `tackroom setup --from <your config repo url>`.
 
