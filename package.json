@@ -1,6 +1,6 @@
 {
   "name": "tackroom-pi",
-  "version": "3.2.1",
+  "version": "3.2.2",
   "private": true,
   "description": "tackroom in Pi: sync status and scheduled jobs behind /tackroom. Installed with pi install, not npm; the npm wrapper for the CLI is in npm/.",
   "license": "MIT",
